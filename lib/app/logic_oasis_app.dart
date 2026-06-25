@@ -40,7 +40,9 @@ class _LogicOasisAppState extends State<LogicOasisApp> {
           ),
           _EntryStage.login => LoginPage(
             key: const ValueKey('login'),
-            onLogin: () => moveTo(_EntryStage.intro),
+            onLogin: (isNewRegistration) {
+              moveTo(isNewRegistration ? _EntryStage.intro : _EntryStage.home);
+            },
           ),
           _EntryStage.intro => PlotIntroPage(
             key: const ValueKey('intro'),
@@ -49,6 +51,10 @@ class _LogicOasisAppState extends State<LogicOasisApp> {
           _EntryStage.home => LogicOasisShell(
             key: const ValueKey('home'),
             state: appState,
+            onLogout: () {
+              appState.changeTab(0);
+              moveTo(_EntryStage.login);
+            },
           ),
         },
       ),

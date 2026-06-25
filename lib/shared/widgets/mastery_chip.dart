@@ -16,18 +16,17 @@ class MasteryChip extends StatelessWidget {
     };
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
+        color: color.withValues(alpha: 0.13),
         borderRadius: BorderRadius.circular(99),
-        border: Border.all(color: color.withValues(alpha: 0.35)),
       ),
       child: Text(
         label,
         style: TextStyle(
           color: color,
-          fontWeight: FontWeight.w700,
-          fontSize: 11,
+          fontWeight: FontWeight.w800,
+          fontSize: 12.5,
           height: 1,
         ),
       ),

@@ -24,20 +24,20 @@ class TopicCard extends StatelessWidget {
 
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(13),
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Container(
-              width: 50,
-              height: 50,
+              width: 58,
+              height: 58,
               decoration: BoxDecoration(
                 color: style.color.withValues(alpha: 0.13),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: Icon(style.icon, color: style.color, size: 28),
+              child: Icon(style.icon, color: style.color, size: 32),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -55,14 +55,14 @@ class TopicCard extends StatelessWidget {
                       MasteryChip(label: topic.mastery),
                     ],
                   ),
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 4),
                   Text(
                     topic.area,
                     style: theme.textTheme.bodyMedium,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 13),
+                  const SizedBox(height: 16),
                   Row(
                     children: [
                       Expanded(
@@ -82,23 +82,28 @@ class TopicCard extends StatelessWidget {
                         child: Text(
                           '$progress%',
                           textAlign: TextAlign.right,
-                          style: theme.textTheme.bodyMedium,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: LogicOasisTheme.ink,
+                            fontSize: 12.5,
+                          ),
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 12),
                       SizedBox(
-                        width: 102,
+                        width: 116,
                         child: FilledButton(
                           onPressed: onStart,
                           style: FilledButton.styleFrom(
                             backgroundColor: isLocked
                                 ? const Color(0xFFE6E6E6)
-                                : LogicOasisTheme.leaf,
+                                : LogicOasisTheme.deepLeaf,
                             foregroundColor: isLocked
                                 ? const Color(0xFF696969)
                                 : Colors.white,
-                            minimumSize: const Size.fromHeight(40),
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            disabledBackgroundColor: const Color(0xFFE6E6E6),
+                            disabledForegroundColor: const Color(0xFF696969),
+                            minimumSize: const Size.fromHeight(42),
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
                           ),
                           child: FittedBox(
                             fit: BoxFit.scaleDown,

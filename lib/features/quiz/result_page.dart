@@ -11,14 +11,14 @@ class ResultPage extends StatelessWidget {
     required this.totalQuestions,
     required this.topicArea,
     required this.reward,
-    required this.onViewParentDashboard,
+    required this.onBackToForge,
   });
 
   final int correctCount;
   final int totalQuestions;
   final String topicArea;
   final QuizReward reward;
-  final VoidCallback onViewParentDashboard;
+  final VoidCallback onBackToForge;
 
   @override
   Widget build(BuildContext context) {
@@ -27,61 +27,58 @@ class ResultPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Quiz Result')),
       body: SafeArea(
-        child: Padding(
+        child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('$topicArea restored', style: theme.textTheme.headlineLarge),
-              const SizedBox(height: 10),
-              Text(
-                'You answered $correctCount of $totalQuestions correctly.',
-                style: theme.textTheme.bodyLarge,
+          children: [
+            Text('$topicArea restored', style: theme.textTheme.headlineLarge),
+            const SizedBox(height: 10),
+            Text(
+              'You answered $correctCount of $totalQuestions correctly.',
+              style: theme.textTheme.bodyLarge,
+            ),
+            const SizedBox(height: 18),
+            SectionCard(
+              title: 'Score',
+              icon: Icons.emoji_events_outlined,
+              child: Text(
+                '${reward.score}%',
+                style: theme.textTheme.headlineLarge,
               ),
-              const SizedBox(height: 18),
-              SectionCard(
-                title: 'Score',
-                icon: Icons.emoji_events_outlined,
-                child: Text(
-                  '${reward.score}%',
-                  style: theme.textTheme.headlineLarge,
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: _RewardTile(
+                    icon: Icons.diamond_outlined,
+                    label: 'Crystals',
+                    value: '+${reward.earnedCrystals}',
+                    color: LogicOasisTheme.water,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: _RewardTile(
-                      icon: Icons.diamond_outlined,
-                      label: 'Crystals',
-                      value: '+${reward.earnedCrystals}',
-                      color: LogicOasisTheme.water,
-                    ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: _RewardTile(
+                    icon: Icons.construction_outlined,
+                    label: 'Repair Ready',
+                    value: 'Home',
+                    color: LogicOasisTheme.clay,
                   ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: _RewardTile(
-                      icon: Icons.construction_outlined,
-                      label: 'Repair Ready',
-                      value: 'Home',
-                      color: LogicOasisTheme.clay,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              RecommendationBox(
-                text:
-                    '${reward.encouragement} Mastery: ${reward.previousMastery} -> ${reward.newMastery}. Spend crystals on Home to choose what to repair.',
-              ),
-              const Spacer(),
-              FilledButton.icon(
-                onPressed: onViewParentDashboard,
-                icon: const Icon(Icons.settings),
-                label: const Text('Open Setting'),
-              ),
-            ],
-          ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            RecommendationBox(
+              text:
+                  '${reward.encouragement} Mastery: ${reward.previousMastery} -> ${reward.newMastery}. Spend crystals on Home to choose what to repair.',
+            ),
+            const SizedBox(height: 22),
+            FilledButton.icon(
+              onPressed: onBackToForge,
+              icon: const Icon(Icons.calculate_outlined),
+              label: const Text('Back to Forge'),
+            ),
+          ],
         ),
       ),
     );

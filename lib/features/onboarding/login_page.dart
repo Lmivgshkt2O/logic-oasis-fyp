@@ -5,7 +5,7 @@ import 'package:logic_oasis/shared/widgets/recommendation_box.dart';
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key, required this.onLogin});
 
-  final VoidCallback onLogin;
+  final ValueChanged<bool> onLogin;
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -100,9 +100,15 @@ class _LoginPageState extends State<LoginPage> {
             ),
             const SizedBox(height: 8),
             FilledButton.icon(
-              onPressed: widget.onLogin,
+              onPressed: () => widget.onLogin(false),
               icon: const Icon(Icons.login),
               label: const Text('Continue as Student'),
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: () => widget.onLogin(true),
+              icon: const Icon(Icons.person_add_alt_1_outlined),
+              label: const Text('Create new student profile'),
             ),
             const SizedBox(height: 18),
             const RecommendationBox(

@@ -14,24 +14,24 @@ class FormulaForgePage extends StatelessWidget {
     final theme = Theme.of(context);
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 18),
       children: [
         Row(
           children: [
             Container(
-              width: 58,
-              height: 58,
+              width: 68,
+              height: 68,
               decoration: BoxDecoration(
                 color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(18),
               ),
               child: Icon(
                 Icons.calculate_outlined,
                 color: theme.colorScheme.primary,
-                size: 30,
+                size: 34,
               ),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -40,7 +40,7 @@ class FormulaForgePage extends StatelessWidget {
                     state.t('Formula Forge', 'Latihan Formula'),
                     style: theme.textTheme.headlineLarge,
                   ),
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 5),
                   Text(
                     state.t(
                       'Choose a topic and practise calmly.',
@@ -77,9 +77,9 @@ class FormulaForgePage extends StatelessWidget {
                             totalQuestions: topic.questions.length,
                             topicArea: topic.area,
                             reward: reward,
-                            onViewParentDashboard: () {
+                            onBackToForge: () {
                               Navigator.of(context).pop();
-                              state.changeTab(2);
+                              state.changeTab(1);
                             },
                           ),
                         ),
@@ -87,7 +87,7 @@ class FormulaForgePage extends StatelessWidget {
                     }
                   },
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 13),
         ],
       ],
     );

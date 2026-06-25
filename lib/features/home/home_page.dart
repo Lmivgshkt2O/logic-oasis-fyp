@@ -14,7 +14,7 @@ class HomePage extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(18),
         child: Stack(
@@ -80,7 +80,7 @@ class HomePage extends StatelessWidget {
             Positioned(
               left: 12,
               right: 12,
-              bottom: 16,
+              bottom: 18,
               child: _RecommendedMissionCard(
                 mission: state.recommendedMission,
                 isBahasaMelayu: state.isBahasaMelayu,
@@ -180,23 +180,25 @@ class _RecommendedMissionCard extends StatelessWidget {
 
     return Card(
       color: Colors.white.withValues(alpha: 0.92),
+      elevation: 2,
+      shadowColor: const Color(0x1A5C8069),
       child: InkWell(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(14),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(13),
+          padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
           child: Row(
             children: [
               Container(
-                width: 48,
-                height: 48,
+                width: 52,
+                height: 52,
                 decoration: BoxDecoration(
                   color: LogicOasisTheme.mint,
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(13),
                 ),
-                child: Icon(icon, color: LogicOasisTheme.leaf),
+                child: Icon(icon, color: LogicOasisTheme.leaf, size: 28),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -204,14 +206,19 @@ class _RecommendedMissionCard extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: theme.textTheme.titleMedium,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontSize: 15.5,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 5),
                     Text(
                       subtitle,
-                      style: theme.textTheme.bodyLarge,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        color: LogicOasisTheme.ink,
+                        fontSize: 15,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -222,16 +229,16 @@ class _RecommendedMissionCard extends StatelessWidget {
               const Icon(
                 Icons.diamond_outlined,
                 color: LogicOasisTheme.water,
-                size: 20,
+                size: 21,
               ),
               const SizedBox(width: 3),
               Text(rewardText, style: theme.textTheme.titleMedium),
-              const SizedBox(width: 6),
+              const SizedBox(width: 7),
               Icon(
                 mission.isReadyToClaim
                     ? Icons.touch_app_outlined
                     : Icons.chevron_right,
-                size: 20,
+                size: 21,
               ),
             ],
           ),
