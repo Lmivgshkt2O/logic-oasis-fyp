@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/features/formula_forge/formula_forge_page.dart';
 import 'package:logic_oasis/features/home/home_page.dart';
 import 'package:logic_oasis/features/settings/settings_page.dart';
+import 'package:logic_oasis/l10n/app_localizations.dart';
 import 'package:logic_oasis/shared/state/app_state.dart';
 
 class LogicOasisShell extends StatefulWidget {
@@ -10,21 +13,76 @@ class LogicOasisShell extends StatefulWidget {
     super.key,
     required this.state,
     required this.onLogout,
+    this.welcomeStudentName,
   });
 
   final AppState state;
   final VoidCallback onLogout;
+  final String? welcomeStudentName;
 
   @override
   State<LogicOasisShell> createState() => _LogicOasisShellState();
 }
 
 class _LogicOasisShellState extends State<LogicOasisShell> {
+  Timer? welcomeTimer;
+  bool showWelcome = false;
+
+  @override
+  void initState() {
+    super.initState();
+    showWelcomeMessage();
+  }
+
+  @override
+  void didUpdateWidget(covariant LogicOasisShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.welcomeStudentName != widget.welcomeStudentName) {
+      showWelcomeMessage();
+    }
+  }
+
+  @override
+  void dispose() {
+    welcomeTimer?.cancel();
+    super.dispose();
+  }
+
+  void showWelcomeMessage() {
+    welcomeTimer?.cancel();
+    if (widget.welcomeStudentName == null ||
+        widget.welcomeStudentName!.trim().isEmpty) {
+      if (mounted) {
+        setState(() {
+          showWelcome = false;
+        });
+      } else {
+        showWelcome = false;
+      }
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        showWelcome = true;
+      });
+    } else {
+      showWelcome = true;
+    }
+    welcomeTimer = Timer(const Duration(seconds: 3), () {
+      if (!mounted) return;
+      setState(() {
+        showWelcome = false;
+      });
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: widget.state,
       builder: (context, _) {
+        final l10n = AppLocalizations.of(context)!;
         final pages = [
           HomePage(state: widget.state),
           FormulaForgePage(state: widget.state),
@@ -36,7 +94,21 @@ class _LogicOasisShellState extends State<LogicOasisShell> {
               ? LogicOasisTheme.eyeComfort()
               : LogicOasisTheme.light(),
           child: Scaffold(
-            body: SafeArea(child: pages[widget.state.selectedTab]),
+            body: SafeArea(
+              child: Stack(
+                children: [
+                  pages[widget.state.selectedTab],
+                  if (showWelcome && widget.state.selectedTab == 0)
+                    Positioned(
+                      top: 18,
+                      right: 78,
+                      child: _WelcomeToast(
+                        studentName: widget.welcomeStudentName!.trim(),
+                      ),
+                    ),
+                ],
+              ),
+            ),
             bottomNavigationBar: _LogicOasisBottomNav(
               selectedIndex: widget.state.selectedTab,
               onSelected: widget.state.changeTab,
@@ -44,23 +116,77 @@ class _LogicOasisShellState extends State<LogicOasisShell> {
                 _NavItem(
                   icon: Icons.home_outlined,
                   selectedIcon: Icons.home,
-                  label: widget.state.t('Home', 'Laman'),
+                  label: l10n.home,
                 ),
                 _NavItem(
                   icon: Icons.calculate_outlined,
                   selectedIcon: Icons.calculate,
-                  label: widget.state.t('Forge', 'Latihan'),
+                  label: l10n.forge,
                 ),
                 _NavItem(
                   icon: Icons.settings_outlined,
                   selectedIcon: Icons.settings,
-                  label: widget.state.t('Settings', 'Tetapan'),
+                  label: l10n.settings,
                 ),
               ],
             ),
           ),
         );
       },
+    );
+  }
+}
+
+class _WelcomeToast extends StatelessWidget {
+  const _WelcomeToast({required this.studentName});
+
+  final String studentName;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Material(
+      color: Colors.transparent,
+      child: AnimatedOpacity(
+        opacity: 1,
+        duration: const Duration(milliseconds: 180),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 220),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.94),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE7EDE8)),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x1A5C8069),
+                blurRadius: 18,
+                offset: Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.waving_hand_outlined,
+                color: LogicOasisTheme.leaf,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  'Welcome back, $studentName',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleMedium?.copyWith(fontSize: 13.5),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -81,12 +207,12 @@ class _LogicOasisBottomNav extends StatelessWidget {
     return SafeArea(
       top: false,
       child: Container(
-        height: 78,
-        margin: const EdgeInsets.fromLTRB(14, 0, 14, 8),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
+        height: 82,
+        margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 9),
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.96),
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(17),
           border: Border.all(color: const Color(0xFFE7EDE8)),
           boxShadow: const [
             BoxShadow(
@@ -136,8 +262,8 @@ class _BottomNavButton extends StatelessWidget {
         children: [
           AnimatedContainer(
             duration: const Duration(milliseconds: 180),
-            width: selected ? 42 : 34,
-            height: 26,
+            width: selected ? 44 : 34,
+            height: 28,
             decoration: BoxDecoration(
               color: selected ? LogicOasisTheme.mint : Colors.transparent,
               borderRadius: BorderRadius.circular(99),
@@ -153,7 +279,7 @@ class _BottomNavButton extends StatelessWidget {
             item.label,
             style: TextStyle(
               color: color,
-              fontSize: 11.5,
+              fontSize: 11,
               fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
               height: 1,
             ),

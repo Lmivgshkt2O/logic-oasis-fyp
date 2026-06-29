@@ -1,17 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/features/settings/parent_auth_page.dart';
+import 'package:logic_oasis/features/settings/parent_link_page.dart';
+import 'package:logic_oasis/l10n/app_localizations.dart';
+import 'package:logic_oasis/shared/repositories/auth_repository.dart';
 import 'package:logic_oasis/shared/state/app_state.dart';
 
 class SettingsPage extends StatelessWidget {
-  const SettingsPage({super.key, required this.state, required this.onLogout});
+  const SettingsPage({
+    super.key,
+    required this.state,
+    required this.onLogout,
+    this.authRepository,
+  });
 
   final AppState state;
   final VoidCallback onLogout;
+  final AuthRepository? authRepository;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 18),
@@ -28,15 +38,12 @@ class SettingsPage extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    state.t('Settings', 'Tetapan'),
+                    l10n.settings,
                     style: theme.textTheme.headlineLarge,
                   ),
                   const SizedBox(height: 5),
                   Text(
-                    state.t(
-                      'Manage your profile and preferences.',
-                      'Urus profil dan tetapan aplikasi.',
-                    ),
+                    l10n.manageProfilePreferences,
                     style: theme.textTheme.bodyLarge,
                   ),
                 ],
@@ -48,18 +55,15 @@ class SettingsPage extends StatelessWidget {
         _SettingTile(
           icon: Icons.person,
           iconColor: LogicOasisTheme.leaf,
-          title: state.t('Student Profile', 'Profil Murid'),
-          subtitle: state.t(
-            'View and edit your profile',
-            'Lihat dan edit profil',
-          ),
+          title: l10n.studentProfile,
+          subtitle: l10n.viewEditProfile,
           onTap: () => _showProfileSheet(context),
         ),
         const SizedBox(height: 12),
         _SettingTile(
           icon: Icons.language,
           iconColor: LogicOasisTheme.water,
-          title: state.t('Language', 'Bahasa'),
+          title: l10n.language,
           trailingText: state.language,
           onTap: () => _showLanguageSheet(context),
         ),
@@ -67,20 +71,16 @@ class SettingsPage extends StatelessWidget {
         _SettingTile(
           icon: Icons.notifications,
           iconColor: const Color(0xFFEAB948),
-          title: state.t('Mission Reminders', 'Peringatan Misi'),
-          trailingText: state.missionReminders
-              ? state.t('On', 'Aktif')
-              : state.t('Off', 'Tidak aktif'),
+          title: l10n.missionReminders,
+          trailingText: state.missionReminders ? l10n.on : l10n.off,
           onTap: () => state.updateMissionReminders(!state.missionReminders),
         ),
         const SizedBox(height: 12),
         _SettingTile(
           icon: Icons.visibility,
           iconColor: LogicOasisTheme.leaf,
-          title: state.t('Eye Comfort', 'Selesa Mata'),
-          trailingText: state.eyeComfortMode
-              ? state.t('On', 'Aktif')
-              : state.t('Off', 'Tidak aktif'),
+          title: l10n.eyeComfort,
+          trailingText: state.eyeComfortMode ? l10n.on : l10n.off,
           onTap: () => state.updateEyeComfortMode(!state.eyeComfortMode),
         ),
         const SizedBox(height: 18),
@@ -89,11 +89,8 @@ class SettingsPage extends StatelessWidget {
         _SettingTile(
           icon: Icons.logout,
           iconColor: const Color(0xFFC65D4B),
-          title: state.t('Log out', 'Log keluar'),
-          subtitle: state.t(
-            'Return to the login page',
-            'Kembali ke halaman log masuk',
-          ),
+          title: l10n.logout,
+          subtitle: l10n.returnLogin,
           onTap: () => _confirmLogout(context),
         ),
       ],
@@ -101,25 +98,21 @@ class SettingsPage extends StatelessWidget {
   }
 
   Future<void> _confirmLogout(BuildContext context) async {
+    final l10n = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text(state.t('Confirm to log out?', 'Sahkan log keluar?')),
-          content: Text(
-            state.t(
-              'You will return to the login page.',
-              'Anda akan kembali ke halaman log masuk.',
-            ),
-          ),
+          title: Text(l10n.confirmLogout),
+          content: Text(l10n.logoutConfirmBody),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: Text(state.t('Cancel', 'Batal')),
+              child: Text(l10n.cancel),
             ),
             FilledButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: Text(state.t('Log out', 'Log keluar')),
+              child: Text(l10n.logout),
             ),
           ],
         );
@@ -132,96 +125,26 @@ class SettingsPage extends StatelessWidget {
 
   Future<void> _showProfileSheet(BuildContext context) async {
     final settingsContext = context;
-    final nameController = TextEditingController(text: state.studentName);
-    var selectedYear = state.yearLevel;
-    var saved = false;
-
-    await showModalBottomSheet<void>(
+    final saved = await showModalBottomSheet<bool>(
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
       builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            return SafeArea(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                  20,
-                  4,
-                  20,
-                  MediaQuery.of(context).viewInsets.bottom + 24,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      state.t('Edit student profile', 'Edit profil murid'),
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: nameController,
-                      decoration: InputDecoration(
-                        labelText: state.t('Student name', 'Nama murid'),
-                        prefixIcon: const Icon(Icons.person_outline),
-                        border: const OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    SegmentedButton<int>(
-                      segments: [
-                        ButtonSegment(
-                          value: 4,
-                          label: Text(state.t('Year 4', 'Tahun 4')),
-                        ),
-                        ButtonSegment(
-                          value: 5,
-                          label: Text(state.t('Year 5', 'Tahun 5')),
-                        ),
-                        ButtonSegment(
-                          value: 6,
-                          label: Text(state.t('Year 6', 'Tahun 6')),
-                        ),
-                      ],
-                      selected: {selectedYear},
-                      onSelectionChanged: (selection) {
-                        setSheetState(() {
-                          selectedYear = selection.first;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 18),
-                    FilledButton.icon(
-                      onPressed: () {
-                        state.updateStudentProfile(
-                          name: nameController.text,
-                          year: selectedYear,
-                        );
-                        saved = true;
-                        Navigator.of(context).pop();
-                      },
-                      icon: const Icon(Icons.save_outlined),
-                      label: Text(state.t('Save Profile', 'Simpan Profil')),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
+        return _StudentProfileSheet(
+          state: state,
+          authRepository: authRepository ?? AuthRepository(),
         );
       },
     );
 
-    nameController.dispose();
-
-    if (saved && settingsContext.mounted) {
+    if (saved == true && settingsContext.mounted) {
+      final l10n = AppLocalizations.of(settingsContext)!;
       ScaffoldMessenger.of(settingsContext)
         ..hideCurrentSnackBar()
         ..showSnackBar(
           SnackBar(
             content: Text(
-              state.t('Student profile updated', 'Profil murid dikemas kini'),
+              l10n.studentProfileUpdated,
             ),
           ),
         );
@@ -265,19 +188,185 @@ class SettingsPage extends StatelessWidget {
     if (selected == null) return;
     state.updateLanguage(selected);
     if (!context.mounted) return;
+    final l10n = AppLocalizations.of(context)!;
 
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
           content: Text(
-            state.t(
-              'Language set to $selected',
-              'Bahasa ditukar kepada $selected',
-            ),
+            l10n.languageSet(selected),
           ),
         ),
       );
+  }
+}
+
+class _StudentProfileSheet extends StatefulWidget {
+  const _StudentProfileSheet({
+    required this.state,
+    required this.authRepository,
+  });
+
+  final AppState state;
+  final AuthRepository authRepository;
+
+  @override
+  State<_StudentProfileSheet> createState() => _StudentProfileSheetState();
+}
+
+class _StudentProfileSheetState extends State<_StudentProfileSheet> {
+  late final TextEditingController nameController;
+  late final FocusNode nameFocusNode;
+  late int selectedYear;
+  bool isSaving = false;
+  String? errorText;
+
+  @override
+  void initState() {
+    super.initState();
+    nameController = TextEditingController(text: widget.state.studentName);
+    nameFocusNode = FocusNode();
+    selectedYear = widget.state.yearLevel;
+  }
+
+  @override
+  void dispose() {
+    nameFocusNode.dispose();
+    nameController.dispose();
+    super.dispose();
+  }
+
+  Future<void> saveProfile() async {
+    if (isSaving) return;
+
+    final trimmedName = nameController.text.trim();
+    if (trimmedName.isEmpty) {
+      final l10n = AppLocalizations.of(context)!;
+      setState(() {
+        errorText = l10n.enterStudentName;
+      });
+      return;
+    }
+
+    nameFocusNode.unfocus();
+    setState(() {
+      isSaving = true;
+      errorText = null;
+    });
+
+    try {
+      await widget.authRepository.updateStudentProfile(
+        uid: widget.state.currentStudentId,
+        email: widget.state.currentStudentEmail,
+        displayName: trimmedName,
+        yearLevel: selectedYear,
+      );
+      widget.state.updateStudentProfile(name: trimmedName, year: selectedYear);
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } on AuthFailure catch (error) {
+      if (!mounted) return;
+      setState(() {
+        errorText = error.message;
+        isSaving = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        errorText = AppLocalizations.of(context)!.updateStudentProfileFailed;
+        isSaving = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          4,
+          20,
+          MediaQuery.of(context).viewInsets.bottom + 24,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              l10n.editStudentProfile,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: nameController,
+              focusNode: nameFocusNode,
+              enabled: !isSaving,
+              onTapOutside: (_) => nameFocusNode.unfocus(),
+              decoration: InputDecoration(
+                labelText: l10n.studentName,
+                prefixIcon: const Icon(Icons.person_outline),
+                border: const OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 14),
+            SegmentedButton<int>(
+              segments: [
+                ButtonSegment(
+                  value: 4,
+                  label: Text(l10n.year4),
+                ),
+                ButtonSegment(
+                  value: 5,
+                  label: Text(l10n.year5),
+                ),
+                ButtonSegment(
+                  value: 6,
+                  label: Text(l10n.year6),
+                ),
+              ],
+              selected: {selectedYear},
+              showSelectedIcon: false,
+              onSelectionChanged: (selection) {
+                if (isSaving) return;
+                setState(() {
+                  selectedYear = selection.first;
+                });
+              },
+            ),
+            if (errorText != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                errorText!,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.error,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+            const SizedBox(height: 18),
+            FilledButton.icon(
+              onPressed: isSaving ? null : saveProfile,
+              icon: isSaving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2.2),
+                    )
+                  : const Icon(Icons.save_outlined),
+              label: Text(
+                isSaving
+                    ? l10n.saving
+                    : l10n.saveProfile,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -399,20 +488,83 @@ class _ParentDashboardCard extends StatelessWidget {
 
   final AppState state;
 
+  Future<void> _openParentAccess(BuildContext context) async {
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final authRepository = AuthRepository();
+
+    try {
+      final parentAccount = await authRepository.fetchLinkedParentAccount(
+        studentId: state.currentStudentId,
+      );
+
+      if (!context.mounted) return;
+
+      if (parentAccount == null) {
+        final shouldRegister = await showDialog<bool>(
+          context: context,
+          builder: (context) {
+            return AlertDialog(
+              title: const Text('Parent account not linked'),
+              content: const Text(
+                "You don't have linked parent account, do you want to register a new account?",
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: const Text('OK'),
+                ),
+              ],
+            );
+          },
+        );
+
+        if (shouldRegister != true || !context.mounted) return;
+        navigator.push(
+          MaterialPageRoute(
+            builder: (_) =>
+                ParentLinkPage(state: state, authRepository: authRepository),
+          ),
+        );
+        return;
+      }
+
+      navigator.push(
+        MaterialPageRoute(
+          builder: (_) => ParentAuthPage(
+            state: state,
+            parentAccount: parentAccount,
+            authRepository: authRepository,
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Unable to check linked parent account.'),
+          ),
+        );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     return Card(
       color: const Color(0xFFFFF6E6),
       elevation: 0.8,
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => ParentAuthPage(state: state)),
-          );
-        },
+        onTap: () => _openParentAccess(context),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 17),
           child: Column(
@@ -441,10 +593,7 @@ class _ParentDashboardCard extends StatelessWidget {
                           children: [
                             Expanded(
                               child: Text(
-                                state.t(
-                                  'Parent Dashboard',
-                                  'Papan Pemuka Ibu Bapa',
-                                ),
+                                l10n.parentDashboard,
                                 style: theme.textTheme.titleLarge?.copyWith(
                                   fontSize: 18,
                                 ),
@@ -462,7 +611,7 @@ class _ParentDashboardCard extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(99),
                               ),
                               child: Text(
-                                state.t('Locked', 'Dikunci'),
+                                l10n.locked,
                                 style: const TextStyle(
                                   color: Color(0xFF7B4B14),
                                   fontWeight: FontWeight.w800,
@@ -474,10 +623,7 @@ class _ParentDashboardCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 7),
                         Text(
-                          state.t(
-                            'Unlock to view progress and weak topics',
-                            'Buka untuk melihat kemajuan dan topik lemah',
-                          ),
+                          l10n.unlockProgressWeakTopics,
                           style: theme.textTheme.bodyMedium,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
@@ -496,14 +642,8 @@ class _ParentDashboardCard extends StatelessWidget {
                     foregroundColor: const Color(0xFF6E410A),
                     minimumSize: const Size.fromHeight(44),
                   ),
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => ParentAuthPage(state: state),
-                      ),
-                    );
-                  },
-                  child: Text(state.t('Unlock Access', 'Buka Akses')),
+                  onPressed: () => _openParentAccess(context),
+                  child: Text(l10n.unlockAccess),
                 ),
               ),
             ],

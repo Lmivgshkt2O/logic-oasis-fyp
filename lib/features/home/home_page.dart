@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/features/home/widgets/oasis_map.dart';
+import 'package:logic_oasis/l10n/app_localizations.dart';
 import 'package:logic_oasis/shared/models/recommended_mission.dart';
 import 'package:logic_oasis/shared/state/app_state.dart';
 
@@ -12,11 +13,12 @@ class HomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(17),
         child: Stack(
           children: [
             Positioned.fill(
@@ -25,6 +27,7 @@ class HomePage extends StatelessWidget {
                 areas: state.oasisAreas,
                 crystals: state.crystals,
                 mutualAidEnergy: state.mutualAidEnergy,
+                isBahasaMelayu: state.isBahasaMelayu,
                 canRepair: state.canRepair,
                 onRepair: state.repairOasisArea,
               ),
@@ -43,14 +46,8 @@ class HomePage extends StatelessWidget {
                       SnackBar(
                         content: Text(
                           nextValue
-                              ? state.t(
-                                  'Mission reminders turned on',
-                                  'Peringatan misi diaktifkan',
-                                )
-                              : state.t(
-                                  'Mission reminders turned off',
-                                  'Peringatan misi dimatikan',
-                                ),
+                              ? l10n.missionRemindersOn
+                              : l10n.missionRemindersOff,
                         ),
                       ),
                     );
@@ -78,8 +75,8 @@ class HomePage extends StatelessWidget {
               ),
             ),
             Positioned(
-              left: 12,
-              right: 12,
+              left: 14,
+              right: 14,
               bottom: 18,
               child: _RecommendedMissionCard(
                 mission: state.recommendedMission,
@@ -95,6 +92,7 @@ class HomePage extends StatelessWidget {
 
   void _handleRecommendedMissionTap(BuildContext context) {
     final mission = state.recommendedMission;
+    final l10n = AppLocalizations.of(context)!;
     if (!mission.isReadyToClaim) {
       state.changeTab(1);
       return;
@@ -107,14 +105,8 @@ class HomePage extends StatelessWidget {
         SnackBar(
           content: Text(
             claimed
-                ? state.t(
-                    'Mission reward claimed: +${mission.rewardCrystals} crystals',
-                    'Ganjaran misi dituntut: +${mission.rewardCrystals} kristal',
-                  )
-                : state.t(
-                    'Mission reward already claimed',
-                    'Ganjaran misi sudah dituntut',
-                  ),
+                ? l10n.missionRewardClaimed(mission.rewardCrystals)
+                : l10n.missionRewardAlreadyClaimed,
           ),
         ),
       );
@@ -164,18 +156,19 @@ class _RecommendedMissionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final title = isBahasaMelayu ? 'Misi dicadangkan' : 'Recommended mission';
+    final l10n = AppLocalizations.of(context)!;
+    final title = l10n.recommendedMission;
     final topicTitle = isBahasaMelayu
         ? mission.topicTitleBm
         : mission.topicTitle;
-    final subtitle = _subtitle(topicTitle);
+    final subtitle = _subtitle(topicTitle, l10n);
     final icon = mission.rewardClaimed
         ? Icons.check_circle_outline
         : mission.isReadyToClaim
         ? Icons.redeem_outlined
         : Icons.flag;
     final rewardText = mission.rewardClaimed
-        ? (isBahasaMelayu ? 'Selesai' : 'Done')
+        ? l10n.done
         : '+${mission.rewardCrystals}';
 
     return Card(
@@ -186,19 +179,19 @@ class _RecommendedMissionCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+          padding: const EdgeInsets.fromLTRB(14, 13, 12, 13),
           child: Row(
             children: [
               Container(
-                width: 52,
-                height: 52,
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
                   color: LogicOasisTheme.mint,
-                  borderRadius: BorderRadius.circular(13),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(icon, color: LogicOasisTheme.leaf, size: 28),
+                child: Icon(icon, color: LogicOasisTheme.leaf, size: 26),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -207,7 +200,7 @@ class _RecommendedMissionCard extends StatelessWidget {
                     Text(
                       title,
                       style: theme.textTheme.titleMedium?.copyWith(
-                        fontSize: 15.5,
+                        fontSize: 14.5,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -217,7 +210,7 @@ class _RecommendedMissionCard extends StatelessWidget {
                       subtitle,
                       style: theme.textTheme.bodyLarge?.copyWith(
                         color: LogicOasisTheme.ink,
-                        fontSize: 15,
+                        fontSize: 13.5,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -225,15 +218,18 @@ class _RecommendedMissionCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               const Icon(
                 Icons.diamond_outlined,
                 color: LogicOasisTheme.water,
-                size: 21,
+                size: 19,
               ),
-              const SizedBox(width: 3),
-              Text(rewardText, style: theme.textTheme.titleMedium),
-              const SizedBox(width: 7),
+              const SizedBox(width: 2),
+              Text(
+                rewardText,
+                style: theme.textTheme.titleMedium?.copyWith(fontSize: 14),
+              ),
+              const SizedBox(width: 5),
               Icon(
                 mission.isReadyToClaim
                     ? Icons.touch_app_outlined
@@ -247,19 +243,20 @@ class _RecommendedMissionCard extends StatelessWidget {
     );
   }
 
-  String _subtitle(String topicTitle) {
+  String _subtitle(String topicTitle, AppLocalizations l10n) {
+    final missionTopic = !isBahasaMelayu && topicTitle == 'Fractions'
+        ? 'Fraction'
+        : topicTitle;
+
     if (mission.rewardClaimed) {
-      return isBahasaMelayu
-          ? 'Ganjaran dituntut. Teruskan latihan $topicTitle.'
-          : 'Reward claimed. Keep practising $topicTitle.';
+      return l10n.rewardClaimedKeepPractising(topicTitle);
     }
     if (mission.isReadyToClaim) {
-      return isBahasaMelayu
-          ? 'Misi selesai. Ketik untuk tuntut ganjaran.'
-          : 'Mission complete. Tap to claim reward.';
+      return l10n.missionCompleteClaimReward;
     }
-    return isBahasaMelayu
-        ? 'Lengkapkan ${mission.requiredCompletions} latihan $topicTitle (${mission.visibleCompletions}/${mission.requiredCompletions})'
-        : 'Complete ${mission.requiredCompletions} $topicTitle practices (${mission.visibleCompletions}/${mission.requiredCompletions})';
+    return l10n.completeTopicDrills(
+      mission.requiredCompletions,
+      isBahasaMelayu ? topicTitle : missionTopic,
+    );
   }
 }

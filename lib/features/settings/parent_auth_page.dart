@@ -1,13 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/features/parent_dashboard/parent_dashboard_page.dart';
+import 'package:logic_oasis/features/settings/parent_password_reset_page.dart';
+import 'package:logic_oasis/l10n/app_localizations.dart';
+import 'package:logic_oasis/shared/repositories/auth_repository.dart';
 import 'package:logic_oasis/shared/state/app_state.dart';
-import 'package:logic_oasis/shared/widgets/recommendation_box.dart';
 
 class ParentAuthPage extends StatefulWidget {
-  const ParentAuthPage({super.key, required this.state});
+  const ParentAuthPage({
+    super.key,
+    required this.state,
+    required this.parentAccount,
+    this.authRepository,
+  });
 
   final AppState state;
+  final LinkedParentAccount parentAccount;
+  final AuthRepository? authRepository;
 
   @override
   State<ParentAuthPage> createState() => _ParentAuthPageState();
@@ -15,35 +24,78 @@ class ParentAuthPage extends StatefulWidget {
 
 class _ParentAuthPageState extends State<ParentAuthPage> {
   final passwordController = TextEditingController();
-  final otpController = TextEditingController();
+  late final AuthRepository authRepository;
   bool obscurePassword = true;
+  bool isLoading = false;
   String? errorText;
+
+  @override
+  void initState() {
+    super.initState();
+    authRepository = widget.authRepository ?? AuthRepository();
+  }
 
   @override
   void dispose() {
     passwordController.dispose();
-    otpController.dispose();
     super.dispose();
   }
 
-  void authenticate() {
-    final password = passwordController.text.trim();
-    final otp = otpController.text.trim();
-    final validPassword = password == 'parent123';
-    final validOtp = otp == '246810';
+  Future<void> authenticate() async {
+    if (isLoading) return;
 
-    if (!validPassword && !validOtp) {
+    final password = passwordController.text.trim();
+    if (password.isEmpty) {
       setState(() {
-        errorText = 'Enter the demo parent password or OTP to continue.';
+        errorText = AppLocalizations.of(context)!.enterLinkedParentPassword;
       });
       return;
     }
 
-    Navigator.of(context).pushReplacement(
+    setState(() {
+      isLoading = true;
+      errorText = null;
+    });
+
+    try {
+      await authRepository.authenticateLinkedParent(
+        parent: widget.parentAccount,
+        password: password,
+      );
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => Scaffold(
+            appBar: AppBar(
+              title: Text(AppLocalizations.of(context)!.parentDashboard),
+            ),
+            body: SafeArea(child: ParentDashboardPage(state: widget.state)),
+          ),
+        ),
+      );
+    } on AuthFailure catch (error) {
+      setState(() {
+        errorText = error.message;
+      });
+    } catch (_) {
+      setState(() {
+        errorText = AppLocalizations.of(context)!.parentAccountUnavailable;
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> openResetPassword() async {
+    await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => Scaffold(
-          appBar: AppBar(title: const Text('Parent Dashboard')),
-          body: SafeArea(child: ParentDashboardPage(state: widget.state)),
+        builder: (_) => ParentPasswordResetPage(
+          parentAccount: widget.parentAccount,
+          authRepository: authRepository,
         ),
       ),
     );
@@ -52,9 +104,12 @@ class _ParentAuthPageState extends State<ParentAuthPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Parent Authentication')),
+      appBar: AppBar(
+        title: Text(l10n.parentAuthentication),
+      ),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
@@ -75,23 +130,27 @@ class _ParentAuthPageState extends State<ParentAuthPage> {
             ),
             const SizedBox(height: 20),
             Text(
-              'Parent access required',
+              l10n.parentAccessRequired,
               style: theme.textTheme.headlineLarge,
             ),
             const SizedBox(height: 8),
             Text(
-              'This dashboard contains learning insights and recommendations for parents.',
+              l10n.parentAuthInstruction,
               style: theme.textTheme.bodyLarge,
             ),
-            const SizedBox(height: 22),
+            const SizedBox(height: 18),
+            _LinkedEmailBox(email: widget.parentAccount.email, state: widget.state),
+            const SizedBox(height: 18),
             TextField(
               controller: passwordController,
               obscureText: obscurePassword,
               decoration: InputDecoration(
-                labelText: 'Parent password',
+                labelText: l10n.parentPassword,
                 prefixIcon: const Icon(Icons.lock_outline),
                 suffixIcon: IconButton(
-                  tooltip: obscurePassword ? 'Show password' : 'Hide password',
+                  tooltip: obscurePassword
+                      ? l10n.showPassword
+                      : l10n.hidePassword,
                   onPressed: () {
                     setState(() {
                       obscurePassword = !obscurePassword;
@@ -105,16 +164,7 @@ class _ParentAuthPageState extends State<ParentAuthPage> {
                 ),
                 border: const OutlineInputBorder(),
               ),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: otpController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'One-time password',
-                prefixIcon: Icon(Icons.pin_outlined),
-                border: OutlineInputBorder(),
-              ),
+              onSubmitted: (_) => authenticate(),
             ),
             if (errorText != null) ...[
               const SizedBox(height: 12),
@@ -126,19 +176,80 @@ class _ParentAuthPageState extends State<ParentAuthPage> {
                 ),
               ),
             ],
-            const SizedBox(height: 18),
-            FilledButton.icon(
-              onPressed: authenticate,
-              icon: const Icon(Icons.lock_open_outlined),
-              label: const Text('Unlock Dashboard'),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: isLoading ? null : openResetPassword,
+                icon: const Icon(Icons.help_outline),
+                label: Text(l10n.forgotPassword),
+              ),
             ),
-            const SizedBox(height: 16),
-            const RecommendationBox(
-              text:
-                  'Prototype access: use password parent123 or OTP 246810. Firebase Auth or real OTP can replace this later.',
+            const SizedBox(height: 8),
+            FilledButton.icon(
+              onPressed: isLoading ? null : authenticate,
+              icon: isLoading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2.2),
+                    )
+                  : const Icon(Icons.lock_open_outlined),
+              label: Text(
+                isLoading
+                    ? l10n.checkingPassword
+                    : l10n.unlockDashboard,
+              ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _LinkedEmailBox extends StatelessWidget {
+  const _LinkedEmailBox({required this.email, required this.state});
+
+  final String email;
+  final AppState state;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE8F4EE),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFCFE3D7)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.mail_outline, color: LogicOasisTheme.leaf),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  AppLocalizations.of(context)!.linkedParentEmail,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  email,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF315C48),
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

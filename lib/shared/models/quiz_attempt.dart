@@ -3,6 +3,7 @@ class QuizAttempt {
     required this.id,
     required this.topicId,
     required this.topicTitle,
+    required this.yearLevel,
     required this.score,
     required this.correctCount,
     required this.totalQuestions,
@@ -14,6 +15,7 @@ class QuizAttempt {
   final String id;
   final String topicId;
   final String topicTitle;
+  final int yearLevel;
   final int score;
   final int correctCount;
   final int totalQuestions;

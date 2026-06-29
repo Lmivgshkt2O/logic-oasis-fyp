@@ -5,7 +5,7 @@ void main() {
   testWidgets('starts with Logic Oasis opening screen', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const LogicOasisApp());
+    await tester.pumpWidget(const LogicOasisApp(loadFirebaseTopics: false));
 
     expect(find.text('Logic Oasis'), findsOneWidget);
     expect(find.text('Learn. Restore. Grow together.'), findsOneWidget);

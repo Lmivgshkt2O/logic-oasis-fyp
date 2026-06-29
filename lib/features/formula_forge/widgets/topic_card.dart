@@ -46,7 +46,7 @@ class TopicCard extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          isBahasaMelayu ? topic.titleBm : topic.title,
+                          topic.localizedTitle(isBahasaMelayu),
                           style: theme.textTheme.titleLarge,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -57,7 +57,7 @@ class TopicCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    topic.area,
+                    topic.localizedArea(isBahasaMelayu),
                     style: theme.textTheme.bodyMedium,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,

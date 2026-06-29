@@ -1,16 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:logic_oasis/app/theme.dart';
+import 'package:logic_oasis/l10n/app_localizations.dart';
 import 'package:logic_oasis/shared/models/quiz_attempt.dart';
 import 'package:logic_oasis/shared/widgets/mastery_chip.dart';
 
 class AttemptRow extends StatelessWidget {
-  const AttemptRow({super.key, required this.attempt});
+  const AttemptRow({
+    super.key,
+    required this.attempt,
+    this.isBahasaMelayu = false,
+  });
 
   final QuizAttempt attempt;
+  final bool isBahasaMelayu;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -45,12 +52,24 @@ class AttemptRow extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                '${attempt.score}% score - ${attempt.correctCount}/${attempt.totalQuestions} correct - +${attempt.earnedCrystals} crystals',
+                isBahasaMelayu
+                    ? l10n.attemptSummary(
+                        attempt.score,
+                        attempt.correctCount,
+                        attempt.totalQuestions,
+                        attempt.earnedCrystals,
+                      )
+                    : l10n.attemptSummary(
+                        attempt.score,
+                        attempt.correctCount,
+                        attempt.totalQuestions,
+                        attempt.earnedCrystals,
+                      ),
                 style: theme.textTheme.bodyMedium,
               ),
               const SizedBox(height: 2),
               Text(
-                _formatTime(attempt.createdAt),
+                _formatTime(attempt.createdAt, l10n),
                 style: theme.textTheme.bodyMedium,
               ),
             ],
@@ -60,11 +79,17 @@ class AttemptRow extends StatelessWidget {
     );
   }
 
-  String _formatTime(DateTime value) {
+  String _formatTime(DateTime value, AppLocalizations l10n) {
     final difference = DateTime.now().difference(value);
-    if (difference.inMinutes < 1) return 'Just now';
-    if (difference.inHours < 1) return '${difference.inMinutes} min ago';
-    if (difference.inDays < 1) return '${difference.inHours} hr ago';
-    return '${difference.inDays} day ago';
+    if (difference.inMinutes < 1) {
+      return l10n.justNow;
+    }
+    if (difference.inHours < 1) {
+      return l10n.minutesAgo(difference.inMinutes);
+    }
+    if (difference.inDays < 1) {
+      return l10n.hoursAgo(difference.inHours);
+    }
+    return l10n.daysAgo(difference.inDays);
   }
 }

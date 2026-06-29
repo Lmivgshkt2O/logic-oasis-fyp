@@ -27,8 +27,10 @@ migrate_working_dir/
 **/doc/api/
 **/ios/Flutter/.last_build_id
 .dart_tool/
-.flutter-plugins-dependencies
+.dart_appdata/
+.dart_localappdata/
 .pub-cache/
+.flutter-plugins-dependencies
 .pub/
 /build/
 /coverage/
@@ -43,3 +45,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Firebase local seed credentials
+firebase_seed/serviceAccountKey*.json
+firebase_seed/.env

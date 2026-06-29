@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:logic_oasis/app/theme.dart';
+import 'package:logic_oasis/l10n/app_localizations.dart';
 import 'package:logic_oasis/shared/models/oasis_area.dart';
 
 class OasisMap extends StatefulWidget {
@@ -11,6 +12,7 @@ class OasisMap extends StatefulWidget {
     required this.areas,
     required this.crystals,
     required this.mutualAidEnergy,
+    required this.isBahasaMelayu,
     required this.canRepair,
     required this.onRepair,
   });
@@ -19,6 +21,7 @@ class OasisMap extends StatefulWidget {
   final List<OasisArea> areas;
   final int crystals;
   final int mutualAidEnergy;
+  final bool isBahasaMelayu;
   final bool Function(OasisArea area) canRepair;
   final bool Function(String areaId) onRepair;
 
@@ -125,6 +128,7 @@ class _OasisMapState extends State<OasisMap> with TickerProviderStateMixin {
       builder: (context) {
         return _RepairDetailSheet(
           area: area,
+          isBahasaMelayu: widget.isBahasaMelayu,
           availableResource: _availableResourceFor(area),
           canRepair: widget.canRepair(area),
           onRepair: () {
@@ -142,12 +146,14 @@ class _OasisMapState extends State<OasisMap> with TickerProviderStateMixin {
     );
 
     if (!context.mounted || result == null) return;
+    final l10n = AppLocalizations.of(context)!;
+    final areaTitle = area.localizedTitle(widget.isBahasaMelayu);
 
     final message = switch (result) {
-      _RepairFeedback.success => '${area.title} repaired +25%',
+      _RepairFeedback.success => l10n.areaRepaired(areaTitle),
       _RepairFeedback.notEnough =>
-        'Not enough ${_resourceLabel(area.resource)}',
-      _RepairFeedback.complete => '${area.title} is fully restored',
+        l10n.notEnoughResource(_resourceLabel(area.resource, l10n)),
+      _RepairFeedback.complete => l10n.areaFullyRestored(areaTitle),
     };
 
     ScaffoldMessenger.of(context)
@@ -307,12 +313,14 @@ class _RepairHotspot extends StatelessWidget {
 class _RepairDetailSheet extends StatelessWidget {
   const _RepairDetailSheet({
     required this.area,
+    required this.isBahasaMelayu,
     required this.availableResource,
     required this.canRepair,
     required this.onRepair,
   });
 
   final OasisArea area;
+  final bool isBahasaMelayu;
   final int availableResource;
   final bool canRepair;
   final VoidCallback onRepair;
@@ -326,7 +334,8 @@ class _RepairDetailSheet extends StatelessWidget {
     final resourceColor = area.resource == OasisResource.crystals
         ? LogicOasisTheme.water
         : LogicOasisTheme.clay;
-    final resourceLabel = _resourceLabel(area.resource);
+    final l10n = AppLocalizations.of(context)!;
+    final resourceLabel = _resourceLabel(area.resource, l10n);
 
     return SafeArea(
       child: Padding(
@@ -351,8 +360,14 @@ class _RepairDetailSheet extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(area.title, style: theme.textTheme.titleLarge),
-                      Text(area.description, style: theme.textTheme.bodyMedium),
+                      Text(
+                        area.localizedTitle(isBahasaMelayu),
+                        style: theme.textTheme.titleLarge,
+                      ),
+                      Text(
+                        area.localizedDescription(isBahasaMelayu),
+                        style: theme.textTheme.bodyMedium,
+                      ),
                     ],
                   ),
                 ),
@@ -362,7 +377,7 @@ class _RepairDetailSheet extends StatelessWidget {
             LinearProgressIndicator(value: area.progress),
             const SizedBox(height: 8),
             Text(
-              '${(area.progress * 100).round()}% restored',
+              l10n.restoredPercent((area.progress * 100).round()),
               style: theme.textTheme.bodyMedium,
             ),
             const SizedBox(height: 18),
@@ -371,7 +386,7 @@ class _RepairDetailSheet extends StatelessWidget {
                 Expanded(
                   child: _SheetMetric(
                     icon: resourceIcon,
-                    label: 'Available',
+                    label: l10n.available,
                     value: '$availableResource',
                     color: resourceColor,
                   ),
@@ -380,7 +395,7 @@ class _RepairDetailSheet extends StatelessWidget {
                 Expanded(
                   child: _SheetMetric(
                     icon: Icons.construction_outlined,
-                    label: 'Repair cost',
+                    label: l10n.repairCost,
                     value: '${area.repairCost}',
                     color: LogicOasisTheme.leaf,
                   ),
@@ -393,10 +408,10 @@ class _RepairDetailSheet extends StatelessWidget {
               icon: Icon(area.isComplete ? Icons.check : Icons.construction),
               label: Text(
                 area.isComplete
-                    ? 'Fully Restored'
+                    ? l10n.fullyRestored
                     : canRepair
-                    ? 'Repair with $resourceLabel'
-                    : 'Need more $resourceLabel',
+                    ? l10n.repairWithResource(resourceLabel)
+                    : l10n.needMoreResource(resourceLabel),
               ),
             ),
           ],
@@ -443,10 +458,10 @@ class _SheetMetric extends StatelessWidget {
   }
 }
 
-String _resourceLabel(OasisResource resource) {
+String _resourceLabel(OasisResource resource, AppLocalizations l10n) {
   return switch (resource) {
-    OasisResource.crystals => 'Math Crystals',
-    OasisResource.mutualAid => 'Mutual Aid',
+    OasisResource.crystals => l10n.mathCrystals,
+    OasisResource.mutualAid => l10n.mutualAid,
   };
 }
 
@@ -515,12 +530,12 @@ class _OasisScenePainter extends CustomPainter {
   final double intro;
   final double pulse;
 
-  static const _water = Color(0xFF78C6C2);
-  static const _landRestored = Color(0xFFC8DFA4);
-  static const _landDry = Color(0xFFD4BC8E);
-  static const _landSide = Color(0xFF8FB26E);
-  static const _stoneTop = Color(0xFFE2DFC5);
-  static const _stoneSide = Color(0xFFBDB99A);
+  static const _water = Color(0xFF69CDCF);
+  static const _landRestored = Color(0xFFDCEAB3);
+  static const _landDry = Color(0xFFCDBB89);
+  static const _landSide = Color(0xFF93B66E);
+  static const _stoneTop = Color(0xFFEFE9CB);
+  static const _stoneSide = Color(0xFFC2BC97);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -547,28 +562,28 @@ class _OasisScenePainter extends CustomPainter {
       ..shader = const LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        colors: [Color(0xFFEAF8F4), Color(0xFFF8F7E7)],
+        colors: [Color(0xFFEEF9F7), Color(0xFFFBF8E5)],
       ).createShader(Offset.zero & size);
     canvas.drawRect(Offset.zero & size, skyPaint);
 
     canvas.drawCircle(
       Offset(size.width * 0.77, size.height * 0.18),
-      size.width * (0.11 + 0.006 * pulse),
-      Paint()..color = const Color(0x66F2D16B),
+      size.width * (0.108 + 0.004 * pulse),
+      Paint()..color = const Color(0x78F0D56E),
     );
 
     _drawHill(
       canvas,
       size,
       y: 0.28,
-      color: const Color(0xFFB8D299).withValues(alpha: 0.58),
-      height: 0.12,
+      color: const Color(0xFFC7DCA8).withValues(alpha: 0.76),
+      height: 0.11,
     );
     _drawHill(
       canvas,
       size,
       y: 0.36,
-      color: const Color(0xFFD1DCA9).withValues(alpha: 0.72),
+      color: const Color(0xFFD5E2AF).withValues(alpha: 0.86),
       height: 0.1,
     );
   }
@@ -618,13 +633,13 @@ class _OasisScenePainter extends CustomPainter {
         end: Alignment.bottomCenter,
         colors: [
           Color.lerp(
-            const Color(0xFFD6BE91),
-            const Color(0xFFBEDAA0),
+            const Color(0xFFD8C393),
+            const Color(0xFFC9E0A4),
             restoration,
           )!,
           Color.lerp(
-            const Color(0xFFBDA579),
-            const Color(0xFF8FC486),
+            const Color(0xFFBCA779),
+            const Color(0xFF9DC98B),
             restoration,
           )!,
         ],
@@ -635,7 +650,7 @@ class _OasisScenePainter extends CustomPainter {
   void _drawWater(Canvas canvas, Size size) {
     final amount = (0.62 + waterway.clamp(0.0, 1.0) * 0.38) * intro;
     final waterPaint = Paint()
-      ..color = Color.lerp(const Color(0xFF7DB8B4), _water, amount)!;
+      ..color = Color.lerp(const Color(0xFF79B6B0), _water, amount)!;
     final riverPath = Path()
       ..moveTo(size.width * 0.61, size.height * 0.39)
       ..cubicTo(
@@ -659,13 +674,13 @@ class _OasisScenePainter extends CustomPainter {
       Paint()
         ..color = waterPaint.color
         ..style = PaintingStyle.stroke
-        ..strokeWidth = size.width * 0.13
+        ..strokeWidth = size.width * 0.14
         ..strokeCap = StrokeCap.round,
     );
 
     final shimmerPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.34)
-      ..strokeWidth = 1.8
+      ..color = Colors.white.withValues(alpha: 0.42)
+      ..strokeWidth = 2.1
       ..strokeCap = StrokeCap.round;
     for (var i = 0; i < 3; i++) {
       final y = size.height * (0.52 + i * 0.1);
@@ -680,33 +695,33 @@ class _OasisScenePainter extends CustomPainter {
   void _drawLandTiles(Canvas canvas, Size size) {
     _drawIsoTile(
       canvas,
-      center: Offset(size.width * 0.31, size.height * 0.5),
-      width: size.width * 0.28,
-      height: size.height * 0.13,
+      center: Offset(size.width * 0.32, size.height * 0.48),
+      width: size.width * 0.31,
+      height: size.height * 0.145,
       topColor: _landTop,
       sideColor: _landSide,
     );
     _drawIsoTile(
       canvas,
-      center: Offset(size.width * 0.7, size.height * 0.62),
-      width: size.width * 0.3,
-      height: size.height * 0.14,
-      topColor: _landTop,
-      sideColor: _landSide,
-    );
-    _drawIsoTile(
-      canvas,
-      center: Offset(size.width * 0.27, size.height * 0.73),
-      width: size.width * 0.32,
+      center: Offset(size.width * 0.71, size.height * 0.61),
+      width: size.width * 0.33,
       height: size.height * 0.15,
       topColor: _landTop,
       sideColor: _landSide,
     );
     _drawIsoTile(
       canvas,
-      center: Offset(size.width * 0.58, size.height * 0.82),
-      width: size.width * 0.32,
-      height: size.height * 0.13,
+      center: Offset(size.width * 0.27, size.height * 0.72),
+      width: size.width * 0.34,
+      height: size.height * 0.155,
+      topColor: _landTop,
+      sideColor: _landSide,
+    );
+    _drawIsoTile(
+      canvas,
+      center: Offset(size.width * 0.58, size.height * 0.8),
+      width: size.width * 0.36,
+      height: size.height * 0.145,
       topColor: _stoneTop,
       sideColor: _stoneSide,
     );
@@ -714,12 +729,13 @@ class _OasisScenePainter extends CustomPainter {
 
   void _drawDecor(Canvas canvas, Size size) {
     for (final tree in [
-      Offset(size.width * 0.11, size.height * 0.54),
-      Offset(size.width * 0.79, size.height * 0.48),
-      Offset(size.width * 0.88, size.height * 0.71),
-      Offset(size.width * 0.18, size.height * 0.87),
+      Offset(size.width * 0.1, size.height * 0.54),
+      Offset(size.width * 0.78, size.height * 0.47),
+      Offset(size.width * 0.89, size.height * 0.69),
+      Offset(size.width * 0.18, size.height * 0.86),
+      Offset(size.width * 0.38, size.height * 0.39),
     ]) {
-      _drawTree(canvas, tree, size.width * 0.035);
+      _drawTree(canvas, tree, size.width * 0.038);
     }
 
     final pebblePaint = Paint()
@@ -744,16 +760,16 @@ class _OasisScenePainter extends CustomPainter {
   void _drawHouse(Canvas canvas, Size size) {
     final amount = (0.6 + bridge.clamp(0.0, 1.0) * 0.4) * intro;
     final base = Rect.fromCenter(
-      center: Offset(size.width * 0.33, size.height * 0.46),
-      width: size.width * 0.15,
-      height: size.height * 0.09,
+      center: Offset(size.width * 0.33, size.height * 0.435),
+      width: size.width * 0.18,
+      height: size.height * 0.105,
     );
-    _drawShadow(canvas, base.center, size.width * 0.17, size.height * 0.032);
+    _drawShadow(canvas, base.center, size.width * 0.2, size.height * 0.04);
 
     final wallPaint = Paint()
       ..color = Color.lerp(
-        const Color(0xFFB99A68),
-        const Color(0xFFDAB77D),
+        const Color(0xFFBA9661),
+        const Color(0xFFDDBA7A),
         amount,
       )!;
     canvas.drawRRect(
@@ -767,21 +783,21 @@ class _OasisScenePainter extends CustomPainter {
         base.width * 0.22,
         base.height,
       ),
-      Paint()..color = const Color(0xFFB2875B),
+      Paint()..color = const Color(0xFFB08455),
     );
 
     final roof = Path()
-      ..moveTo(base.left - size.width * 0.016, base.top + size.height * 0.01)
-      ..lineTo(base.center.dx, base.top - size.height * 0.055)
-      ..lineTo(base.right + size.width * 0.016, base.top + size.height * 0.01)
+      ..moveTo(base.left - size.width * 0.022, base.top + size.height * 0.012)
+      ..lineTo(base.center.dx, base.top - size.height * 0.062)
+      ..lineTo(base.right + size.width * 0.022, base.top + size.height * 0.012)
       ..close();
-    canvas.drawPath(roof, Paint()..color = const Color(0xFFA46B45));
+    canvas.drawPath(roof, Paint()..color = const Color(0xFFA8633E));
     canvas.drawLine(
       Offset(base.left, base.top + size.height * 0.012),
       Offset(base.right, base.top + size.height * 0.012),
       Paint()
         ..color = const Color(0xFF7E543B)
-        ..strokeWidth = 1.4,
+        ..strokeWidth = 1.7,
     );
 
     canvas.drawRRect(
@@ -829,14 +845,14 @@ class _OasisScenePainter extends CustomPainter {
       bridgePath,
       Paint()
         ..color = bridgeColor
-        ..strokeWidth = 8
+        ..strokeWidth = 10
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.round,
     );
 
     final railPaint = Paint()
       ..color = const Color(0xFF704F38)
-      ..strokeWidth = 2
+      ..strokeWidth = 2.4
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
     canvas.drawPath(
@@ -860,30 +876,30 @@ class _OasisScenePainter extends CustomPainter {
   void _drawMarket(Canvas canvas, Size size) {
     final amount = (0.58 + market.clamp(0.0, 1.0) * 0.42) * intro;
     final base = Rect.fromCenter(
-      center: Offset(size.width * 0.72, size.height * 0.62),
-      width: size.width * 0.18,
-      height: size.height * 0.08,
+      center: Offset(size.width * 0.73, size.height * 0.595),
+      width: size.width * 0.22,
+      height: size.height * 0.095,
     );
-    _drawShadow(canvas, base.center, size.width * 0.18, size.height * 0.032);
+    _drawShadow(canvas, base.center, size.width * 0.23, size.height * 0.038);
 
     canvas.drawRRect(
       RRect.fromRectAndRadius(base, const Radius.circular(5)),
       Paint()
         ..color = Color.lerp(
-          const Color(0xFF7AA074),
-          const Color(0xFF6FAE78),
+          const Color(0xFF6F9667),
+          const Color(0xFF64A66F),
           amount,
         )!,
     );
     final awning = Rect.fromLTWH(
-      base.left - size.width * 0.012,
-      base.top - size.height * 0.025,
-      base.width + size.width * 0.024,
-      size.height * 0.035,
+      base.left - size.width * 0.014,
+      base.top - size.height * 0.03,
+      base.width + size.width * 0.028,
+      size.height * 0.042,
     );
     canvas.drawRRect(
       RRect.fromRectAndRadius(awning, const Radius.circular(5)),
-      Paint()..color = const Color(0xFF89C07D),
+      Paint()..color = const Color(0xFF8BC37A),
     );
     final stripePaint = Paint()..color = const Color(0xFFE9F5D7);
     for (var i = 0; i < 3; i++) {
@@ -906,11 +922,11 @@ class _OasisScenePainter extends CustomPainter {
 
   void _drawGarden(Canvas canvas, Size size) {
     final amount = (0.5 + garden.clamp(0.0, 1.0) * 0.5) * intro;
-    final center = Offset(size.width * 0.27, size.height * 0.71);
+    final center = Offset(size.width * 0.27, size.height * 0.705);
     _drawShadow(canvas, center, size.width * 0.2, size.height * 0.035);
 
     final leafPaint = Paint()
-      ..color = LogicOasisTheme.leaf.withValues(alpha: 0.58 + amount * 0.25);
+      ..color = LogicOasisTheme.leaf.withValues(alpha: 0.68 + amount * 0.24);
     for (final spot in [
       Offset(center.dx - size.width * 0.045, center.dy),
       Offset(center.dx + size.width * 0.015, center.dy - size.height * 0.02),
@@ -919,14 +935,14 @@ class _OasisScenePainter extends CustomPainter {
       canvas.drawOval(
         Rect.fromCenter(
           center: spot,
-          width: size.width * 0.065 * amount,
-          height: size.height * 0.025 * amount,
+          width: size.width * 0.078 * amount,
+          height: size.height * 0.031 * amount,
         ),
         leafPaint,
       );
     }
 
-    final flowerPaint = Paint()..color = const Color(0xFFE98F79);
+    final flowerPaint = Paint()..color = const Color(0xFFE88973);
     for (final flower in [
       Offset(center.dx - size.width * 0.07, center.dy + size.height * 0.035),
       Offset(center.dx + size.width * 0.07, center.dy - size.height * 0.005),
@@ -936,20 +952,20 @@ class _OasisScenePainter extends CustomPainter {
   }
 
   void _drawPond(Canvas canvas, Size size) {
-    final center = Offset(size.width * 0.58, size.height * 0.81);
+    final center = Offset(size.width * 0.58, size.height * 0.785);
     canvas.drawOval(
       Rect.fromCenter(
         center: center,
-        width: size.width * 0.23,
-        height: size.height * 0.08,
+        width: size.width * 0.27,
+        height: size.height * 0.095,
       ),
       Paint()..color = const Color(0xFFE5E0C3),
     );
     canvas.drawOval(
       Rect.fromCenter(
         center: center,
-        width: size.width * 0.18,
-        height: size.height * 0.058,
+        width: size.width * 0.215,
+        height: size.height * 0.069,
       ),
       Paint()..color = _water,
     );

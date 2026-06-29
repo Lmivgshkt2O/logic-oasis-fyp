@@ -19,6 +19,16 @@ class OasisArea {
 
   bool get isComplete => progress >= 1;
 
+  String localizedTitle(bool isBahasaMelayu) {
+    if (!isBahasaMelayu) return title;
+    return _titleBmFallback[title] ?? title;
+  }
+
+  String localizedDescription(bool isBahasaMelayu) {
+    if (!isBahasaMelayu) return description;
+    return _descriptionBmFallback[description] ?? description;
+  }
+
   OasisArea copyWith({
     String? id,
     String? title,
@@ -36,4 +46,22 @@ class OasisArea {
       progress: progress ?? this.progress,
     );
   }
+
+  static const Map<String, String> _titleBmFallback = {
+    'Fraction Bridge': 'Jambatan Pecahan',
+    'Decimal Waterway': 'Laluan Air Perpuluhan',
+    'Percentage Garden': 'Taman Peratus',
+    'Market Corner': 'Sudut Pasar',
+  };
+
+  static const Map<String, String> _descriptionBmFallback = {
+    'Reconnect oasis paths and learning routes.':
+        'Sambungkan semula laluan oasis dan laluan pembelajaran.',
+    'Bring clean water back to the oasis.':
+        'Bawa air bersih kembali ke oasis.',
+    'Grow green areas through steady practice.':
+        'Suburkan kawasan hijau melalui latihan berterusan.',
+    'Rebuild facilities with helpful community energy.':
+        'Bina semula kemudahan dengan tenaga bantuan komuniti.',
+  };
 }
