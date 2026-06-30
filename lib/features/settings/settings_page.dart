@@ -505,18 +505,16 @@ class _ParentDashboardCard extends StatelessWidget {
           context: context,
           builder: (context) {
             return AlertDialog(
-              title: const Text('Parent account not linked'),
-              content: const Text(
-                "You don't have linked parent account, do you want to register a new account?",
-              ),
+              title: Text(AppLocalizations.of(context)!.parentAccountNotLinked),
+              content: Text(AppLocalizations.of(context)!.parentAccountNotLinkedBody),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(false),
-                  child: const Text('Cancel'),
+                  child: Text(AppLocalizations.of(context)!.cancel),
                 ),
                 FilledButton(
                   onPressed: () => Navigator.of(context).pop(true),
-                  child: const Text('OK'),
+                  child: Text(AppLocalizations.of(context)!.createParentAccount),
                 ),
               ],
             );
@@ -548,7 +546,7 @@ class _ParentDashboardCard extends StatelessWidget {
         ..hideCurrentSnackBar()
         ..showSnackBar(
           const SnackBar(
-            content: Text('Unable to check linked parent account.'),
+            content: Text('Unable to check linked parent account. Please try again.'),
           ),
         );
     }

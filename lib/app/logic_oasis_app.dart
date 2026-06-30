@@ -8,6 +8,7 @@ import 'package:logic_oasis/features/onboarding/plot_intro_page.dart';
 import 'package:logic_oasis/l10n/app_localizations.dart';
 import 'package:logic_oasis/shared/repositories/auth_repository.dart';
 import 'package:logic_oasis/shared/state/app_state.dart';
+import 'package:logic_oasis/shared/state/app_state_scope.dart';
 
 class LogicOasisApp extends StatefulWidget {
   const LogicOasisApp({super.key, this.loadFirebaseTopics = true});
@@ -20,7 +21,7 @@ class LogicOasisApp extends StatefulWidget {
 
 class _LogicOasisAppState extends State<LogicOasisApp>
     with WidgetsBindingObserver {
-  final AppState appState = AppState();
+  late final AppState appState = AppState(persistQuizResults: true);
   final AuthRepository authRepository = AuthRepository();
   _EntryStage stage = _EntryStage.opening;
   String? loggedInStudentName;
@@ -87,60 +88,63 @@ class _LogicOasisAppState extends State<LogicOasisApp>
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: appState,
-      builder: (context, _) {
-        return MaterialApp(
-          title: 'Logic Oasis',
-          debugShowCheckedModeBanner: false,
-          theme: LogicOasisTheme.light(),
-          locale: appState.locale,
-          supportedLocales: AppLocalizations.supportedLocales,
-          localizationsDelegates: const [
-            AppLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-          ],
-          home: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 420),
-            switchInCurve: Curves.easeOutCubic,
-            switchOutCurve: Curves.easeInCubic,
-            child: switch (stage) {
-              _EntryStage.opening => OpeningAnimationPage(
-                key: const ValueKey('opening'),
-                onFinished: completeOpening,
-              ),
-              _EntryStage.login => LoginPage(
-                key: const ValueKey('login'),
-                onLogin: (profile) {
-                  loggedInStudentName = profile.displayName;
-                  appState.updateSignedInStudent(
-                    uid: profile.uid,
-                    email: profile.email,
-                    name: profile.displayName,
-                    year: profile.yearLevel,
-                  );
-                  moveTo(_EntryStage.home);
-                },
-              ),
-              _EntryStage.intro => PlotIntroPage(
-                key: const ValueKey('intro'),
-                onFinished: () => moveTo(_EntryStage.home),
-              ),
-              _EntryStage.home => LogicOasisShell(
-                key: const ValueKey('home'),
-                state: appState,
-                welcomeStudentName: loggedInStudentName,
-                onLogout: () {
-                  appState.changeTab(0);
-                  logout();
-                },
-              ),
-            },
-          ),
-        );
-      },
+    return AppStateScope(
+      state: appState,
+      child: Builder(
+        builder: (context) {
+          final state = AppStateScope.watch(context);
+
+          return MaterialApp(
+            title: 'Logic Oasis',
+            debugShowCheckedModeBanner: false,
+            theme: LogicOasisTheme.light(),
+            locale: state.locale,
+            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+            ],
+            home: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 420),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              child: switch (stage) {
+                _EntryStage.opening => OpeningAnimationPage(
+                  key: const ValueKey('opening'),
+                  onFinished: completeOpening,
+                ),
+                _EntryStage.login => LoginPage(
+                  key: const ValueKey('login'),
+                  onLogin: (profile) {
+                    loggedInStudentName = profile.displayName;
+                    appState.updateSignedInStudent(
+                      uid: profile.uid,
+                      email: profile.email,
+                      name: profile.displayName,
+                      year: profile.yearLevel,
+                    );
+                    moveTo(_EntryStage.home);
+                  },
+                ),
+                _EntryStage.intro => PlotIntroPage(
+                  key: const ValueKey('intro'),
+                  onFinished: () => moveTo(_EntryStage.home),
+                ),
+                _EntryStage.home => LogicOasisShell(
+                  key: const ValueKey('home'),
+                  welcomeStudentName: loggedInStudentName,
+                  onLogout: () {
+                    state.changeTab(0);
+                    logout();
+                  },
+                ),
+              },
+            ),
+          );
+        },
+      ),
     );
   }
 }

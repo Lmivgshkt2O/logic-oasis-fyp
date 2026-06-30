@@ -6,17 +6,15 @@ import 'package:logic_oasis/features/formula_forge/formula_forge_page.dart';
 import 'package:logic_oasis/features/home/home_page.dart';
 import 'package:logic_oasis/features/settings/settings_page.dart';
 import 'package:logic_oasis/l10n/app_localizations.dart';
-import 'package:logic_oasis/shared/state/app_state.dart';
+import 'package:logic_oasis/shared/state/app_state_scope.dart';
 
 class LogicOasisShell extends StatefulWidget {
   const LogicOasisShell({
     super.key,
-    required this.state,
     required this.onLogout,
     this.welcomeStudentName,
   });
 
-  final AppState state;
   final VoidCallback onLogout;
   final String? welcomeStudentName;
 
@@ -79,60 +77,56 @@ class _LogicOasisShellState extends State<LogicOasisShell> {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: widget.state,
-      builder: (context, _) {
-        final l10n = AppLocalizations.of(context)!;
-        final pages = [
-          HomePage(state: widget.state),
-          FormulaForgePage(state: widget.state),
-          SettingsPage(state: widget.state, onLogout: widget.onLogout),
-        ];
+    final state = AppStateScope.watch(context);
+    final l10n = AppLocalizations.of(context)!;
+    final pages = [
+      HomePage(state: state),
+      FormulaForgePage(state: state),
+      SettingsPage(state: state, onLogout: widget.onLogout),
+    ];
 
-        return Theme(
-          data: widget.state.eyeComfortMode
-              ? LogicOasisTheme.eyeComfort()
-              : LogicOasisTheme.light(),
-          child: Scaffold(
-            body: SafeArea(
-              child: Stack(
-                children: [
-                  pages[widget.state.selectedTab],
-                  if (showWelcome && widget.state.selectedTab == 0)
-                    Positioned(
-                      top: 18,
-                      right: 78,
-                      child: _WelcomeToast(
-                        studentName: widget.welcomeStudentName!.trim(),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            bottomNavigationBar: _LogicOasisBottomNav(
-              selectedIndex: widget.state.selectedTab,
-              onSelected: widget.state.changeTab,
-              items: [
-                _NavItem(
-                  icon: Icons.home_outlined,
-                  selectedIcon: Icons.home,
-                  label: l10n.home,
+    return Theme(
+      data: state.eyeComfortMode
+          ? LogicOasisTheme.eyeComfort()
+          : LogicOasisTheme.light(),
+      child: Scaffold(
+        body: SafeArea(
+          child: Stack(
+            children: [
+              pages[state.selectedTab],
+              if (showWelcome && state.selectedTab == 0)
+                Positioned(
+                  top: 18,
+                  right: 78,
+                  child: _WelcomeToast(
+                    studentName: widget.welcomeStudentName!.trim(),
+                  ),
                 ),
-                _NavItem(
-                  icon: Icons.calculate_outlined,
-                  selectedIcon: Icons.calculate,
-                  label: l10n.forge,
-                ),
-                _NavItem(
-                  icon: Icons.settings_outlined,
-                  selectedIcon: Icons.settings,
-                  label: l10n.settings,
-                ),
-              ],
-            ),
+            ],
           ),
-        );
-      },
+        ),
+        bottomNavigationBar: _LogicOasisBottomNav(
+          selectedIndex: state.selectedTab,
+          onSelected: state.changeTab,
+          items: [
+            _NavItem(
+              icon: Icons.home_outlined,
+              selectedIcon: Icons.home,
+              label: l10n.home,
+            ),
+            _NavItem(
+              icon: Icons.calculate_outlined,
+              selectedIcon: Icons.calculate,
+              label: l10n.forge,
+            ),
+            _NavItem(
+              icon: Icons.settings_outlined,
+              selectedIcon: Icons.settings,
+              label: l10n.settings,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -9,11 +9,13 @@ class TopicCard extends StatelessWidget {
     required this.topic,
     required this.isBahasaMelayu,
     required this.onStart,
+    this.lockedReason,
   });
 
   final Topic topic;
   final bool isBahasaMelayu;
   final VoidCallback? onStart;
+  final String? lockedReason;
 
   @override
   Widget build(BuildContext context) {
@@ -57,9 +59,11 @@ class TopicCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    topic.localizedArea(isBahasaMelayu),
+                    isLocked && lockedReason != null
+                        ? lockedReason!
+                        : topic.localizedArea(isBahasaMelayu),
                     style: theme.textTheme.bodyMedium,
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 16),

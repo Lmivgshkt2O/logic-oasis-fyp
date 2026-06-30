@@ -17,6 +17,7 @@ class AppState extends ChangeNotifier {
   AppState({
     TopicRepository? topicRepository,
     LearningRepository? learningRepository,
+    this.persistQuizResults = false,
   }) : _topicRepository = topicRepository,
        _learningRepository = learningRepository,
        topics = List<Topic>.from(_localTopicsForYear(4));
@@ -299,6 +300,7 @@ class AppState extends ChangeNotifier {
 
   final TopicRepository? _topicRepository;
   final LearningRepository? _learningRepository;
+  final bool persistQuizResults;
   final List<Topic> topics;
   int selectedTab = 0;
   bool isLoadingTopics = false;
@@ -310,6 +312,9 @@ class AppState extends ChangeNotifier {
   bool isLoadingParentDashboard = false;
   bool loadedParentDashboardFromFirebase = false;
   String? parentDashboardMessage;
+  bool isLoadingOasisProgress = false;
+  bool loadedOasisProgressFromFirebase = false;
+  String? oasisProgressMessage;
   String currentStudentId = demoStudentId;
   String? currentStudentEmail;
   String studentName = 'Aiman';
@@ -605,6 +610,9 @@ class AppState extends ChangeNotifier {
     }
     notifyListeners();
     unawaited(saveAppSession());
+    if (persistQuizResults) {
+      unawaited(_saveOasisProgressToFirebase());
+    }
   }
 
   void updateSignedInStudent({
@@ -627,24 +635,36 @@ class AppState extends ChangeNotifier {
     }
     notifyListeners();
     unawaited(saveAppSession());
+    if (persistQuizResults) {
+      unawaited(loadOasisProgressFromFirebase());
+    }
   }
 
   void updateLanguage(String value) {
     language = value;
     notifyListeners();
     unawaited(saveAppSession());
+    if (persistQuizResults) {
+      unawaited(_saveOasisProgressToFirebase());
+    }
   }
 
   void updateMissionReminders(bool value) {
     missionReminders = value;
     notifyListeners();
     unawaited(saveAppSession());
+    if (persistQuizResults) {
+      unawaited(_saveOasisProgressToFirebase());
+    }
   }
 
   void updateEyeComfortMode(bool value) {
     eyeComfortMode = value;
     notifyListeners();
     unawaited(saveAppSession());
+    if (persistQuizResults) {
+      unawaited(_saveOasisProgressToFirebase());
+    }
   }
 
   QuizReward saveQuizResult({
@@ -659,6 +679,10 @@ class AppState extends ChangeNotifier {
     }
 
     final topic = topics[topicIndex];
+    if (totalQuestions <= 0) {
+      throw ArgumentError('totalQuestions must be greater than zero.');
+    }
+
     final score = ((correctCount / totalQuestions) * 100).round();
     final earnedCrystals = _calculateCrystals(score, correctCount);
     final newMastery = _masteryForScore(score);
@@ -697,7 +721,10 @@ class AppState extends ChangeNotifier {
     );
 
     notifyListeners();
-    unawaited(_saveQuizResultToFirebase(attempt, timeTakenSeconds));
+    if (persistQuizResults) {
+      unawaited(_saveQuizResultToFirebase(attempt, timeTakenSeconds));
+      unawaited(_saveOasisProgressToFirebase());
+    }
     return reward;
   }
 
@@ -798,6 +825,103 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  Future<void> loadOasisProgressFromFirebase() async {
+    if (!persistQuizResults || isLoadingOasisProgress) return;
+
+    isLoadingOasisProgress = true;
+    oasisProgressMessage = null;
+    notifyListeners();
+
+    try {
+      final repository = _learningRepository ?? LearningRepository();
+      final snapshot = await repository.fetchOasisProgress(
+        studentId: currentStudentId,
+      );
+
+      if (snapshot == null || snapshot.isEmpty) {
+        loadedOasisProgressFromFirebase = false;
+        oasisProgressMessage = t(
+          'Using local oasis progress until Firebase has saved progress.',
+          'Menggunakan kemajuan oasis setempat sehingga Firebase mempunyai kemajuan tersimpan.',
+        );
+      } else {
+        _applyOasisProgress(snapshot);
+        await saveAppSession();
+        loadedOasisProgressFromFirebase = true;
+        oasisProgressMessage = t(
+          'Loaded oasis progress from Firebase.',
+          'Kemajuan oasis dimuat daripada Firebase.',
+        );
+      }
+    } catch (_) {
+      loadedOasisProgressFromFirebase = false;
+      oasisProgressMessage = t(
+        'Firebase oasis progress unavailable. Local progress is still kept.',
+        'Kemajuan oasis Firebase tidak tersedia. Kemajuan setempat masih dikekalkan.',
+      );
+    } finally {
+      isLoadingOasisProgress = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _saveOasisProgressToFirebase() async {
+    try {
+      final repository = _learningRepository ?? LearningRepository();
+      await repository.saveOasisProgress(
+        studentId: currentStudentId,
+        yearLevel: yearLevel,
+        crystals: crystals,
+        mutualAidEnergy: mutualAidEnergy,
+        language: language,
+        missionReminders: missionReminders,
+        eyeComfortMode: eyeComfortMode,
+        repairedAreas: oasisAreaProgress,
+      );
+      loadedOasisProgressFromFirebase = true;
+      oasisProgressMessage = t(
+        'Oasis progress synced to Firebase.',
+        'Kemajuan oasis disegerakkan ke Firebase.',
+      );
+    } catch (_) {
+      loadedOasisProgressFromFirebase = false;
+      oasisProgressMessage = t(
+        'Firebase oasis sync failed. Local progress is still kept.',
+        'Penyegerakan oasis Firebase gagal. Kemajuan setempat masih dikekalkan.',
+      );
+    } finally {
+      notifyListeners();
+    }
+  }
+
+  void _applyOasisProgress(OasisProgressSnapshot snapshot) {
+    if (snapshot.crystals != null) {
+      crystals = snapshot.crystals!.clamp(0, 99999).toInt();
+    }
+    if (snapshot.mutualAidEnergy != null) {
+      mutualAidEnergy = snapshot.mutualAidEnergy!.clamp(0, 99999).toInt();
+    }
+    if (snapshot.language != null) {
+      language = snapshot.language!;
+    }
+    if (snapshot.missionReminders != null) {
+      missionReminders = snapshot.missionReminders!;
+    }
+    if (snapshot.eyeComfortMode != null) {
+      eyeComfortMode = snapshot.eyeComfortMode!;
+    }
+    if (snapshot.repairedAreas.isEmpty) return;
+
+    for (var index = 0; index < oasisAreas.length; index += 1) {
+      final area = oasisAreas[index];
+      final progress = snapshot.repairedAreas[area.id];
+      if (progress == null) continue;
+      oasisAreas[index] = area.copyWith(
+        progress: progress.clamp(0.0, 1.0).toDouble(),
+      );
+    }
+  }
+
   bool claimRecommendedMissionReward() {
     final mission = recommendedMission;
     if (!mission.isReadyToClaim) return false;
@@ -805,6 +929,9 @@ class AppState extends ChangeNotifier {
     crystals += mission.rewardCrystals;
     claimedRecommendedMissionTopicIds.add(mission.topicId);
     notifyListeners();
+    if (persistQuizResults) {
+      unawaited(_saveOasisProgressToFirebase());
+    }
     return true;
   }
 
@@ -990,6 +1117,9 @@ class AppState extends ChangeNotifier {
       progress: (area.progress + 0.25).clamp(0.0, 1.0),
     );
     notifyListeners();
+    if (persistQuizResults) {
+      unawaited(_saveOasisProgressToFirebase());
+    }
     return true;
   }
 

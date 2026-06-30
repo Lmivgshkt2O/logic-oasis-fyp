@@ -44,10 +44,11 @@ class _ParentAuthPageState extends State<ParentAuthPage> {
   Future<void> authenticate() async {
     if (isLoading) return;
 
+    final l10n = AppLocalizations.of(context)!;
     final password = passwordController.text.trim();
     if (password.isEmpty) {
       setState(() {
-        errorText = AppLocalizations.of(context)!.enterLinkedParentPassword;
+        errorText = l10n.enterLinkedParentPassword;
       });
       return;
     }
@@ -65,21 +66,25 @@ class _ParentAuthPageState extends State<ParentAuthPage> {
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (_) => Scaffold(
+          builder: (routeContext) => Scaffold(
             appBar: AppBar(
-              title: Text(AppLocalizations.of(context)!.parentDashboard),
+              title: Text(
+                AppLocalizations.of(routeContext)!.parentDashboard,
+              ),
             ),
             body: SafeArea(child: ParentDashboardPage(state: widget.state)),
           ),
         ),
       );
     } on AuthFailure catch (error) {
+      if (!mounted) return;
       setState(() {
         errorText = error.message;
       });
     } catch (_) {
+      if (!mounted) return;
       setState(() {
-        errorText = AppLocalizations.of(context)!.parentAccountUnavailable;
+        errorText = l10n.parentAccountUnavailable;
       });
     } finally {
       if (mounted) {

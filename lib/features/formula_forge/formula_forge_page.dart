@@ -66,6 +66,9 @@ class FormulaForgePage extends StatelessWidget {
           TopicCard(
             topic: topic,
             isBahasaMelayu: state.isBahasaMelayu,
+            lockedReason: topic.questions.isEmpty
+                ? l10n.topicLockedQuestionBank
+                : null,
             onStart: topic.questions.isEmpty
                 ? null
                 : () async {
