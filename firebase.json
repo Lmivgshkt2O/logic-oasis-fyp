@@ -1,0 +1,28 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "logic-oasis-fyp",
+          "appId": "1:559775119210:android:e2b03de7554ce31af41713",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "logic-oasis-fyp",
+          "configurations": {
+            "android": "1:559775119210:android:e2b03de7554ce31af41713",
+            "ios": "1:559775119210:ios:51edeb9eb4640c6ef41713",
+            "macos": "1:559775119210:ios:51edeb9eb4640c6ef41713",
+            "web": "1:559775119210:web:b02b25972c811124f41713",
+            "windows": "1:559775119210:web:c47ce61e0b2649b4f41713"
+          }
+        }
+      }
+    }
+  },
+  "firestore": {
+    "rules": "firestore.rules"
+  }
+}

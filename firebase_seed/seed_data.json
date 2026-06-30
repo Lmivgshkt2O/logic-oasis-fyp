@@ -1,0 +1,382 @@
+{
+  "users": {
+    "student_aiman_y4": {
+      "displayName": "Aiman",
+      "email": "student@example.com",
+      "yearLevel": 4,
+      "language": "English",
+      "role": "student",
+      "parentIds": ["parent_mrs_nadia"],
+      "preferredTopics": ["fractions_y4", "decimals_y4"],
+      "lastActiveAt": "__SERVER_TIMESTAMP__",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "parent_mrs_nadia": {
+      "displayName": "Mrs Nadia",
+      "email": "parent@example.com",
+      "role": "parent",
+      "linkedStudentIds": ["student_aiman_y4"],
+      "createdAt": "__SERVER_TIMESTAMP__"
+    }
+  },
+  "parentLinks": {
+    "link_parent_mrs_nadia_student_aiman_y4": {
+      "parentId": "parent_mrs_nadia",
+      "studentId": "student_aiman_y4",
+      "relation": "Mother",
+      "status": "active",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    }
+  },
+  "topics": {
+    "fractions_y4": {
+      "title": "Fractions",
+      "titleBm": "Pecahan",
+      "yearLevel": 4,
+      "syllabus": "KSSR Semakan 2017",
+      "order": 1,
+      "isActive": true,
+      "description": "Understand, compare, simplify, and add basic fractions."
+    },
+    "decimals_y4": {
+      "title": "Decimals",
+      "titleBm": "Perpuluhan",
+      "yearLevel": 4,
+      "syllabus": "KSSR Semakan 2017",
+      "order": 2,
+      "isActive": true,
+      "description": "Read, compare, and calculate with tenths and hundredths."
+    }
+  },
+  "questions": {
+    "q_frac_001": {
+      "topicId": "fractions_y4",
+      "subtopicId": "equivalent_fractions",
+      "difficultyLevel": "Easy",
+      "questionText": "Which fraction is equal to 1/2?",
+      "options": ["1/4", "2/4", "3/4", "4/4"],
+      "answerIndex": 1,
+      "explanation": "2/4 can be simplified by dividing both numerator and denominator by 2.",
+      "language": "English",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_frac_002": {
+      "topicId": "fractions_y4",
+      "subtopicId": "compare_unit_fractions",
+      "difficultyLevel": "Easy",
+      "questionText": "Which fraction is larger?",
+      "options": ["1/3", "1/5", "1/8", "1/10"],
+      "answerIndex": 0,
+      "explanation": "For unit fractions, the smaller denominator gives the larger fraction.",
+      "language": "English",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_frac_003": {
+      "topicId": "fractions_y4",
+      "subtopicId": "add_like_denominators",
+      "difficultyLevel": "Easy",
+      "questionText": "What is 1/4 + 1/4?",
+      "options": ["1/8", "1/4", "1/2", "1"],
+      "answerIndex": 2,
+      "explanation": "One quarter plus one quarter makes two quarters, which is 1/2.",
+      "language": "English",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_frac_004": {
+      "topicId": "fractions_y4",
+      "subtopicId": "fraction_representation",
+      "difficultyLevel": "Medium",
+      "questionText": "Which fraction shows three out of four equal parts?",
+      "options": ["1/4", "2/4", "3/4", "4/3"],
+      "answerIndex": 2,
+      "explanation": "3/4 means three selected parts from four equal parts.",
+      "language": "English",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_frac_005": {
+      "topicId": "fractions_y4",
+      "subtopicId": "simplify_fractions",
+      "difficultyLevel": "Medium",
+      "questionText": "What is 2/6 simplified?",
+      "options": ["1/2", "1/3", "2/3", "3/6"],
+      "answerIndex": 1,
+      "explanation": "Divide 2 and 6 by 2. The simplified fraction is 1/3.",
+      "language": "English",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_dec_001": {
+      "topicId": "decimals_y4",
+      "subtopicId": "place_value",
+      "difficultyLevel": "Easy",
+      "questionText": "What is the value of the digit 5 in 3.52?",
+      "options": ["5 ones", "5 tenths", "5 hundredths", "5 tens"],
+      "answerIndex": 1,
+      "explanation": "In 3.52, the digit 5 is in the tenths place.",
+      "language": "English",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_dec_002": {
+      "topicId": "decimals_y4",
+      "subtopicId": "compare_decimals",
+      "difficultyLevel": "Easy",
+      "questionText": "Which decimal is the largest?",
+      "options": ["0.4", "0.35", "0.09", "0.3"],
+      "answerIndex": 0,
+      "explanation": "0.4 is 0.40, which is greater than 0.35, 0.09, and 0.30.",
+      "language": "English",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_dec_003": {
+      "topicId": "decimals_y4",
+      "subtopicId": "decimal_fraction_link",
+      "difficultyLevel": "Medium",
+      "questionText": "Which decimal is equal to 7/10?",
+      "options": ["0.07", "0.7", "7.0", "0.17"],
+      "answerIndex": 1,
+      "explanation": "Seven tenths is written as 0.7.",
+      "language": "English",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_dec_004": {
+      "topicId": "decimals_y4",
+      "subtopicId": "add_decimals",
+      "difficultyLevel": "Medium",
+      "questionText": "What is 1.2 + 0.3?",
+      "options": ["1.5", "1.23", "1.05", "0.15"],
+      "answerIndex": 0,
+      "explanation": "Add the tenths: 1.2 + 0.3 = 1.5.",
+      "language": "English",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_dec_005": {
+      "topicId": "decimals_y4",
+      "subtopicId": "money_decimals",
+      "difficultyLevel": "Hard",
+      "questionText": "A pencil costs RM1.25 and an eraser costs RM0.50. What is the total?",
+      "options": ["RM1.50", "RM1.75", "RM2.25", "RM0.75"],
+      "answerIndex": 1,
+      "explanation": "RM1.25 + RM0.50 = RM1.75.",
+      "language": "English",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    }
+  },
+  "quizAttempts": {
+    "attempt_aiman_frac_001": {
+      "studentId": "student_aiman_y4",
+      "topicId": "fractions_y4",
+      "score": 40,
+      "correctRate": 0.4,
+      "correctCount": 2,
+      "totalQuestions": 5,
+      "wrongCount": 3,
+      "timeTakenSeconds": 240,
+      "retryCount": 0,
+      "difficultyLevel": "Easy",
+      "masteryLevel": "Weak",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "attempt_aiman_dec_001": {
+      "studentId": "student_aiman_y4",
+      "topicId": "decimals_y4",
+      "score": 80,
+      "correctRate": 0.8,
+      "correctCount": 4,
+      "totalQuestions": 5,
+      "wrongCount": 1,
+      "timeTakenSeconds": 210,
+      "retryCount": 0,
+      "difficultyLevel": "Easy",
+      "masteryLevel": "Strong",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "attempt_aiman_frac_002": {
+      "studentId": "student_aiman_y4",
+      "topicId": "fractions_y4",
+      "score": 60,
+      "correctRate": 0.6,
+      "correctCount": 3,
+      "totalQuestions": 5,
+      "wrongCount": 2,
+      "timeTakenSeconds": 225,
+      "retryCount": 1,
+      "difficultyLevel": "Medium",
+      "masteryLevel": "Moderate",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    }
+  },
+  "topicMastery": {
+    "student_aiman_y4_fractions_y4": {
+      "studentId": "student_aiman_y4",
+      "topicId": "fractions_y4",
+      "masteryLevel": "Weak",
+      "averageScore": 50,
+      "recentTrend": "improving",
+      "attemptsCount": 2,
+      "updatedAt": "__SERVER_TIMESTAMP__"
+    },
+    "student_aiman_y4_decimals_y4": {
+      "studentId": "student_aiman_y4",
+      "topicId": "decimals_y4",
+      "masteryLevel": "Strong",
+      "averageScore": 80,
+      "recentTrend": "stable",
+      "attemptsCount": 1,
+      "updatedAt": "__SERVER_TIMESTAMP__"
+    }
+  },
+  "oasisProgress": {
+    "student_aiman_y4": {
+      "studentId": "student_aiman_y4",
+      "yearLevel": 4,
+      "crystals": 124,
+      "mutualAidEnergy": 36,
+      "language": "English",
+      "missionReminders": true,
+      "eyeComfortMode": false,
+      "repairedAreas": {
+        "fraction_bridge": 0.25,
+        "decimal_waterway": 0.25,
+        "percentage_garden": 0,
+        "market_corner": 0
+      },
+      "updatedAt": "__SERVER_TIMESTAMP__"
+    }
+  },
+  "forumPosts": {
+    "post_frac_help_001": {
+      "studentId": "student_aiman_y4",
+      "topicId": "fractions_y4",
+      "questionText": "Why is 2/6 the same as 1/3?",
+      "status": "open",
+      "acceptedReplyId": "reply_frac_help_001",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "post_dec_help_001": {
+      "studentId": "student_aiman_y4",
+      "topicId": "decimals_y4",
+      "questionText": "How do I know whether 0.4 is bigger than 0.35?",
+      "status": "open",
+      "acceptedReplyId": null,
+      "createdAt": "__SERVER_TIMESTAMP__"
+    }
+  },
+  "forumReplies": {
+    "reply_frac_help_001": {
+      "postId": "post_frac_help_001",
+      "studentId": "student_peer_sara_y4",
+      "finalAnswer": "2/6 is equal to 1/3.",
+      "steps": ["Find a number that divides both 2 and 6.", "Divide both numbers by 2: 2 ÷ 2 = 1 and 6 ÷ 2 = 3."],
+      "explanation": "Fractions stay equal when the numerator and denominator are divided by the same number.",
+      "moderationStatus": "Accepted",
+      "helpfulVotes": 3,
+      "reports": 0,
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "reply_dec_help_001": {
+      "postId": "post_dec_help_001",
+      "studentId": "student_peer_sara_y4",
+      "finalAnswer": "0.4 is bigger.",
+      "steps": ["Write 0.4 as 0.40.", "Compare 0.40 and 0.35."],
+      "explanation": "Forty hundredths is greater than thirty-five hundredths.",
+      "moderationStatus": "Accepted",
+      "helpfulVotes": 1,
+      "reports": 0,
+      "createdAt": "__SERVER_TIMESTAMP__"
+    }
+  },
+  "moderationLogs": {
+    "mod_reply_frac_help_001": {
+      "replyId": "reply_frac_help_001",
+      "postId": "post_frac_help_001",
+      "ruleResults": {
+        "answerOnly": false,
+        "missingSteps": false,
+        "tooShortExplanation": false,
+        "inappropriateWords": false,
+        "spamPattern": false
+      },
+      "label": "Accepted",
+      "reasons": ["Final answer, steps, and explanation are present."],
+      "modelVersion": "rules_v0_fyp1",
+      "checkedAt": "__SERVER_TIMESTAMP__"
+    },
+    "mod_reply_dec_help_001": {
+      "replyId": "reply_dec_help_001",
+      "postId": "post_dec_help_001",
+      "ruleResults": {
+        "answerOnly": false,
+        "missingSteps": false,
+        "tooShortExplanation": false,
+        "inappropriateWords": false,
+        "spamPattern": false
+      },
+      "label": "Accepted",
+      "reasons": ["Reply compares place values and includes explanation."],
+      "modelVersion": "rules_v0_fyp1",
+      "checkedAt": "__SERVER_TIMESTAMP__"
+    },
+    "mod_demo_needs_improvement": {
+      "replyId": "demo_reply_answer_only",
+      "postId": "post_frac_help_001",
+      "ruleResults": {
+        "answerOnly": true,
+        "missingSteps": true,
+        "tooShortExplanation": true,
+        "inappropriateWords": false,
+        "spamPattern": false
+      },
+      "label": "Needs Improvement",
+      "reasons": ["Reply gives an answer but does not show enough working steps."],
+      "modelVersion": "rules_v0_fyp1",
+      "checkedAt": "__SERVER_TIMESTAMP__"
+    }
+  },
+  "helperReputation": {
+    "student_peer_sara_y4_fractions_y4": {
+      "studentId": "student_peer_sara_y4",
+      "topicId": "fractions_y4",
+      "helpfulCount": 8,
+      "acceptedReplyCount": 4,
+      "reportCount": 0,
+      "reputationScore": 92,
+      "recentActivityStatus": "active",
+      "updatedAt": "__SERVER_TIMESTAMP__"
+    },
+    "student_peer_sara_y4_decimals_y4": {
+      "studentId": "student_peer_sara_y4",
+      "topicId": "decimals_y4",
+      "helpfulCount": 3,
+      "acceptedReplyCount": 2,
+      "reportCount": 0,
+      "reputationScore": 78,
+      "recentActivityStatus": "active",
+      "updatedAt": "__SERVER_TIMESTAMP__"
+    }
+  },
+  "studyBuddyRecommendations": {
+    "buddy_rec_aiman_fractions_sara": {
+      "studentId": "student_aiman_y4",
+      "buddyStudentId": "student_peer_sara_y4",
+      "topicId": "fractions_y4",
+      "matchScore": 86,
+      "status": "recommended",
+      "reasons": [
+        "Aiman's weakest current topic is Fractions.",
+        "Sara has strong helper reputation in Fractions.",
+        "Sara has accepted replies and recent helpful votes."
+      ],
+      "createdAt": "__SERVER_TIMESTAMP__"
+    }
+  },
+  "parentReports": {
+    "report_parent_mrs_nadia_aiman_week_001": {
+      "parentId": "parent_mrs_nadia",
+      "studentId": "student_aiman_y4",
+      "weakTopic": "Fractions",
+      "reasons": ["Fractions average score is 50 across two attempts.", "The latest Fractions retry improved from 40 to 60."],
+      "suggestedAction": "Review equivalent fractions for 10 minutes, then complete one guided Fractions mission.",
+      "collaborationSummary": "Aiman asked one Fractions question and received one accepted peer explanation.",
+      "generatedAt": "__SERVER_TIMESTAMP__"
+    }
+  }
+}

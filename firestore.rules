@@ -1,0 +1,73 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function ownsUserDoc(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function ownsStudentField() {
+      return signedIn() &&
+        request.resource.data.studentId == request.auth.uid;
+    }
+
+    function ownsExistingStudentField() {
+      return signedIn() &&
+        resource.data.studentId == request.auth.uid;
+    }
+
+    match /topics/{topicId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /questions/{questionId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /users/{userId} {
+      allow read, write: if ownsUserDoc(userId);
+    }
+
+    match /rememberedProfiles/{profileId} {
+      allow read, write: if ownsUserDoc(profileId);
+    }
+
+    match /parentAccounts/{parentId} {
+      allow read, write: if signedIn();
+    }
+
+    match /quizAttempts/{attemptId} {
+      allow read: if ownsExistingStudentField();
+      allow create, update: if ownsStudentField();
+      allow delete: if false;
+    }
+
+    match /topicMastery/{masteryId} {
+      allow read: if ownsExistingStudentField();
+      allow create, update: if ownsStudentField();
+      allow delete: if false;
+    }
+
+    match /oasisProgress/{progressId} {
+      allow read: if ownsExistingStudentField();
+      allow create, update: if ownsStudentField();
+      allow delete: if false;
+    }
+
+    match /aiModelRuns/{runId} {
+      allow read: if ownsExistingStudentField();
+      allow create, update: if ownsStudentField();
+      allow delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -47,5 +47,9 @@ app.*.map.json
 /android/app/release
 
 # Firebase local seed credentials
+firebase_seed/node_modules/
 firebase_seed/serviceAccountKey*.json
 firebase_seed/.env
+
+# Generated planning/report artifacts
+outputs/

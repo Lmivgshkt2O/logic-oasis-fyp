@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "559775119210",
+    "project_id": "logic-oasis-fyp",
+    "storage_bucket": "logic-oasis-fyp.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:559775119210:android:e2b03de7554ce31af41713",
+        "android_client_info": {
+          "package_name": "com.example.logic_oasis"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "559775119210-i727s4c40s7tk4dsjcugrnp9ekf4m37c.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.logic_oasis",
+            "certificate_hash": "96567c1a193b90ea6a9841f4a7830123f5108d84"
+          }
+        },
+        {
+          "client_id": "559775119210-9dh9khp3btas0oq5g65deo174odfbqto.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCrpZi_BU-1A9q5gYhaLLAeoF-wjGYJUoo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "559775119210-9dh9khp3btas0oq5g65deo174odfbqto.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "559775119210-sllf6lpkkq35dst480693lho622r58r3.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.logicOasis"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

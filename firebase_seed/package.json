@@ -1,0 +1,13 @@
+{
+  "name": "logic-oasis-firebase-seed",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Firestore seed data for Logic Oasis FYP1 demo.",
+  "type": "commonjs",
+  "scripts": {
+    "seed": "node seed_firestore.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.0"
+  }
+}
