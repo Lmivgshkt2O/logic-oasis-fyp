@@ -32,6 +32,12 @@ void main() {
     );
 
     expect(find.text('Back to Forge'), findsOneWidget);
+    expect(find.text('Mistakes'), findsOneWidget);
+    expect(find.text('1 to review'), findsOneWidget);
+    expect(
+      find.text('Next action: Review 1 mistake, then try a new topic.'),
+      findsOneWidget,
+    );
 
     await tester.tap(find.text('Back to Forge'));
 

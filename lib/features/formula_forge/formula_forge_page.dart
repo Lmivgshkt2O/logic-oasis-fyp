@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:logic_oasis/app/logic_oasis_design.dart';
+import 'package:logic_oasis/features/formula_forge/subtopic_page.dart';
 import 'package:logic_oasis/features/formula_forge/widgets/topic_card.dart';
-import 'package:logic_oasis/features/quiz/quiz_page.dart';
-import 'package:logic_oasis/features/quiz/result_page.dart';
 import 'package:logic_oasis/l10n/app_localizations.dart';
-import 'package:logic_oasis/shared/models/quiz_completion.dart';
+import 'package:logic_oasis/shared/models/topic.dart';
 import 'package:logic_oasis/shared/state/app_state.dart';
+import 'package:logic_oasis/shared/widgets/logic_oasis_figma_components.dart';
 
 class FormulaForgePage extends StatelessWidget {
   const FormulaForgePage({super.key, required this.state});
@@ -13,47 +14,19 @@ class FormulaForgePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 18),
+    return LogicOasisScaffold(
       children: [
-        Row(
-          children: [
-            Container(
-              width: 68,
-              height: 68,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Icon(
-                Icons.calculate_outlined,
-                color: theme.colorScheme.primary,
-                size: 34,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    l10n.formulaForge,
-                    style: theme.textTheme.headlineLarge,
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    l10n.forgeSubtitle,
-                    style: theme.textTheme.bodyLarge,
-                  ),
-                ],
-              ),
-            ),
-          ],
+        LogicHeader(
+          leading: const _ForgeVillageIcon(),
+          title: 'Formula Forge',
+          subtitle: state.t(
+            'Practice topics that restore your oasis.',
+            l10n.forgeSubtitle,
+          ),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 18),
         if (state.isLoadingTopics || state.topicLoadMessage != null) ...[
           _FirebaseStatusBanner(state: state),
           const SizedBox(height: 13),
@@ -66,51 +39,62 @@ class FormulaForgePage extends StatelessWidget {
           TopicCard(
             topic: topic,
             isBahasaMelayu: state.isBahasaMelayu,
-            lockedReason: topic.questions.isEmpty
-                ? l10n.topicLockedQuestionBank
-                : null,
-            onStart: topic.questions.isEmpty
-                ? null
-                : () async {
-                    final result = await Navigator.of(context)
-                        .push<QuizCompletion>(
-                          MaterialPageRoute(
-                            builder: (_) => QuizPage(
-                              topic: topic,
-                              isBahasaMelayu: state.isBahasaMelayu,
-                            ),
-                          ),
-                        );
-                    if (result != null && context.mounted) {
-                      final reward = state.saveQuizResult(
-                        topicId: topic.id,
-                        correctCount: result.correctCount,
-                        totalQuestions: topic.questions.length,
-                        timeTakenSeconds: result.timeTakenSeconds,
-                      );
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => ResultPage(
-                            correctCount: result.correctCount,
-                            totalQuestions: topic.questions.length,
-                            topicArea: topic.localizedArea(
-                              state.isBahasaMelayu,
-                            ),
-                            isBahasaMelayu: state.isBahasaMelayu,
-                            reward: reward,
-                            onBackToForge: () {
-                              Navigator.of(context).pop();
-                              state.changeTab(1);
-                            },
-                          ),
+            lockedReason: _lockedReasonForTopic(state, topic, l10n),
+            onStart: _canOpenTopic(state, topic)
+                ? () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => SubtopicPage(
+                          state: state,
+                          topic: topic,
                         ),
-                      );
-                    }
-                  },
+                      ),
+                    );
+                  }
+                : null,
           ),
-          const SizedBox(height: 13),
+          const SizedBox(height: 14),
         ],
       ],
+    );
+  }
+
+  bool _canOpenTopic(AppState state, Topic topic) {
+    return state.isTopicUnlocked(topic) &&
+        state.subtopicsForTopic(topic).isNotEmpty;
+  }
+
+  String? _lockedReasonForTopic(
+    AppState state,
+    Topic topic,
+    AppLocalizations l10n,
+  ) {
+    final sequenceReason = state.lockedReasonForTopic(topic);
+    if (sequenceReason != null) return sequenceReason;
+    if (state.subtopicsForTopic(topic).isEmpty) {
+      return l10n.topicLockedQuestionBank;
+    }
+    return null;
+  }
+}
+
+class _ForgeVillageIcon extends StatelessWidget {
+  const _ForgeVillageIcon();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 58,
+      height: 58,
+      decoration: BoxDecoration(
+        color: const Color(0xFFDDF4E4),
+        borderRadius: BorderRadius.circular(17),
+      ),
+      child: const Icon(
+        Icons.account_balance_rounded,
+        color: LogicOasisDesign.forest,
+        size: 30,
+      ),
     );
   }
 }

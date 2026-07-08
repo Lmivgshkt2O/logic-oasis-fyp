@@ -6,8 +6,13 @@
       "yearLevel": 4,
       "language": "English",
       "role": "student",
-      "parentIds": ["parent_mrs_nadia"],
-      "preferredTopics": ["fractions_y4", "decimals_y4"],
+      "parentIds": [
+        "parent_mrs_nadia"
+      ],
+      "preferredTopics": [
+        "whole_numbers_y4",
+        "fractions_y4"
+      ],
       "lastActiveAt": "__SERVER_TIMESTAMP__",
       "createdAt": "__SERVER_TIMESTAMP__"
     },
@@ -15,7 +20,9 @@
       "displayName": "Mrs Nadia",
       "email": "parent@example.com",
       "role": "parent",
-      "linkedStudentIds": ["student_aiman_y4"],
+      "linkedStudentIds": [
+        "student_aiman_y4"
+      ],
       "createdAt": "__SERVER_TIMESTAMP__"
     }
   },
@@ -29,198 +36,1600 @@
     }
   },
   "topics": {
+    "whole_numbers_y4": {
+      "title": "Whole Numbers up to 100 000",
+      "titleBm": "Nombor Bulat hingga 100 000",
+      "yearLevel": 4,
+      "syllabus": "KSSR Semakan 2017",
+      "order": 1,
+      "isActive": true,
+      "description": "Read, write, compare, classify, and continue number patterns",
+      "descriptionBm": "Baca, tulis, banding, kelaskan dan sambung pola nombor",
+      "contentStatus": "complete_chapter_seed"
+    },
     "fractions_y4": {
       "title": "Fractions",
       "titleBm": "Pecahan",
       "yearLevel": 4,
       "syllabus": "KSSR Semakan 2017",
-      "order": 1,
+      "order": 2,
       "isActive": true,
-      "description": "Understand, compare, simplify, and add basic fractions."
+      "description": "Understand and compare fractions.",
+      "descriptionBm": "Fahami dan bandingkan pecahan.",
+      "contentStatus": "placeholder_locked_until_previous_topic_complete"
     },
     "decimals_y4": {
       "title": "Decimals",
       "titleBm": "Perpuluhan",
       "yearLevel": 4,
       "syllabus": "KSSR Semakan 2017",
+      "order": 3,
+      "isActive": true,
+      "description": "Read, compare, and calculate with decimal values.",
+      "descriptionBm": "Baca, banding dan kira nilai perpuluhan.",
+      "contentStatus": "placeholder_locked_until_previous_topic_complete"
+    },
+    "percentages_y4": {
+      "title": "Percentages",
+      "titleBm": "Peratus",
+      "yearLevel": 4,
+      "syllabus": "KSSR Semakan 2017",
+      "order": 4,
+      "isActive": true,
+      "description": "Connect percentages with parts of one hundred.",
+      "descriptionBm": "Hubungkan peratus dengan bahagian daripada seratus.",
+      "contentStatus": "placeholder_locked_until_previous_topic_complete"
+    },
+    "money_y4": {
+      "title": "Money",
+      "titleBm": "Wang",
+      "yearLevel": 4,
+      "syllabus": "KSSR Semakan 2017",
+      "order": 5,
+      "isActive": true,
+      "description": "Solve daily spending problems using ringgit and sen.",
+      "descriptionBm": "Selesaikan masalah perbelanjaan harian menggunakan ringgit dan sen.",
+      "contentStatus": "placeholder_locked_until_previous_topic_complete"
+    }
+  },
+  "subtopics": {
+    "whole_numbers_y4_read_write_numbers": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "read_write_numbers",
+      "title": "Read and Write Numbers",
+      "titleBm": "Baca dan Tulis Nombor",
+      "yearLevel": 4,
+      "order": 1,
+      "isActive": true,
+      "description": "Read and write numbers in numerals and words.",
+      "descriptionBm": "Baca dan tulis nombor dalam angka dan perkataan.",
+      "standardCode": "KSSR Year 4: Whole Numbers 1.1.1",
+      "sourcePages": "Buku Teks Matematik Tahun 4, pp. 2-3"
+    },
+    "whole_numbers_y4_place_digit_value": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "place_digit_value",
+      "title": "Place Value and Digit Value",
+      "titleBm": "Nilai Tempat dan Nilai Digit",
+      "yearLevel": 4,
       "order": 2,
       "isActive": true,
-      "description": "Read, compare, and calculate with tenths and hundredths."
+      "description": "Identify place value, digit value, and expanded form.",
+      "descriptionBm": "Kenal nilai tempat, nilai digit dan cerakinan.",
+      "standardCode": "KSSR Year 4: Whole Numbers 1.1.2",
+      "sourcePages": "Buku Teks Matematik Tahun 4, pp. 4-5"
+    },
+    "whole_numbers_y4_compare_order_numbers": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "compare_order_numbers",
+      "title": "Compare and Order Numbers",
+      "titleBm": "Banding dan Susun Nombor",
+      "yearLevel": 4,
+      "order": 3,
+      "isActive": true,
+      "description": "Compare numbers and arrange them in order.",
+      "descriptionBm": "Banding nombor dan susun mengikut tertib.",
+      "standardCode": "KSSR Year 4: Whole Numbers 1.1.2",
+      "sourcePages": "Buku Teks Matematik Tahun 4, pp. 6-8"
+    },
+    "whole_numbers_y4_odd_even_numbers": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "odd_even_numbers",
+      "title": "Odd and Even Numbers",
+      "titleBm": "Nombor Ganjil dan Nombor Genap",
+      "yearLevel": 4,
+      "order": 4,
+      "isActive": true,
+      "description": "Classify numbers as odd or even.",
+      "descriptionBm": "Kelaskan nombor sebagai ganjil atau genap.",
+      "standardCode": "KSSR Year 4: Whole Numbers 1.2.1",
+      "sourcePages": "Buku Teks Matematik Tahun 4, pp. 9-10"
+    },
+    "whole_numbers_y4_number_patterns": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "number_patterns",
+      "title": "Number Patterns",
+      "titleBm": "Pola Nombor",
+      "yearLevel": 4,
+      "order": 5,
+      "isActive": true,
+      "description": "Recognise and continue ascending or descending patterns.",
+      "descriptionBm": "Kenal dan sambung pola menaik atau menurun.",
+      "standardCode": "KSSR Year 4: Whole Numbers 1.5.1",
+      "sourcePages": "Buku Teks Matematik Tahun 4, p. 11"
     }
   },
   "questions": {
-    "q_frac_001": {
-      "topicId": "fractions_y4",
-      "subtopicId": "equivalent_fractions",
+    "q_y4_whole_read_write_numbers_01": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "read_write_numbers",
+      "order": 1,
+      "bloomLevel": "Remember",
       "difficultyLevel": "Easy",
-      "questionText": "Which fraction is equal to 1/2?",
-      "options": ["1/4", "2/4", "3/4", "4/4"],
+      "questionText": "Which numeral shows twenty thousand four?",
+      "questionTextBm": "Angka manakah menunjukkan dua puluh ribu empat?",
+      "options": [
+        "2 004",
+        "20 004",
+        "24 000",
+        "200 004"
+      ],
+      "optionsBm": [
+        "2 004",
+        "20 004",
+        "24 000",
+        "200 004"
+      ],
       "answerIndex": 1,
-      "explanation": "2/4 can be simplified by dividing both numerator and denominator by 2.",
-      "language": "English",
+      "explanation": "Remember: twenty thousand four has 2 in the ten-thousands place and 4 ones.",
+      "explanationBm": "Ingat: dua puluh ribu empat mempunyai 2 di tempat puluh ribu dan 4 sa.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
       "createdAt": "__SERVER_TIMESTAMP__"
     },
-    "q_frac_002": {
-      "topicId": "fractions_y4",
-      "subtopicId": "compare_unit_fractions",
+    "q_y4_whole_read_write_numbers_02": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "read_write_numbers",
+      "order": 2,
+      "bloomLevel": "Remember",
       "difficultyLevel": "Easy",
-      "questionText": "Which fraction is larger?",
-      "options": ["1/3", "1/5", "1/8", "1/10"],
+      "questionText": "Which number is written as 70 015?",
+      "questionTextBm": "Nombor manakah ditulis sebagai 70 015?",
+      "options": [
+        "seventy thousand fifteen",
+        "seventeen thousand fifteen",
+        "seventy thousand fifty",
+        "seven thousand fifteen"
+      ],
+      "optionsBm": [
+        "tujuh puluh ribu lima belas",
+        "tujuh belas ribu lima belas",
+        "tujuh puluh ribu lima puluh",
+        "tujuh ribu lima belas"
+      ],
       "answerIndex": 0,
-      "explanation": "For unit fractions, the smaller denominator gives the larger fraction.",
-      "language": "English",
+      "explanation": "Remember: 70 015 is read as seventy thousand fifteen.",
+      "explanationBm": "Ingat: 70 015 dibaca sebagai tujuh puluh ribu lima belas.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
       "createdAt": "__SERVER_TIMESTAMP__"
     },
-    "q_frac_003": {
-      "topicId": "fractions_y4",
-      "subtopicId": "add_like_denominators",
+    "q_y4_whole_read_write_numbers_03": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "read_write_numbers",
+      "order": 3,
+      "bloomLevel": "Understand",
       "difficultyLevel": "Easy",
-      "questionText": "What is 1/4 + 1/4?",
-      "options": ["1/8", "1/4", "1/2", "1"],
-      "answerIndex": 2,
-      "explanation": "One quarter plus one quarter makes two quarters, which is 1/2.",
-      "language": "English",
-      "createdAt": "__SERVER_TIMESTAMP__"
-    },
-    "q_frac_004": {
-      "topicId": "fractions_y4",
-      "subtopicId": "fraction_representation",
-      "difficultyLevel": "Medium",
-      "questionText": "Which fraction shows three out of four equal parts?",
-      "options": ["1/4", "2/4", "3/4", "4/3"],
-      "answerIndex": 2,
-      "explanation": "3/4 means three selected parts from four equal parts.",
-      "language": "English",
-      "createdAt": "__SERVER_TIMESTAMP__"
-    },
-    "q_frac_005": {
-      "topicId": "fractions_y4",
-      "subtopicId": "simplify_fractions",
-      "difficultyLevel": "Medium",
-      "questionText": "What is 2/6 simplified?",
-      "options": ["1/2", "1/3", "2/3", "3/6"],
+      "questionText": "Which numeral matches sixty-one thousand seven hundred?",
+      "questionTextBm": "Angka manakah sepadan dengan enam puluh satu ribu tujuh ratus?",
+      "options": [
+        "61 070",
+        "61 700",
+        "16 700",
+        "60 170"
+      ],
+      "optionsBm": [
+        "61 070",
+        "61 700",
+        "16 700",
+        "60 170"
+      ],
       "answerIndex": 1,
-      "explanation": "Divide 2 and 6 by 2. The simplified fraction is 1/3.",
-      "language": "English",
+      "explanation": "Understand: seven hundred means 700, so the number is 61 700.",
+      "explanationBm": "Fahami: tujuh ratus bermaksud 700, jadi nombornya ialah 61 700.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
       "createdAt": "__SERVER_TIMESTAMP__"
     },
-    "q_dec_001": {
-      "topicId": "decimals_y4",
-      "subtopicId": "place_value",
+    "q_y4_whole_read_write_numbers_04": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "read_write_numbers",
+      "order": 4,
+      "bloomLevel": "Understand",
       "difficultyLevel": "Easy",
-      "questionText": "What is the value of the digit 5 in 3.52?",
-      "options": ["5 ones", "5 tenths", "5 hundredths", "5 tens"],
-      "answerIndex": 1,
-      "explanation": "In 3.52, the digit 5 is in the tenths place.",
-      "language": "English",
-      "createdAt": "__SERVER_TIMESTAMP__"
-    },
-    "q_dec_002": {
-      "topicId": "decimals_y4",
-      "subtopicId": "compare_decimals",
-      "difficultyLevel": "Easy",
-      "questionText": "Which decimal is the largest?",
-      "options": ["0.4", "0.35", "0.09", "0.3"],
+      "questionText": "Which wording is correct for 14 906?",
+      "questionTextBm": "Perkataan manakah betul untuk 14 906?",
+      "options": [
+        "fourteen thousand nine hundred six",
+        "fourteen thousand ninety-six",
+        "one thousand four hundred ninety-six",
+        "forty thousand nine hundred six"
+      ],
+      "optionsBm": [
+        "empat belas ribu sembilan ratus enam",
+        "empat belas ribu sembilan puluh enam",
+        "seribu empat ratus sembilan puluh enam",
+        "empat puluh ribu sembilan ratus enam"
+      ],
       "answerIndex": 0,
-      "explanation": "0.4 is 0.40, which is greater than 0.35, 0.09, and 0.30.",
-      "language": "English",
+      "explanation": "Understand: 14 906 has 14 thousand and 906.",
+      "explanationBm": "Fahami: 14 906 mempunyai 14 ribu dan 906.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
       "createdAt": "__SERVER_TIMESTAMP__"
     },
-    "q_dec_003": {
-      "topicId": "decimals_y4",
-      "subtopicId": "decimal_fraction_link",
+    "q_y4_whole_read_write_numbers_05": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "read_write_numbers",
+      "order": 5,
+      "bloomLevel": "Apply",
       "difficultyLevel": "Medium",
-      "questionText": "Which decimal is equal to 7/10?",
-      "options": ["0.07", "0.7", "7.0", "0.17"],
+      "questionText": "Write thirty-eight thousand two hundred nine in numerals.",
+      "questionTextBm": "Tulis tiga puluh lapan ribu dua ratus sembilan dalam angka.",
+      "options": [
+        "38 029",
+        "38 209",
+        "30 809",
+        "83 209"
+      ],
+      "optionsBm": [
+        "38 029",
+        "38 209",
+        "30 809",
+        "83 209"
+      ],
       "answerIndex": 1,
-      "explanation": "Seven tenths is written as 0.7.",
-      "language": "English",
+      "explanation": "Apply: combine 38 thousand and 209 to form 38 209.",
+      "explanationBm": "Aplikasi: gabungkan 38 ribu dan 209 menjadi 38 209.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
       "createdAt": "__SERVER_TIMESTAMP__"
     },
-    "q_dec_004": {
-      "topicId": "decimals_y4",
-      "subtopicId": "add_decimals",
+    "q_y4_whole_read_write_numbers_06": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "read_write_numbers",
+      "order": 6,
+      "bloomLevel": "Apply",
       "difficultyLevel": "Medium",
-      "questionText": "What is 1.2 + 0.3?",
-      "options": ["1.5", "1.23", "1.05", "0.15"],
+      "questionText": "A card says 50 813. Which sentence reads it correctly?",
+      "questionTextBm": "Kad menunjukkan 50 813. Ayat manakah membacanya dengan betul?",
+      "options": [
+        "fifty thousand eight hundred thirteen",
+        "five thousand eight hundred thirteen",
+        "fifty thousand eighty-three",
+        "fifteen thousand eight hundred thirteen"
+      ],
+      "optionsBm": [
+        "lima puluh ribu lapan ratus tiga belas",
+        "lima ribu lapan ratus tiga belas",
+        "lima puluh ribu lapan puluh tiga",
+        "lima belas ribu lapan ratus tiga belas"
+      ],
       "answerIndex": 0,
-      "explanation": "Add the tenths: 1.2 + 0.3 = 1.5.",
-      "language": "English",
+      "explanation": "Apply: read each place from left to right.",
+      "explanationBm": "Aplikasi: baca setiap nilai tempat dari kiri ke kanan.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
       "createdAt": "__SERVER_TIMESTAMP__"
     },
-    "q_dec_005": {
-      "topicId": "decimals_y4",
-      "subtopicId": "money_decimals",
+    "q_y4_whole_read_write_numbers_07": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "read_write_numbers",
+      "order": 7,
+      "bloomLevel": "Analyze",
+      "difficultyLevel": "Medium",
+      "questionText": "Which pair does not match?",
+      "questionTextBm": "Pasangan manakah tidak sepadan?",
+      "options": [
+        "47 293 - forty-seven thousand two hundred ninety-three",
+        "20 008 - twenty thousand eight",
+        "76 100 - seventy-six thousand one hundred",
+        "61 700 - sixty-one thousand seventy"
+      ],
+      "optionsBm": [
+        "47 293 - empat puluh tujuh ribu dua ratus sembilan puluh tiga",
+        "20 008 - dua puluh ribu lapan",
+        "76 100 - tujuh puluh enam ribu seratus",
+        "61 700 - enam puluh satu ribu tujuh puluh"
+      ],
+      "answerIndex": 3,
+      "explanation": "Analyze: 61 700 is sixty-one thousand seven hundred, not seventy.",
+      "explanationBm": "Analisis: 61 700 ialah enam puluh satu ribu tujuh ratus, bukan tujuh puluh.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_read_write_numbers_08": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "read_write_numbers",
+      "order": 8,
+      "bloomLevel": "Analyze",
+      "difficultyLevel": "Medium",
+      "questionText": "Which number has the same wording pattern as 20 004?",
+      "questionTextBm": "Nombor manakah mempunyai pola bacaan yang sama seperti 20 004?",
+      "options": [
+        "30 006",
+        "30 060",
+        "36 000",
+        "3 006"
+      ],
+      "optionsBm": [
+        "30 006",
+        "30 060",
+        "36 000",
+        "3 006"
+      ],
+      "answerIndex": 0,
+      "explanation": "Analyze: both 20 004 and 30 006 have thousands and ones with no hundreds or tens.",
+      "explanationBm": "Analisis: kedua-duanya mempunyai ribu dan sa tanpa ratus atau puluh.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_read_write_numbers_09": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "read_write_numbers",
+      "order": 9,
+      "bloomLevel": "Evaluate",
       "difficultyLevel": "Hard",
-      "questionText": "A pencil costs RM1.25 and an eraser costs RM0.50. What is the total?",
-      "options": ["RM1.50", "RM1.75", "RM2.25", "RM0.75"],
+      "questionText": "A pupil writes 40 300 as forty thousand three. What is the best correction?",
+      "questionTextBm": "Murid menulis 40 300 sebagai empat puluh ribu tiga. Apakah pembetulan terbaik?",
+      "options": [
+        "It should be forty thousand three hundred.",
+        "It should be four thousand three hundred.",
+        "It should be forty-three thousand.",
+        "It should be forty thousand thirty."
+      ],
+      "optionsBm": [
+        "Sepatutnya empat puluh ribu tiga ratus.",
+        "Sepatutnya empat ribu tiga ratus.",
+        "Sepatutnya empat puluh tiga ribu.",
+        "Sepatutnya empat puluh ribu tiga puluh."
+      ],
+      "answerIndex": 0,
+      "explanation": "Evaluate: the digit 3 is in the hundreds place, so it means three hundred.",
+      "explanationBm": "Menilai: digit 3 berada di tempat ratus, jadi nilainya tiga ratus.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_read_write_numbers_10": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "read_write_numbers",
+      "order": 10,
+      "bloomLevel": "Create",
+      "difficultyLevel": "Hard",
+      "questionText": "Which number is best for the clue: 6 ten-thousands, 3 thousands, 8 hundreds, 4 tens, 1 one?",
+      "questionTextBm": "Nombor manakah terbaik untuk petunjuk: 6 puluh ribu, 3 ribu, 8 ratus, 4 puluh, 1 sa?",
+      "options": [
+        "63 841",
+        "68 341",
+        "36 841",
+        "63 481"
+      ],
+      "optionsBm": [
+        "63 841",
+        "68 341",
+        "36 841",
+        "63 481"
+      ],
+      "answerIndex": 0,
+      "explanation": "Create: build the number from each place value in order.",
+      "explanationBm": "Mencipta: bina nombor mengikut setiap nilai tempat secara tertib.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_place_digit_value_01": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "place_digit_value",
+      "order": 1,
+      "bloomLevel": "Remember",
+      "difficultyLevel": "Easy",
+      "questionText": "In 62 307, what is the place value of digit 6?",
+      "questionTextBm": "Dalam 62 307, apakah nilai tempat bagi digit 6?",
+      "options": [
+        "thousands",
+        "ten-thousands",
+        "hundreds",
+        "tens"
+      ],
+      "optionsBm": [
+        "ribu",
+        "puluh ribu",
+        "ratus",
+        "puluh"
+      ],
       "answerIndex": 1,
-      "explanation": "RM1.25 + RM0.50 = RM1.75.",
-      "language": "English",
+      "explanation": "Remember: digit 6 is in the ten-thousands place.",
+      "explanationBm": "Ingat: digit 6 berada di tempat puluh ribu.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_place_digit_value_02": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "place_digit_value",
+      "order": 2,
+      "bloomLevel": "Remember",
+      "difficultyLevel": "Easy",
+      "questionText": "In 62 307, what is the digit value of 6?",
+      "questionTextBm": "Dalam 62 307, apakah nilai digit bagi 6?",
+      "options": [
+        "6",
+        "600",
+        "6 000",
+        "60 000"
+      ],
+      "optionsBm": [
+        "6",
+        "600",
+        "6 000",
+        "60 000"
+      ],
+      "answerIndex": 3,
+      "explanation": "Remember: 6 ten-thousands is 60 000.",
+      "explanationBm": "Ingat: 6 puluh ribu bernilai 60 000.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_place_digit_value_03": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "place_digit_value",
+      "order": 3,
+      "bloomLevel": "Understand",
+      "difficultyLevel": "Easy",
+      "questionText": "Which expanded form is correct for 62 307?",
+      "questionTextBm": "Cerakinan manakah betul untuk 62 307?",
+      "options": [
+        "60 000 + 2 000 + 300 + 7",
+        "6 000 + 2 000 + 300 + 7",
+        "60 000 + 200 + 30 + 7",
+        "62 000 + 307"
+      ],
+      "optionsBm": [
+        "60 000 + 2 000 + 300 + 7",
+        "6 000 + 2 000 + 300 + 7",
+        "60 000 + 200 + 30 + 7",
+        "62 000 + 307"
+      ],
+      "answerIndex": 0,
+      "explanation": "Understand: split each non-zero digit by its place value.",
+      "explanationBm": "Fahami: cerakinkan setiap digit bukan sifar mengikut nilai tempat.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_place_digit_value_04": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "place_digit_value",
+      "order": 4,
+      "bloomLevel": "Understand",
+      "difficultyLevel": "Easy",
+      "questionText": "What does the digit 3 mean in 45 309?",
+      "questionTextBm": "Apakah maksud digit 3 dalam 45 309?",
+      "options": [
+        "3 ones",
+        "3 tens",
+        "3 hundreds",
+        "3 thousands"
+      ],
+      "optionsBm": [
+        "3 sa",
+        "3 puluh",
+        "3 ratus",
+        "3 ribu"
+      ],
+      "answerIndex": 2,
+      "explanation": "Understand: the 3 is in the hundreds place, so it means 300.",
+      "explanationBm": "Fahami: 3 berada di tempat ratus, jadi nilainya 300.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_place_digit_value_05": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "place_digit_value",
+      "order": 5,
+      "bloomLevel": "Apply",
+      "difficultyLevel": "Medium",
+      "questionText": "Complete: 80 439 = 80 000 + 400 + 30 + __.",
+      "questionTextBm": "Lengkapkan: 80 439 = 80 000 + 400 + 30 + __.",
+      "options": [
+        "4",
+        "9",
+        "39",
+        "90"
+      ],
+      "optionsBm": [
+        "4",
+        "9",
+        "39",
+        "90"
+      ],
+      "answerIndex": 1,
+      "explanation": "Apply: the ones digit is 9.",
+      "explanationBm": "Aplikasi: digit sa ialah 9.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_place_digit_value_06": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "place_digit_value",
+      "order": 6,
+      "bloomLevel": "Apply",
+      "difficultyLevel": "Medium",
+      "questionText": "Complete: 72 904 = 70 000 + 2 000 + __ + 4.",
+      "questionTextBm": "Lengkapkan: 72 904 = 70 000 + 2 000 + __ + 4.",
+      "options": [
+        "9",
+        "90",
+        "900",
+        "9 000"
+      ],
+      "optionsBm": [
+        "9",
+        "90",
+        "900",
+        "9 000"
+      ],
+      "answerIndex": 2,
+      "explanation": "Apply: the digit 9 is in the hundreds place, so its value is 900.",
+      "explanationBm": "Aplikasi: digit 9 di tempat ratus, jadi nilainya 900.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_place_digit_value_07": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "place_digit_value",
+      "order": 7,
+      "bloomLevel": "Analyze",
+      "difficultyLevel": "Medium",
+      "questionText": "Which number has digit 8 worth 80 000?",
+      "questionTextBm": "Nombor manakah mempunyai digit 8 bernilai 80 000?",
+      "options": [
+        "18 407",
+        "78 350",
+        "82 148",
+        "40 812"
+      ],
+      "optionsBm": [
+        "18 407",
+        "78 350",
+        "82 148",
+        "40 812"
+      ],
+      "answerIndex": 2,
+      "explanation": "Analyze: 8 must be in the ten-thousands place.",
+      "explanationBm": "Analisis: 8 mesti berada di tempat puluh ribu.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_place_digit_value_08": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "place_digit_value",
+      "order": 8,
+      "bloomLevel": "Analyze",
+      "difficultyLevel": "Medium",
+      "questionText": "Which statement about 65 174 is true?",
+      "questionTextBm": "Pernyataan manakah benar tentang 65 174?",
+      "options": [
+        "The digit 6 is worth 6 000.",
+        "The digit 5 is worth 5 000.",
+        "The digit 1 is worth 10.",
+        "The digit 7 is worth 700."
+      ],
+      "optionsBm": [
+        "Digit 6 bernilai 6 000.",
+        "Digit 5 bernilai 5 000.",
+        "Digit 1 bernilai 10.",
+        "Digit 7 bernilai 700."
+      ],
+      "answerIndex": 1,
+      "explanation": "Analyze: in 65 174, digit 5 is in the thousands place.",
+      "explanationBm": "Analisis: dalam 65 174, digit 5 berada di tempat ribu.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_place_digit_value_09": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "place_digit_value",
+      "order": 9,
+      "bloomLevel": "Evaluate",
+      "difficultyLevel": "Hard",
+      "questionText": "A pupil writes 11 568 = 10 000 + 1 000 + 500 + 60 + 8. Is it correct?",
+      "questionTextBm": "Murid menulis 11 568 = 10 000 + 1 000 + 500 + 60 + 8. Adakah betul?",
+      "options": [
+        "Correct, all digit values are shown.",
+        "Wrong, 500 should be 50.",
+        "Wrong, 60 should be 600.",
+        "Wrong, 8 should be 80."
+      ],
+      "optionsBm": [
+        "Betul, semua nilai digit ditunjukkan.",
+        "Salah, 500 sepatutnya 50.",
+        "Salah, 60 sepatutnya 600.",
+        "Salah, 8 sepatutnya 80."
+      ],
+      "answerIndex": 0,
+      "explanation": "Evaluate: each part matches the digit value in 11 568.",
+      "explanationBm": "Menilai: setiap bahagian sepadan dengan nilai digit dalam 11 568.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_place_digit_value_10": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "place_digit_value",
+      "order": 10,
+      "bloomLevel": "Create",
+      "difficultyLevel": "Hard",
+      "questionText": "Which number fits: 40 000 + 600 + 9 + 30?",
+      "questionTextBm": "Nombor manakah sepadan: 40 000 + 600 + 9 + 30?",
+      "options": [
+        "40 639",
+        "40 693",
+        "46 039",
+        "40 369"
+      ],
+      "optionsBm": [
+        "40 639",
+        "40 693",
+        "46 039",
+        "40 369"
+      ],
+      "answerIndex": 0,
+      "explanation": "Create: combine the values as 40 000 + 600 + 30 + 9 = 40 639.",
+      "explanationBm": "Mencipta: gabungkan nilai menjadi 40 000 + 600 + 30 + 9 = 40 639.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_compare_order_numbers_01": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "compare_order_numbers",
+      "order": 1,
+      "bloomLevel": "Remember",
+      "difficultyLevel": "Easy",
+      "questionText": "Which number is greater, 75 141 or 69 711?",
+      "questionTextBm": "Nombor manakah lebih besar, 75 141 atau 69 711?",
+      "options": [
+        "75 141",
+        "69 711",
+        "Both are equal",
+        "Cannot compare"
+      ],
+      "optionsBm": [
+        "75 141",
+        "69 711",
+        "Kedua-duanya sama",
+        "Tidak boleh dibanding"
+      ],
+      "answerIndex": 0,
+      "explanation": "Remember: compare from the ten-thousands place first.",
+      "explanationBm": "Ingat: banding dari tempat puluh ribu dahulu.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_compare_order_numbers_02": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "compare_order_numbers",
+      "order": 2,
+      "bloomLevel": "Remember",
+      "difficultyLevel": "Easy",
+      "questionText": "Which symbol completes 24 712 __ 69 711?",
+      "questionTextBm": "Simbol manakah melengkapkan 24 712 __ 69 711?",
+      "options": [
+        ">",
+        "<",
+        "=",
+        "+"
+      ],
+      "optionsBm": [
+        ">",
+        "<",
+        "=",
+        "+"
+      ],
+      "answerIndex": 1,
+      "explanation": "Remember: 24 712 is less than 69 711.",
+      "explanationBm": "Ingat: 24 712 kurang daripada 69 711.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_compare_order_numbers_03": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "compare_order_numbers",
+      "order": 3,
+      "bloomLevel": "Understand",
+      "difficultyLevel": "Easy",
+      "questionText": "Which is the smallest number?",
+      "questionTextBm": "Nombor manakah paling kecil?",
+      "options": [
+        "6 387",
+        "53 127",
+        "42 093",
+        "45 909"
+      ],
+      "optionsBm": [
+        "6 387",
+        "53 127",
+        "42 093",
+        "45 909"
+      ],
+      "answerIndex": 0,
+      "explanation": "Understand: 6 387 has fewer thousands than the other numbers.",
+      "explanationBm": "Fahami: 6 387 mempunyai nilai ribu yang lebih kecil.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_compare_order_numbers_04": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "compare_order_numbers",
+      "order": 4,
+      "bloomLevel": "Understand",
+      "difficultyLevel": "Easy",
+      "questionText": "Arrange in ascending order: 1 105, 24 712, 69 711, 75 141.",
+      "questionTextBm": "Susun menaik: 1 105, 24 712, 69 711, 75 141.",
+      "options": [
+        "1 105, 24 712, 69 711, 75 141",
+        "75 141, 69 711, 24 712, 1 105",
+        "24 712, 1 105, 69 711, 75 141",
+        "69 711, 75 141, 1 105, 24 712"
+      ],
+      "optionsBm": [
+        "1 105, 24 712, 69 711, 75 141",
+        "75 141, 69 711, 24 712, 1 105",
+        "24 712, 1 105, 69 711, 75 141",
+        "69 711, 75 141, 1 105, 24 712"
+      ],
+      "answerIndex": 0,
+      "explanation": "Understand: ascending order means smallest to largest.",
+      "explanationBm": "Fahami: tertib menaik bermaksud paling kecil ke paling besar.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_compare_order_numbers_05": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "compare_order_numbers",
+      "order": 5,
+      "bloomLevel": "Apply",
+      "difficultyLevel": "Medium",
+      "questionText": "Which number is between 52 173 and 59 000?",
+      "questionTextBm": "Nombor manakah berada antara 52 173 dan 59 000?",
+      "options": [
+        "40 298",
+        "52 171",
+        "54 001",
+        "60 145"
+      ],
+      "optionsBm": [
+        "40 298",
+        "52 171",
+        "54 001",
+        "60 145"
+      ],
+      "answerIndex": 2,
+      "explanation": "Apply: 54 001 is greater than 52 173 and less than 59 000.",
+      "explanationBm": "Aplikasi: 54 001 lebih daripada 52 173 dan kurang daripada 59 000.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_compare_order_numbers_06": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "compare_order_numbers",
+      "order": 6,
+      "bloomLevel": "Apply",
+      "difficultyLevel": "Medium",
+      "questionText": "Choose the descending order.",
+      "questionTextBm": "Pilih tertib menurun.",
+      "options": [
+        "15 367, 15 202, 14 419, 13 719",
+        "13 719, 14 419, 15 202, 15 367",
+        "15 202, 15 367, 13 719, 14 419",
+        "14 419, 13 719, 15 202, 15 367"
+      ],
+      "optionsBm": [
+        "15 367, 15 202, 14 419, 13 719",
+        "13 719, 14 419, 15 202, 15 367",
+        "15 202, 15 367, 13 719, 14 419",
+        "14 419, 13 719, 15 202, 15 367"
+      ],
+      "answerIndex": 0,
+      "explanation": "Apply: descending order means largest to smallest.",
+      "explanationBm": "Aplikasi: tertib menurun bermaksud paling besar ke paling kecil.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_compare_order_numbers_07": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "compare_order_numbers",
+      "order": 7,
+      "bloomLevel": "Analyze",
+      "difficultyLevel": "Medium",
+      "questionText": "In 13 719 and 14 419, which digit comparison decides the smaller number?",
+      "questionTextBm": "Dalam 13 719 dan 14 419, perbandingan digit manakah menentukan nombor yang lebih kecil?",
+      "options": [
+        "Compare the ten-thousands digits.",
+        "Compare the thousands digits after ten-thousands are equal.",
+        "Compare the ones digits first.",
+        "Compare the hundreds digits only."
+      ],
+      "optionsBm": [
+        "Banding digit puluh ribu.",
+        "Banding digit ribu selepas puluh ribu sama.",
+        "Banding digit sa dahulu.",
+        "Banding digit ratus sahaja."
+      ],
+      "answerIndex": 1,
+      "explanation": "Analyze: both have 1 ten-thousand, then 3 thousands is less than 4 thousands.",
+      "explanationBm": "Analisis: kedua-duanya ada 1 puluh ribu, kemudian 3 ribu kurang daripada 4 ribu.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_compare_order_numbers_08": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "compare_order_numbers",
+      "order": 8,
+      "bloomLevel": "Analyze",
+      "difficultyLevel": "Medium",
+      "questionText": "Which list has one number out of order?",
+      "questionTextBm": "Senarai manakah mempunyai satu nombor tidak mengikut tertib?",
+      "options": [
+        "18 031, 18 310, 18 013, 18 103",
+        "65 501, 65 096, 65 609, 65 820",
+        "70 061, 70 068, 70 120",
+        "24 691, 31 002, 77 115"
+      ],
+      "optionsBm": [
+        "18 031, 18 310, 18 013, 18 103",
+        "65 501, 65 096, 65 609, 65 820",
+        "70 061, 70 068, 70 120",
+        "24 691, 31 002, 77 115"
+      ],
+      "answerIndex": 0,
+      "explanation": "Analyze: 18 013 should come before 18 031 in ascending order.",
+      "explanationBm": "Analisis: 18 013 sepatutnya berada sebelum 18 031 dalam tertib menaik.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_compare_order_numbers_09": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "compare_order_numbers",
+      "order": 9,
+      "bloomLevel": "Evaluate",
+      "difficultyLevel": "Hard",
+      "questionText": "A student says 89 127 is smaller than 89 413 because 7 is smaller than 3 is false. Which reason is best?",
+      "questionTextBm": "Murid berkata 89 127 lebih kecil daripada 89 413 kerana 7 lebih kecil daripada 3 adalah salah. Sebab manakah terbaik?",
+      "options": [
+        "Compare hundreds before ones; 1 hundred is less than 4 hundreds.",
+        "Compare ones first in every number.",
+        "89 127 is actually greater.",
+        "Only the ten-thousands digit matters."
+      ],
+      "optionsBm": [
+        "Banding ratus sebelum sa; 1 ratus kurang daripada 4 ratus.",
+        "Banding sa dahulu untuk semua nombor.",
+        "89 127 sebenarnya lebih besar.",
+        "Hanya digit puluh ribu penting."
+      ],
+      "answerIndex": 0,
+      "explanation": "Evaluate: the result is right, but the best reason uses the first different place.",
+      "explanationBm": "Menilai: jawapan betul, tetapi sebab terbaik menggunakan nilai tempat berbeza yang pertama.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_compare_order_numbers_10": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "compare_order_numbers",
+      "order": 10,
+      "bloomLevel": "Create",
+      "difficultyLevel": "Hard",
+      "questionText": "Which value can replace K so that 40 298, 52 173, K, 59 000 is ascending?",
+      "questionTextBm": "Nilai manakah boleh menggantikan K supaya 40 298, 52 173, K, 59 000 ialah tertib menaik?",
+      "options": [
+        "52 171",
+        "54 001",
+        "59 145",
+        "40 100"
+      ],
+      "optionsBm": [
+        "52 171",
+        "54 001",
+        "59 145",
+        "40 100"
+      ],
+      "answerIndex": 1,
+      "explanation": "Create: choose a number greater than 52 173 and smaller than 59 000.",
+      "explanationBm": "Mencipta: pilih nombor yang lebih besar daripada 52 173 dan lebih kecil daripada 59 000.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_odd_even_numbers_01": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "odd_even_numbers",
+      "order": 1,
+      "bloomLevel": "Remember",
+      "difficultyLevel": "Easy",
+      "questionText": "Which ending digit shows an even number?",
+      "questionTextBm": "Digit akhir manakah menunjukkan nombor genap?",
+      "options": [
+        "1",
+        "3",
+        "6",
+        "9"
+      ],
+      "optionsBm": [
+        "1",
+        "3",
+        "6",
+        "9"
+      ],
+      "answerIndex": 2,
+      "explanation": "Remember: even numbers end with 0, 2, 4, 6, or 8.",
+      "explanationBm": "Ingat: nombor genap berakhir dengan 0, 2, 4, 6 atau 8.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_odd_even_numbers_02": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "odd_even_numbers",
+      "order": 2,
+      "bloomLevel": "Remember",
+      "difficultyLevel": "Easy",
+      "questionText": "Which number is odd?",
+      "questionTextBm": "Nombor manakah ganjil?",
+      "options": [
+        "50 204",
+        "76 000",
+        "84 316",
+        "64 271"
+      ],
+      "optionsBm": [
+        "50 204",
+        "76 000",
+        "84 316",
+        "64 271"
+      ],
+      "answerIndex": 3,
+      "explanation": "Remember: 64 271 ends with 1, so it is odd.",
+      "explanationBm": "Ingat: 64 271 berakhir dengan 1, jadi nombor itu ganjil.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_odd_even_numbers_03": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "odd_even_numbers",
+      "order": 3,
+      "bloomLevel": "Understand",
+      "difficultyLevel": "Easy",
+      "questionText": "Why is 18 an even number?",
+      "questionTextBm": "Mengapakah 18 ialah nombor genap?",
+      "options": [
+        "It can be divided by 2 without a remainder.",
+        "It is greater than 10.",
+        "It has two digits.",
+        "It ends with 8, so it is odd."
+      ],
+      "optionsBm": [
+        "Ia boleh dibahagi 2 tanpa baki.",
+        "Ia lebih besar daripada 10.",
+        "Ia mempunyai dua digit.",
+        "Ia berakhir dengan 8, jadi ganjil."
+      ],
+      "answerIndex": 0,
+      "explanation": "Understand: even numbers can be grouped in pairs exactly.",
+      "explanationBm": "Fahami: nombor genap boleh dikumpulkan secara berpasangan tepat.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_odd_even_numbers_04": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "odd_even_numbers",
+      "order": 4,
+      "bloomLevel": "Understand",
+      "difficultyLevel": "Easy",
+      "questionText": "Which pair contains one odd and one even number?",
+      "questionTextBm": "Pasangan manakah mengandungi satu nombor ganjil dan satu nombor genap?",
+      "options": [
+        "1 028 and 1 420",
+        "1 029 and 1 037",
+        "6 020 and 6 303",
+        "76 000 and 50 204"
+      ],
+      "optionsBm": [
+        "1 028 dan 1 420",
+        "1 029 dan 1 037",
+        "6 020 dan 6 303",
+        "76 000 dan 50 204"
+      ],
+      "answerIndex": 2,
+      "explanation": "Understand: 6 020 is even and 6 303 is odd.",
+      "explanationBm": "Fahami: 6 020 ialah genap dan 6 303 ialah ganjil.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_odd_even_numbers_05": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "odd_even_numbers",
+      "order": 5,
+      "bloomLevel": "Apply",
+      "difficultyLevel": "Medium",
+      "questionText": "List all odd numbers from 520 to 531.",
+      "questionTextBm": "Senaraikan semua nombor ganjil dari 520 hingga 531.",
+      "options": [
+        "521, 523, 525, 527, 529, 531",
+        "520, 522, 524, 526, 528, 530",
+        "521, 522, 523, 524, 525",
+        "520, 521, 522, 523, 524, 525"
+      ],
+      "optionsBm": [
+        "521, 523, 525, 527, 529, 531",
+        "520, 522, 524, 526, 528, 530",
+        "521, 522, 523, 524, 525",
+        "520, 521, 522, 523, 524, 525"
+      ],
+      "answerIndex": 0,
+      "explanation": "Apply: choose numbers ending with 1, 3, 5, 7, or 9.",
+      "explanationBm": "Aplikasi: pilih nombor yang berakhir dengan 1, 3, 5, 7 atau 9.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_odd_even_numbers_06": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "odd_even_numbers",
+      "order": 6,
+      "bloomLevel": "Apply",
+      "difficultyLevel": "Medium",
+      "questionText": "Which numbers are even: 16 783, 76 000, 90 909?",
+      "questionTextBm": "Nombor manakah genap: 16 783, 76 000, 90 909?",
+      "options": [
+        "16 783 only",
+        "76 000 only",
+        "90 909 only",
+        "All three"
+      ],
+      "optionsBm": [
+        "16 783 sahaja",
+        "76 000 sahaja",
+        "90 909 sahaja",
+        "Ketiga-tiganya"
+      ],
+      "answerIndex": 1,
+      "explanation": "Apply: only 76 000 ends with 0.",
+      "explanationBm": "Aplikasi: hanya 76 000 berakhir dengan 0.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_odd_even_numbers_07": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "odd_even_numbers",
+      "order": 7,
+      "bloomLevel": "Analyze",
+      "difficultyLevel": "Medium",
+      "questionText": "Which statement is true?",
+      "questionTextBm": "Pernyataan manakah benar?",
+      "options": [
+        "All numbers ending with 5 are even.",
+        "All numbers ending with 2 are even.",
+        "All numbers ending with 8 are odd.",
+        "All numbers ending with 0 are odd."
+      ],
+      "optionsBm": [
+        "Semua nombor berakhir dengan 5 ialah genap.",
+        "Semua nombor berakhir dengan 2 ialah genap.",
+        "Semua nombor berakhir dengan 8 ialah ganjil.",
+        "Semua nombor berakhir dengan 0 ialah ganjil."
+      ],
+      "answerIndex": 1,
+      "explanation": "Analyze: the last digit decides odd or even.",
+      "explanationBm": "Analisis: digit akhir menentukan ganjil atau genap.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_odd_even_numbers_08": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "odd_even_numbers",
+      "order": 8,
+      "bloomLevel": "Analyze",
+      "difficultyLevel": "Medium",
+      "questionText": "A number ends with 9. What can you conclude?",
+      "questionTextBm": "Satu nombor berakhir dengan 9. Apakah kesimpulannya?",
+      "options": [
+        "It is odd.",
+        "It is even.",
+        "It must be less than 10 000.",
+        "It must have five digits."
+      ],
+      "optionsBm": [
+        "Nombor itu ganjil.",
+        "Nombor itu genap.",
+        "Nombor itu mesti kurang daripada 10 000.",
+        "Nombor itu mesti mempunyai lima digit."
+      ],
+      "answerIndex": 0,
+      "explanation": "Analyze: the size of the number does not matter; the last digit is 9.",
+      "explanationBm": "Analisis: saiz nombor tidak penting; digit akhirnya ialah 9.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_odd_even_numbers_09": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "odd_even_numbers",
+      "order": 9,
+      "bloomLevel": "Evaluate",
+      "difficultyLevel": "Hard",
+      "questionText": "A pupil says 32 is odd and 85 is even. Which correction is best?",
+      "questionTextBm": "Murid berkata 32 ganjil dan 85 genap. Pembetulan manakah terbaik?",
+      "options": [
+        "32 is even because it ends with 2; 85 is odd because it ends with 5.",
+        "Both are even because both have two digits.",
+        "Both are odd because both are greater than 30.",
+        "32 is odd because 3 is odd; 85 is even because 8 is even."
+      ],
+      "optionsBm": [
+        "32 genap kerana berakhir dengan 2; 85 ganjil kerana berakhir dengan 5.",
+        "Kedua-duanya genap kerana mempunyai dua digit.",
+        "Kedua-duanya ganjil kerana lebih daripada 30.",
+        "32 ganjil kerana 3 ganjil; 85 genap kerana 8 genap."
+      ],
+      "answerIndex": 0,
+      "explanation": "Evaluate: the last digit gives the correct classification.",
+      "explanationBm": "Menilai: digit akhir memberikan pengelasan yang betul.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_odd_even_numbers_10": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "odd_even_numbers",
+      "order": 10,
+      "bloomLevel": "Create",
+      "difficultyLevel": "Hard",
+      "questionText": "Choose a four-digit even number using 1, 4, 7, and 8 once each.",
+      "questionTextBm": "Pilih nombor genap empat digit menggunakan 1, 4, 7 dan 8 sekali sahaja.",
+      "options": [
+        "1 748",
+        "1 487",
+        "7 841",
+        "8 741"
+      ],
+      "optionsBm": [
+        "1 748",
+        "1 487",
+        "7 841",
+        "8 741"
+      ],
+      "answerIndex": 0,
+      "explanation": "Create: an even number must end with 4 or 8; 1 748 uses each digit once.",
+      "explanationBm": "Mencipta: nombor genap mesti berakhir dengan 4 atau 8; 1 748 menggunakan setiap digit sekali.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_number_patterns_01": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "number_patterns",
+      "order": 1,
+      "bloomLevel": "Remember",
+      "difficultyLevel": "Easy",
+      "questionText": "What is the next number: 28 010, 28 016, 28 022, __?",
+      "questionTextBm": "Apakah nombor seterusnya: 28 010, 28 016, 28 022, __?",
+      "options": [
+        "28 024",
+        "28 026",
+        "28 028",
+        "28 032"
+      ],
+      "optionsBm": [
+        "28 024",
+        "28 026",
+        "28 028",
+        "28 032"
+      ],
+      "answerIndex": 2,
+      "explanation": "Remember: the pattern increases by 6 each time.",
+      "explanationBm": "Ingat: pola bertambah 6 setiap kali.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_number_patterns_02": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "number_patterns",
+      "order": 2,
+      "bloomLevel": "Remember",
+      "difficultyLevel": "Easy",
+      "questionText": "What is the rule for 10 017, 10 010, 10 003, 9 996?",
+      "questionTextBm": "Apakah peraturan bagi 10 017, 10 010, 10 003, 9 996?",
+      "options": [
+        "add 7",
+        "subtract 7",
+        "add 10",
+        "subtract 10"
+      ],
+      "optionsBm": [
+        "tambah 7",
+        "tolak 7",
+        "tambah 10",
+        "tolak 10"
+      ],
+      "answerIndex": 1,
+      "explanation": "Remember: each number is 7 less than the previous number.",
+      "explanationBm": "Ingat: setiap nombor kurang 7 daripada nombor sebelumnya.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_number_patterns_03": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "number_patterns",
+      "order": 3,
+      "bloomLevel": "Understand",
+      "difficultyLevel": "Easy",
+      "questionText": "Which number completes 20 730, 30 730, 40 730, __?",
+      "questionTextBm": "Nombor manakah melengkapkan 20 730, 30 730, 40 730, __?",
+      "options": [
+        "41 730",
+        "50 730",
+        "40 740",
+        "60 730"
+      ],
+      "optionsBm": [
+        "41 730",
+        "50 730",
+        "40 740",
+        "60 730"
+      ],
+      "answerIndex": 1,
+      "explanation": "Understand: the ten-thousands digit increases by 1, so the value adds 10 000.",
+      "explanationBm": "Fahami: digit puluh ribu bertambah 1, jadi nilainya bertambah 10 000.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_number_patterns_04": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "number_patterns",
+      "order": 4,
+      "bloomLevel": "Understand",
+      "difficultyLevel": "Easy",
+      "questionText": "Which pattern is descending?",
+      "questionTextBm": "Pola manakah menurun?",
+      "options": [
+        "13 700, 14 000, 14 300",
+        "70 061, 70 068, 70 075",
+        "9 989, 9 996, 10 003",
+        "60 730, 50 730, 40 730"
+      ],
+      "optionsBm": [
+        "13 700, 14 000, 14 300",
+        "70 061, 70 068, 70 075",
+        "9 989, 9 996, 10 003",
+        "60 730, 50 730, 40 730"
+      ],
+      "answerIndex": 3,
+      "explanation": "Understand: descending means the numbers become smaller.",
+      "explanationBm": "Fahami: menurun bermaksud nombor semakin kecil.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_number_patterns_05": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "number_patterns",
+      "order": 5,
+      "bloomLevel": "Apply",
+      "difficultyLevel": "Medium",
+      "questionText": "Complete: 50 730, 60 730, __, 80 730.",
+      "questionTextBm": "Lengkapkan: 50 730, 60 730, __, 80 730.",
+      "options": [
+        "60 740",
+        "70 730",
+        "75 730",
+        "90 730"
+      ],
+      "optionsBm": [
+        "60 740",
+        "70 730",
+        "75 730",
+        "90 730"
+      ],
+      "answerIndex": 1,
+      "explanation": "Apply: add 10 000 each time.",
+      "explanationBm": "Aplikasi: tambah 10 000 setiap kali.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_number_patterns_06": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "number_patterns",
+      "order": 6,
+      "bloomLevel": "Apply",
+      "difficultyLevel": "Medium",
+      "questionText": "Complete: 10 017, 10 010, 10 003, __.",
+      "questionTextBm": "Lengkapkan: 10 017, 10 010, 10 003, __.",
+      "options": [
+        "9 996",
+        "9 999",
+        "10 000",
+        "10 010"
+      ],
+      "optionsBm": [
+        "9 996",
+        "9 999",
+        "10 000",
+        "10 010"
+      ],
+      "answerIndex": 0,
+      "explanation": "Apply: subtract 7 from 10 003.",
+      "explanationBm": "Aplikasi: tolak 7 daripada 10 003.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_number_patterns_07": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "number_patterns",
+      "order": 7,
+      "bloomLevel": "Analyze",
+      "difficultyLevel": "Medium",
+      "questionText": "Which number breaks the pattern 5 120, 5 130, 5 140, 5 155, 5 160?",
+      "questionTextBm": "Nombor manakah mengganggu pola 5 120, 5 130, 5 140, 5 155, 5 160?",
+      "options": [
+        "5 120",
+        "5 130",
+        "5 155",
+        "5 160"
+      ],
+      "optionsBm": [
+        "5 120",
+        "5 130",
+        "5 155",
+        "5 160"
+      ],
+      "answerIndex": 2,
+      "explanation": "Analyze: the pattern should add 10, so 5 150 should appear instead of 5 155.",
+      "explanationBm": "Analisis: pola sepatutnya tambah 10, jadi 5 150 patut muncul, bukan 5 155.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_number_patterns_08": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "number_patterns",
+      "order": 8,
+      "bloomLevel": "Analyze",
+      "difficultyLevel": "Medium",
+      "questionText": "What is the rule: 18 031, 18 131, 18 231, 18 331?",
+      "questionTextBm": "Apakah peraturan: 18 031, 18 131, 18 231, 18 331?",
+      "options": [
+        "add 10",
+        "add 100",
+        "add 1 000",
+        "subtract 100"
+      ],
+      "optionsBm": [
+        "tambah 10",
+        "tambah 100",
+        "tambah 1 000",
+        "tolak 100"
+      ],
+      "answerIndex": 1,
+      "explanation": "Analyze: only the hundreds digit changes by 1 each step.",
+      "explanationBm": "Analisis: hanya digit ratus berubah sebanyak 1 setiap langkah.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_number_patterns_09": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "number_patterns",
+      "order": 9,
+      "bloomLevel": "Evaluate",
+      "difficultyLevel": "Hard",
+      "questionText": "A student says the next number after 28 022 is 28 026 because the pattern adds 4. Which judgement is best?",
+      "questionTextBm": "Murid berkata nombor selepas 28 022 ialah 28 026 kerana pola tambah 4. Pertimbangan manakah terbaik?",
+      "options": [
+        "Wrong; the earlier jumps are +6, so the next number is 28 028.",
+        "Correct; every pattern adds 4.",
+        "Wrong; the next number is 28 024.",
+        "Correct; 26 is after 22."
+      ],
+      "optionsBm": [
+        "Salah; beza sebelumnya ialah +6, jadi nombor seterusnya 28 028.",
+        "Betul; semua pola tambah 4.",
+        "Salah; nombor seterusnya 28 024.",
+        "Betul; 26 selepas 22."
+      ],
+      "answerIndex": 0,
+      "explanation": "Evaluate: check more than one step before deciding the rule.",
+      "explanationBm": "Menilai: semak lebih daripada satu langkah sebelum menentukan peraturan.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "q_y4_whole_number_patterns_10": {
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "number_patterns",
+      "order": 10,
+      "bloomLevel": "Create",
+      "difficultyLevel": "Hard",
+      "questionText": "Choose a number that can continue this pattern: 40 298, 50 298, 60 298, __.",
+      "questionTextBm": "Pilih nombor yang boleh menyambung pola ini: 40 298, 50 298, 60 298, __.",
+      "options": [
+        "60 308",
+        "70 298",
+        "69 298",
+        "80 298"
+      ],
+      "optionsBm": [
+        "60 308",
+        "70 298",
+        "69 298",
+        "80 298"
+      ],
+      "answerIndex": 1,
+      "explanation": "Create: continue the add 10 000 rule.",
+      "explanationBm": "Mencipta: sambung peraturan tambah 10 000.",
+      "language": "bilingual",
+      "syllabus": "KSSR Semakan 2017",
       "createdAt": "__SERVER_TIMESTAMP__"
     }
   },
   "quizAttempts": {
-    "attempt_aiman_frac_001": {
+    "attempt_aiman_whole_read_write_001": {
       "studentId": "student_aiman_y4",
-      "topicId": "fractions_y4",
-      "score": 40,
-      "correctRate": 0.4,
-      "correctCount": 2,
-      "totalQuestions": 5,
-      "wrongCount": 3,
-      "timeTakenSeconds": 240,
-      "retryCount": 0,
-      "difficultyLevel": "Easy",
-      "masteryLevel": "Weak",
-      "createdAt": "__SERVER_TIMESTAMP__"
-    },
-    "attempt_aiman_dec_001": {
-      "studentId": "student_aiman_y4",
-      "topicId": "decimals_y4",
-      "score": 80,
-      "correctRate": 0.8,
-      "correctCount": 4,
-      "totalQuestions": 5,
-      "wrongCount": 1,
-      "timeTakenSeconds": 210,
-      "retryCount": 0,
-      "difficultyLevel": "Easy",
-      "masteryLevel": "Strong",
-      "createdAt": "__SERVER_TIMESTAMP__"
-    },
-    "attempt_aiman_frac_002": {
-      "studentId": "student_aiman_y4",
-      "topicId": "fractions_y4",
+      "topicId": "whole_numbers_y4",
+      "topicTitle": "Whole Numbers up to 100 000",
+      "subtopicId": "read_write_numbers",
+      "subtopicTitle": "Read and Write Numbers",
+      "yearLevel": 4,
       "score": 60,
       "correctRate": 0.6,
-      "correctCount": 3,
-      "totalQuestions": 5,
-      "wrongCount": 2,
-      "timeTakenSeconds": 225,
-      "retryCount": 1,
-      "difficultyLevel": "Medium",
+      "correctCount": 6,
+      "totalQuestions": 10,
+      "wrongCount": 4,
+      "timeTakenSeconds": 240,
+      "retryCount": 0,
+      "difficultyLevel": "Mixed",
       "masteryLevel": "Moderate",
+      "earnedCrystals": 42,
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "attempt_aiman_whole_place_value_001": {
+      "studentId": "student_aiman_y4",
+      "topicId": "whole_numbers_y4",
+      "topicTitle": "Whole Numbers up to 100 000",
+      "subtopicId": "place_digit_value",
+      "subtopicTitle": "Place Value and Digit Value",
+      "yearLevel": 4,
+      "score": 80,
+      "correctRate": 0.8,
+      "correctCount": 8,
+      "totalQuestions": 10,
+      "wrongCount": 2,
+      "timeTakenSeconds": 210,
+      "retryCount": 0,
+      "difficultyLevel": "Mixed",
+      "masteryLevel": "Strong",
+      "earnedCrystals": 56,
+      "createdAt": "__SERVER_TIMESTAMP__"
+    },
+    "attempt_aiman_whole_compare_001": {
+      "studentId": "student_aiman_y4",
+      "topicId": "whole_numbers_y4",
+      "topicTitle": "Whole Numbers up to 100 000",
+      "subtopicId": "compare_order_numbers",
+      "subtopicTitle": "Compare and Order Numbers",
+      "yearLevel": 4,
+      "score": 40,
+      "correctRate": 0.4,
+      "correctCount": 4,
+      "totalQuestions": 10,
+      "wrongCount": 6,
+      "timeTakenSeconds": 260,
+      "retryCount": 0,
+      "difficultyLevel": "Mixed",
+      "masteryLevel": "Weak",
+      "earnedCrystals": 30,
       "createdAt": "__SERVER_TIMESTAMP__"
     }
   },
   "topicMastery": {
-    "student_aiman_y4_fractions_y4": {
+    "student_aiman_y4_y4_whole_numbers_y4": {
       "studentId": "student_aiman_y4",
-      "topicId": "fractions_y4",
-      "masteryLevel": "Weak",
-      "averageScore": 50,
-      "recentTrend": "improving",
-      "attemptsCount": 2,
+      "topicId": "whole_numbers_y4",
+      "latestSubtopicId": "compare_order_numbers",
+      "yearLevel": 4,
+      "masteryLevel": "Moderate",
+      "averageScore": 60,
+      "completedSubtopicCount": 2,
+      "totalSubtopicCount": 5,
+      "progress": 0.4,
+      "recentTrend": "declining",
+      "attemptsCount": 3,
       "updatedAt": "__SERVER_TIMESTAMP__"
-    },
-    "student_aiman_y4_decimals_y4": {
+    }
+  },
+  "subtopicMastery": {
+    "student_aiman_y4_y4_whole_numbers_y4_read_write_numbers": {
       "studentId": "student_aiman_y4",
-      "topicId": "decimals_y4",
-      "masteryLevel": "Strong",
-      "averageScore": 80,
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "read_write_numbers",
+      "subtopicTitle": "Read and Write Numbers",
+      "yearLevel": 4,
+      "masteryLevel": "Moderate",
+      "averageScore": 60,
+      "bestCorrectRate": 0.6,
       "recentTrend": "stable",
       "attemptsCount": 1,
+      "completed": true,
+      "unlocked": true,
+      "updatedAt": "__SERVER_TIMESTAMP__"
+    },
+    "student_aiman_y4_y4_whole_numbers_y4_place_digit_value": {
+      "studentId": "student_aiman_y4",
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "place_digit_value",
+      "subtopicTitle": "Place Value and Digit Value",
+      "yearLevel": 4,
+      "masteryLevel": "Strong",
+      "averageScore": 80,
+      "bestCorrectRate": 0.8,
+      "recentTrend": "stable",
+      "attemptsCount": 1,
+      "completed": true,
+      "unlocked": true,
+      "updatedAt": "__SERVER_TIMESTAMP__"
+    },
+    "student_aiman_y4_y4_whole_numbers_y4_compare_order_numbers": {
+      "studentId": "student_aiman_y4",
+      "topicId": "whole_numbers_y4",
+      "subtopicId": "compare_order_numbers",
+      "subtopicTitle": "Compare and Order Numbers",
+      "yearLevel": 4,
+      "masteryLevel": "Weak",
+      "averageScore": 40,
+      "bestCorrectRate": 0.4,
+      "recentTrend": "stable",
+      "attemptsCount": 1,
+      "completed": false,
+      "unlocked": true,
       "updatedAt": "__SERVER_TIMESTAMP__"
     }
   },
@@ -234,10 +1643,10 @@
       "missionReminders": true,
       "eyeComfortMode": false,
       "repairedAreas": {
-        "fraction_bridge": 0.25,
-        "decimal_waterway": 0.25,
+        "fraction_bridge": 0.4,
+        "decimal_waterway": 0,
         "percentage_garden": 0,
-        "market_corner": 0
+        "market_corner": 0.25
       },
       "updatedAt": "__SERVER_TIMESTAMP__"
     }
@@ -265,7 +1674,10 @@
       "postId": "post_frac_help_001",
       "studentId": "student_peer_sara_y4",
       "finalAnswer": "2/6 is equal to 1/3.",
-      "steps": ["Find a number that divides both 2 and 6.", "Divide both numbers by 2: 2 ÷ 2 = 1 and 6 ÷ 2 = 3."],
+      "steps": [
+        "Find a number that divides both 2 and 6.",
+        "Divide both numbers by 2: 2 ÷ 2 = 1 and 6 ÷ 2 = 3."
+      ],
       "explanation": "Fractions stay equal when the numerator and denominator are divided by the same number.",
       "moderationStatus": "Accepted",
       "helpfulVotes": 3,
@@ -276,7 +1688,10 @@
       "postId": "post_dec_help_001",
       "studentId": "student_peer_sara_y4",
       "finalAnswer": "0.4 is bigger.",
-      "steps": ["Write 0.4 as 0.40.", "Compare 0.40 and 0.35."],
+      "steps": [
+        "Write 0.4 as 0.40.",
+        "Compare 0.40 and 0.35."
+      ],
       "explanation": "Forty hundredths is greater than thirty-five hundredths.",
       "moderationStatus": "Accepted",
       "helpfulVotes": 1,
@@ -296,7 +1711,9 @@
         "spamPattern": false
       },
       "label": "Accepted",
-      "reasons": ["Final answer, steps, and explanation are present."],
+      "reasons": [
+        "Final answer, steps, and explanation are present."
+      ],
       "modelVersion": "rules_v0_fyp1",
       "checkedAt": "__SERVER_TIMESTAMP__"
     },
@@ -311,7 +1728,9 @@
         "spamPattern": false
       },
       "label": "Accepted",
-      "reasons": ["Reply compares place values and includes explanation."],
+      "reasons": [
+        "Reply compares place values and includes explanation."
+      ],
       "modelVersion": "rules_v0_fyp1",
       "checkedAt": "__SERVER_TIMESTAMP__"
     },
@@ -326,7 +1745,9 @@
         "spamPattern": false
       },
       "label": "Needs Improvement",
-      "reasons": ["Reply gives an answer but does not show enough working steps."],
+      "reasons": [
+        "Reply gives an answer but does not show enough working steps."
+      ],
       "modelVersion": "rules_v0_fyp1",
       "checkedAt": "__SERVER_TIMESTAMP__"
     }
@@ -368,14 +1789,70 @@
       "createdAt": "__SERVER_TIMESTAMP__"
     }
   },
+  "aiModelRuns": {
+    "student_aiman_y4_whole_numbers_y4_demo": {
+      "studentId": "student_aiman_y4",
+      "topicId": "whole_numbers_y4",
+      "yearLevel": 4,
+      "modelName": "xgboost_shap_bkt_v1",
+      "xgboostPrediction": "Moderate",
+      "weaknessProbability": 0.48,
+      "confidence": 0.74,
+      "shapReasons": [
+        "Whole numbers average score is in the moderate range",
+        "Two subtopics are completed but compare and order needs support",
+        "The most recent attempt is weaker than the previous attempt"
+      ],
+      "shapDetails": [
+        {
+          "feature": "averageScore",
+          "value": 60,
+          "shapValue": 0.42,
+          "direction": "increased",
+          "reason": "Average score is in the moderate range",
+          "source": "shap"
+        },
+        {
+          "feature": "bktMasteryProbability",
+          "value": 0.64,
+          "shapValue": 0.26,
+          "direction": "increased",
+          "reason": "Current mastery probability is moderate",
+          "source": "shap"
+        },
+        {
+          "feature": "recentTrend",
+          "value": "declining",
+          "shapValue": 0.35,
+          "direction": "increased",
+          "reason": "Latest subtopic result declined",
+          "source": "shap"
+        }
+      ],
+      "bktPriorKnowledge": 0.35,
+      "bktLearnRate": 0.18,
+      "bktGuessRate": 0.2,
+      "bktSlipRate": 0.1,
+      "bktMasteryProbability": 0.64,
+      "finalMasteryLabel": "Moderate",
+      "recommendedAction": "Review compare and order numbers, then retry that subtopic quiz.",
+      "recentTrend": "declining",
+      "attemptsCount": 3,
+      "createdAt": "__SERVER_TIMESTAMP__"
+    }
+  },
   "parentReports": {
     "report_parent_mrs_nadia_aiman_week_001": {
       "parentId": "parent_mrs_nadia",
       "studentId": "student_aiman_y4",
-      "weakTopic": "Fractions",
-      "reasons": ["Fractions average score is 50 across two attempts.", "The latest Fractions retry improved from 40 to 60."],
-      "suggestedAction": "Review equivalent fractions for 10 minutes, then complete one guided Fractions mission.",
-      "collaborationSummary": "Aiman asked one Fractions question and received one accepted peer explanation.",
+      "weakTopic": "Whole Numbers up to 100 000",
+      "reasons": [
+        "Whole numbers average score is 60 across three subtopic attempts.",
+        "Read and Write Numbers and Place Value are complete.",
+        "Compare and Order Numbers is still weak and needs a retry."
+      ],
+      "suggestedAction": "Review number comparison for 10 minutes, then retry the Compare and Order Numbers subtopic.",
+      "collaborationSummary": "Aiman has completed 2 of 5 Whole Numbers subtopics and can continue the chapter flow.",
       "generatedAt": "__SERVER_TIMESTAMP__"
     }
   }

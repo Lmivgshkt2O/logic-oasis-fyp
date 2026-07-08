@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:logic_oasis/app/logic_oasis_design.dart';
 import 'package:logic_oasis/features/settings/parent_auth_page.dart';
 import 'package:logic_oasis/shared/repositories/auth_repository.dart';
 import 'package:logic_oasis/shared/state/app_state.dart';
@@ -106,10 +107,18 @@ class _ParentLinkPageState extends State<ParentLinkPage> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Link parent account')),
-      body: SafeArea(
-        child: Form(
-          key: formKey,
-          child: ListView(
+      body: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [LogicOasisDesign.page, LogicOasisDesign.pageWarm],
+          ),
+        ),
+        child: SafeArea(
+          child: Form(
+            key: formKey,
+            child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
             children: [
               Container(
@@ -220,7 +229,8 @@ class _ParentLinkPageState extends State<ParentLinkPage> {
                 text:
                     'Prototype safeguard: this password is only for the local FYP demo flow. Use Firebase Auth or server-side verification before real user testing.',
               ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

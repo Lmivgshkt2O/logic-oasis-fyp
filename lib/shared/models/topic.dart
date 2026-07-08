@@ -1,4 +1,5 @@
 import 'package:logic_oasis/shared/models/quiz_question.dart';
+import 'package:logic_oasis/shared/models/subtopic.dart';
 
 class Topic {
   const Topic({
@@ -10,8 +11,9 @@ class Topic {
     required this.yearLevel,
     required this.progress,
     required this.mastery,
-    required this.questions,
-  });
+    List<QuizQuestion> questions = const [],
+    this.subtopics = const [],
+  }) : _questions = questions;
 
   final String id;
   final String title;
@@ -21,7 +23,15 @@ class Topic {
   final int yearLevel;
   final double progress;
   final String mastery;
-  final List<QuizQuestion> questions;
+  final List<QuizQuestion> _questions;
+  final List<Subtopic> subtopics;
+
+  List<QuizQuestion> get questions {
+    if (_questions.isNotEmpty || subtopics.isEmpty) return _questions;
+    return subtopics
+        .expand((subtopic) => subtopic.questions)
+        .toList(growable: false);
+  }
 
   Topic copyWith({
     String? id,
@@ -33,6 +43,7 @@ class Topic {
     double? progress,
     String? mastery,
     List<QuizQuestion>? questions,
+    List<Subtopic>? subtopics,
   }) {
     return Topic(
       id: id ?? this.id,
@@ -44,6 +55,7 @@ class Topic {
       progress: progress ?? this.progress,
       mastery: mastery ?? this.mastery,
       questions: questions ?? this.questions,
+      subtopics: subtopics ?? this.subtopics,
     );
   }
 

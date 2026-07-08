@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:logic_oasis/app/logic_oasis_design.dart';
 import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/l10n/app_localizations.dart';
 import 'package:logic_oasis/shared/repositories/auth_repository.dart';
@@ -127,10 +128,18 @@ class _ParentPasswordResetPageState extends State<ParentPasswordResetPage> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Setting new password')),
-      body: SafeArea(
-        child: Form(
-          key: formKey,
-          child: ListView(
+      body: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [LogicOasisDesign.page, LogicOasisDesign.pageWarm],
+          ),
+        ),
+        child: SafeArea(
+          child: Form(
+            key: formKey,
+            child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
             children: [
               Container(
@@ -251,7 +260,8 @@ class _ParentPasswordResetPageState extends State<ParentPasswordResetPage> {
               RecommendationBox(
                 text: AppLocalizations.of(context)!.prototypeOtpNotice,
               ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

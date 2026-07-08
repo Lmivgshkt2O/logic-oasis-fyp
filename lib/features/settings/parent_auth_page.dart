@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:logic_oasis/app/logic_oasis_design.dart';
 import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/features/parent_dashboard/parent_dashboard_page.dart';
 import 'package:logic_oasis/features/settings/parent_password_reset_page.dart';
@@ -115,10 +116,18 @@ class _ParentAuthPageState extends State<ParentAuthPage> {
       appBar: AppBar(
         title: Text(l10n.parentAuthentication),
       ),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-          children: [
+      body: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [LogicOasisDesign.page, LogicOasisDesign.pageWarm],
+          ),
+        ),
+        child: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+            children: [
             Container(
               width: 70,
               height: 70,
@@ -206,7 +215,8 @@ class _ParentAuthPageState extends State<ParentAuthPage> {
                     : l10n.unlockDashboard,
               ),
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -224,9 +234,10 @@ class _LinkedEmailBox extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(13),
       decoration: BoxDecoration(
-        color: const Color(0xFFE8F4EE),
-        borderRadius: BorderRadius.circular(10),
+        color: LogicOasisDesign.mintLight,
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFCFE3D7)),
+        boxShadow: LogicOasisDesign.softShadow,
       ),
       child: Row(
         children: [

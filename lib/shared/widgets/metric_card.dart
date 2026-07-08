@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:logic_oasis/app/logic_oasis_design.dart';
+import 'package:logic_oasis/shared/widgets/logic_oasis_figma_components.dart';
 
 class MetricCard extends StatelessWidget {
   const MetricCard({
@@ -18,17 +20,31 @@ class MetricCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
+    return SoftCard(
+      padding: const EdgeInsets.all(14),
+      radius: 18,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 96),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Icon(icon, color: color),
             const SizedBox(height: 12),
-            Text(value, style: theme.textTheme.headlineMedium),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(value, style: theme.textTheme.headlineMedium),
+            ),
             const SizedBox(height: 2),
-            Text(label, style: theme.textTheme.bodyMedium),
+            Text(
+              label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: LogicOasisDesign.body,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ],
         ),
       ),

@@ -99,6 +99,17 @@ class _LogicOasisAppState extends State<LogicOasisApp>
             debugShowCheckedModeBanner: false,
             theme: LogicOasisTheme.light(),
             locale: state.locale,
+            builder: (context, child) {
+              final mediaQuery = MediaQuery.of(context);
+              return MediaQuery(
+                data: mediaQuery.copyWith(
+                  textScaler: state.accessibilityMode
+                      ? const TextScaler.linear(1.08)
+                      : mediaQuery.textScaler,
+                ),
+                child: child ?? const SizedBox.shrink(),
+              );
+            },
             supportedLocales: AppLocalizations.supportedLocales,
             localizationsDelegates: const [
               AppLocalizations.delegate,

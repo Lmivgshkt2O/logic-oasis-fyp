@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:logic_oasis/app/logic_oasis_design.dart';
 import 'package:logic_oasis/app/theme.dart';
 
 class AnswerTile extends StatelessWidget {
@@ -20,7 +21,7 @@ class AnswerTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Color border = LogicOasisTheme.line;
-    Color background = Colors.white;
+    Color background = LogicOasisDesign.card;
     IconData? icon;
 
     if (correct) {
@@ -38,13 +39,14 @@ class AnswerTile extends StatelessWidget {
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(16),
       child: Container(
         padding: const EdgeInsets.all(15),
         decoration: BoxDecoration(
           color: background,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(color: border, width: 1.4),
+          boxShadow: LogicOasisDesign.softShadow,
         ),
         child: Row(
           children: [

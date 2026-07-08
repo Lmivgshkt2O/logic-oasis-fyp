@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:logic_oasis/app/logic_oasis_design.dart';
 import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/features/onboarding/register_page.dart';
 import 'package:logic_oasis/shared/repositories/auth_repository.dart';
@@ -140,10 +141,18 @@ class _LoginPageState extends State<LoginPage> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      body: SafeArea(
-        child: Form(
-          key: formKey,
-          child: ListView(
+      body: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [LogicOasisDesign.page, LogicOasisDesign.pageWarm],
+          ),
+        ),
+        child: SafeArea(
+          child: Form(
+            key: formKey,
+            child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
             children: [
               Align(
@@ -287,7 +296,8 @@ class _LoginPageState extends State<LoginPage> {
                 text:
                     'Parent Dashboard is available later inside Setting with password or OTP access.',
               ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -315,9 +325,10 @@ class _InfoBox extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFE8F4EE),
-        borderRadius: BorderRadius.circular(8),
+        color: LogicOasisDesign.mintLight,
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFCFE3D7)),
+        boxShadow: LogicOasisDesign.softShadow,
       ),
       child: Text(
         message,
@@ -341,8 +352,9 @@ class _ErrorBox extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: const Color(0xFFFFEDEA),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFE2A39B)),
+        boxShadow: LogicOasisDesign.softShadow,
       ),
       child: Text(
         message,

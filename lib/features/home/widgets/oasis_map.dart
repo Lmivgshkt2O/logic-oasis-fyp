@@ -55,7 +55,7 @@ class _OasisMapState extends State<OasisMap> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    final restoration = widget.progress.clamp(0.0, 1.0);
+    final restoration = widget.progress.clamp(0.0, 1.0).toDouble();
     final areaProgress = {
       for (final area in widget.areas) area.id: area.progress,
     };
@@ -178,34 +178,47 @@ class _PositionedRepairHotspot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final position = switch (area.id) {
-      'fraction_bridge' => const _HotspotPosition(left: 64, top: 184),
-      'decimal_waterway' => const _HotspotPosition(right: 34, bottom: 212),
-      'percentage_garden' => const _HotspotPosition(left: 42, bottom: 194),
-      'market_corner' => const _HotspotPosition(right: 48, top: 252),
-      _ => const _HotspotPosition(left: 40, bottom: 82),
+      'fraction_bridge' => const _HotspotPosition(x: 0.46, y: 0.58),
+      'decimal_waterway' => const _HotspotPosition(x: 0.62, y: 0.47),
+      'percentage_garden' => const _HotspotPosition(x: 0.27, y: 0.7),
+      'market_corner' => const _HotspotPosition(x: 0.74, y: 0.62),
+      _ => const _HotspotPosition(x: 0.5, y: 0.55),
     };
 
-    return Positioned(
-      left: position.left,
-      right: position.right,
-      top: position.top,
-      bottom: position.bottom,
-      child: _RepairHotspot(
-        area: area,
-        canRepair: canRepair,
-        onOpenDetails: onOpenDetails,
+    return Positioned.fill(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final hotspotLeft = constraints.maxWidth * position.x - 28;
+          final hotspotTop = constraints.maxHeight * position.y - 30;
+
+          return Stack(
+            children: [
+              Positioned(
+                left: hotspotLeft
+                    .clamp(8.0, constraints.maxWidth - 64)
+                    .toDouble(),
+                top: hotspotTop
+                    .clamp(8.0, constraints.maxHeight - 74)
+                    .toDouble(),
+                child: _RepairHotspot(
+                  area: area,
+                  canRepair: canRepair,
+                  onOpenDetails: onOpenDetails,
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 }
 
 class _HotspotPosition {
-  const _HotspotPosition({this.left, this.right, this.top, this.bottom});
+  const _HotspotPosition({required this.x, required this.y});
 
-  final double? left;
-  final double? right;
-  final double? top;
-  final double? bottom;
+  final double x;
+  final double y;
 }
 
 class _RepairHotspot extends StatelessWidget {

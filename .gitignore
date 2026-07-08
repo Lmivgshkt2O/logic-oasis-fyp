@@ -31,6 +31,7 @@ migrate_working_dir/
 .dart_localappdata/
 .pub-cache/
 .flutter-plugins-dependencies
+devtools_options.yaml
 .pub/
 /build/
 /coverage/
@@ -53,3 +54,7 @@ firebase_seed/.env
 
 # Generated planning/report artifacts
 outputs/
+
+# AI notebook/generated model artifacts
+ai_pipeline/.ipynb_checkpoints/
+ai_pipeline/xgboost_logic_oasis_model.pkl

@@ -1,112 +1,198 @@
 import 'package:flutter/material.dart';
+import 'package:logic_oasis/app/logic_oasis_design.dart';
 
 class LogicOasisTheme {
-  static const ink = Color(0xFF0F3028);
-  static const bodyInk = Color(0xFF5D6763);
-  static const leaf = Color(0xFF3F9675);
-  static const deepLeaf = Color(0xFF1E7B60);
-  static const mint = Color(0xFFE8F4EC);
-  static const sand = Color(0xFFFFF5E4);
-  static const clay = Color(0xFFC47B2D);
-  static const water = Color(0xFF4FA5D8);
-  static const sky = Color(0xFFEAF7F5);
-  static const line = Color(0xFFE2E8E2);
-  static const page = Color(0xFFF7FAF5);
+  static const ink = LogicOasisDesign.ink;
+  static const bodyInk = LogicOasisDesign.body;
+  static const leaf = LogicOasisDesign.leaf;
+  static const deepLeaf = LogicOasisDesign.forest;
+  static const mint = LogicOasisDesign.mintLight;
+  static const sand = LogicOasisDesign.sand;
+  static const clay = LogicOasisDesign.orange;
+  static const water = LogicOasisDesign.water;
+  static const sky = LogicOasisDesign.sky;
+  static const line = LogicOasisDesign.line;
+  static const cream = LogicOasisDesign.cream;
+  static const page = LogicOasisDesign.page;
 
   static ThemeData light() {
     final colorScheme = ColorScheme.fromSeed(
-      seedColor: leaf,
+      seedColor: LogicOasisDesign.leaf,
       brightness: Brightness.light,
-      primary: leaf,
-      secondary: water,
-      surface: Colors.white,
+      primary: LogicOasisDesign.leaf,
+      secondary: LogicOasisDesign.water,
+      surface: LogicOasisDesign.cream,
     );
 
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
-      scaffoldBackgroundColor: page,
+      scaffoldBackgroundColor: LogicOasisDesign.page,
+      fontFamily: 'Roboto',
       appBarTheme: const AppBarTheme(
         centerTitle: false,
         elevation: 0,
-        backgroundColor: page,
-        foregroundColor: ink,
+        backgroundColor: Colors.transparent,
+        foregroundColor: LogicOasisDesign.ink,
+        surfaceTintColor: Colors.transparent,
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: LogicOasisDesign.card,
+        prefixIconColor: LogicOasisDesign.forest,
+        suffixIconColor: LogicOasisDesign.body,
+        labelStyle: const TextStyle(
+          color: LogicOasisDesign.body,
+          fontWeight: FontWeight.w700,
+        ),
+        floatingLabelStyle: const TextStyle(
+          color: LogicOasisDesign.forest,
+          fontWeight: FontWeight.w900,
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 15,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: LogicOasisDesign.line),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: LogicOasisDesign.line),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(
+            color: LogicOasisDesign.leaf,
+            width: 1.6,
+          ),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Color(0xFFC45B45)),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(
+            color: Color(0xFFC45B45),
+            width: 1.6,
+          ),
+        ),
       ),
       cardTheme: CardThemeData(
-        color: Colors.white,
-        elevation: 0.6,
+        color: LogicOasisDesign.card,
+        elevation: 0,
         margin: EdgeInsets.zero,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-          side: const BorderSide(color: line),
+          borderRadius: BorderRadius.circular(LogicOasisDesign.radiusCard),
+          side: const BorderSide(color: LogicOasisDesign.line),
         ),
-        shadowColor: const Color(0x1A68856F),
+        shadowColor: const Color(0x33496F55),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: LogicOasisDesign.deepForest,
+        contentTextStyle: const TextStyle(
+          color: Colors.white,
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        behavior: SnackBarBehavior.floating,
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          minimumSize: const Size.fromHeight(42),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
+          backgroundColor: LogicOasisDesign.yellow,
+          foregroundColor: LogicOasisDesign.forest,
+          minimumSize: const Size.fromHeight(48),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           textStyle: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w800,
+            fontSize: 15,
+            fontWeight: FontWeight.w900,
             height: 1.05,
           ),
         ),
       ),
-      navigationBarTheme: NavigationBarThemeData(
-        height: 72,
-        backgroundColor: Colors.white,
-        indicatorColor: mint,
-        elevation: 0,
-        iconTheme: WidgetStateProperty.resolveWith((states) {
-          final selected = states.contains(WidgetState.selected);
-          return IconThemeData(
-            size: selected ? 23 : 22,
-            color: selected ? leaf : const Color(0xFF6D7470),
-          );
-        }),
-        labelTextStyle: WidgetStateProperty.resolveWith((states) {
-          final selected = states.contains(WidgetState.selected);
-          return TextStyle(
-            color: selected ? leaf : const Color(0xFF4F5954),
-            fontSize: 11.5,
-            fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: LogicOasisDesign.forest,
+          minimumSize: const Size.fromHeight(48),
+          side: const BorderSide(color: LogicOasisDesign.line),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          textStyle: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w900,
             height: 1.05,
-          );
+          ),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: LogicOasisDesign.forest,
+          textStyle: const TextStyle(fontWeight: FontWeight.w900),
+        ),
+      ),
+      checkboxTheme: CheckboxThemeData(
+        fillColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return LogicOasisDesign.leaf;
+          }
+          return LogicOasisDesign.card;
         }),
+        checkColor: const WidgetStatePropertyAll(Colors.white),
+        side: const BorderSide(color: LogicOasisDesign.line, width: 1.4),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+      ),
+      segmentedButtonTheme: SegmentedButtonThemeData(
+        style: SegmentedButton.styleFrom(
+          backgroundColor: LogicOasisDesign.card,
+          foregroundColor: LogicOasisDesign.body,
+          selectedBackgroundColor: LogicOasisDesign.mintLight,
+          selectedForegroundColor: LogicOasisDesign.forest,
+          side: const BorderSide(color: LogicOasisDesign.line),
+          textStyle: const TextStyle(fontWeight: FontWeight.w900),
+        ),
+      ),
+      progressIndicatorTheme: const ProgressIndicatorThemeData(
+        color: LogicOasisDesign.leaf,
+        linearTrackColor: Color(0xFFE7E0D3),
       ),
       textTheme: const TextTheme(
         headlineLarge: TextStyle(
-          fontSize: 28,
-          fontWeight: FontWeight.w800,
-          color: ink,
-          height: 1.05,
+          fontSize: 38,
+          fontWeight: FontWeight.w900,
+          color: LogicOasisDesign.forest,
+          height: 1.04,
         ),
         headlineMedium: TextStyle(
-          fontSize: 22,
-          fontWeight: FontWeight.w800,
-          color: ink,
-          height: 1.12,
+          fontSize: 24,
+          fontWeight: FontWeight.w900,
+          color: LogicOasisDesign.forest,
+          height: 1.08,
         ),
         titleLarge: TextStyle(
           fontSize: 18,
-          fontWeight: FontWeight.w800,
-          color: ink,
+          fontWeight: FontWeight.w900,
+          color: LogicOasisDesign.deepForest,
           height: 1.12,
         ),
         titleMedium: TextStyle(
-          fontSize: 15.5,
-          fontWeight: FontWeight.w800,
-          color: ink,
-          height: 1.15,
+          fontSize: 16,
+          fontWeight: FontWeight.w900,
+          color: LogicOasisDesign.deepForest,
+          height: 1.16,
         ),
-        bodyLarge: TextStyle(fontSize: 15, color: bodyInk, height: 1.25),
+        bodyLarge: TextStyle(
+          fontSize: 15,
+          color: LogicOasisDesign.body,
+          height: 1.25,
+        ),
         bodyMedium: TextStyle(
           fontSize: 13,
-          color: bodyInk,
+          color: LogicOasisDesign.body,
           height: 1.25,
         ),
       ),
@@ -116,16 +202,10 @@ class LogicOasisTheme {
   static ThemeData eyeComfort() {
     final base = light();
     return base.copyWith(
-      scaffoldBackgroundColor: const Color(0xFFFAF8EF),
-      appBarTheme: const AppBarTheme(
-        centerTitle: false,
-        elevation: 0,
-        backgroundColor: Color(0xFFFAF8EF),
-        foregroundColor: ink,
-      ),
+      scaffoldBackgroundColor: const Color(0xFFFFF1CE),
       colorScheme: base.colorScheme.copyWith(
-        surface: const Color(0xFFFFFCF4),
-        primary: const Color(0xFF4F7F67),
+        surface: const Color(0xFFFFF8E7),
+        primary: const Color(0xFF5E7E59),
       ),
     );
   }

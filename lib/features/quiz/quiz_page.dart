@@ -4,6 +4,7 @@ import 'package:logic_oasis/l10n/app_localizations.dart';
 import 'package:logic_oasis/shared/models/quiz_completion.dart';
 import 'package:logic_oasis/shared/models/quiz_question.dart';
 import 'package:logic_oasis/shared/models/topic.dart';
+import 'package:logic_oasis/shared/widgets/logic_oasis_figma_components.dart';
 import 'package:logic_oasis/shared/widgets/recommendation_box.dart';
 
 class QuizPage extends StatefulWidget {
@@ -75,10 +76,9 @@ class _QuizPageState extends State<QuizPage> {
       appBar: AppBar(
         title: Text(widget.topic.localizedTitle(widget.isBahasaMelayu)),
       ),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-          children: [
+      body: LogicOasisScaffold(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        children: [
             LinearProgressIndicator(value: progress),
             const SizedBox(height: 18),
             Text(
@@ -129,8 +129,7 @@ class _QuizPageState extends State<QuizPage> {
                 ),
               ),
             ],
-          ],
-        ),
+        ],
       ),
     );
   }

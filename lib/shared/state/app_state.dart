@@ -1,12 +1,15 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:logic_oasis/shared/data/year4_chapter1_content.dart';
 import 'package:logic_oasis/shared/models/ai_diagnosis.dart';
 import 'package:logic_oasis/shared/models/oasis_area.dart';
 import 'package:logic_oasis/shared/models/quiz_attempt.dart';
 import 'package:logic_oasis/shared/models/quiz_question.dart';
 import 'package:logic_oasis/shared/models/quiz_reward.dart';
 import 'package:logic_oasis/shared/models/recommended_mission.dart';
+import 'package:logic_oasis/shared/models/subtopic.dart';
 import 'package:logic_oasis/shared/models/topic.dart';
 import 'package:logic_oasis/shared/models/weak_topic_insight.dart';
 import 'package:logic_oasis/shared/repositories/learning_repository.dart';
@@ -24,54 +27,127 @@ class AppState extends ChangeNotifier {
 
   static const String demoStudentId = 'student_aiman_y4';
   // Used only when the student has no quiz attempts yet.
-  static const String recommendedMissionTopicId = 'fractions_y4';
+  static const String recommendedMissionTopicId = 'whole_numbers_y4';
   static const int recommendedMissionRequiredCompletions = 2;
   static const int recommendedMissionRewardCrystals = 20;
   static const String _lastTabKey = 'logic_oasis_last_tab';
   static const String _languageKey = 'logic_oasis_language';
   static const String _missionRemindersKey = 'logic_oasis_mission_reminders';
   static const String _eyeComfortKey = 'logic_oasis_eye_comfort';
+  static const String _soundEnabledKey = 'logic_oasis_sound_enabled';
+  static const String _accessibilityModeKey =
+      'logic_oasis_accessibility_mode';
+  static const String _screenTimeLimitKey = 'logic_oasis_screen_time_limit';
+  static const String _unlockedTopicIdsKey = 'logic_oasis_unlocked_topics';
+  static const String _unlockedSubtopicIdsKey =
+      'logic_oasis_unlocked_subtopics';
+  static const String _claimedMissionTopicIdsKey =
+      'logic_oasis_claimed_mission_topics';
+  static const String _savedAttemptsKey = 'logic_oasis_saved_attempts';
+  static const int _maxStoredResource = 99999;
 
-  static const List<Topic> _localTopicBank = [
+  static final List<Topic> _localTopicBank = [
+    ...year4Chapter1Topics,
     const Topic(
       id: 'fractions_y4',
       title: 'Fractions',
       titleBm: 'Pecahan',
       area: 'Understand and compare fractions',
       yearLevel: 4,
-      progress: 0.72,
-      mastery: 'Strong',
-      questions: [
-        QuizQuestion(
-          question: 'Which fraction is equal to 1/2?',
-          options: ['1/4', '2/4', '3/4', '4/4'],
-          answerIndex: 1,
-          explanation: '2/4 can be simplified by dividing both numbers by 2.',
+      progress: 0,
+      mastery: 'Locked',
+      subtopics: [
+        Subtopic(
+          id: 'equivalent_fractions',
+          title: 'Equivalent Fractions',
+          titleBm: 'Pecahan Setara',
+          order: 1,
+          description: 'Recognise fractions with the same value.',
+          descriptionBm: 'Kenal pecahan yang mempunyai nilai yang sama.',
+          progress: 1,
+          mastery: 'Strong',
+          questions: [
+            QuizQuestion(
+              subtopicId: 'equivalent_fractions',
+              question: 'Which fraction is equal to 1/2?',
+              options: ['1/4', '2/4', '3/4', '4/4'],
+              answerIndex: 1,
+              explanation:
+                  '2/4 can be simplified by dividing both numbers by 2.',
+            ),
+            QuizQuestion(
+              subtopicId: 'equivalent_fractions',
+              question: 'Which fraction is equivalent to 3/6?',
+              questionBm: 'Pecahan manakah yang setara dengan 3/6?',
+              options: ['1/2', '1/3', '2/3', '3/4'],
+              optionsBm: ['1/2', '1/3', '2/3', '3/4'],
+              answerIndex: 0,
+              explanation: '3/6 simplifies to 1/2.',
+              explanationBm: '3/6 diringkaskan kepada 1/2.',
+            ),
+          ],
         ),
-        QuizQuestion(
-          question: 'Which fraction is larger?',
-          options: ['1/3', '1/5', '1/8', '1/10'],
-          answerIndex: 0,
-          explanation: 'For unit fractions, the smaller denominator is larger.',
+        Subtopic(
+          id: 'compare_unit_fractions',
+          title: 'Compare Unit Fractions',
+          titleBm: 'Banding Pecahan Unit',
+          order: 2,
+          description: 'Compare unit fractions by denominator size.',
+          descriptionBm: 'Banding pecahan unit mengikut saiz penyebut.',
+          progress: 1,
+          mastery: 'Strong',
+          questions: [
+            QuizQuestion(
+              subtopicId: 'compare_unit_fractions',
+              question: 'Which fraction is larger?',
+              options: ['1/3', '1/5', '1/8', '1/10'],
+              answerIndex: 0,
+              explanation:
+                  'For unit fractions, the smaller denominator is larger.',
+            ),
+            QuizQuestion(
+              subtopicId: 'compare_unit_fractions',
+              question: 'Which is smaller?',
+              questionBm: 'Yang manakah lebih kecil?',
+              options: ['1/2', '1/4', '1/6', '1/8'],
+              optionsBm: ['1/2', '1/4', '1/6', '1/8'],
+              answerIndex: 3,
+              explanation:
+                  'For unit fractions, the larger denominator is smaller.',
+              explanationBm:
+                  'Bagi pecahan unit, penyebut yang lebih besar memberi nilai lebih kecil.',
+            ),
+          ],
         ),
-        QuizQuestion(
-          question: 'What is 1/4 + 1/4?',
-          options: ['1/8', '1/4', '1/2', '1'],
-          answerIndex: 2,
-          explanation:
-              'One quarter plus one quarter makes two quarters, or 1/2.',
-        ),
-        QuizQuestion(
-          question: 'Which shows three out of four equal parts?',
-          options: ['1/4', '2/4', '3/4', '4/3'],
-          answerIndex: 2,
-          explanation: '3/4 means three selected parts from four equal parts.',
-        ),
-        QuizQuestion(
-          question: 'What is 2/6 simplified?',
-          options: ['1/2', '1/3', '2/3', '3/6'],
-          answerIndex: 1,
-          explanation: 'Divide 2 and 6 by 2. The answer is 1/3.',
+        Subtopic(
+          id: 'add_like_denominators',
+          title: 'Add Like Denominators',
+          titleBm: 'Tambah Penyebut Sama',
+          order: 3,
+          description: 'Add fractions that share the same denominator.',
+          descriptionBm: 'Tambah pecahan yang mempunyai penyebut yang sama.',
+          progress: .4,
+          mastery: 'Weak',
+          questions: [
+            QuizQuestion(
+              subtopicId: 'add_like_denominators',
+              question: 'What is 1/4 + 1/4?',
+              options: ['1/8', '1/4', '1/2', '1'],
+              answerIndex: 2,
+              explanation:
+                  'One quarter plus one quarter makes two quarters, or 1/2.',
+            ),
+            QuizQuestion(
+              subtopicId: 'add_like_denominators',
+              question: 'What is 2/5 + 1/5?',
+              questionBm: 'Berapakah 2/5 + 1/5?',
+              options: ['2/10', '3/5', '3/10', '1/5'],
+              optionsBm: ['2/10', '3/5', '3/10', '1/5'],
+              answerIndex: 1,
+              explanation: 'Keep the denominator 5 and add 2 + 1.',
+              explanationBm: 'Kekalkan penyebut 5 dan tambah 2 + 1.',
+            ),
+          ],
         ),
       ],
     ),
@@ -81,9 +157,52 @@ class AppState extends ChangeNotifier {
       titleBm: 'Perpuluhan',
       area: 'Decimals and place value',
       yearLevel: 4,
-      progress: 0.48,
-      mastery: 'Moderate',
-      questions: [],
+      progress: 0,
+      mastery: 'Locked',
+      subtopics: [
+        Subtopic(
+          id: 'decimal_place_value',
+          title: 'Decimal Place Value',
+          titleBm: 'Nilai Tempat Perpuluhan',
+          order: 1,
+          description: 'Read tenths and hundredths.',
+          descriptionBm: 'Baca persepuluh dan perseratus.',
+          progress: 1,
+          mastery: 'Moderate',
+          questions: [
+            QuizQuestion(
+              subtopicId: 'decimal_place_value',
+              question: 'What is the value of the digit 5 in 3.52?',
+              questionBm: 'Apakah nilai digit 5 dalam 3.52?',
+              options: ['5 ones', '5 tenths', '5 hundredths', '5 tens'],
+              optionsBm: ['5 sa', '5 persepuluh', '5 perseratus', '5 puluh'],
+              answerIndex: 1,
+              explanation: 'The digit 5 is in the tenths place.',
+              explanationBm: 'Digit 5 berada di tempat persepuluh.',
+            ),
+          ],
+        ),
+        Subtopic(
+          id: 'compare_decimals',
+          title: 'Compare Decimals',
+          titleBm: 'Banding Perpuluhan',
+          order: 2,
+          description: 'Compare decimal values.',
+          descriptionBm: 'Banding nilai perpuluhan.',
+          questions: [
+            QuizQuestion(
+              subtopicId: 'compare_decimals',
+              question: 'Which decimal is the largest?',
+              questionBm: 'Perpuluhan manakah yang paling besar?',
+              options: ['0.4', '0.35', '0.09', '0.3'],
+              optionsBm: ['0.4', '0.35', '0.09', '0.3'],
+              answerIndex: 0,
+              explanation: '0.4 is the same as 0.40, which is largest.',
+              explanationBm: '0.4 sama dengan 0.40, iaitu paling besar.',
+            ),
+          ],
+        ),
+      ],
     ),
     const Topic(
       id: 'percentages_y4',
@@ -91,9 +210,44 @@ class AppState extends ChangeNotifier {
       titleBm: 'Peratus',
       area: 'Percentages in real life',
       yearLevel: 4,
-      progress: 0.28,
-      mastery: 'Weak',
-      questions: [],
+      progress: 0,
+      mastery: 'Locked',
+      subtopics: [
+        Subtopic(
+          id: 'percentage_meaning',
+          title: 'Meaning of Percentage',
+          titleBm: 'Maksud Peratus',
+          order: 1,
+          description: 'Connect percentage with parts out of 100.',
+          descriptionBm: 'Hubungkan peratus dengan bahagian daripada 100.',
+          questions: [
+            QuizQuestion(
+              subtopicId: 'percentage_meaning',
+              question: '50% is the same as which fraction?',
+              options: ['1/4', '1/3', '1/2', '3/4'],
+              answerIndex: 2,
+              explanation: '50% means half of the whole.',
+            ),
+          ],
+        ),
+        Subtopic(
+          id: 'percentage_of_quantity',
+          title: 'Percentage of Quantity',
+          titleBm: 'Peratus daripada Kuantiti',
+          order: 2,
+          description: 'Find common percentages of a number.',
+          descriptionBm: 'Cari peratus lazim daripada suatu nombor.',
+          questions: [
+            QuizQuestion(
+              subtopicId: 'percentage_of_quantity',
+              question: 'What is 25% of 80?',
+              options: ['10', '20', '25', '40'],
+              answerIndex: 1,
+              explanation: '25% is one quarter. One quarter of 80 is 20.',
+            ),
+          ],
+        ),
+      ],
     ),
     const Topic(
       id: 'money_y4',
@@ -103,7 +257,51 @@ class AppState extends ChangeNotifier {
       yearLevel: 4,
       progress: 0,
       mastery: 'Locked',
-      questions: [],
+      subtopics: [
+        Subtopic(
+          id: 'money_addition',
+          title: 'Add Money',
+          titleBm: 'Tambah Wang',
+          order: 1,
+          description: 'Add ringgit and sen in daily spending.',
+          descriptionBm: 'Tambah ringgit dan sen dalam perbelanjaan harian.',
+          questions: [
+            QuizQuestion(
+              subtopicId: 'money_addition',
+              question:
+                  'A pencil costs RM1.25 and an eraser costs RM0.50. What is the total?',
+              questionBm:
+                  'Sebatang pensel berharga RM1.25 dan pemadam berharga RM0.50. Berapakah jumlahnya?',
+              options: ['RM1.50', 'RM1.75', 'RM2.25', 'RM0.75'],
+              optionsBm: ['RM1.50', 'RM1.75', 'RM2.25', 'RM0.75'],
+              answerIndex: 1,
+              explanation: 'RM1.25 + RM0.50 = RM1.75.',
+              explanationBm: 'RM1.25 + RM0.50 = RM1.75.',
+            ),
+          ],
+        ),
+        Subtopic(
+          id: 'money_change',
+          title: 'Find Change',
+          titleBm: 'Cari Baki Wang',
+          order: 2,
+          description: 'Subtract spending from the amount paid.',
+          descriptionBm: 'Tolak perbelanjaan daripada jumlah bayaran.',
+          questions: [
+            QuizQuestion(
+              subtopicId: 'money_change',
+              question: 'You pay RM10 for an item costing RM6.40. What is the change?',
+              questionBm:
+                  'Anda membayar RM10 untuk barang berharga RM6.40. Berapakah bakinya?',
+              options: ['RM2.60', 'RM3.60', 'RM4.40', 'RM16.40'],
+              optionsBm: ['RM2.60', 'RM3.60', 'RM4.40', 'RM16.40'],
+              answerIndex: 1,
+              explanation: 'RM10.00 - RM6.40 = RM3.60.',
+              explanationBm: 'RM10.00 - RM6.40 = RM3.60.',
+            ),
+          ],
+        ),
+      ],
     ),
     const Topic(
       id: 'fractions_y5',
@@ -322,10 +520,15 @@ class AppState extends ChangeNotifier {
   String language = 'English';
   bool missionReminders = true;
   bool eyeComfortMode = false;
+  bool soundEnabled = true;
+  bool accessibilityMode = false;
+  int screenTimeLimitMinutes = 30;
   int crystals = 124;
   int mutualAidEnergy = 36;
   int? latestFractionsScore;
   final Set<String> claimedRecommendedMissionTopicIds = <String>{};
+  final Set<String> _unlockedTopicIds = <String>{};
+  final Set<String> _unlockedSubtopicIds = <String>{};
   final List<AiDiagnosis> aiDiagnoses = <AiDiagnosis>[];
   final List<OasisArea> oasisAreas = [
     const OasisArea(
@@ -361,44 +564,7 @@ class AppState extends ChangeNotifier {
       progress: 0.25,
     ),
   ];
-  final List<QuizAttempt> attempts = [
-    QuizAttempt(
-      id: 'attempt_demo_003',
-      topicId: 'money_y4',
-      topicTitle: 'Money',
-      yearLevel: 4,
-      score: 86,
-      correctCount: 4,
-      totalQuestions: 5,
-      earnedCrystals: 40,
-      mastery: 'Strong',
-      createdAt: DateTime.now().subtract(const Duration(hours: 3)),
-    ),
-    QuizAttempt(
-      id: 'attempt_demo_002',
-      topicId: 'decimals_y4',
-      topicTitle: 'Decimals',
-      yearLevel: 4,
-      score: 42,
-      correctCount: 2,
-      totalQuestions: 5,
-      earnedCrystals: 22,
-      mastery: 'Weak',
-      createdAt: DateTime.now().subtract(const Duration(days: 1)),
-    ),
-    QuizAttempt(
-      id: 'attempt_demo_001',
-      topicId: 'fractions_y4',
-      topicTitle: 'Fractions',
-      yearLevel: 4,
-      score: 76,
-      correctCount: 4,
-      totalQuestions: 5,
-      earnedCrystals: 34,
-      mastery: 'Moderate',
-      createdAt: DateTime.now().subtract(const Duration(days: 2)),
-    ),
-  ];
+  final List<QuizAttempt> attempts = [];
 
   List<QuizAttempt> get currentYearAttempts => attempts
       .where((attempt) => attempt.yearLevel == yearLevel)
@@ -421,11 +587,86 @@ class AppState extends ChangeNotifier {
 
   List<QuizAttempt> get recentAttempts => currentYearAttempts.take(4).toList();
 
+  int get estimatedScreenTimeMinutesToday {
+    final minutes = (currentYearAttempts.length * 8) + (completedQuizzes > 0 ? 4 : 0);
+    return minutes.clamp(0, screenTimeLimitMinutes).toInt();
+  }
+
+  double get screenTimeProgress {
+    if (screenTimeLimitMinutes <= 0) return 0;
+    return (estimatedScreenTimeMinutesToday / screenTimeLimitMinutes)
+        .clamp(0.0, 1.0)
+        .toDouble();
+  }
+
   bool get isBahasaMelayu => language == 'Bahasa Melayu';
 
   Locale get locale => isBahasaMelayu ? const Locale('ms') : const Locale('en');
 
   AiDiagnosis? get recommendedAiDiagnosis => _recommendedAiDiagnosis();
+
+  List<Subtopic> subtopicsForTopic(Topic topic) {
+    final subtopics = topic.subtopics;
+    if (subtopics.isNotEmpty) {
+      return List<Subtopic>.from(subtopics)
+        ..sort((a, b) => a.order.compareTo(b.order));
+    }
+    if (topic.questions.isEmpty) return const <Subtopic>[];
+    return [
+      Subtopic(
+        id: '${topic.id}_practice',
+        title: topic.title,
+        titleBm: topic.titleBm,
+        order: 1,
+        description: topic.area,
+        descriptionBm: topic.areaBm,
+        progress: topic.progress,
+        mastery: topic.mastery,
+        questions: topic.questions,
+      ),
+    ];
+  }
+
+  bool isTopicUnlocked(Topic topic) {
+    final topicIndex = topics.indexWhere((item) => item.id == topic.id);
+    if (topicIndex <= 0) return true;
+    if (_unlockedTopicIds.contains(topic.id)) return true;
+    final previousTopic = topics[topicIndex - 1];
+    return _isTopicComplete(previousTopic);
+  }
+
+  String? lockedReasonForTopic(Topic topic) {
+    if (isTopicUnlocked(topic)) return null;
+    final topicIndex = topics.indexWhere((item) => item.id == topic.id);
+    if (topicIndex <= 0) return null;
+    final previousTopic = topics[topicIndex - 1];
+    return t(
+      'Complete ${previousTopic.title} first.',
+      'Lengkapkan ${previousTopic.titleBm} dahulu.',
+    );
+  }
+
+  bool isSubtopicUnlocked(Topic topic, Subtopic subtopic) {
+    final subtopics = subtopicsForTopic(topic);
+    final subtopicIndex = subtopics.indexWhere((item) => item.id == subtopic.id);
+    if (subtopicIndex <= 0) return true;
+    if (_unlockedSubtopicIds.contains(_subtopicUnlockKey(topic, subtopic))) {
+      return true;
+    }
+    return subtopics[subtopicIndex - 1].isComplete;
+  }
+
+  String? lockedReasonForSubtopic(Topic topic, Subtopic subtopic) {
+    if (isSubtopicUnlocked(topic, subtopic)) return null;
+    final subtopics = subtopicsForTopic(topic);
+    final subtopicIndex = subtopics.indexWhere((item) => item.id == subtopic.id);
+    if (subtopicIndex <= 0) return null;
+    final previousSubtopic = subtopics[subtopicIndex - 1];
+    return t(
+      'Complete ${previousSubtopic.title} with more than 50%.',
+      'Lengkapkan ${previousSubtopic.titleBm} dengan lebih daripada 50%.',
+    );
+  }
 
   Future<void> loadSavedAppPreferences() async {
     final preferences = await SharedPreferences.getInstance();
@@ -434,6 +675,26 @@ class AppState extends ChangeNotifier {
     missionReminders =
         preferences.getBool(_missionRemindersKey) ?? missionReminders;
     eyeComfortMode = preferences.getBool(_eyeComfortKey) ?? eyeComfortMode;
+    soundEnabled = preferences.getBool(_soundEnabledKey) ?? soundEnabled;
+    accessibilityMode =
+        preferences.getBool(_accessibilityModeKey) ?? accessibilityMode;
+    screenTimeLimitMinutes =
+        preferences.getInt(_screenTimeLimitKey) ?? screenTimeLimitMinutes;
+    screenTimeLimitMinutes = screenTimeLimitMinutes.clamp(15, 120).toInt();
+    _unlockedTopicIds
+      ..clear()
+      ..addAll(preferences.getStringList(_unlockedTopicIdsKey) ?? const []);
+    _unlockedSubtopicIds
+      ..clear()
+      ..addAll(preferences.getStringList(_unlockedSubtopicIdsKey) ?? const []);
+    claimedRecommendedMissionTopicIds
+      ..clear()
+      ..addAll(
+        preferences.getStringList(_claimedMissionTopicIdsKey) ?? const [],
+      );
+    _restoreSavedAttempts(preferences.getString(_savedAttemptsKey));
+    _applyAttemptProgressToTopics();
+    _recordUnlockedProgression();
     notifyListeners();
   }
 
@@ -443,6 +704,26 @@ class AppState extends ChangeNotifier {
     await preferences.setString(_languageKey, language);
     await preferences.setBool(_missionRemindersKey, missionReminders);
     await preferences.setBool(_eyeComfortKey, eyeComfortMode);
+    await preferences.setBool(_soundEnabledKey, soundEnabled);
+    await preferences.setBool(_accessibilityModeKey, accessibilityMode);
+    await preferences.setInt(_screenTimeLimitKey, screenTimeLimitMinutes);
+    await preferences.setStringList(
+      _unlockedTopicIdsKey,
+      _unlockedTopicIds.toList()..sort(),
+    );
+    await preferences.setStringList(
+      _unlockedSubtopicIdsKey,
+      _unlockedSubtopicIds.toList()..sort(),
+    );
+    await preferences.setStringList(
+      _claimedMissionTopicIdsKey,
+      claimedRecommendedMissionTopicIds.toList()..sort(),
+    );
+    await preferences.setString(_savedAttemptsKey, _encodedSavedAttempts());
+  }
+
+  void _saveAppSessionInBackground() {
+    unawaited(saveAppSession().catchError((_) {}));
   }
 
   Future<void> clearSavedSessionPosition() async {
@@ -475,6 +756,8 @@ class AppState extends ChangeNotifier {
         topics
           ..clear()
           ..addAll(_mergeTopicProgress(firebaseTopics));
+        _applyAttemptProgressToTopics();
+        _recordUnlockedProgression();
         loadedTopicsFromFirebase = true;
         topicLoadMessage = t(
           'Loaded ${firebaseTopics.length} Year $yearLevel topics from Firebase.',
@@ -500,7 +783,7 @@ class AppState extends ChangeNotifier {
       (topic) => topic.id == recommendedTopicId,
       orElse: () => topics.first,
     );
-    final completedCompletions = attempts
+    final completedCompletions = currentYearAttempts
         .where((attempt) => attempt.topicId == topic.id)
         .length;
 
@@ -575,6 +858,7 @@ class AppState extends ChangeNotifier {
   }
 
   double get restorationProgress {
+    if (oasisAreas.isEmpty) return 0;
     final areaAverage =
         oasisAreas.fold<double>(0, (sum, area) => sum + area.progress) /
         oasisAreas.length;
@@ -582,7 +866,7 @@ class AppState extends ChangeNotifier {
   }
 
   Map<String, double> get oasisAreaProgress => {
-    for (final area in oasisAreas) area.id: area.progress,
+    for (final area in oasisAreas) area.id: area.progress.clamp(0.0, 1.0),
   };
 
   String get predictedWeakTopic => weakTopicInsight.topicTitle;
@@ -637,6 +921,7 @@ class AppState extends ChangeNotifier {
     unawaited(saveAppSession());
     if (persistQuizResults) {
       unawaited(loadOasisProgressFromFirebase());
+      unawaited(loadParentDashboardFromFirebase());
     }
   }
 
@@ -667,8 +952,27 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  void updateSoundEnabled(bool value) {
+    soundEnabled = value;
+    notifyListeners();
+    unawaited(saveAppSession());
+  }
+
+  void updateAccessibilityMode(bool value) {
+    accessibilityMode = value;
+    notifyListeners();
+    unawaited(saveAppSession());
+  }
+
+  void updateScreenTimeLimit(int minutes) {
+    screenTimeLimitMinutes = minutes.clamp(15, 120).toInt();
+    notifyListeners();
+    unawaited(saveAppSession());
+  }
+
   QuizReward saveQuizResult({
     required String topicId,
+    String? subtopicId,
     required int correctCount,
     required int totalQuestions,
     int timeTakenSeconds = 0,
@@ -683,10 +987,24 @@ class AppState extends ChangeNotifier {
       throw ArgumentError('totalQuestions must be greater than zero.');
     }
 
-    final score = ((correctCount / totalQuestions) * 100).round();
-    final earnedCrystals = _calculateCrystals(score, correctCount);
+    final normalizedCorrectCount = correctCount.clamp(0, totalQuestions);
+    final score = ((normalizedCorrectCount / totalQuestions) * 100).round();
+    final earnedCrystals = _calculateCrystals(score, normalizedCorrectCount);
     final newMastery = _masteryForScore(score);
-    final learningProgress = mathMax(topic.progress, score / 100);
+    final subtopicUpdate = _updatedSubtopicsForResult(
+      topic: topic,
+      subtopicId: subtopicId,
+      score: score,
+      mastery: newMastery,
+    );
+    final updatedSubtopics = subtopicUpdate.$1;
+    final updatedSubtopic = subtopicUpdate.$2;
+    final learningProgress = subtopicId == null
+        ? mathMax(topic.progress, score / 100)
+        : _topicProgressFromSubtopics(updatedSubtopics);
+    final topicMastery = subtopicId == null
+        ? newMastery
+        : _topicMasteryFromSubtopics(updatedSubtopics);
 
     latestFractionsScore = topicId == 'fractions_y4'
         ? score
@@ -694,16 +1012,20 @@ class AppState extends ChangeNotifier {
     crystals += earnedCrystals;
     topics[topicIndex] = topic.copyWith(
       progress: learningProgress,
-      mastery: newMastery,
+      mastery: topicMastery,
+      subtopics: updatedSubtopics,
     );
+    _recordUnlockedProgression();
     final attemptId = 'attempt_${DateTime.now().millisecondsSinceEpoch}';
     final attempt = QuizAttempt(
       id: attemptId,
       topicId: topic.id,
       topicTitle: topic.title,
+      subtopicId: updatedSubtopic?.id,
+      subtopicTitle: updatedSubtopic?.title,
       yearLevel: topic.yearLevel,
       score: score,
-      correctCount: correctCount,
+      correctCount: normalizedCorrectCount,
       totalQuestions: totalQuestions,
       earnedCrystals: earnedCrystals,
       mastery: newMastery,
@@ -716,16 +1038,42 @@ class AppState extends ChangeNotifier {
       score: score,
       earnedCrystals: earnedCrystals,
       previousMastery: topic.mastery,
-      newMastery: newMastery,
+      newMastery: subtopicId == null ? newMastery : topicMastery,
       encouragement: _encouragementForScore(score),
     );
 
     notifyListeners();
+    _saveAppSessionInBackground();
     if (persistQuizResults) {
       unawaited(_saveQuizResultToFirebase(attempt, timeTakenSeconds));
       unawaited(_saveOasisProgressToFirebase());
     }
     return reward;
+  }
+
+  (List<Subtopic>, Subtopic?) _updatedSubtopicsForResult({
+    required Topic topic,
+    required String? subtopicId,
+    required int score,
+    required String mastery,
+  }) {
+    final subtopics = subtopicsForTopic(topic);
+    if (subtopics.isEmpty || subtopicId == null) return (subtopics, null);
+
+    final subtopicIndex = subtopics.indexWhere(
+      (subtopic) => subtopic.id == subtopicId,
+    );
+    if (subtopicIndex == -1) {
+      throw ArgumentError('Unknown subtopicId: $subtopicId');
+    }
+
+    final selected = subtopics[subtopicIndex];
+    final updated = selected.copyWith(
+      progress: mathMax(selected.progress, score / 100),
+      mastery: mastery,
+    );
+    subtopics[subtopicIndex] = updated;
+    return (subtopics, updated);
   }
 
   Future<void> _saveQuizResultToFirebase(
@@ -756,6 +1104,7 @@ class AppState extends ChangeNotifier {
         retryCount: topicAttempts.length - 1,
         difficultyLevel: 'Mixed',
         topicAttempts: topicAttempts,
+        totalSubtopicCount: _totalSubtopicCountForTopic(attempt.topicId),
       );
       lastQuizSavedToFirebase = true;
       quizSaveMessage = t(
@@ -802,6 +1151,9 @@ class AppState extends ChangeNotifier {
           attempts
             ..clear()
             ..addAll(snapshot.attempts);
+          _applyAttemptProgressToTopics();
+          _recordUnlockedProgression();
+          unawaited(saveAppSession());
         }
         aiDiagnoses
           ..clear()
@@ -896,10 +1248,12 @@ class AppState extends ChangeNotifier {
 
   void _applyOasisProgress(OasisProgressSnapshot snapshot) {
     if (snapshot.crystals != null) {
-      crystals = snapshot.crystals!.clamp(0, 99999).toInt();
+      crystals = snapshot.crystals!.clamp(0, _maxStoredResource).toInt();
     }
     if (snapshot.mutualAidEnergy != null) {
-      mutualAidEnergy = snapshot.mutualAidEnergy!.clamp(0, 99999).toInt();
+      mutualAidEnergy = snapshot.mutualAidEnergy!
+          .clamp(0, _maxStoredResource)
+          .toInt();
     }
     if (snapshot.language != null) {
       language = snapshot.language!;
@@ -929,6 +1283,7 @@ class AppState extends ChangeNotifier {
     crystals += mission.rewardCrystals;
     claimedRecommendedMissionTopicIds.add(mission.topicId);
     notifyListeners();
+    _saveAppSessionInBackground();
     if (persistQuizResults) {
       unawaited(_saveOasisProgressToFirebase());
     }
@@ -937,33 +1292,270 @@ class AppState extends ChangeNotifier {
 
   double mathMax(double a, double b) => a > b ? a : b;
 
-  List<Topic> _mergeTopicProgress(List<Topic> firebaseTopics) {
-    return firebaseTopics.map((firebaseTopic) {
-      final localMatches = _localTopicBank.where(
-        (localTopic) => localTopic.id == firebaseTopic.id,
-      );
-      if (localMatches.isEmpty) return firebaseTopic;
+  bool _isTopicComplete(Topic topic) {
+    final subtopics = subtopicsForTopic(topic);
+    if (subtopics.isNotEmpty) {
+      return subtopics.every((subtopic) => subtopic.isComplete);
+    }
+    if (topic.mastery == 'Moderate' || topic.mastery == 'Strong') {
+      return true;
+    }
+    return topic.progress > 0.5;
+  }
 
-      final localTopic = localMatches.first;
-      return firebaseTopic.copyWith(
-        progress: localTopic.progress,
-        mastery: localTopic.mastery,
+  double _topicProgressFromSubtopics(List<Subtopic> subtopics) {
+    if (subtopics.isEmpty) return 0;
+    final completedCount = subtopics
+        .where((subtopic) => subtopic.isComplete)
+        .length;
+    return completedCount / subtopics.length;
+  }
+
+  String _topicMasteryFromSubtopics(List<Subtopic> subtopics) {
+    if (subtopics.isEmpty) return 'New';
+    final progress = _topicProgressFromSubtopics(subtopics);
+    if (progress >= .8) return 'Strong';
+    if (progress > .5) return 'Moderate';
+    final hasModerateWork = subtopics.any(
+      (subtopic) =>
+          subtopic.mastery == 'Moderate' || subtopic.mastery == 'Strong',
+    );
+    return hasModerateWork ? 'Moderate' : 'Weak';
+  }
+
+  List<Topic> _mergeTopicProgress(List<Topic> sourceTopics) {
+    final localTopics = _localTopicsForYear(yearLevel);
+    final merged = <Topic>[];
+    for (final localTopic in localTopics) {
+      final sourceMatches = sourceTopics.where(
+        (sourceTopic) => sourceTopic.id == localTopic.id,
       );
-    }).toList();
+      if (sourceMatches.isEmpty) {
+        merged.add(localTopic);
+        continue;
+      }
+
+      final sourceTopic = sourceMatches.first;
+      merged.add(
+        sourceTopic.copyWith(
+          progress: localTopic.progress,
+          mastery: localTopic.mastery,
+          subtopics: sourceTopic.subtopics.isEmpty
+              ? localTopic.subtopics
+              : sourceTopic.subtopics,
+        ),
+      );
+    }
+
+    for (final sourceTopic in sourceTopics) {
+      if (merged.any((topic) => topic.id == sourceTopic.id)) continue;
+      merged.add(
+        sourceTopic.copyWith(
+          progress: sourceTopic.progress,
+          mastery: sourceTopic.mastery,
+        ),
+      );
+    }
+    return merged;
   }
 
   void _resetTopicsForCurrentYear() {
     topics
       ..clear()
       ..addAll(_mergeTopicProgress(_localTopicsForYear(yearLevel)));
+    _applyAttemptProgressToTopics();
+    _recordUnlockedProgression();
     topicLoadMessage = null;
     loadedTopicsFromFirebase = false;
   }
 
+  void _applyAttemptProgressToTopics() {
+    final yearAttempts = currentYearAttempts;
+    if (yearAttempts.isEmpty) return;
+
+    for (var topicIndex = 0; topicIndex < topics.length; topicIndex += 1) {
+      final topic = topics[topicIndex];
+      final topicAttempts = yearAttempts
+          .where((attempt) => attempt.topicId == topic.id)
+          .toList(growable: false);
+      if (topicAttempts.isEmpty) continue;
+
+      final subtopics = subtopicsForTopic(topic);
+      if (subtopics.isNotEmpty) {
+        final updatedSubtopics = subtopics
+            .map((subtopic) {
+              final subtopicAttempts = topicAttempts
+                  .where((attempt) => attempt.subtopicId == subtopic.id)
+                  .toList(growable: false);
+              if (subtopicAttempts.isEmpty) return subtopic;
+
+              final bestAttempt = _bestAttempt(subtopicAttempts);
+              return subtopic.copyWith(
+                progress: mathMax(subtopic.progress, bestAttempt.score / 100),
+                mastery: bestAttempt.mastery,
+              );
+            })
+            .toList(growable: false);
+
+        topics[topicIndex] = topic.copyWith(
+          progress: _topicProgressFromSubtopics(updatedSubtopics),
+          mastery: _topicMasteryFromSubtopics(updatedSubtopics),
+          subtopics: updatedSubtopics,
+        );
+        continue;
+      }
+
+      final bestAttempt = _bestAttempt(topicAttempts);
+      topics[topicIndex] = topic.copyWith(
+        progress: mathMax(topic.progress, bestAttempt.score / 100),
+        mastery: bestAttempt.mastery,
+      );
+    }
+  }
+
+  QuizAttempt _bestAttempt(List<QuizAttempt> sourceAttempts) {
+    return sourceAttempts.reduce((best, attempt) {
+      if (attempt.score != best.score) {
+        return attempt.score > best.score ? attempt : best;
+      }
+      return attempt.createdAt.isAfter(best.createdAt) ? attempt : best;
+    });
+  }
+
+  void _restoreSavedAttempts(String? encodedAttempts) {
+    if (encodedAttempts == null || encodedAttempts.trim().isEmpty) return;
+
+    try {
+      final decoded = jsonDecode(encodedAttempts);
+      if (decoded is! List) return;
+
+      final restoredAttempts = decoded
+          .map(_attemptFromSavedJson)
+          .whereType<QuizAttempt>()
+          .toList(growable: false)
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      if (restoredAttempts.isEmpty) return;
+
+      attempts
+        ..clear()
+        ..addAll(restoredAttempts);
+    } catch (_) {
+      return;
+    }
+  }
+
+  String _encodedSavedAttempts() {
+    final encodedAttempts = attempts.map(_attemptToJson).toList(growable: false);
+    return jsonEncode(encodedAttempts);
+  }
+
+  Map<String, Object?> _attemptToJson(QuizAttempt attempt) {
+    return {
+      'id': attempt.id,
+      'topicId': attempt.topicId,
+      'topicTitle': attempt.topicTitle,
+      'subtopicId': attempt.subtopicId,
+      'subtopicTitle': attempt.subtopicTitle,
+      'yearLevel': attempt.yearLevel,
+      'score': attempt.score,
+      'correctCount': attempt.correctCount,
+      'totalQuestions': attempt.totalQuestions,
+      'earnedCrystals': attempt.earnedCrystals,
+      'mastery': attempt.mastery,
+      'createdAt': attempt.createdAt.toIso8601String(),
+    };
+  }
+
+  QuizAttempt? _attemptFromSavedJson(Object? value) {
+    if (value is! Map) return null;
+
+    final id = value['id'];
+    final topicId = value['topicId'];
+    final topicTitle = value['topicTitle'];
+    final yearLevel = value['yearLevel'];
+    final score = value['score'];
+    final correctCount = value['correctCount'];
+    final totalQuestions = value['totalQuestions'];
+    final earnedCrystals = value['earnedCrystals'];
+    final mastery = value['mastery'];
+    final createdAt = value['createdAt'];
+
+    if (id is! String ||
+        topicId is! String ||
+        topicTitle is! String ||
+        yearLevel is! num ||
+        score is! num ||
+        correctCount is! num ||
+        totalQuestions is! num ||
+        earnedCrystals is! num ||
+        mastery is! String ||
+        createdAt is! String) {
+      return null;
+    }
+
+    final parsedCreatedAt = DateTime.tryParse(createdAt);
+    if (parsedCreatedAt == null) return null;
+
+    final subtopicId = value['subtopicId'];
+    final subtopicTitle = value['subtopicTitle'];
+    return QuizAttempt(
+      id: id,
+      topicId: topicId,
+      topicTitle: topicTitle,
+      subtopicId: subtopicId is String && subtopicId.isNotEmpty
+          ? subtopicId
+          : null,
+      subtopicTitle: subtopicTitle is String && subtopicTitle.isNotEmpty
+          ? subtopicTitle
+          : null,
+      yearLevel: yearLevel.round().clamp(4, 6).toInt(),
+      score: score.round().clamp(0, 100).toInt(),
+      correctCount: correctCount.round(),
+      totalQuestions: totalQuestions.round() <= 0
+          ? 1
+          : totalQuestions.round(),
+      earnedCrystals: earnedCrystals.round(),
+      mastery: mastery,
+      createdAt: parsedCreatedAt,
+    );
+  }
+
+  bool _recordUnlockedProgression() {
+    var changed = false;
+    for (var topicIndex = 1; topicIndex < topics.length; topicIndex += 1) {
+      if (_isTopicComplete(topics[topicIndex - 1])) {
+        changed = _unlockedTopicIds.add(topics[topicIndex].id) || changed;
+      }
+    }
+
+    for (final topic in topics) {
+      final subtopics = subtopicsForTopic(topic);
+      for (var index = 1; index < subtopics.length; index += 1) {
+        if (subtopics[index - 1].isComplete) {
+          changed =
+              _unlockedSubtopicIds.add(
+                _subtopicUnlockKey(topic, subtopics[index]),
+              ) ||
+              changed;
+        }
+      }
+    }
+    return changed;
+  }
+
+  String _subtopicUnlockKey(Topic topic, Subtopic subtopic) {
+    return '${topic.id}::${subtopic.id}';
+  }
+
+  int _totalSubtopicCountForTopic(String topicId) {
+    final matches = topics.where((topic) => topic.id == topicId);
+    if (matches.isEmpty) return 0;
+    return subtopicsForTopic(matches.first).length;
+  }
+
   String _currentRecommendedMissionTopicId() {
     final aiRecommendation = _recommendedAiDiagnosis();
-    if (aiRecommendation != null &&
-        !claimedRecommendedMissionTopicIds.contains(aiRecommendation.topicId)) {
+    if (aiRecommendation != null) {
       return aiRecommendation.topicId;
     }
 
@@ -973,9 +1565,6 @@ class AppState extends ChangeNotifier {
     final grouped = <String, List<QuizAttempt>>{};
     for (final attempt in yearAttempts) {
       if (!topics.any((topic) => topic.id == attempt.topicId)) continue;
-      if (claimedRecommendedMissionTopicIds.contains(attempt.topicId)) {
-        continue;
-      }
       grouped.putIfAbsent(attempt.topicId, () => []).add(attempt);
     }
 
@@ -1017,15 +1606,12 @@ class AppState extends ChangeNotifier {
     AiDiagnosis? selected;
     var selectedScore = double.negativeInfinity;
 
-    for (final diagnosis in aiDiagnoses) {
-      if (diagnosis.yearLevel != null && diagnosis.yearLevel != yearLevel) {
-        continue;
-      }
-      if (!topics.any((topic) => topic.id == diagnosis.topicId)) continue;
-      final weaknessWeight = diagnosis.weaknessProbability;
-      final masteryGap = 1 - diagnosis.bktMasteryProbability;
-      final score = (weaknessWeight * 0.65) + (masteryGap * 0.35);
-      if (score > selectedScore) {
+    for (final diagnosis in _latestAiDiagnosesForCurrentYear()) {
+      final score = diagnosis.priorityScore;
+      if (score > selectedScore ||
+          (score == selectedScore &&
+              selected != null &&
+              diagnosis.isNewerThan(selected))) {
         selected = diagnosis;
         selectedScore = score;
       }
@@ -1041,14 +1627,15 @@ class AppState extends ChangeNotifier {
     final topicTitle = _topicTitleFor(diagnosis.topicId);
     final masteryPercent = (diagnosis.bktMasteryProbability * 100).round();
     final weaknessPercent = (diagnosis.weaknessProbability * 100).round();
-    final reason = diagnosis.shapReasons.isEmpty
+    final reasons = diagnosis.explanationReasons;
+    final reason = reasons.isEmpty
         ? t(
             '$topicTitle is flagged by the Grey Box AI with $weaknessPercent% weakness risk and $masteryPercent% BKT mastery.',
             '$topicTitle ditandakan oleh AI Grey Box dengan risiko kelemahan $weaknessPercent% dan penguasaan BKT $masteryPercent%.',
           )
         : t(
-            '$topicTitle is flagged by the Grey Box AI because ${diagnosis.shapReasons.take(3).join(', ')}.',
-            '$topicTitle ditandakan oleh AI Grey Box kerana ${diagnosis.shapReasons.take(3).join(', ')}.',
+            '$topicTitle is flagged by the Grey Box AI because ${reasons.take(3).join(', ')}.',
+            '$topicTitle ditandakan oleh AI Grey Box kerana ${reasons.take(3).join(', ')}.',
           );
 
     return WeakTopicInsight(
@@ -1074,10 +1661,7 @@ class AppState extends ChangeNotifier {
   }
 
   void _applyAiTopicMastery() {
-    for (final diagnosis in aiDiagnoses) {
-      if (diagnosis.yearLevel != null && diagnosis.yearLevel != yearLevel) {
-        continue;
-      }
+    for (final diagnosis in _latestAiDiagnosesForCurrentYear()) {
       final topicIndex = topics.indexWhere(
         (topic) => topic.id == diagnosis.topicId,
       );
@@ -1091,11 +1675,29 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  List<AiDiagnosis> _latestAiDiagnosesForCurrentYear() {
+    final latestByTopic = <String, AiDiagnosis>{};
+    for (final diagnosis in aiDiagnoses) {
+      if (diagnosis.yearLevel != null && diagnosis.yearLevel != yearLevel) {
+        continue;
+      }
+      if (!topics.any((topic) => topic.id == diagnosis.topicId)) continue;
+
+      final existing = latestByTopic[diagnosis.topicId];
+      if (existing == null || diagnosis.isNewerThan(existing)) {
+        latestByTopic[diagnosis.topicId] = diagnosis;
+      }
+    }
+    return latestByTopic.values.toList(growable: false);
+  }
+
   bool canRepair(OasisArea area) {
     if (area.isComplete) return false;
     return switch (area.resource) {
-      OasisResource.crystals => crystals >= area.repairCost,
-      OasisResource.mutualAid => mutualAidEnergy >= area.repairCost,
+      OasisResource.crystals =>
+        area.repairCost > 0 && crystals >= area.repairCost,
+      OasisResource.mutualAid =>
+        area.repairCost > 0 && mutualAidEnergy >= area.repairCost,
     };
   }
 

@@ -3,6 +3,7 @@ import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/l10n/app_localizations.dart';
 import 'package:logic_oasis/shared/state/app_state.dart';
 import 'package:logic_oasis/shared/widgets/attempt_row.dart';
+import 'package:logic_oasis/shared/widgets/logic_oasis_figma_components.dart';
 import 'package:logic_oasis/shared/widgets/metric_card.dart';
 import 'package:logic_oasis/shared/widgets/recommendation_box.dart';
 import 'package:logic_oasis/shared/widgets/section_card.dart';
@@ -46,7 +47,7 @@ class _ParentDashboardContent extends StatelessWidget {
     final aiDiagnosis = state.recommendedAiDiagnosis;
     final story = _ParentLearningStory.fromState(state);
 
-    return ListView(
+    return LogicOasisScaffold(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
       children: [
         Text(
@@ -162,7 +163,10 @@ class _ParentDashboardContent extends StatelessWidget {
                   weaknessProbability: aiDiagnosis.weaknessProbability,
                   confidence: aiDiagnosis.confidence,
                   finalLabel: aiDiagnosis.finalMasteryLabel,
-                  shapReasons: aiDiagnosis.shapReasons,
+                  modelName: aiDiagnosis.modelName,
+                  attemptsCount: aiDiagnosis.attemptsCount,
+                  createdAt: aiDiagnosis.createdAt,
+                  shapReasons: aiDiagnosis.explanationReasons,
                   isBahasaMelayu: state.isBahasaMelayu,
                 ),
               ],
@@ -230,9 +234,43 @@ class _ParentLearningStory {
 
   factory _ParentLearningStory.fromState(AppState state) {
     final insight = state.weakTopicInsight;
+    final aiDiagnosis = state.recommendedAiDiagnosis;
     final average = state.averageScore;
     final trend = _trendText(state);
     final hasAttempts = state.currentYearAttempts.isNotEmpty;
+
+    if (aiDiagnosis != null) {
+      final weaknessPercent = (aiDiagnosis.weaknessProbability * 100).round();
+      final masteryPercent = (aiDiagnosis.bktMasteryProbability * 100).round();
+      final confidencePercent = (aiDiagnosis.confidence * 100).round();
+
+      return _ParentLearningStory(
+        status: state.t('AI focus found', 'Fokus AI ditemui'),
+        statusDetail: state.t(
+          'Grey Box AI marks ${insight.topicTitle} as ${aiDiagnosis.finalMasteryLabel}: $weaknessPercent% weakness risk, $masteryPercent% BKT mastery, $confidencePercent% confidence.',
+          'AI Grey Box menanda ${insight.topicTitle} sebagai ${aiDiagnosis.finalMasteryLabel}: risiko kelemahan $weaknessPercent%, penguasaan BKT $masteryPercent%, keyakinan $confidencePercent%.',
+        ),
+        priority: state.t(
+          'Main focus: ${insight.topicTitle}.',
+          'Fokus utama: ${insight.topicTitle}.',
+        ),
+        parentMeaning: state.t(
+          'For FYP1, this combines seeded/offline AI evidence with quiz-history fallback, so the recommendation remains explainable during the demo.',
+          'Untuk FYP1, ini menggabungkan bukti AI berbenih/luar talian dengan sandaran sejarah kuiz supaya cadangan kekal boleh diterangkan semasa demo.',
+        ),
+        tonightAction: aiDiagnosis.recommendedAction,
+        conversationPrompt: state.t(
+          'Which part of ${insight.topicTitle} should we practise slowly together?',
+          'Bahagian mana dalam ${insight.topicTitle} patut kita latih perlahan-lahan bersama?',
+        ),
+        weekGoal: state.t(
+          'Complete 2 focused attempts and compare the next AI update with this one.',
+          'Lengkapkan 2 cubaan berfokus dan bandingkan kemas kini AI seterusnya dengan yang ini.',
+        ),
+        statusColor: LogicOasisTheme.water,
+        statusIcon: Icons.psychology_alt_outlined,
+      );
+    }
 
     if (!hasAttempts) {
       return _ParentLearningStory(
@@ -406,15 +444,11 @@ class _ParentInsightSummary extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Container(
+    return SoftCard(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Color.alphaBlend(
-          story.statusColor.withValues(alpha: 0.09),
-          Colors.white,
-        ),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: story.statusColor.withValues(alpha: 0.28)),
+      color: Color.alphaBlend(
+        story.statusColor.withValues(alpha: 0.09),
+        LogicOasisTheme.cream,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -537,6 +571,9 @@ class _AiDiagnosisDetails extends StatelessWidget {
     required this.weaknessProbability,
     required this.confidence,
     required this.finalLabel,
+    required this.modelName,
+    required this.attemptsCount,
+    required this.createdAt,
     required this.shapReasons,
     required this.isBahasaMelayu,
   });
@@ -545,6 +582,9 @@ class _AiDiagnosisDetails extends StatelessWidget {
   final double weaknessProbability;
   final double confidence;
   final String finalLabel;
+  final String modelName;
+  final int attemptsCount;
+  final DateTime createdAt;
   final List<String> shapReasons;
   final bool isBahasaMelayu;
 
@@ -556,19 +596,25 @@ class _AiDiagnosisDetails extends StatelessWidget {
     final weaknessText = (weaknessProbability * 100).round();
     final confidenceText = (confidence * 100).round();
 
-    return Container(
+    return SoftCard(
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE8F4EE),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFCFE3D7)),
-      ),
+      color: LogicOasisTheme.mint,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             l10n.greyBoxAiResult,
             style: theme.textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            isBahasaMelayu
+                ? 'Bukti AI FYP1: $modelName, ${attemptsCount.clamp(0, 999)} rekod cubaan.'
+                : 'FYP1 AI evidence: $modelName, ${attemptsCount.clamp(0, 999)} attempt records.',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: LogicOasisTheme.ink,
+              fontWeight: FontWeight.w700,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
@@ -580,6 +626,18 @@ class _AiDiagnosisDetails extends StatelessWidget {
             ),
             style: theme.textTheme.bodyMedium,
           ),
+          if (createdAt.millisecondsSinceEpoch > 0) ...[
+            const SizedBox(height: 6),
+            Text(
+              isBahasaMelayu
+                  ? 'Dikemas kini: ${formatAiUpdatedAt(createdAt)}'
+                  : 'Updated: ${formatAiUpdatedAt(createdAt)}',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: LogicOasisTheme.ink,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
           if (shapReasons.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(
@@ -587,10 +645,37 @@ class _AiDiagnosisDetails extends StatelessWidget {
               style: theme.textTheme.bodyMedium,
             ),
           ],
+          const SizedBox(height: 8),
+          Text(
+            isBahasaMelayu
+                ? 'Jika rekod AI tiada, papan pemuka menggunakan logik topik lemah berdasarkan markah kuiz.'
+                : 'If AI records are unavailable, the dashboard falls back to weak-topic logic from quiz scores.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: LogicOasisTheme.deepLeaf,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ],
       ),
     );
   }
+}
+
+String formatAiUpdatedAt(DateTime value) {
+  final malaysiaTime = _malaysiaTime(value);
+  final hour = malaysiaTime.hour;
+  final displayHour = hour == 0 ? 12 : hour > 12 ? hour - 12 : hour;
+  final minute = malaysiaTime.minute.toString().padLeft(2, '0');
+  final period = hour >= 12 ? 'PM' : 'AM';
+  return '${malaysiaTime.day}/${malaysiaTime.month}/${malaysiaTime.year} '
+      '$displayHour:$minute $period';
+}
+
+DateTime _malaysiaTime(DateTime value) {
+  if (value.isUtc) {
+    return value.add(const Duration(hours: 8));
+  }
+  return value.toUtc().add(const Duration(hours: 8));
 }
 
 class _ParentDashboardStatusBanner extends StatelessWidget {
@@ -607,15 +692,9 @@ class _ParentDashboardStatusBanner extends StatelessWidget {
         ? l10n.loadingParentDashboard
         : state.parentDashboardMessage ?? '';
 
-    return Container(
+    return SoftCard(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: isSuccess ? const Color(0xFFE8F4EE) : const Color(0xFFFFF6E6),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: isSuccess ? const Color(0xFFCFE3D7) : const Color(0xFFF0D8A8),
-        ),
-      ),
+      color: isSuccess ? LogicOasisTheme.mint : LogicOasisTheme.sand,
       child: Row(
         children: [
           SizedBox(

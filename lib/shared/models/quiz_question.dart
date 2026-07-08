@@ -1,5 +1,8 @@
 class QuizQuestion {
   const QuizQuestion({
+    this.subtopicId,
+    this.order,
+    this.bloomLevel,
     required this.question,
     this.questionBm,
     required this.options,
@@ -9,6 +12,9 @@ class QuizQuestion {
     this.explanationBm,
   });
 
+  final String? subtopicId;
+  final int? order;
+  final String? bloomLevel;
   final String question;
   final String? questionBm;
   final List<String> options;

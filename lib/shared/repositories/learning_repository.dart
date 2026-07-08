@@ -46,47 +46,165 @@ class LearningRepository {
     required int retryCount,
     required String difficultyLevel,
     required List<QuizAttempt> topicAttempts,
+    int totalSubtopicCount = 0,
   }) async {
     final batch = _firestore.batch();
     final attemptRef = _firestore.collection('quizAttempts').doc(attempt.id);
     final masteryRef = _firestore
         .collection('topicMastery')
         .doc('${studentId}_y${attempt.yearLevel}_${attempt.topicId}');
+    final subtopicMasteryRef = attempt.subtopicId == null
+        ? null
+        : _firestore
+              .collection('subtopicMastery')
+              .doc(
+                '${studentId}_y${attempt.yearLevel}_${attempt.topicId}_${attempt.subtopicId}',
+              );
+    final subtopicAttempts = attempt.subtopicId == null
+        ? const <QuizAttempt>[]
+        : topicAttempts
+              .where((item) => item.subtopicId == attempt.subtopicId)
+              .toList();
 
-    final correctRate = attempt.totalQuestions == 0
-        ? 0.0
-        : attempt.correctCount / attempt.totalQuestions;
+    batch.set(
+      attemptRef,
+      buildQuizAttemptData(
+        studentId: studentId,
+        attempt: attempt,
+        timeTakenSeconds: timeTakenSeconds,
+        retryCount: retryCount,
+        difficultyLevel: difficultyLevel,
+      ),
+      SetOptions(merge: true),
+    );
 
-    batch.set(attemptRef, {
+    batch.set(
+      masteryRef,
+      buildTopicMasteryData(
+        studentId: studentId,
+        attempt: attempt,
+        topicAttempts: topicAttempts,
+        totalSubtopicCount: totalSubtopicCount,
+      ),
+      SetOptions(merge: true),
+    );
+
+    if (subtopicMasteryRef != null) {
+      batch.set(
+        subtopicMasteryRef,
+        buildSubtopicMasteryData(
+          studentId: studentId,
+          attempt: attempt,
+          subtopicAttempts: subtopicAttempts,
+        ),
+        SetOptions(merge: true),
+      );
+    }
+
+    await batch.commit();
+  }
+
+  static Map<String, Object> buildQuizAttemptData({
+    required String studentId,
+    required QuizAttempt attempt,
+    required int timeTakenSeconds,
+    required int retryCount,
+    required String difficultyLevel,
+  }) {
+    final totalQuestions = attempt.totalQuestions <= 0
+        ? 1
+        : attempt.totalQuestions;
+    final correctCount = attempt.correctCount.clamp(0, totalQuestions);
+    final wrongCount = totalQuestions - correctCount;
+    final correctRate = correctCount / totalQuestions;
+
+    return {
       'studentId': studentId,
       'topicId': attempt.topicId,
       'topicTitle': attempt.topicTitle,
+      if (attempt.subtopicId != null) 'subtopicId': attempt.subtopicId!,
+      if (attempt.subtopicTitle != null)
+        'subtopicTitle': attempt.subtopicTitle!,
       'yearLevel': attempt.yearLevel,
-      'score': attempt.score,
+      'score': attempt.score.clamp(0, 100),
       'correctRate': correctRate,
-      'correctCount': attempt.correctCount,
-      'totalQuestions': attempt.totalQuestions,
-      'wrongCount': attempt.totalQuestions - attempt.correctCount,
-      'timeTakenSeconds': timeTakenSeconds,
-      'retryCount': retryCount,
+      'correctCount': correctCount,
+      'totalQuestions': totalQuestions,
+      'wrongCount': wrongCount,
+      'timeTakenSeconds': timeTakenSeconds < 0 ? 0 : timeTakenSeconds,
+      'retryCount': retryCount < 0 ? 0 : retryCount,
       'difficultyLevel': difficultyLevel,
       'masteryLevel': attempt.mastery,
       'earnedCrystals': attempt.earnedCrystals,
       'createdAt': Timestamp.fromDate(attempt.createdAt),
-    }, SetOptions(merge: true));
+    };
+  }
 
-    batch.set(masteryRef, {
+  static Map<String, Object> buildTopicMasteryData({
+    required String studentId,
+    required QuizAttempt attempt,
+    required List<QuizAttempt> topicAttempts,
+    int totalSubtopicCount = 0,
+  }) {
+    final orderedAttempts = _latestFirst(topicAttempts);
+    final completedSubtopicCount = _completedSubtopicCount(orderedAttempts);
+    final normalizedTotalSubtopics = totalSubtopicCount < completedSubtopicCount
+        ? completedSubtopicCount
+        : totalSubtopicCount;
+    final averageScore = _averageScore(orderedAttempts);
+    final progress = normalizedTotalSubtopics > 0
+        ? completedSubtopicCount / normalizedTotalSubtopics
+        : averageScore / 100;
+
+    return {
       'studentId': studentId,
       'topicId': attempt.topicId,
+      if (attempt.subtopicId != null) 'latestSubtopicId': attempt.subtopicId!,
       'yearLevel': attempt.yearLevel,
-      'masteryLevel': _masteryForAverage(topicAttempts),
-      'averageScore': _averageScore(topicAttempts),
-      'recentTrend': _recentTrend(topicAttempts),
-      'attemptsCount': topicAttempts.length,
+      'masteryLevel': _masteryForAverage(orderedAttempts),
+      'averageScore': averageScore,
+      'completedSubtopicCount': completedSubtopicCount,
+      'totalSubtopicCount': normalizedTotalSubtopics,
+      'progress': progress.clamp(0.0, 1.0),
+      'recentTrend': _recentTrend(orderedAttempts),
+      'attemptsCount': orderedAttempts.length,
       'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    };
+  }
 
-    await batch.commit();
+  static Map<String, Object> buildSubtopicMasteryData({
+    required String studentId,
+    required QuizAttempt attempt,
+    List<QuizAttempt> subtopicAttempts = const <QuizAttempt>[],
+  }) {
+    final orderedAttempts = _latestFirst(
+      subtopicAttempts.isEmpty ? [attempt] : subtopicAttempts,
+    );
+    final bestCorrectRate = orderedAttempts
+        .map(_correctRateForAttempt)
+        .fold<double>(0, (best, rate) => rate > best ? rate : best);
+    final completed =
+        bestCorrectRate > 0.5 ||
+        orderedAttempts.any(
+          (item) => item.mastery == 'Moderate' || item.mastery == 'Strong',
+        );
+
+    return {
+      'studentId': studentId,
+      'topicId': attempt.topicId,
+      'subtopicId': attempt.subtopicId ?? '',
+      if (attempt.subtopicTitle != null)
+        'subtopicTitle': attempt.subtopicTitle!,
+      'yearLevel': attempt.yearLevel,
+      'masteryLevel': _masteryForAverage(orderedAttempts),
+      'averageScore': _averageScore(orderedAttempts),
+      'bestCorrectRate': bestCorrectRate,
+      'recentTrend': _recentTrend(orderedAttempts),
+      'attemptsCount': orderedAttempts.length,
+      'completed': completed,
+      'unlocked': true,
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
   }
 
   Future<void> saveOasisProgress({
@@ -144,15 +262,15 @@ class LearningRepository {
     final attemptsSnapshot = await _firestore
         .collection('quizAttempts')
         .where('studentId', isEqualTo: studentId)
-        .get();
+        .get(const GetOptions(source: Source.server));
     final masterySnapshot = await _firestore
         .collection('topicMastery')
         .where('studentId', isEqualTo: studentId)
-        .get();
+        .get(const GetOptions(source: Source.server));
     final aiSnapshot = await _firestore
         .collection('aiModelRuns')
         .where('studentId', isEqualTo: studentId)
-        .get();
+        .get(const GetOptions(source: Source.server));
 
     final topicTitles = {for (final topic in topics) topic.id: topic.title};
     final topicYearLevels = {
@@ -202,7 +320,10 @@ class LearningRepository {
   List<AiDiagnosis> _latestDiagnosisPerTopic(List<AiDiagnosis> diagnoses) {
     final latestByTopic = <String, AiDiagnosis>{};
     for (final diagnosis in diagnoses) {
-      latestByTopic.putIfAbsent(diagnosis.topicId, () => diagnosis);
+      final existing = latestByTopic[diagnosis.topicId];
+      if (existing == null || diagnosis.isNewerThan(existing)) {
+        latestByTopic[diagnosis.topicId] = diagnosis;
+      }
     }
     return latestByTopic.values.toList(growable: false);
   }
@@ -227,6 +348,8 @@ class LearningRepository {
 
     final createdAt = data['createdAt'];
     final topicTitle = data['topicTitle'];
+    final subtopicId = data['subtopicId'];
+    final subtopicTitle = data['subtopicTitle'];
     final yearLevel =
         _intValue(data['yearLevel']) ??
         topicYearLevels[topicId] ??
@@ -241,6 +364,12 @@ class LearningRepository {
       topicTitle: topicTitle is String && topicTitle.isNotEmpty
           ? topicTitle
           : topicTitles[topicId] ?? topicId,
+      subtopicId: subtopicId is String && subtopicId.isNotEmpty
+          ? subtopicId
+          : null,
+      subtopicTitle: subtopicTitle is String && subtopicTitle.isNotEmpty
+          ? subtopicTitle
+          : null,
       yearLevel: yearLevel.clamp(4, 6),
       score: score.round(),
       correctCount: correctCount.round(),
@@ -253,24 +382,52 @@ class LearningRepository {
     );
   }
 
-  int _averageScore(List<QuizAttempt> attempts) {
+  static List<QuizAttempt> _latestFirst(List<QuizAttempt> attempts) {
+    return List<QuizAttempt>.from(attempts)
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  }
+
+  static int _averageScore(List<QuizAttempt> attempts) {
     if (attempts.isEmpty) return 0;
     final total = attempts.fold<int>(0, (sum, attempt) => sum + attempt.score);
     return (total / attempts.length).round();
   }
 
-  String _masteryForAverage(List<QuizAttempt> attempts) {
+  static double _correctRateForAttempt(QuizAttempt attempt) {
+    final totalQuestions = attempt.totalQuestions <= 0
+        ? 1
+        : attempt.totalQuestions;
+    final correctCount = attempt.correctCount.clamp(0, totalQuestions);
+    return correctCount / totalQuestions;
+  }
+
+  static int _completedSubtopicCount(List<QuizAttempt> attempts) {
+    final completedSubtopicIds = <String>{};
+    for (final attempt in attempts) {
+      final subtopicId = attempt.subtopicId;
+      if (subtopicId == null || subtopicId.isEmpty) continue;
+      final correctRate = _correctRateForAttempt(attempt);
+      if (correctRate > 0.5 ||
+          attempt.mastery == 'Moderate' ||
+          attempt.mastery == 'Strong') {
+        completedSubtopicIds.add(subtopicId);
+      }
+    }
+    return completedSubtopicIds.length;
+  }
+
+  static String _masteryForAverage(List<QuizAttempt> attempts) {
     final average = _averageScore(attempts);
     return _masteryForScore(average);
   }
 
-  String _masteryForScore(int score) {
+  static String _masteryForScore(int score) {
     if (score >= 80) return 'Strong';
     if (score >= 50) return 'Moderate';
     return 'Weak';
   }
 
-  String _recentTrend(List<QuizAttempt> attempts) {
+  static String _recentTrend(List<QuizAttempt> attempts) {
     if (attempts.length < 2) return 'stable';
 
     final latest = attempts[0].score;

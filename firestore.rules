@@ -30,6 +30,11 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /subtopics/{subtopicId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     match /users/{userId} {
       allow read, write: if ownsUserDoc(userId);
     }
@@ -49,6 +54,12 @@ service cloud.firestore {
     }
 
     match /topicMastery/{masteryId} {
+      allow read: if ownsExistingStudentField();
+      allow create, update: if ownsStudentField();
+      allow delete: if false;
+    }
+
+    match /subtopicMastery/{masteryId} {
       allow read: if ownsExistingStudentField();
       allow create, update: if ownsStudentField();
       allow delete: if false;
