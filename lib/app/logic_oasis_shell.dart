@@ -115,15 +115,15 @@ class _LogicOasisShellState extends State<LogicOasisShell> {
             onSelected: state.changeTab,
             items: [
               BottomNavItemData(
-                icon: Icons.home_rounded,
+                icon: 'nav_home',
                 label: l10n.home,
               ),
               BottomNavItemData(
-                icon: Icons.handyman_rounded,
+                icon: 'nav_forge',
                 label: l10n.forge,
               ),
               BottomNavItemData(
-                icon: Icons.settings_rounded,
+                icon: 'nav_settings',
                 label: l10n.settings,
               ),
             ],

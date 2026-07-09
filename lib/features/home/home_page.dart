@@ -47,13 +47,13 @@ class HomePage extends StatelessWidget {
             ),
             SoftIconButton(
               icon: state.missionReminders
-                  ? Icons.notifications_active_rounded
-                  : Icons.notifications_off_rounded,
+                  ? 'notifications_active'
+                  : 'notifications_off',
               onTap: () => _toggleMissionReminders(context),
             ),
             const SizedBox(width: 10),
             SoftIconButton(
-              icon: Icons.settings_rounded,
+              icon: 'settings',
               onTap: () => state.changeTab(2),
             ),
           ],
@@ -64,7 +64,7 @@ class HomePage extends StatelessWidget {
             Expanded(
               child: StatCard(
                 compact: true,
-                icon: Icons.diamond_rounded,
+                icon: 'stat_crystal',
                 iconColor: const Color(0xFF36BFE2),
                 value: '${state.crystals}',
                 label: 'Crystals',
@@ -74,7 +74,7 @@ class HomePage extends StatelessWidget {
             Expanded(
               child: StatCard(
                 compact: true,
-                icon: Icons.bolt_rounded,
+                icon: 'stat_energy',
                 iconColor: const Color(0xFFFFB92E),
                 value: '${state.mutualAidEnergy}',
                 label: 'Energy',
@@ -84,7 +84,7 @@ class HomePage extends StatelessWidget {
             Expanded(
               child: StatCard(
                 compact: true,
-                icon: Icons.local_fire_department_rounded,
+                icon: 'stat_streak',
                 iconColor: const Color(0xFFFF6B4A),
                 value: '${state.currentYearAttempts.length}',
                 label: 'Day Streak',

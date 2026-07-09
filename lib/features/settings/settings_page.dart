@@ -31,7 +31,7 @@ class SettingsPage extends StatelessWidget {
             'Personalise your oasis.',
             l10n.manageProfilePreferences,
           ),
-          trailing: const SoftIconButton(icon: Icons.settings_rounded),
+          trailing: const SoftIconButton(icon: 'nav_settings'),
         ),
         const SizedBox(height: 18),
         _FigmaProfileCard(
@@ -49,7 +49,7 @@ class SettingsPage extends StatelessWidget {
           title: 'LEARNING',
           children: [
             SettingsRow(
-              icon: Icons.volume_up_rounded,
+              icon: 'volume_up',
               iconColor: LogicOasisDesign.leaf,
               label: state.t('Sound', 'Bunyi'),
               value: state.soundEnabled
@@ -67,14 +67,14 @@ class SettingsPage extends StatelessWidget {
               },
             ),
             SettingsRow(
-              icon: Icons.language_rounded,
+              icon: 'language',
               iconColor: LogicOasisDesign.forest,
               label: state.t('Language', 'Bahasa'),
               value: state.language,
               onTap: () => _showLanguageSheet(context),
             ),
             SettingsRow(
-              icon: Icons.accessibility_new_rounded,
+              icon: 'accessibility',
               iconColor: const Color(0xFF42A6E2),
               label: state.t('Accessibility', 'Aksesibiliti'),
               value: state.accessibilityMode
@@ -99,8 +99,8 @@ class SettingsPage extends StatelessWidget {
             ),
             SettingsRow(
               icon: state.missionReminders
-                  ? Icons.notifications_active_rounded
-                  : Icons.notifications_off_rounded,
+                  ? 'notifications_active'
+                  : 'notifications_off',
               iconColor: const Color(0xFFE6A124),
               label: state.t('Notification', 'Notifikasi'),
               value: state.missionReminders
@@ -124,7 +124,7 @@ class SettingsPage extends StatelessWidget {
               },
             ),
             SettingsRow(
-              icon: Icons.visibility_rounded,
+              icon: 'visibility',
               iconColor: state.eyeComfortMode
                   ? const Color(0xFF8A6B2C)
                   : const Color(0xFF6C8BD8),
@@ -151,7 +151,7 @@ class SettingsPage extends StatelessWidget {
             ),
             _EyeProtectingStatusCard(state: state),
             SettingsRow(
-              icon: Icons.hourglass_bottom_rounded,
+              icon: 'screen_time',
               iconColor: const Color(0xFFFFB532),
               label: state.t('Screen Time', 'Masa Skrin'),
               value: state.t(
@@ -177,7 +177,7 @@ class SettingsPage extends StatelessWidget {
               onTap: () => _openParentAccess(context),
             ),
             SettingsRow(
-              icon: Icons.privacy_tip_rounded,
+              icon: 'privacy',
               iconColor: const Color(0xFF4FBF87),
               label: state.t('Privacy & Safety', 'Privasi & Keselamatan'),
               showDivider: false,
@@ -253,18 +253,34 @@ class SettingsPage extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 ListTile(
-                  leading: const Icon(Icons.language_rounded),
+                  leading: const AppSvgIcon(
+                    'language',
+                    color: LogicOasisDesign.forest,
+                    size: 22,
+                  ),
                   title: const Text('English'),
                   trailing: state.language == 'English'
-                      ? const Icon(Icons.check_rounded)
+                      ? const AppSvgIcon(
+                          'check',
+                          color: LogicOasisDesign.leaf,
+                          size: 22,
+                        )
                       : null,
                   onTap: () => Navigator.of(context).pop('English'),
                 ),
                 ListTile(
-                  leading: const Icon(Icons.translate_rounded),
+                  leading: const AppSvgIcon(
+                    'language',
+                    color: Color(0xFF42A6E2),
+                    size: 22,
+                  ),
                   title: const Text('Bahasa Melayu'),
                   trailing: state.language == 'Bahasa Melayu'
-                      ? const Icon(Icons.check_rounded)
+                      ? const AppSvgIcon(
+                          'check',
+                          color: LogicOasisDesign.leaf,
+                          size: 22,
+                        )
                       : null,
                   onTap: () => Navigator.of(context).pop('Bahasa Melayu'),
                 ),
@@ -313,7 +329,11 @@ class SettingsPage extends StatelessWidget {
                 for (final minutes in limits)
                   ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.timer_outlined),
+                    leading: const AppSvgIcon(
+                      'screen_time',
+                      color: Color(0xFFFFB532),
+                      size: 22,
+                    ),
                     title: Text(
                       state.t(
                         '$minutes minutes per day',
@@ -321,7 +341,11 @@ class SettingsPage extends StatelessWidget {
                       ),
                     ),
                     trailing: state.screenTimeLimitMinutes == minutes
-                        ? const Icon(Icons.check_rounded)
+                        ? const AppSvgIcon(
+                            'check',
+                            color: LogicOasisDesign.leaf,
+                            size: 22,
+                          )
                         : null,
                     onTap: () => Navigator.of(context).pop(minutes),
                   ),
@@ -364,7 +388,7 @@ class SettingsPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 _SafetyTile(
-                  icon: Icons.lock_outline_rounded,
+                  icon: 'lock_outline',
                   title: state.t('Protected parent access', 'Akses ibu bapa dilindungi'),
                   body: state.t(
                     'Parent dashboard opens through a linked parent account and password gate.',
@@ -372,7 +396,7 @@ class SettingsPage extends StatelessWidget {
                   ),
                 ),
                 _SafetyTile(
-                  icon: Icons.cloud_sync_outlined,
+                  icon: 'cloud_sync',
                   title: state.t('Learning data', 'Data pembelajaran'),
                   body: state.t(
                     'Quiz attempts, mastery, oasis progress, and settings are saved locally and synced to Firebase when available.',
@@ -380,7 +404,7 @@ class SettingsPage extends StatelessWidget {
                   ),
                 ),
                 _SafetyTile(
-                  icon: Icons.psychology_alt_outlined,
+                  icon: 'psychology_alt',
                   title: state.t('AI explanation', 'Penjelasan AI'),
                   body: state.t(
                     'FYP1 AI evidence is explainable and parent-facing: BKT mastery, weakness risk, confidence, and SHAP-style reasons.',
@@ -388,7 +412,7 @@ class SettingsPage extends StatelessWidget {
                   ),
                 ),
                 _SafetyTile(
-                  icon: Icons.shield_outlined,
+                  icon: 'shield',
                   title: state.t('Child-safe scope', 'Skop selamat kanak-kanak'),
                   body: state.t(
                     'The app avoids open chat and keeps student-facing navigation limited to Home, Forge, and Settings.',
@@ -403,7 +427,11 @@ class SettingsPage extends StatelessWidget {
                       _openParentAccess(settingsContext);
                     }
                   },
-                  icon: const Icon(Icons.supervisor_account_rounded),
+                  icon: const AppSvgIcon(
+                    'supervisor_account',
+                    color: Colors.white,
+                    size: 20,
+                  ),
                   label: Text(state.t('Open parent access', 'Buka akses ibu bapa')),
                 ),
               ],
@@ -491,7 +519,7 @@ class _SafetyTile extends StatelessWidget {
     required this.body,
   });
 
-  final IconData icon;
+  final String icon;
   final String title;
   final String body;
 
@@ -504,7 +532,7 @@ class _SafetyTile extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: LogicOasisDesign.forest, size: 22),
+          AppSvgIcon(icon, color: LogicOasisDesign.forest, size: 22),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -551,10 +579,8 @@ class _EyeProtectingStatusCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Icon(
-              enabled
-                  ? Icons.wb_sunny_outlined
-                  : Icons.visibility_off_outlined,
+            AppSvgIcon(
+              enabled ? 'visibility' : 'visibility_off',
               color: iconColor,
               size: 22,
             ),
@@ -782,7 +808,7 @@ class _FigmaProfileCard extends StatelessWidget {
               Expanded(
                 child: StatCard(
                   compact: true,
-                  icon: Icons.diamond_rounded,
+                  icon: 'stat_crystal',
                   iconColor: const Color(0xFF36BFE2),
                   value: '$crystals',
                   label: 'Crystals',
@@ -792,7 +818,7 @@ class _FigmaProfileCard extends StatelessWidget {
               Expanded(
                 child: StatCard(
                   compact: true,
-                  icon: Icons.bolt_rounded,
+                  icon: 'stat_energy',
                   iconColor: const Color(0xFFFFB92E),
                   value: '$energy',
                   label: 'Energy',
@@ -802,7 +828,7 @@ class _FigmaProfileCard extends StatelessWidget {
               Expanded(
                 child: StatCard(
                   compact: true,
-                  icon: Icons.local_fire_department_rounded,
+                  icon: 'stat_streak',
                   iconColor: const Color(0xFFFF6B4A),
                   value: '$streak',
                   label: 'Day Streak',

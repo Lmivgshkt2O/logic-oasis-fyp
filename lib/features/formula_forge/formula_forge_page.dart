@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:logic_oasis/app/logic_oasis_design.dart';
 import 'package:logic_oasis/features/formula_forge/subtopic_page.dart';
 import 'package:logic_oasis/features/formula_forge/widgets/topic_card.dart';
 import 'package:logic_oasis/l10n/app_localizations.dart';
@@ -84,16 +83,15 @@ class _ForgeVillageIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 58,
-      height: 58,
+      width: 68,
+      height: 68,
       decoration: BoxDecoration(
         color: const Color(0xFFDDF4E4),
-        borderRadius: BorderRadius.circular(17),
+        borderRadius: BorderRadius.circular(18),
       ),
-      child: const Icon(
-        Icons.account_balance_rounded,
-        color: LogicOasisDesign.forest,
-        size: 30,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: const AppIllustration('oasis_stage_1_damaged.jpg'),
       ),
     );
   }

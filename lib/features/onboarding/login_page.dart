@@ -284,7 +284,7 @@ class _LoginPageState extends State<LoginPage> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: () => showProviderSetup('Facebook'),
+                      onPressed: isLoading ? null : () => showProviderSetup('Facebook'),
                       icon: const Icon(Icons.facebook),
                       label: const Text('Facebook'),
                     ),

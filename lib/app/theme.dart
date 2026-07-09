@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:logic_oasis/app/logic_oasis_design.dart';
 
 class LogicOasisTheme {
@@ -28,7 +29,7 @@ class LogicOasisTheme {
       useMaterial3: true,
       colorScheme: colorScheme,
       scaffoldBackgroundColor: LogicOasisDesign.page,
-      fontFamily: 'Roboto',
+      fontFamily: GoogleFonts.fredoka().fontFamily,
       appBarTheme: const AppBarTheme(
         centerTitle: false,
         elevation: 0,
@@ -117,6 +118,7 @@ class LogicOasisTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: LogicOasisDesign.forest,
+          backgroundColor: LogicOasisDesign.card,
           minimumSize: const Size.fromHeight(48),
           side: const BorderSide(color: LogicOasisDesign.line),
           shape: RoundedRectangleBorder(

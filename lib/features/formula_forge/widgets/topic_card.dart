@@ -34,13 +34,11 @@ class TopicCard extends StatelessWidget {
       opacity: locked ? .74 : 1,
       child: SoftCard(
         onTap: onStart,
-        padding: const EdgeInsets.all(14),
-        radius: 20,
         color: const Color(0xFFFFFDF4),
         child: Row(
           children: [
             TopicThumbnail(topicId: topic.id),
-            const SizedBox(width: 14),
+            const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -55,7 +53,7 @@ class TopicCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: LogicOasisDesign.ink,
-                            fontSize: 18,
+                            fontSize: 20,
                             fontWeight: FontWeight.w900,
                             height: 1.05,
                           ),
@@ -81,34 +79,24 @@ class TopicCard extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    learningArea,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Color(0xFF786B58),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+
                   const SizedBox(height: 10),
                   Row(
                     children: [
                       Text(
                         '${(topic.progress * 100).round()}%',
                         style: TextStyle(
-                          color: style.accent,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w900,
-                        ),
+                      color: style.accent,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                    ),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: ProgressBar(
                           value: topic.progress,
                           color: style.accent,
-                          height: 6,
+                          height: 7,
                         ),
                       ),
                     ],
@@ -147,7 +135,7 @@ class TopicCard extends StatelessWidget {
     if (locked) {
       return const _TopicStatus(
         label: 'Locked',
-        icon: Icons.lock_rounded,
+        icon: 'lock_outline',
         color: Color(0xFF8C7A61),
         background: Color(0xFFF1E8D7),
       );
@@ -155,7 +143,7 @@ class TopicCard extends StatelessWidget {
     if (topic.progress >= .7 || topic.mastery == 'Strong') {
       return const _TopicStatus(
         label: 'Doing Great',
-        icon: Icons.check_rounded,
+        icon: 'check',
         color: LogicOasisDesign.forest,
         background: Color(0xFFE3F5DB),
       );
@@ -163,14 +151,14 @@ class TopicCard extends StatelessWidget {
     if (topic.progress < .35 || topic.mastery == 'Weak') {
       return const _TopicStatus(
         label: 'Needs Help',
-        icon: Icons.warning_amber_rounded,
+        icon: 'warning',
         color: Color(0xFFD84D45),
         background: Color(0xFFFFE8E0),
       );
     }
     return const _TopicStatus(
       label: 'Keep Practicing',
-      icon: Icons.star_border_rounded,
+      icon: 'star',
       color: Color(0xFFB96E00),
       background: Color(0xFFFFF0CC),
     );
@@ -218,7 +206,7 @@ class _TopicStatus {
   });
 
   final String label;
-  final IconData icon;
+  final String icon;
   final Color color;
   final Color background;
 }
