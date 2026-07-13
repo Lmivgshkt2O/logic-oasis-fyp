@@ -534,34 +534,62 @@ class AppState extends ChangeNotifier {
     const OasisArea(
       id: 'fraction_bridge',
       title: 'Fraction Bridge',
+      topic: 'Fractions',
       description: 'Reconnect oasis paths and learning routes.',
       resource: OasisResource.crystals,
       repairCost: 30,
       progress: 0.25,
+      markerPosition: Offset(0.40, 0.55),
+      damagedImage: 'assets/illustrations/oasis_parts/fraction_bridge_damaged.png',
+      repairingImage: 'assets/illustrations/oasis_parts/fraction_bridge_repairing_50.png',
+      restoredImage: 'assets/illustrations/oasis_parts/fraction_bridge_restored_100.png',
+      homeOverlay50: 'assets/illustrations/oasis_parts/home_overlay_fraction_bridge_50.png',
+      homeOverlay100: 'assets/illustrations/oasis_parts/home_overlay_fraction_bridge_100.png',
     ),
     const OasisArea(
       id: 'decimal_waterway',
       title: 'Decimal Waterway',
+      topic: 'Decimals',
       description: 'Bring clean water back to the oasis.',
       resource: OasisResource.crystals,
       repairCost: 35,
       progress: 0,
+      markerPosition: Offset(0.72, 0.35),
+      damagedImage: 'assets/illustrations/oasis_parts/decimal_waterway_damaged.png',
+      repairingImage: 'assets/illustrations/oasis_parts/decimal_waterway_repairing_50.png',
+      restoredImage: 'assets/illustrations/oasis_parts/decimal_waterway_restored_100.png',
+      homeOverlay50: 'assets/illustrations/oasis_parts/home_overlay_decimal_waterway_50.png',
+      homeOverlay100: 'assets/illustrations/oasis_parts/home_overlay_decimal_waterway_100.png',
     ),
     const OasisArea(
       id: 'percentage_garden',
       title: 'Percentage Garden',
+      topic: 'Percentages',
       description: 'Grow green areas through steady practice.',
       resource: OasisResource.crystals,
       repairCost: 40,
       progress: 0,
+      markerPosition: Offset(0.14, 0.70),
+      damagedImage: 'assets/illustrations/oasis_parts/percentage_garden_damaged.png',
+      repairingImage: 'assets/illustrations/oasis_parts/percentage_garden_repairing_50.png',
+      restoredImage: 'assets/illustrations/oasis_parts/percentage_garden_restored_100.png',
+      homeOverlay50: 'assets/illustrations/oasis_parts/home_overlay_percentage_garden_50.png',
+      homeOverlay100: 'assets/illustrations/oasis_parts/home_overlay_percentage_garden_100.png',
     ),
     const OasisArea(
       id: 'market_corner',
       title: 'Market Corner',
+      topic: 'Money',
       description: 'Rebuild facilities with helpful community energy.',
       resource: OasisResource.mutualAid,
       repairCost: 20,
       progress: 0.25,
+      markerPosition: Offset(0.78, 0.62),
+      damagedImage: 'assets/illustrations/oasis_parts/market_corner_damaged.png',
+      repairingImage: 'assets/illustrations/oasis_parts/market_corner_repairing_50.png',
+      restoredImage: 'assets/illustrations/oasis_parts/market_corner_restored_100.png',
+      homeOverlay50: 'assets/illustrations/oasis_parts/home_overlay_market_corner_50.png',
+      homeOverlay100: 'assets/illustrations/oasis_parts/home_overlay_market_corner_100.png',
     ),
   ];
   final List<QuizAttempt> attempts = [];
@@ -1264,16 +1292,20 @@ class AppState extends ChangeNotifier {
     if (snapshot.eyeComfortMode != null) {
       eyeComfortMode = snapshot.eyeComfortMode!;
     }
-    if (snapshot.repairedAreas.isEmpty) return;
-
     for (var index = 0; index < oasisAreas.length; index += 1) {
       final area = oasisAreas[index];
-      final progress = snapshot.repairedAreas[area.id];
-      if (progress == null) continue;
+      // Force reset for testing!
       oasisAreas[index] = area.copyWith(
-        progress: progress.clamp(0.0, 1.0).toDouble(),
+        progress: 0.0,
       );
     }
+    
+    // Give plenty of resources to test
+    crystals = 800;
+    mutualAidEnergy = 800;
+    
+    // Sync the reset back to Firebase
+    unawaited(_saveOasisProgressToFirebase());
   }
 
   bool claimRecommendedMissionReward() {

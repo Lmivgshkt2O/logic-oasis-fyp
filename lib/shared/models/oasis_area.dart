@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 enum OasisResource { crystals, mutualAid }
 
 class OasisArea {
@@ -8,6 +10,13 @@ class OasisArea {
     required this.resource,
     required this.repairCost,
     required this.progress,
+    this.topic = '',
+    this.markerPosition = Offset.zero,
+    this.damagedImage = '',
+    this.repairingImage = '',
+    this.restoredImage = '',
+    this.homeOverlay50,
+    this.homeOverlay100,
   });
 
   final String id;
@@ -17,7 +26,37 @@ class OasisArea {
   final int repairCost;
   final double progress;
 
+  /// The math topic this oasis area is linked to (e.g. 'Fractions').
+  final String topic;
+
+  /// Fractional position (0.0–1.0) within the scene for the repair marker.
+  final Offset markerPosition;
+
+  /// Standalone preview images for damaged / repairing / restored states.
+  final String damagedImage;
+  final String repairingImage;
+  final String restoredImage;
+
+  /// Scene-aligned transparent overlays for in-scene restoration visuals.
+  final String? homeOverlay50;
+  final String? homeOverlay100;
+
   bool get isComplete => progress >= 1;
+
+  /// Returns the standalone preview image matching the current progress.
+  String get currentImage {
+    if (damagedImage.isEmpty) return '';
+    if (progress >= 1.0) return restoredImage;
+    if (progress >= 0.5) return repairingImage;
+    return damagedImage;
+  }
+
+  /// Returns the scene overlay path for the current progress, or null.
+  String? get currentOverlay {
+    if (progress >= 1.0) return homeOverlay100;
+    if (progress >= 0.5) return homeOverlay50;
+    return null;
+  }
 
   String localizedTitle(bool isBahasaMelayu) {
     if (!isBahasaMelayu) return title;
@@ -36,6 +75,13 @@ class OasisArea {
     OasisResource? resource,
     int? repairCost,
     double? progress,
+    String? topic,
+    Offset? markerPosition,
+    String? damagedImage,
+    String? repairingImage,
+    String? restoredImage,
+    String? homeOverlay50,
+    String? homeOverlay100,
   }) {
     return OasisArea(
       id: id ?? this.id,
@@ -44,6 +90,13 @@ class OasisArea {
       resource: resource ?? this.resource,
       repairCost: repairCost ?? this.repairCost,
       progress: progress ?? this.progress,
+      topic: topic ?? this.topic,
+      markerPosition: markerPosition ?? this.markerPosition,
+      damagedImage: damagedImage ?? this.damagedImage,
+      repairingImage: repairingImage ?? this.repairingImage,
+      restoredImage: restoredImage ?? this.restoredImage,
+      homeOverlay50: homeOverlay50 ?? this.homeOverlay50,
+      homeOverlay100: homeOverlay100 ?? this.homeOverlay100,
     );
   }
 

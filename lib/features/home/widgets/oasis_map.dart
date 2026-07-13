@@ -357,6 +357,29 @@ class _RepairDetailSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    AnimatedSwitcher(
+              duration: const Duration(milliseconds: 400),
+              child: Image.asset(
+                area.currentImage,
+                key: ValueKey(area.currentImage),
+                height: 140,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) {
+                  return const SizedBox(
+                    height: 140,
+                    child: Center(
+                      child: Text('Image not found'),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
             Row(
               children: [
                 Container(
@@ -414,17 +437,26 @@ class _RepairDetailSheet extends StatelessWidget {
                   ),
                 ),
               ],
+                    ),
+                  ],
+                ),
+              ),
             ),
-            const SizedBox(height: 18),
-            FilledButton.icon(
-              onPressed: canRepair ? onRepair : null,
-              icon: Icon(area.isComplete ? Icons.check : Icons.construction),
-              label: Text(
-                area.isComplete
-                    ? l10n.fullyRestored
-                    : canRepair
-                    ? l10n.repairWithResource(resourceLabel)
-                    : l10n.needMoreResource(resourceLabel),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: canRepair ? onRepair : null,
+                icon: Icon(area.isComplete ? Icons.check : Icons.construction),
+                label: Text(
+                  area.isComplete
+                      ? l10n.fullyRestored
+                      : canRepair
+                      ? area.progress >= 0.5
+                          ? 'Complete Restoration'
+                          : l10n.repairWithResource(resourceLabel)
+                      : l10n.needMoreResource(resourceLabel),
+                ),
               ),
             ),
           ],
@@ -452,19 +484,25 @@ class _SheetMetric extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: LogicOasisTheme.line),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Icon(icon, color: color),
-          const SizedBox(height: 8),
-          Text(value, style: theme.textTheme.titleLarge),
-          Text(label, style: theme.textTheme.bodyMedium),
+          Icon(icon, color: color, size: 24),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(value, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900)),
+                Text(label, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700)),
+              ],
+            ),
+          ),
         ],
       ),
     );
