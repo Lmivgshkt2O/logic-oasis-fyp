@@ -21,17 +21,39 @@ service cloud.firestore {
     }
 
     match /topics/{topicId} {
-      allow read: if true;
+      allow read: if signedIn();
       allow write: if false;
     }
 
     match /questions/{questionId} {
-      allow read: if true;
+      allow read: if signedIn();
       allow write: if false;
     }
 
+    match /questionBanks/{bankId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    // Correctness and explanations are server-only. Callable quiz-session
+    // functions use the Admin SDK and are not constrained by these rules.
+    match /questionAnswerKeys/{questionId} {
+      allow read, write: if false;
+    }
+
+    // U3 session and response documents are created and finalized only by
+    // callable Functions through the Admin SDK. The app receives safe return
+    // payloads, not direct document access.
+    match /quizSessions/{sessionId} {
+      allow read, write: if false;
+    }
+
+    match /questionResponses/{responseId} {
+      allow read, write: if false;
+    }
+
     match /subtopics/{subtopicId} {
-      allow read: if true;
+      allow read: if signedIn();
       allow write: if false;
     }
 
@@ -49,20 +71,17 @@ service cloud.firestore {
 
     match /quizAttempts/{attemptId} {
       allow read: if ownsExistingStudentField();
-      allow create, update: if ownsStudentField();
-      allow delete: if false;
+      allow write: if false;
     }
 
     match /topicMastery/{masteryId} {
       allow read: if ownsExistingStudentField();
-      allow create, update: if ownsStudentField();
-      allow delete: if false;
+      allow write: if false;
     }
 
     match /subtopicMastery/{masteryId} {
       allow read: if ownsExistingStudentField();
-      allow create, update: if ownsStudentField();
-      allow delete: if false;
+      allow write: if false;
     }
 
     match /oasisProgress/{progressId} {
@@ -73,8 +92,7 @@ service cloud.firestore {
 
     match /aiModelRuns/{runId} {
       allow read: if ownsExistingStudentField();
-      allow create, update: if ownsStudentField();
-      allow delete: if false;
+      allow write: if false;
     }
 
     match /{document=**} {

@@ -1,0 +1,385 @@
+"""Python callable endpoints for server-authoritative Logic Oasis quizzes."""
+
+from __future__ import annotations
+
+from datetime import datetime, timedelta, timezone
+from typing import Any, Callable
+from uuid import uuid4
+
+import firebase_admin
+from firebase_admin import firestore
+from firebase_functions import https_fn
+
+from quiz_session import (
+    QuizSessionError,
+    client_completion,
+    client_response,
+    client_session,
+    response_document_id,
+)
+
+
+QUESTION_COUNT = 5
+SESSION_TTL_MINUTES = 30
+FUNCTION_REGION = "asia-southeast1"
+
+try:
+    firebase_admin.get_app()
+except ValueError:
+    firebase_admin.initialize_app()
+
+_db: Any | None = None
+
+
+def firestore_db() -> Any:
+    """Create the Admin client only when a callable actually executes.
+
+    Firebase imports this module to discover functions before a local emulator
+    or deploy process has Application Default Credentials. Deferring the client
+    keeps discovery credential-free while production invocation still uses the
+    function service account.
+    """
+    global _db
+    if _db is None:
+        _db = firestore.client()
+    return _db
+
+
+def _auth_uid(request: https_fn.CallableRequest) -> str:
+    if request.auth is None or not request.auth.uid:
+        raise QuizSessionError("unauthenticated", "Sign in before starting a quiz.")
+    return request.auth.uid
+
+
+def _data(request: https_fn.CallableRequest) -> dict[str, Any]:
+    if not isinstance(request.data, dict):
+        raise QuizSessionError("invalid-argument", "Quiz request data must be an object.")
+    return request.data
+
+
+def _string(data: dict[str, Any], key: str) -> str:
+    value = data.get(key)
+    if not isinstance(value, str) or not value.strip():
+        raise QuizSessionError("invalid-argument", f"{key} is required.")
+    return value
+
+
+def _int(data: dict[str, Any], key: str) -> int:
+    value = data.get(key)
+    if isinstance(value, bool):
+        raise QuizSessionError("invalid-argument", f"{key} must be an integer.")
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float) and value.is_integer():
+        # Callable JSON numbers can arrive as 4.0 even when Flutter supplied
+        # an integer. Keep the trust boundary strict by accepting only values
+        # with no fractional component.
+        return int(value)
+    if isinstance(value, str) and value.strip().isdigit():
+        # The Android callable bridge may serialize a whole number as text.
+        # Accept only digits; fractional, signed, and arbitrary strings remain
+        # invalid at this boundary.
+        return int(value.strip())
+    raise QuizSessionError("invalid-argument", f"{key} must be an integer.")
+
+
+def _active_easy_bank(topic_id: str, subtopic_id: str, year_level: int) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    bank_docs = list(
+        firestore_db().collection("questionBanks")
+        .where("topicId", "==", topic_id)
+        .where("subtopicId", "==", subtopic_id)
+        .where("yearLevel", "==", year_level)
+        .where("difficultyLevel", "==", "Easy")
+        .where("isActive", "==", True)
+        .limit(1)
+        .stream()
+    )
+    if not bank_docs:
+        raise QuizSessionError("failed-precondition", "No active Easy question bank is available.")
+    bank = dict(bank_docs[0].to_dict() or {})
+    bank["bankId"] = bank_docs[0].id
+    question_ids = bank.get("questionIds")
+    if not isinstance(question_ids, list) or len(question_ids) < QUESTION_COUNT:
+        raise QuizSessionError("failed-precondition", "The active question bank is incomplete.")
+    database = firestore_db()
+    snapshots = database.get_all(
+        [database.collection("questions").document(str(item)) for item in question_ids]
+    )
+    questions = []
+    for snapshot in snapshots:
+        if snapshot.exists:
+            question = dict(snapshot.to_dict() or {})
+            question["questionId"] = snapshot.id
+            questions.append(question)
+    questions = [
+        question for question in questions
+        if question.get("bankId") == bank["bankId"]
+        and question.get("contentVersion") == bank.get("version")
+        and question.get("isActive") is True
+    ]
+    questions.sort(key=lambda item: (item.get("order", 0), item["questionId"]))
+    if len(questions) < QUESTION_COUNT:
+        raise QuizSessionError("failed-precondition", "The active question bank has too few valid prompts.")
+    return bank, questions[:QUESTION_COUNT]
+
+
+def start_quiz_session(data: dict[str, Any], student_id: str) -> dict[str, Any]:
+    topic_id = _string(data, "topicId")
+    subtopic_id = _string(data, "subtopicId")
+    year_level = _int(data, "yearLevel")
+    bank, questions = _active_easy_bank(topic_id, subtopic_id, year_level)
+    now = datetime.now(timezone.utc)
+    session_id = f"session_{uuid4().hex}"
+    session = {
+        "sessionId": session_id,
+        "attemptId": f"attempt_{uuid4().hex}",
+        "studentId": student_id,
+        # U5 may replace this cold-start source with an active assignment.
+        "assignmentId": "cold_start_easy",
+        "assignmentSource": "cold_start_easy",
+        "bankId": bank["bankId"],
+        "topicId": topic_id,
+        "subtopicId": subtopic_id,
+        "yearLevel": year_level,
+        "difficultyLevel": "Easy",
+        "contentVersion": bank["version"],
+        "questionIds": [question["questionId"] for question in questions],
+        "expectedResponseCount": len(questions),
+        "status": "active",
+        "validatedResponseCount": 0,
+        "startedAt": now,
+        "expiresAt": now + timedelta(minutes=SESSION_TTL_MINUTES),
+        "finalizedAt": None,
+    }
+    firestore_db().collection("quizSessions").document(session_id).create(session)
+    return client_session(session, questions)
+
+
+def submit_quiz_response(data: dict[str, Any], student_id: str) -> dict[str, Any]:
+    session_id = _string(data, "sessionId")
+    question_id = _string(data, "questionId")
+    selected_index = _int(data, "selectedIndex")
+    sequence_index = _int(data, "sequenceIndex")
+    idempotency_key = _string(data, "idempotencyKey")
+    response_time_ms = max(0, _int(data, "responseTimeMs"))
+    hint_count = max(0, _int(data, "hintCount"))
+    if selected_index < 0:
+        raise QuizSessionError("invalid-argument", "selectedIndex must not be negative.")
+    database = firestore_db()
+    response_ref = database.collection("questionResponses").document(response_document_id(session_id, sequence_index))
+    session_ref = database.collection("quizSessions").document(session_id)
+
+    @firestore.transactional
+    def submit(transaction: firestore.Transaction) -> dict[str, Any]:
+        session_snapshot = session_ref.get(transaction=transaction)
+        if not session_snapshot.exists:
+            raise QuizSessionError("not-found", "Quiz session not found.")
+        session = dict(session_snapshot.to_dict() or {})
+        if session.get("studentId") != student_id:
+            raise QuizSessionError("permission-denied", "This quiz session belongs to another student.")
+        if session.get("status") != "active":
+            raise QuizSessionError("failed-precondition", "Quiz session is not active.")
+        expires_at = session.get("expiresAt")
+        if isinstance(expires_at, datetime) and datetime.now(timezone.utc) >= expires_at:
+            transaction.update(session_ref, {"status": "expired"})
+            raise QuizSessionError("deadline-exceeded", "Quiz session expired. Start a new quiz.")
+        question_ids = session.get("questionIds")
+        if not isinstance(question_ids, list) or sequence_index < 0 or sequence_index >= len(question_ids):
+            raise QuizSessionError("invalid-argument", "The response sequence is invalid.")
+        if question_ids[sequence_index] != question_id:
+            raise QuizSessionError("failed-precondition", "Submit quiz responses in the assigned order.")
+        existing = response_ref.get(transaction=transaction)
+        if existing.exists:
+            response = dict(existing.to_dict() or {})
+            if (
+                response.get("idempotencyKey") == idempotency_key
+                and response.get("questionId") == question_id
+                and response.get("selectedIndex") == selected_index
+            ):
+                return response
+            raise QuizSessionError("already-exists", "This question response is already sealed.")
+        question_ref = database.collection("questions").document(question_id)
+        key_ref = database.collection("questionAnswerKeys").document(question_id)
+        prior_response_ref = (
+            database.collection("questionResponses").document(
+            response_document_id(session_id, sequence_index - 1)
+            )
+            if sequence_index > 0
+            else None
+        )
+        content_refs = [question_ref, key_ref]
+        if prior_response_ref is not None:
+            content_refs.append(prior_response_ref)
+        content_snapshots = {
+            snapshot.reference.path: snapshot
+            for snapshot in transaction.get_all(content_refs)
+        }
+        question_snapshot = content_snapshots[question_ref.path]
+        key_snapshot = content_snapshots[key_ref.path]
+        if prior_response_ref is not None:
+            prior_response = content_snapshots[prior_response_ref.path]
+            if not prior_response.exists:
+                raise QuizSessionError(
+                    "failed-precondition",
+                    "Submit quiz responses in sequence.",
+                )
+        if not question_snapshot.exists or not key_snapshot.exists:
+            raise QuizSessionError("failed-precondition", "Quiz content is no longer available.")
+        question = dict(question_snapshot.to_dict() or {})
+        answer_key = dict(key_snapshot.to_dict() or {})
+        if (
+            question.get("bankId") != session.get("bankId")
+            or question.get("contentVersion") != session.get("contentVersion")
+            or answer_key.get("contentVersion") != session.get("contentVersion")
+            or not question.get("isActive")
+            or not answer_key.get("isActive")
+        ):
+            raise QuizSessionError("failed-precondition", "The quiz content changed. Start a new quiz.")
+        options = question.get("options")
+        answer_index = answer_key.get("answerIndex")
+        if (
+            not isinstance(options, list)
+            or selected_index >= len(options)
+            or isinstance(answer_index, bool)
+            or not isinstance(answer_index, int)
+            or answer_index < 0
+            or answer_index >= len(options)
+        ):
+            raise QuizSessionError("failed-precondition", "The quiz answer key is invalid.")
+        response = {
+            "responseId": response_ref.id,
+            "sessionId": session_id,
+            "attemptId": session["attemptId"],
+            "studentId": student_id,
+            "questionId": question_id,
+            "skillId": question["skillId"],
+            "bankId": session["bankId"],
+            "selectedIndex": selected_index,
+            "serverIsCorrect": selected_index == answer_index,
+            "explanation": answer_key.get("explanation", ""),
+            "explanationBm": answer_key.get("explanationBm", ""),
+            "validationStatus": "validated",
+            "responseTimeMs": response_time_ms,
+            "hintCount": hint_count,
+            "sequenceIndex": sequence_index,
+            "idempotencyKey": idempotency_key,
+            "createdAt": firestore.SERVER_TIMESTAMP,
+        }
+        transaction.create(response_ref, response)
+        transaction.update(session_ref, {"validatedResponseCount": firestore.Increment(1)})
+        return response
+
+    return client_response(submit(database.transaction()))
+
+
+def finalize_quiz_session(data: dict[str, Any], student_id: str) -> dict[str, Any]:
+    session_id = _string(data, "sessionId")
+    database = firestore_db()
+    session_ref = database.collection("quizSessions").document(session_id)
+
+    @firestore.transactional
+    def finalize(transaction: firestore.Transaction) -> dict[str, Any]:
+        session_snapshot = session_ref.get(transaction=transaction)
+        if not session_snapshot.exists:
+            raise QuizSessionError("not-found", "Quiz session not found.")
+        session = dict(session_snapshot.to_dict() or {})
+        if session.get("studentId") != student_id:
+            raise QuizSessionError("permission-denied", "This quiz session belongs to another student.")
+        attempt_ref = database.collection("quizAttempts").document(session["attemptId"])
+        if session.get("status") == "finalized":
+            attempt_snapshot = attempt_ref.get(transaction=transaction)
+            if not attempt_snapshot.exists:
+                raise QuizSessionError("failed-precondition", "Finalized attempt is unavailable.")
+            return dict(attempt_snapshot.to_dict() or {})
+        if session.get("status") != "active":
+            raise QuizSessionError("failed-precondition", "Quiz session is not active.")
+        expires_at = session.get("expiresAt")
+        if isinstance(expires_at, datetime) and datetime.now(timezone.utc) >= expires_at:
+            transaction.update(session_ref, {"status": "expired"})
+            raise QuizSessionError("deadline-exceeded", "Quiz session expired. Start a new quiz.")
+        question_ids = session.get("questionIds")
+        count = session.get("validatedResponseCount")
+        expected_response_count = session.get("expectedResponseCount")
+        if (
+            not isinstance(question_ids, list)
+            or expected_response_count != len(question_ids)
+            or count != expected_response_count
+        ):
+            raise QuizSessionError("failed-precondition", "Every question must be securely checked first.")
+        response_refs = [
+            database.collection("questionResponses").document(response_document_id(session_id, index))
+            for index in range(len(question_ids))
+        ]
+        response_snapshots = {
+            snapshot.reference.path: snapshot
+            for snapshot in transaction.get_all(response_refs)
+        }
+        responses = []
+        for index, response_ref in enumerate(response_refs):
+            response_snapshot = response_snapshots[response_ref.path]
+            if not response_snapshot.exists:
+                raise QuizSessionError("failed-precondition", "A validated response is missing.")
+            response = dict(response_snapshot.to_dict() or {})
+            if response.get("validationStatus") != "validated" or response.get("questionId") != question_ids[index]:
+                raise QuizSessionError("failed-precondition", "Response lineage is invalid.")
+            responses.append(response)
+        correct_count = sum(1 for response in responses if response.get("serverIsCorrect") is True)
+        total = len(responses)
+        attempt = {
+            "attemptId": session["attemptId"], "sessionId": session_id, "studentId": student_id,
+            "topicId": session["topicId"], "subtopicId": session["subtopicId"],
+            "yearLevel": session["yearLevel"], "bankId": session["bankId"],
+            "difficultyLevel": session["difficultyLevel"], "contentVersion": session["contentVersion"],
+            "correctCount": correct_count, "totalQuestions": total,
+            "score": round(correct_count * 100 / total),
+            "trustedCorrectCount": correct_count,
+            "trustedScore": round(correct_count * 100 / total),
+            "responseCount": total,
+            "responseIds": [response["responseId"] for response in responses],
+            "validationStatus": "finalized",
+            "finalizationStatus": "finalized",
+            "processingStatus": "pending",
+            "dataSource": "runtime_callable",
+            "startedAt": session["startedAt"],
+            "deviceSessionId": "not_recorded",
+            "createdAt": firestore.SERVER_TIMESTAMP,
+            "finalizedAt": firestore.SERVER_TIMESTAMP,
+        }
+        transaction.create(attempt_ref, attempt)
+        transaction.update(session_ref, {"status": "finalized", "finalizedAt": firestore.SERVER_TIMESTAMP})
+        return attempt
+
+    return client_completion(finalize(database.transaction()))
+
+
+_ERROR_CODES: dict[str, https_fn.FunctionsErrorCode] = {
+    "unauthenticated": https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+    "permission-denied": https_fn.FunctionsErrorCode.PERMISSION_DENIED,
+    "invalid-argument": https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+    "not-found": https_fn.FunctionsErrorCode.NOT_FOUND,
+    "already-exists": https_fn.FunctionsErrorCode.ALREADY_EXISTS,
+    "failed-precondition": https_fn.FunctionsErrorCode.FAILED_PRECONDITION,
+    "deadline-exceeded": https_fn.FunctionsErrorCode.DEADLINE_EXCEEDED,
+}
+
+
+def _call(handler: Callable[[dict[str, Any], str], dict[str, Any]], request: https_fn.CallableRequest) -> dict[str, Any]:
+    try:
+        return handler(_data(request), _auth_uid(request))
+    except QuizSessionError as error:
+        raise https_fn.HttpsError(_ERROR_CODES.get(error.code, https_fn.FunctionsErrorCode.INTERNAL), str(error))
+
+
+@https_fn.on_call(region=FUNCTION_REGION)
+def startQuizSession(request: https_fn.CallableRequest) -> dict[str, Any]:
+    return _call(start_quiz_session, request)
+
+
+@https_fn.on_call(region=FUNCTION_REGION)
+def submitQuizResponse(request: https_fn.CallableRequest) -> dict[str, Any]:
+    return _call(submit_quiz_response, request)
+
+
+@https_fn.on_call(region=FUNCTION_REGION)
+def finalizeQuizSession(request: https_fn.CallableRequest) -> dict[str, Any]:
+    return _call(finalize_quiz_session, request)
