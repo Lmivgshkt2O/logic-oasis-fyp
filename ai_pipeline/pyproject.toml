@@ -1,0 +1,8 @@
+[project]
+name = "logic-oasis-ai"
+version = "0.1.0"
+description = "Validated, offline AI pipeline contracts for Logic Oasis"
+requires-python = ">=3.11"
+
+[tool.unittest]
+start-directory = "tests"

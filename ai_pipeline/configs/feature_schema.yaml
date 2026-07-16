@@ -1,0 +1,28 @@
+schemaVersion: quiz-attempt-features-v1
+sourceContract: attempt-evidence-v1
+trustedAttemptGate:
+  finalizationStatus: finalized
+  validationStatus: finalized
+  dataSource: runtime_callable
+trustedResponseGate:
+  validationStatus: validated
+finalEvaluationProvenance:
+  - real
+developmentOnlyProvenance:
+  - emulator_verified
+rejectedProvenance:
+  - seed_demo
+  - synthetic_test
+features:
+  - total_questions
+  - correct_count
+  - correct_rate
+  - mean_response_time_ms
+  - mean_hint_count
+identity:
+  studentKey: sha256(namespace:salt:studentId)
+  rawStudentIdAllowedInExport: false
+lifecycle:
+  initialStatus: candidate
+  activeRuntimeStatus: promoted
+  automaticRetrainingAfterQuiz: false
