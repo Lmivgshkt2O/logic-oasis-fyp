@@ -120,7 +120,8 @@ class SourceParityTests(unittest.TestCase):
         candidate = ModelArtifact(
             artifact_id="xgb-2026-07-16", model_type="xgboost", model_version="v1",
             feature_schema_version="quiz-attempt-features-v1", training_dataset_version="2026-07-16-r1",
-            artifact_sha256="abc123",
+            artifact_sha256="abc123", evaluation_status="evaluated", evaluation_report_sha256="report123",
+            promotion_gate_status="passed",
         )
         registry.register_candidate(candidate)
         with self.assertRaisesRegex(ValueError, "no promoted runtime model"):

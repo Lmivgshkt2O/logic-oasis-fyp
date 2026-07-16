@@ -10,6 +10,11 @@ from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from typing import Mapping
 
+from .prediction_contract import (
+    DEFAULT_MASTERY_CRITERION, PREDICTION_LABEL_VERSION, PREDICTION_TARGET,
+    PredictionContract,
+)
+
 
 CANDIDATE = "candidate"
 PROMOTED = "promoted"
@@ -23,6 +28,12 @@ class ModelArtifact:
     feature_schema_version: str
     training_dataset_version: str
     artifact_sha256: str
+    prediction_target: str = PREDICTION_TARGET
+    label_version: str = PREDICTION_LABEL_VERSION
+    mastery_criterion: float = DEFAULT_MASTERY_CRITERION
+    evaluation_status: str = "not_evaluated"
+    evaluation_report_sha256: str | None = None
+    promotion_gate_status: str = "not_passed"
     lifecycle_status: str = CANDIDATE
     promoted_at: datetime | None = None
 
@@ -35,6 +46,16 @@ class ModelArtifact:
                 raise ValueError(f"{field} is required")
         if self.lifecycle_status not in (CANDIDATE, PROMOTED):
             raise ValueError("lifecycle_status must be candidate or promoted")
+        if not 0.0 < self.mastery_criterion < 1.0:
+            raise ValueError("mastery_criterion must be between zero and one")
+        if self.evaluation_status not in {"not_evaluated", "evaluated"}:
+            raise ValueError("evaluation_status must be not_evaluated or evaluated")
+        if self.evaluation_status == "evaluated" and not self.evaluation_report_sha256:
+            raise ValueError("evaluated artifacts require evaluation_report_sha256")
+        if self.promotion_gate_status not in {"not_passed", "passed"}:
+            raise ValueError("promotion_gate_status must be not_passed or passed")
+        if self.promotion_gate_status == "passed" and self.evaluation_status != "evaluated":
+            raise ValueError("promotion requires an evaluated artifact")
         if self.lifecycle_status == PROMOTED and self.promoted_at is None:
             raise ValueError("promoted artifacts require promoted_at")
         if self.lifecycle_status == CANDIDATE and self.promoted_at is not None:
@@ -48,6 +69,12 @@ class ModelArtifact:
             "featureSchemaVersion": self.feature_schema_version,
             "trainingDatasetVersion": self.training_dataset_version,
             "artifactSha256": self.artifact_sha256,
+            "predictionTarget": self.prediction_target,
+            "labelVersion": self.label_version,
+            "masteryCriterion": self.mastery_criterion,
+            "evaluationStatus": self.evaluation_status,
+            "evaluationReportSha256": self.evaluation_report_sha256,
+            "promotionGateStatus": self.promotion_gate_status,
             "lifecycleStatus": self.lifecycle_status,
             "promotedAt": self.promoted_at,
         }
@@ -56,9 +83,10 @@ class ModelArtifact:
 class ModelRegistry:
     """Promote an explicit candidate; never train or activate implicitly."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, prediction_contract: PredictionContract = PredictionContract()) -> None:
         self._artifacts: dict[str, ModelArtifact] = {}
         self._active_artifact_id: str | None = None
+        self._prediction_contract = prediction_contract
 
     def register_candidate(self, artifact: ModelArtifact) -> ModelArtifact:
         if artifact.lifecycle_status != CANDIDATE:
@@ -75,6 +103,20 @@ class ModelRegistry:
             raise ValueError("candidate artifact is not registered")
         if artifact.lifecycle_status != CANDIDATE:
             raise ValueError("only candidate artifacts may be promoted")
+        if artifact.model_type != "xgboost":
+            raise ValueError("only evaluated XGBoost artifacts may become active runtime models")
+        if artifact.evaluation_status != "evaluated":
+            raise ValueError("an unevaluated artifact cannot become active")
+        if artifact.promotion_gate_status != "passed":
+            raise ValueError("an artifact whose promotion gates have not passed cannot become active")
+        contract = self._prediction_contract
+        if (
+            artifact.prediction_target != contract.target_name
+            or artifact.label_version != contract.label_version
+            or artifact.mastery_criterion != contract.mastery_criterion
+            or artifact.feature_schema_version != contract.feature_schema_version
+        ):
+            raise ValueError("artifact does not match the active prediction contract")
         timestamp = promoted_at or datetime.now(timezone.utc)
         if timestamp.tzinfo is None:
             raise ValueError("promoted_at must include a timezone")

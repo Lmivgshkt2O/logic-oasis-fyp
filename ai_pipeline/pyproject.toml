@@ -3,6 +3,11 @@ name = "logic-oasis-ai"
 version = "0.1.0"
 description = "Validated, offline AI pipeline contracts for Logic Oasis"
 requires-python = ">=3.11"
+dependencies = [
+  "joblib>=1.5",
+  "scikit-learn>=1.5",
+  "xgboost>=2.0",
+]
 
 [tool.unittest]
 start-directory = "tests"

@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import csv
 from dataclasses import replace
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from .firestore_source import SourceDataset, load_firestore_dataset
+from ..time_utils import parse_timestamp
 
 
 def load_csv_dataset(
@@ -147,12 +147,5 @@ def _boolean(row: Mapping[str, str], field: str) -> bool:
     raise ValueError(f"{field} must be true or false")
 
 
-def _timestamp(row: Mapping[str, str], field: str) -> datetime:
-    raw_value = _string(row, field)
-    try:
-        value = datetime.fromisoformat(raw_value.replace("Z", "+00:00"))
-    except ValueError as error:
-        raise ValueError(f"{field} must be an ISO-8601 timestamp") from error
-    if value.tzinfo is None:
-        raise ValueError(f"{field} must include a timezone")
-    return value
+def _timestamp(row: Mapping[str, str], field: str):
+    return parse_timestamp(_string(row, field), field)
