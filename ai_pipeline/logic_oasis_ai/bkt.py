@@ -93,8 +93,10 @@ class MasterySnapshot:
             "pGuess": self.parameters.guess_rate,
             "pSlip": self.parameters.slip_rate,
             "observationCount": self.evidence_count,
-            "sourceAttemptIds": list(self.source_attempt_ids),
-            "sourceResponseIds": list(self.source_response_ids),
+            # Response-level history remains in immutable quiz evidence. The
+            # runtime snapshot stores only its bounded latest lineage marker.
+            "sourceAttemptId": self.source_attempt_ids[-1],
+            "sourceResponseId": self.source_response_ids[-1],
             "sourceAttemptSequence": self.source_attempt_sequence,
             "sequenceIndex": self.sequence_index,
             "pKnownAfterAttempt": self.p_known_after_attempt,

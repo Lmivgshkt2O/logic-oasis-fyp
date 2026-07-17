@@ -103,6 +103,24 @@ class BktMasteryTests(unittest.TestCase):
         self.assertEqual(snapshots[0].model_version, BKT_MODEL_VERSION)
         self.assertEqual((2, 0), (snapshots[0].source_attempt_sequence, snapshots[0].sequence_index))
 
+    def test_firestore_snapshot_uses_bounded_latest_lineage(self):
+        first = attempt("a1", ("r1",), source_attempt_sequence=1, correct_count=1)
+        second = attempt("a2", ("r2",), source_attempt_sequence=2)
+        snapshot = build_mastery_snapshots(
+            [first, second],
+            {
+                "a1": [response("r1", "a1", is_correct=True, sequence_index=0, minutes=0)],
+                "a2": [response("r2", "a2", is_correct=False, sequence_index=0, minutes=1)],
+            },
+        )[0]
+
+        document = snapshot.to_firestore_document()
+
+        self.assertEqual("a2", document["sourceAttemptId"])
+        self.assertEqual("r2", document["sourceResponseId"])
+        self.assertNotIn("sourceAttemptIds", document)
+        self.assertNotIn("sourceResponseIds", document)
+
     def test_responses_in_one_attempt_replay_by_sequence_index_not_created_at(self):
         source = attempt("a1", ("r1", "r2"), source_attempt_sequence=1, correct_count=1)
         snapshots = build_mastery_snapshots(
