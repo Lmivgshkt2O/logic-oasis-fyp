@@ -49,3 +49,15 @@ def validate_response_lineage(
             raise ValueError("response telemetry does not satisfy the U3-R contract")
     if sum(response.is_correct for response in ordered) != attempt.correct_count:
         raise ValueError("attempt correct count does not match validated responses")
+
+
+def validate_bkt_attempt_lineage(
+    attempt: FinalizedQuizAttemptRecord,
+    responses: Sequence[ValidatedResponseRecord],
+) -> None:
+    """Validate the additional U4 ordering and state-scope requirements."""
+    validate_response_lineage(attempt, responses)
+    if not attempt.subtopic_id:
+        raise ValueError("attempt subtopicId is required for BKT state scope")
+    if attempt.source_attempt_sequence is None or attempt.source_attempt_sequence < 1:
+        raise ValueError("sourceAttemptSequence must be a positive integer for BKT replay")

@@ -1,4 +1,8 @@
-"""Legacy wrapper around the shared U4 BKT observation equation."""
+"""Legacy wrapper around the shared U4 BKT observation equation.
+
+This summary-only helper is not valid U4 runtime evidence, but it must still
+respect the U3-R server-owned sequence rather than using a wall-clock field.
+"""
 
 from logic_oasis_ai.bkt import BktParameters, update_probability
 
@@ -17,7 +21,15 @@ def update_bkt_mastery(
         slip_rate=slip_rate,
     )
     mastery = parameters.prior_knowledge
-    ordered_attempts = sorted(attempts, key=lambda item: item.get("createdAtSort", ""))
+    materialized_attempts = tuple(attempts)
+    for attempt in materialized_attempts:
+        sequence = attempt.get("sourceAttemptSequence")
+        if isinstance(sequence, bool) or not isinstance(sequence, int) or sequence < 1:
+            raise ValueError("sourceAttemptSequence is required for ordered BKT replay")
+    ordered_attempts = sorted(
+        materialized_attempts,
+        key=lambda item: item["sourceAttemptSequence"],
+    )
 
     for attempt in ordered_attempts:
         correct_rate = float(attempt.get("correctRate", 0))

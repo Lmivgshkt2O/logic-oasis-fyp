@@ -47,6 +47,7 @@ class FinalizedQuizAttemptRecord:
     attempt_id: str
     session_id: str
     student_id: str
+    subtopic_id: str
     total_questions: int
     correct_count: int
     score: int
@@ -66,6 +67,7 @@ class FinalizedQuizAttemptRecord:
             attempt_id=attempt_id,
             session_id=_required_string(data, "sessionId"),
             student_id=_required_string(data, "studentId"),
+            subtopic_id=_required_string(data, "subtopicId"),
             total_questions=_required_int(data, "totalQuestions"),
             correct_count=_required_int(data, "correctCount"),
             score=_required_int(data, "score"),
