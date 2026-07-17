@@ -33,8 +33,13 @@ class ModelArtifact:
     mastery_criterion: float = DEFAULT_MASTERY_CRITERION
     evaluation_status: str = "not_evaluated"
     evaluation_report_sha256: str | None = None
+    artifact_manifest_sha256: str | None = None
     promotion_gate_status: str = "not_passed"
     lifecycle_status: str = CANDIDATE
+    approval_id: str | None = None
+    approved_by: str | None = None
+    approved_at: datetime | None = None
+    approval_rationale: str | None = None
     promoted_at: datetime | None = None
 
     def __post_init__(self) -> None:
@@ -60,6 +65,11 @@ class ModelArtifact:
             raise ValueError("promoted artifacts require promoted_at")
         if self.lifecycle_status == CANDIDATE and self.promoted_at is not None:
             raise ValueError("candidate artifacts cannot have promoted_at")
+        approval_values = (self.approval_id, self.approved_by, self.approved_at, self.approval_rationale)
+        if any(value is not None for value in approval_values) and not all(value is not None for value in approval_values):
+            raise ValueError("approval metadata must be complete when supplied")
+        if self.approved_at is not None and self.approved_at.tzinfo is None:
+            raise ValueError("approved_at must include a timezone")
 
     def to_registry_document(self) -> dict[str, object]:
         return {
@@ -74,8 +84,13 @@ class ModelArtifact:
             "masteryCriterion": self.mastery_criterion,
             "evaluationStatus": self.evaluation_status,
             "evaluationReportSha256": self.evaluation_report_sha256,
+            "artifactManifestSha256": self.artifact_manifest_sha256,
             "promotionGateStatus": self.promotion_gate_status,
             "lifecycleStatus": self.lifecycle_status,
+            "approvalId": self.approval_id,
+            "approvedBy": self.approved_by,
+            "approvedAt": self.approved_at,
+            "approvalRationale": self.approval_rationale,
             "promotedAt": self.promoted_at,
         }
 
@@ -117,6 +132,10 @@ class ModelRegistry:
             or artifact.feature_schema_version != contract.feature_schema_version
         ):
             raise ValueError("artifact does not match the active prediction contract")
+        if not artifact.artifact_manifest_sha256:
+            raise ValueError("an artifact without a manifest cannot become active")
+        if not all((artifact.approval_id, artifact.approved_by, artifact.approved_at, artifact.approval_rationale)):
+            raise ValueError("supervisor approval metadata is required before activation")
         timestamp = promoted_at or datetime.now(timezone.utc)
         if timestamp.tzinfo is None:
             raise ValueError("promoted_at must include a timezone")

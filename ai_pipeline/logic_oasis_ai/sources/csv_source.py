@@ -84,6 +84,10 @@ def _parse_attempt_row(row: Mapping[str, str]) -> tuple[str, dict[str, Any]]:
         "bankId": _string(row, "bankId"),
         "difficultyLevel": _string(row, "difficultyLevel"),
         "contentVersion": _string(row, "contentVersion"),
+        "yearLevel": _integer(row, "yearLevel"),
+        "assignmentId": _string(row, "assignmentId"),
+        "assignmentSource": _string(row, "assignmentSource"),
+        "adaptivePolicyVersion": _string(row, "adaptivePolicyVersion"),
     }
     sequence = _optional_integer(row, "sourceAttemptSequence")
     if sequence is not None:
@@ -93,7 +97,7 @@ def _parse_attempt_row(row: Mapping[str, str]) -> tuple[str, dict[str, Any]]:
 
 def _parse_response_row(row: Mapping[str, str]) -> tuple[str, dict[str, Any]]:
     response_id = _string(row, "responseId")
-    return response_id, {
+    response = {
         "responseId": response_id,
         "sessionId": _string(row, "sessionId"),
         "attemptId": _string(row, "attemptId"),
@@ -108,7 +112,13 @@ def _parse_response_row(row: Mapping[str, str]) -> tuple[str, dict[str, Any]]:
         "responseTimeQuality": _string(row, "responseTimeQuality"),
         "hintCount": _integer(row, "hintCount"),
         "hintTelemetryStatus": _string(row, "hintTelemetryStatus"),
+        "questionVersion": _string(row, "questionVersion"),
+        "contentVersion": _string(row, "contentVersion"),
     }
+    prior_exposure = _optional_integer(row, "priorExposureCount")
+    if prior_exposure is not None:
+        response["priorExposureCount"] = prior_exposure
+    return response_id, response
 
 
 def _student_identity(row: Mapping[str, str]) -> str:

@@ -167,6 +167,9 @@ def start_quiz_session(data: dict[str, Any], student_id: str) -> dict[str, Any]:
         # U5 may replace this cold-start source with an active assignment.
         "assignmentId": "cold_start_easy",
         "assignmentSource": "cold_start_easy",
+        # This is an audit label for the cold-start decision, not a client
+        # supplied policy or a runtime model result.
+        "adaptivePolicyVersion": "adaptive-policy-v1",
         "bankId": bank["bankId"],
         "topicId": topic_id,
         "subtopicId": subtopic_id,
@@ -283,6 +286,12 @@ def submit_quiz_response(data: dict[str, Any], student_id: str) -> dict[str, Any
             "questionId": question_id,
             "skillId": question["skillId"],
             "bankId": session["bankId"],
+            "questionVersion": question["contentVersion"],
+            "contentVersion": session["contentVersion"],
+            # FYP1 does not yet calculate learner-wide exposure.  Persist a
+            # server-derived availability marker so exports never invent a
+            # zero exposure value from a client request.
+            "priorExposureCount": question.get("priorExposureCount"),
             "selectedIndex": selected_index,
             "serverIsCorrect": selected_index == answer_index,
             "explanation": answer_key.get("explanation", ""),
@@ -378,6 +387,9 @@ def finalize_quiz_session(data: dict[str, Any], student_id: str) -> dict[str, An
             "topicId": session["topicId"], "subtopicId": session["subtopicId"],
             "yearLevel": session["yearLevel"], "bankId": session["bankId"],
             "difficultyLevel": session["difficultyLevel"], "contentVersion": session["contentVersion"],
+            "assignmentId": session["assignmentId"],
+            "assignmentSource": session["assignmentSource"],
+            "adaptivePolicyVersion": session["adaptivePolicyVersion"],
             "correctCount": correct_count, "totalQuestions": total,
             "score": round(correct_count * 100 / total),
             "trustedCorrectCount": correct_count,

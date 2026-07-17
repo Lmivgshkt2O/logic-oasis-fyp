@@ -21,6 +21,9 @@ class ValidatedResponseRecord:
     response_time_quality: str = "client_reported_unverified"
     hint_count: int = 0
     hint_telemetry_status: str = "not_supported"
+    question_version: str = ""
+    content_version: str = ""
+    prior_exposure_count: int | None = None
 
     @classmethod
     def from_firestore(cls, response_id: str, data: dict[str, Any]) -> "ValidatedResponseRecord":
@@ -39,6 +42,9 @@ class ValidatedResponseRecord:
             response_time_quality=_required_string(data, "responseTimeQuality"),
             hint_count=_required_int(data, "hintCount"),
             hint_telemetry_status=_required_string(data, "hintTelemetryStatus"),
+            question_version=_required_string(data, "questionVersion"),
+            content_version=_required_string(data, "contentVersion"),
+            prior_exposure_count=_optional_non_negative_int(data, "priorExposureCount"),
         )
 
 
@@ -57,6 +63,10 @@ class FinalizedQuizAttemptRecord:
     data_source: str
     finalized_at: datetime
     source_attempt_sequence: int | None = None
+    year_level: int | None = None
+    assignment_id: str | None = None
+    assignment_source: str | None = None
+    adaptive_policy_version: str | None = None
 
     @classmethod
     def from_firestore(cls, attempt_id: str, data: dict[str, Any]) -> "FinalizedQuizAttemptRecord":
@@ -77,6 +87,10 @@ class FinalizedQuizAttemptRecord:
             data_source=_required_string(data, "dataSource"),
             finalized_at=_required_datetime(data, "finalizedAt"),
             source_attempt_sequence=_optional_non_negative_int(data, "sourceAttemptSequence"),
+            year_level=_required_positive_int(data, "yearLevel"),
+            assignment_id=_required_string(data, "assignmentId"),
+            assignment_source=_required_string(data, "assignmentSource"),
+            adaptive_policy_version=_required_string(data, "adaptivePolicyVersion"),
         )
 
     @property
@@ -100,11 +114,18 @@ def _required_int(data: dict[str, Any], field: str) -> int:
 
 
 def _optional_non_negative_int(data: dict[str, Any], field: str) -> int | None:
-    if field not in data:
+    if field not in data or data.get(field) is None:
         return None
     value = _required_int(data, field)
     if value < 0:
         raise ValueError(f"{field} must be a non-negative integer")
+    return value
+
+
+def _required_positive_int(data: dict[str, Any], field: str) -> int:
+    value = _required_int(data, field)
+    if value < 1:
+        raise ValueError(f"{field} must be a positive integer")
     return value
 
 

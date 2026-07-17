@@ -45,6 +45,8 @@ class AttemptValidationTests(unittest.TestCase):
         attempt = next(iter(self.service.attempts.values()))
         self.assertEqual(5, len(attempt["responseIds"]))
         self.assertEqual(1, attempt["sourceAttemptSequence"])
+        self.assertEqual("cold_start_easy", attempt["assignmentSource"])
+        self.assertEqual("adaptive-policy-v1", attempt["adaptivePolicyVersion"])
         self.assertEqual(["q0", "q1", "q2", "q3", "q4"], self.session["questionIds"])
         self.assertNotIn("correctOptionIndex", attempt)
         self.assertNotIn("earnedCrystals", attempt)
@@ -130,6 +132,9 @@ class AttemptValidationTests(unittest.TestCase):
         self.assertEqual(0, sealed["hintCount"])
         self.assertEqual("client_reported_unverified", sealed["responseTimeQuality"])
         self.assertEqual("not_supported", sealed["hintTelemetryStatus"])
+        self.assertEqual("v1", sealed["questionVersion"])
+        self.assertEqual("v1", sealed["contentVersion"])
+        self.assertIsNone(sealed["priorExposureCount"])
 
     def test_expired_complete_session_cannot_finalize(self) -> None:
         self._submit_all()

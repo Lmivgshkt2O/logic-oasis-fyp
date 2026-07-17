@@ -15,7 +15,7 @@ from ..schemas import FinalizedQuizAttemptRecord, ValidatedResponseRecord
 from ..validators import validate_response_lineage
 
 
-SOURCE_SCHEMA_VERSION = "attempt-evidence-v1"
+SOURCE_SCHEMA_VERSION = "attempt-evidence-v2"
 APPROVED_PROVENANCE = frozenset({"real", "emulator_verified"})
 KNOWN_PROVENANCE = APPROVED_PROVENANCE | frozenset({"seed_demo", "synthetic_test"})
 
@@ -29,6 +29,10 @@ class AttemptContext:
     bank_id: str
     difficulty_level: str
     content_version: str
+    year_level: int
+    assignment_id: str
+    assignment_source: str
+    adaptive_policy_version: str
 
 
 @dataclass(frozen=True)
@@ -37,6 +41,9 @@ class ResponseMetrics:
     response_time_quality: str
     hint_count: int
     hint_telemetry_status: str
+    question_version: str
+    content_version: str
+    prior_exposure_count: int | None
 
 
 @dataclass(frozen=True)
@@ -85,6 +92,10 @@ def load_firestore_dataset(
             bank_id=_required_string(data, "bankId"),
             difficulty_level=_required_string(data, "difficultyLevel"),
             content_version=_required_string(data, "contentVersion"),
+            year_level=_required_positive_int(data, "yearLevel"),
+            assignment_id=_required_string(data, "assignmentId"),
+            assignment_source=_required_string(data, "assignmentSource"),
+            adaptive_policy_version=_required_string(data, "adaptivePolicyVersion"),
         )
 
     responses_by_attempt: dict[str, list[ValidatedResponseRecord]] = defaultdict(list)
@@ -104,6 +115,9 @@ def load_firestore_dataset(
             hint_telemetry_status=_required_exact_string(
                 data, "hintTelemetryStatus", "not_supported"
             ),
+            question_version=_required_string(data, "questionVersion"),
+            content_version=_required_string(data, "contentVersion"),
+            prior_exposure_count=_optional_non_negative_int(data, "priorExposureCount"),
         )
 
     _assert_no_orphan_responses(responses_by_attempt, attempts)
@@ -112,6 +126,7 @@ def load_firestore_dataset(
     for attempt in ordered_attempts:
         rows = tuple(sorted(responses_by_attempt[attempt.attempt_id], key=lambda row: row.sequence_index))
         validate_response_lineage(attempt, rows)
+        _validate_pair_audit_context(attempt, contexts[attempt.attempt_id], rows, metrics)
         frozen_responses[attempt.attempt_id] = rows
 
     return SourceDataset(
@@ -189,6 +204,19 @@ def _required_non_negative_int(data: Mapping[str, Any], field: str) -> int:
     return value
 
 
+def _optional_non_negative_int(data: Mapping[str, Any], field: str) -> int | None:
+    if field not in data or data.get(field) is None:
+        return None
+    return _required_non_negative_int(data, field)
+
+
+def _required_positive_int(data: Mapping[str, Any], field: str) -> int:
+    value = _required_non_negative_int(data, field)
+    if value < 1:
+        raise ValueError(f"{field} must be a positive integer")
+    return value
+
+
 def _required_response_time_ms(data: Mapping[str, Any]) -> int:
     value = _required_non_negative_int(data, "responseTimeMs")
     if value > 900_000:
@@ -208,3 +236,21 @@ def _required_exact_string(data: Mapping[str, Any], field: str, expected: str) -
     if value != expected:
         raise ValueError(f"{field} must be {expected}")
     return value
+
+
+def _validate_pair_audit_context(
+    attempt: FinalizedQuizAttemptRecord,
+    context: AttemptContext,
+    responses: tuple[ValidatedResponseRecord, ...],
+    metrics: Mapping[str, ResponseMetrics],
+) -> None:
+    """Keep target-pair audit metadata server-derived and content-consistent."""
+    if attempt.year_level != context.year_level:
+        raise ValueError("attempt yearLevel does not match pair-audit context")
+    for response in responses:
+        response_metrics = metrics[response.response_id]
+        if (
+            response_metrics.content_version != context.content_version
+            or response_metrics.question_version != context.content_version
+        ):
+            raise ValueError("response question/content version conflicts with its attempt")
