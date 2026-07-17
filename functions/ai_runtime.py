@@ -433,25 +433,29 @@ class FirestoreRuntimeGateway:
             if job.get("status") in TERMINAL_STATES:
                 return str(job["status"])
             now = datetime.now(timezone.utc)
-            transaction.set(run_ref, {**raw_run, "createdAt": now}, merge=True)
+            projection_writes: list[tuple[Any, Mapping[str, Any]]] = []
             for snapshot in snapshots:
                 ref = self.db.collection("masterySnapshots").document(mastery_snapshot_id(
                     str(snapshot["studentId"]), str(snapshot["subtopicId"]), str(snapshot["skillId"])))
                 existing = ref.get(transaction=transaction)
                 if is_newer_projection(sequence, _snapshot_dict(existing)):
-                    transaction.set(ref, {**snapshot, "updatedAt": now}, merge=True)
+                    projection_writes.append((ref, {**snapshot, "updatedAt": now}))
             if mastery is not None:
                 ref = self.db.collection("subtopicMastery").document(subtopic_mastery_id(
                     str(attempt["studentId"]), int(attempt["yearLevel"]), str(attempt["topicId"]), str(attempt["subtopicId"])))
                 existing = ref.get(transaction=transaction)
                 if is_newer_projection(sequence, _snapshot_dict(existing)):
-                    transaction.set(ref, {**mastery, "updatedAt": now}, merge=True)
+                    projection_writes.append((ref, {**mastery, "updatedAt": now}))
             if assignment is not None:
                 ref = self.db.collection("adaptiveAssignments").document(adaptive_assignment_id(
                     str(attempt["studentId"]), str(attempt["subtopicId"])))
                 existing = ref.get(transaction=transaction)
                 if is_newer_projection(sequence, _snapshot_dict(existing)):
-                    transaction.set(ref, {**assignment, "updatedAt": now}, merge=True)
+                    projection_writes.append((ref, {**assignment, "updatedAt": now}))
+            # Firestore transactions require every read to occur before the first write.
+            transaction.set(run_ref, {**raw_run, "createdAt": now}, merge=True)
+            for ref, document in projection_writes:
+                transaction.set(ref, document, merge=True)
             display = {"completed": "analysis_completed", "fallback": "analysis_fallback", "failed": "analysis_failed"}[state]
             status = safe_status_document(attempt=attempt, analysis_state=state, display_code=display)
             status["updatedAt"] = now

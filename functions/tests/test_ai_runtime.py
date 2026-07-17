@@ -14,7 +14,7 @@ sys.path.insert(0, str(ROOT / "ai_pipeline"))
 sys.path.insert(0, str(ROOT / "functions"))
 
 import ai_runtime
-from ai_runtime import RuntimeBundle, RuntimeClaim, RuntimeFailure, process_finalized_attempt
+from ai_runtime import FirestoreRuntimeGateway, RuntimeBundle, RuntimeClaim, RuntimeFailure, process_finalized_attempt
 
 
 NOW = datetime(2026, 7, 17, tzinfo=timezone.utc)
@@ -167,6 +167,59 @@ class AiRuntimeTests(unittest.TestCase):
                 process_finalized_attempt("attempt-1", gateway=self.gateway, bundle=self.bundle)
             self.assertEqual("failed", process_finalized_attempt("attempt-1", gateway=self.gateway, bundle=self.bundle))
         self.assertEqual(3, self.gateway.jobs["attempt-1"]["attemptCount"])
+
+    def test_firestore_finalization_reads_all_projections_before_its_first_write(self) -> None:
+        class Snapshot:
+            exists = False
+            id = "unused"
+            reference = ""
+
+            def to_dict(self):
+                return {}
+
+        class Transaction:
+            wrote = False
+            writes = 0
+
+            def set(self, *_args, **_kwargs):
+                self.wrote = True
+                self.writes += 1
+
+        class Ref:
+            def __init__(self, transaction):
+                self.transaction = transaction
+
+            def get(self, transaction):
+                if transaction.wrote:
+                    raise AssertionError("Firestore read occurred after a transaction write")
+                return Snapshot()
+
+        class Collection:
+            def __init__(self, transaction):
+                self.transaction = transaction
+
+            def document(self, _document_id):
+                return Ref(self.transaction)
+
+        class Database:
+            def __init__(self):
+                self.current_transaction = Transaction()
+
+            def transaction(self):
+                return self.current_transaction
+
+            def collection(self, _collection_id):
+                return Collection(self.current_transaction)
+
+        database = Database()
+        gateway = FirestoreRuntimeGateway(database)
+        snapshot = {"studentId": "student-1", "subtopicId": "subtopic-1", "skillId": "skill-1"}
+        assignment = {"studentId": "student-1", "subtopicId": "subtopic-1"}
+        mastery = {"studentId": "student-1", "yearLevel": 4, "topicId": "topic-1", "subtopicId": "subtopic-1"}
+        with patch("firebase_admin.firestore.transactional", lambda function: lambda transaction: function(transaction)):
+            self.assertEqual("fallback", gateway.finalize(trusted_attempt(), state="fallback", code="approval_missing",
+                raw_run={"status": "fallback"}, snapshots=[snapshot], assignment=assignment, mastery=mastery))
+        self.assertGreater(database.current_transaction.writes, 0)
 
 
 if __name__ == "__main__":

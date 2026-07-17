@@ -27,7 +27,19 @@
   },
   "functions": {
     "source": "functions",
-    "runtime": "python311"
+    "runtime": "python311",
+    "ignore": [
+      "venv",
+      "venv/**",
+      ".venv",
+      ".venv/**",
+      "tests",
+      "tests/**",
+      "__pycache__",
+      "__pycache__/**",
+      "**/__pycache__/**",
+      "**/*.pyc"
+    ]
   },
   "emulators": {
     "functions": {
