@@ -16,6 +16,7 @@ from logic_oasis_ai.model_registry import ModelArtifact
 from logic_oasis_ai.prediction_contract import (
     DataSufficiency,
     PredictionContract,
+    PairAuditSummary,
     SupervisedExample,
     assess_data_sufficiency,
     feature_names,
@@ -47,6 +48,8 @@ class ComparisonReport:
     test_attempt_ids: tuple[str, ...]
     results: tuple[ModelResult, ...]
     random_seed: int
+    pair_audit_summary: PairAuditSummary | None = None
+    telemetry_readiness_status: str = "not_audited"
 
     def to_document(self) -> dict[str, object]:
         return {
@@ -63,6 +66,8 @@ class ComparisonReport:
             "trainAttemptIds": list(self.train_attempt_ids),
             "testAttemptIds": list(self.test_attempt_ids),
             "randomSeed": self.random_seed,
+            "telemetryReadinessStatus": self.telemetry_readiness_status,
+            "pairAudit": self.pair_audit_summary.to_document() if self.pair_audit_summary else None,
             "models": [
                 {"algorithm": result.algorithm, "features": list(result.feature_names), "metrics": dict(result.metrics)}
                 for result in self.results
@@ -77,15 +82,23 @@ def evaluate_fair_comparison(
     examples: Iterable[SupervisedExample],
     *,
     random_seed: int = RANDOM_SEED,
+    pair_audit_summary: PairAuditSummary | None = None,
+    telemetry_readiness_status: str = "not_audited",
+    allow_synthetic_test: bool = False,
 ) -> ComparisonReport:
     """Evaluate all comparison models on exactly one grouped holdout split."""
     rows = tuple(examples)
     contract = rows[0].contract if rows else PredictionContract()
     if any(row.contract != contract for row in rows):
         raise ValueError("all examples must share one frozen prediction contract")
+    if random_seed != RANDOM_SEED:
+        raise ValueError(f"U7 requires deterministic random seed {RANDOM_SEED}")
+    if telemetry_readiness_status not in {"not_audited", "ready", "not_ready"}:
+        raise ValueError("telemetry_readiness_status is not recognized")
     readiness = assess_data_sufficiency(rows)
-    if not readiness.can_compare:
-        return ComparisonReport(contract, readiness, (), (), (), random_seed)
+    synthetic_execution = allow_synthetic_test and rows and all(row.provenance == "synthetic_test" for row in rows)
+    if not readiness.can_compare and not synthetic_execution:
+        return ComparisonReport(contract, readiness, (), (), (), random_seed, pair_audit_summary, telemetry_readiness_status)
     train, test = grouped_holdout_split(rows, random_seed=random_seed)
     if readiness.claim_level == "held_out_comparison" and len({row.target for row in test}) != 2:
         readiness = replace(
@@ -110,6 +123,8 @@ def evaluate_fair_comparison(
         test_attempt_ids=tuple(row.attempt_id for row in test),
         results=results,
         random_seed=random_seed,
+        pair_audit_summary=pair_audit_summary,
+        telemetry_readiness_status=telemetry_readiness_status,
     )
 
 
@@ -118,6 +133,7 @@ def evaluate_bkt_ablation(
     bkt_examples: Iterable[SupervisedExample],
     *,
     random_seed: int = RANDOM_SEED,
+    allow_synthetic_test: bool = False,
 ) -> Mapping[str, ComparisonReport]:
     """Compare the same rows with and without the separately named BKT feature."""
     base_rows = tuple(base_examples)
@@ -140,8 +156,8 @@ def evaluate_bkt_ablation(
         ):
             raise ValueError("BKT ablation may differ only by a valid BKT feature")
     return {
-        "without_bkt": evaluate_fair_comparison(base_rows, random_seed=random_seed),
-        "with_bkt": evaluate_fair_comparison(bkt_rows, random_seed=random_seed),
+        "without_bkt": evaluate_fair_comparison(base_rows, random_seed=random_seed, allow_synthetic_test=allow_synthetic_test),
+        "with_bkt": evaluate_fair_comparison(bkt_rows, random_seed=random_seed, allow_synthetic_test=allow_synthetic_test),
     }
 
 
@@ -170,6 +186,7 @@ def save_xgboost_bundle(
             "featureNames": list(result.feature_names),
             "trainingDatasetVersion": training_dataset_version,
             "evaluationReportSha256": evaluation_report_sha256,
+            "bundleSchemaVersion": "xgboost-risk-bundle-v1",
         },
         "model": result.model,
     }
@@ -177,6 +194,7 @@ def save_xgboost_bundle(
 
     joblib.dump(document, output)
     artifact_hash = _file_sha256(output)
+    manifest_hash = sha256(json.dumps(document["manifest"], sort_keys=True).encode("utf-8")).hexdigest()
     return ModelArtifact(
         artifact_id=f"xgboost-{model_version}",
         model_type="xgboost",
@@ -189,6 +207,7 @@ def save_xgboost_bundle(
         mastery_criterion=report.contract.mastery_criterion,
         evaluation_status="evaluated",
         evaluation_report_sha256=evaluation_report_sha256,
+        artifact_manifest_sha256=manifest_hash,
         promotion_gate_status="not_passed",
     )
 
@@ -206,6 +225,7 @@ def load_xgboost_bundle(path: str | Path, *, contract: PredictionContract) -> Ma
         "labelVersion": contract.label_version,
         "masteryCriterion": contract.mastery_criterion,
         "featureSchemaVersion": contract.feature_schema_version,
+        "bundleSchemaVersion": "xgboost-risk-bundle-v1",
     }
     if any(manifest.get(key) != value for key, value in expected.items()):
         raise ValueError("model bundle does not match the frozen prediction contract")
@@ -224,18 +244,22 @@ def write_comparison_report(report: ComparisonReport, output_path: str | Path) -
         f"- Claim level: **{document['claimLevel']}**",
         f"- Limitation: {document['limitation']}",
         f"- Examples/students: {document['exampleCount']} / {document['studentCount']}",
+        f"- Telemetry readiness: `{document['telemetryReadinessStatus']}`",
         "",
-        "| Model | Features | Accuracy | Precision | Recall | F1 | ROC-AUC | Log loss | Brier |",
-        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| Model | Features | Accuracy | Precision | Recall | F1 | ROC-AUC | PR-AUC | Log loss | Brier |",
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for model in document["models"]:
         metrics = model["metrics"]
         lines.append(
-            "| {algorithm} | {features} | {accuracy} | {precision} | {recall} | {f1} | {roc_auc} | {log_loss} | {brier_score} |".format(
+            "| {algorithm} | {features} | {accuracy} | {precision} | {recall} | {f1} | {roc_auc} | {pr_auc} | {log_loss} | {brier_score} |".format(
                 algorithm=model["algorithm"], features=", ".join(model["features"]), **metrics,
             )
         )
-    lines.extend(["", "Do not claim model superiority without repeated grouped/held-out results."])
+    pair_audit = document["pairAudit"]
+    if pair_audit:
+        lines.extend(["", "## Pair audit", "", *(f"- {key}: {value}" for key, value in pair_audit.items())])
+    lines.extend(["", "Do not claim model superiority without approved repeated grouped/held-out real-data results."])
     output.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return output
 
@@ -254,7 +278,7 @@ def _evaluate_one(name, trainer, train, test, columns, random_seed) -> ModelResu
 
 def _metrics(targets, predictions, probabilities, latency_ms, model) -> Mapping[str, object]:
     from sklearn.metrics import (
-        accuracy_score, brier_score_loss, confusion_matrix, f1_score, log_loss,
+        accuracy_score, average_precision_score, brier_score_loss, confusion_matrix, f1_score, log_loss,
         precision_score, recall_score, roc_auc_score,
     )
 
@@ -264,6 +288,7 @@ def _metrics(targets, predictions, probabilities, latency_ms, model) -> Mapping[
         "recall": round(float(recall_score(targets, predictions, zero_division=0)), 6),
         "f1": round(float(f1_score(targets, predictions, zero_division=0)), 6),
         "roc_auc": round(float(roc_auc_score(targets, probabilities)), 6) if len(set(targets)) == 2 else None,
+        "pr_auc": round(float(average_precision_score(targets, probabilities)), 6) if len(set(targets)) == 2 else None,
         "log_loss": round(float(log_loss(targets, probabilities, labels=[0, 1])), 6),
         "brier_score": round(float(brier_score_loss(targets, probabilities)), 6),
         "confusion_matrix": confusion_matrix(targets, predictions, labels=[0, 1]).tolist(),

@@ -1,5 +1,5 @@
-schemaVersion: quiz-attempt-features-v1
-sourceContract: attempt-evidence-v1
+schemaVersion: quiz-attempt-features-v2
+sourceContract: attempt-evidence-v2
 trustedAttemptGate:
   finalizationStatus: finalized
   validationStatus: finalized
@@ -14,11 +14,21 @@ rejectedProvenance:
   - seed_demo
   - synthetic_test
 features:
-  - total_questions
-  - correct_count
   - correct_rate
   - mean_response_time_ms
-  - mean_hint_count
+excludedFeatures:
+  - total_questions # fixed at five in the FYP1 quiz
+  - correct_count # duplicates correct_rate
+  - mean_hint_count # hint interaction is not implemented in FYP1
+  - hint_count
+  - next_attempt_score
+  - next_attempt_correct_rate
+  - next_bank
+  - future_mastery
+  - raw_answer_text
+  - raw_question_text
+  - answer_key
+  - student_id
 identity:
   studentKey: sha256(namespace:salt:studentId)
   rawStudentIdAllowedInExport: false

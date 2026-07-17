@@ -13,15 +13,14 @@ def train_mlp(examples: tuple[SupervisedExample, ...], *, random_seed: int):
     from sklearn.preprocessing import StandardScaler
 
     matrix, targets, names = validated_training_data(examples)
-    # Early stopping needs enough rows for a validation fold; tiny studies still
-    # receive an explicitly preliminary report rather than a misleading claim.
-    use_early_stopping = len(matrix) >= 30
+    # FYP1 has no viable inner student-grouped validation protocol yet.  The
+    # outer held-out students must never be used for stopping.
     model = make_pipeline(
         StandardScaler(),
         MLPClassifier(
             hidden_layer_sizes=(8,),
             alpha=0.01,
-            early_stopping=use_early_stopping,
+            early_stopping=False,
             max_iter=500,
             tol=0.01,
             n_iter_no_change=12,

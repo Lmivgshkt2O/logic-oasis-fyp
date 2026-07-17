@@ -173,7 +173,7 @@ class SourceParityTests(unittest.TestCase):
         registry = ModelRegistry()
         candidate = ModelArtifact(
             artifact_id="xgb-2026-07-16", model_type="xgboost", model_version="v1",
-            feature_schema_version="quiz-attempt-features-v1", training_dataset_version="2026-07-16-r1",
+            feature_schema_version="quiz-attempt-features-v2", training_dataset_version="2026-07-16-r1",
             artifact_sha256="abc123", evaluation_status="evaluated", evaluation_report_sha256="report123",
             artifact_manifest_sha256="manifest123", promotion_gate_status="passed",
             approval_id="approval-1", approved_by="supervisor@example.edu", approved_at=NOW,

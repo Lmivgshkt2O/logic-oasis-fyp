@@ -9,7 +9,8 @@ from typing import Iterable
 from .sources.firestore_source import SourceDataset
 
 
-FEATURE_SCHEMA_VERSION = "quiz-attempt-features-v1"
+FEATURE_SCHEMA_VERSION = "quiz-attempt-features-v2"
+BASE_FEATURE_NAMES = ("correct_rate", "mean_response_time_ms")
 
 
 @dataclass(frozen=True)
@@ -31,15 +32,21 @@ class AttemptFeatureRow:
     mean_hint_count: float
     provenance: str
     feature_schema_version: str = FEATURE_SCHEMA_VERSION
+    source_attempt_sequence: int | None = None
+    year_level: int | None = None
+    assignment_source: str = ""
+    adaptive_policy_version: str = ""
+    skill_ids: tuple[str, ...] = ()
+    question_ids: tuple[str, ...] = ()
+    response_ids: tuple[str, ...] = ()
+    question_versions: tuple[str, ...] = ()
+    response_time_quality: str = "client_reported_unverified"
 
     def to_model_features(self) -> dict[str, float]:
         """Return the numeric fields eligible for an eventual U7 comparison."""
         return {
-            "total_questions": float(self.total_questions),
-            "correct_count": float(self.correct_count),
             "correct_rate": self.correct_rate,
             "mean_response_time_ms": self.mean_response_time_ms,
-            "mean_hint_count": self.mean_hint_count,
         }
 
 
@@ -78,6 +85,15 @@ def build_attempt_features(
                 mean_response_time_ms=round(_mean(metric.response_time_ms for metric in metrics), 8),
                 mean_hint_count=round(_mean(metric.hint_count for metric in metrics), 8),
                 provenance=dataset.provenance,
+                source_attempt_sequence=attempt.source_attempt_sequence,
+                year_level=context.year_level,
+                assignment_source=context.assignment_source,
+                adaptive_policy_version=context.adaptive_policy_version,
+                skill_ids=tuple(sorted({response.skill_id for response in responses})),
+                question_ids=tuple(sorted(response.question_id for response in responses)),
+                response_ids=tuple(sorted(response.response_id for response in responses)),
+                question_versions=tuple(sorted({metric.question_version for metric in metrics})),
+                response_time_quality=_shared_response_time_quality(metrics),
             )
         )
     return tuple(rows)
@@ -93,3 +109,10 @@ def _mean(values: Iterable[int]) -> float:
     if not materialized:
         raise ValueError("validated attempt must contain responses")
     return sum(materialized) / len(materialized)
+
+
+def _shared_response_time_quality(metrics: Iterable[object]) -> str:
+    qualities = {getattr(metric, "response_time_quality") for metric in metrics}
+    if len(qualities) != 1:
+        raise ValueError("validated attempt response-time quality must be consistent")
+    return qualities.pop()
