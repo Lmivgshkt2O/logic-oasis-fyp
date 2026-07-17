@@ -96,7 +96,7 @@ class PairAuditSummary:
     censored_policy_pairs: int
     censored_repeated_question_pairs: int
 
-    def to_document(self) -> dict[str, int]:
+    def to_document(self) -> dict[str, int | float]:
         return {
             "totalCurrentAttempts": self.total_current_attempts,
             "eligiblePairs": self.eligible_pairs,
@@ -185,7 +185,7 @@ def build_prediction_dataset(
                     attempt_id=current.attempt_id,
                     student_key=current.student_key,
                     subtopic_id=current.subtopic_id,
-                    observed_at=_parse_timestamp(current.finalized_at),
+                    observed_at=parse_timestamp(current.finalized_at, "finalized_at"),
                     features=features,
                     target=next_attempt.correct_rate < contract.mastery_criterion,
                     contract=contract,
@@ -257,7 +257,7 @@ def _validate_rows(rows: tuple[AttemptFeatureRow, ...], *, contract: PredictionC
 
 
 def _ordered_attempts(rows: list[AttemptFeatureRow]) -> tuple[AttemptFeatureRow, ...]:
-    ordered = tuple(sorted(rows, key=lambda row: (row.source_attempt_sequence or 0, _parse_timestamp(row.finalized_at), row.attempt_id)))
+    ordered = tuple(sorted(rows, key=lambda row: (row.source_attempt_sequence or 0, parse_timestamp(row.finalized_at, "finalized_at"), row.attempt_id)))
     sequences = [row.source_attempt_sequence for row in ordered]
     if len(set(sequences)) != len(sequences):
         raise ValueError("sourceAttemptSequence must be unique within a student/subtopic")
@@ -336,7 +336,3 @@ def _validate_current_features(values: Mapping[str, float]) -> None:
         raise ValueError(f"required current features are missing: {sorted(missing)}")
     if any(not isfinite(float(value)) for value in values.values()):
         raise ValueError("feature values must be finite")
-
-
-def _parse_timestamp(value: str) -> datetime:
-    return parse_timestamp(value, "finalized_at")

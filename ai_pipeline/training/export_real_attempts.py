@@ -205,7 +205,11 @@ def _assert_safe_manifest(manifest: dict[str, object], key: bytes | str) -> None
 
 
 def _file_sha256(path: Path) -> str:
-    return sha256(path.read_bytes()).hexdigest()
+    digest = sha256()
+    with path.open("rb") as file:
+        for chunk in iter(lambda: file.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _write_csv(path: Path, fields: tuple[str, ...], rows: Iterable[dict[str, object]]) -> None:

@@ -11,6 +11,9 @@ from firebase_admin import firestore
 from firebase_functions import https_fn
 
 from quiz_session import (
+    CLIENT_REPORTED_UNVERIFIED,
+    HINT_TELEMETRY_NOT_SUPPORTED,
+    MAX_RESPONSE_TIME_MS,
     QuizSessionError,
     client_completion,
     client_response,
@@ -22,9 +25,6 @@ from quiz_session import (
 QUESTION_COUNT = 5
 SESSION_TTL_MINUTES = 30
 FUNCTION_REGION = "asia-southeast1"
-MAX_RESPONSE_TIME_MS = 900_000
-CLIENT_REPORTED_UNVERIFIED = "client_reported_unverified"
-HINT_TELEMETRY_NOT_SUPPORTED = "not_supported"
 _TELEMETRY_FIELDS = frozenset({
     "responseTimeMs",
     "hintCount",
