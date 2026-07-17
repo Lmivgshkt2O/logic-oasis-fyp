@@ -24,6 +24,8 @@ def validate_response_lineage(
         raise ValueError("attempt is not a trusted finalized runtime attempt")
     if attempt.source_attempt_sequence is None:
         raise ValueError("attempt is legacy_no_sequence and cannot be trusted final evidence")
+    if attempt.source_attempt_sequence < 1:
+        raise ValueError("sourceAttemptSequence must be a positive integer")
     if len(responses) != attempt.total_questions:
         raise ValueError("attempt response count does not match")
     ordered = sorted(responses, key=lambda response: response.sequence_index)

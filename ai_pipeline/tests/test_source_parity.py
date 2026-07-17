@@ -108,6 +108,16 @@ class SourceParityTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "legacy_no_sequence"):
             load_firestore_dataset(legacy, firestore_responses(), provenance="real")
 
+    def test_zero_source_attempt_sequence_is_rejected_by_firestore_and_csv(self):
+        invalid_attempts = firestore_attempts()
+        invalid_attempts[0]["sourceAttemptSequence"] = 0
+        with self.assertRaisesRegex(ValueError, "positive integer"):
+            load_firestore_dataset(invalid_attempts, firestore_responses(), provenance="real")
+        with self.assertRaisesRegex(ValueError, "positive integer"):
+            load_csv_dataset(
+                csv_rows(invalid_attempts), csv_rows(firestore_responses()), provenance="real"
+            )
+
     def test_u3r_telemetry_contract_rejects_invalid_values(self):
         excessive_time = firestore_responses()
         excessive_time[0]["responseTimeMs"] = 900_001

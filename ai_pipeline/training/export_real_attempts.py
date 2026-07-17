@@ -15,6 +15,8 @@ from hashlib import sha256
 import hmac
 import json
 from pathlib import Path
+from shutil import rmtree
+from tempfile import mkdtemp
 from typing import Iterable
 
 from logic_oasis_ai.features import FEATURE_SCHEMA_VERSION
@@ -118,15 +120,26 @@ def export_real_attempts(
         response.response_id: hmac_pseudonym("response", response.response_id, pseudonymization_key)
         for responses in dataset.responses_by_attempt.values() for response in responses
     }
-    attempts_path = output / "attempts.csv"
-    responses_path = output / "responses.csv"
-    _write_csv(attempts_path, ATTEMPT_FIELDS, _attempt_rows(dataset, attempt_keys, session_keys, response_keys, pseudonymization_key))
-    _write_csv(responses_path, RESPONSE_FIELDS, _response_rows(dataset, attempt_keys, session_keys, response_keys, pseudonymization_key))
-    manifest = _manifest(release, dataset, attempts_path, responses_path)
-    _assert_safe_manifest(manifest, pseudonymization_key)
-    manifest_path = output / "manifest.json"
-    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    return {"attempts": attempts_path, "responses": responses_path, "manifest": manifest_path}
+    staging = Path(mkdtemp(prefix=".release-staging-", dir=output))
+    try:
+        staged_attempts = staging / "attempts.csv"
+        staged_responses = staging / "responses.csv"
+        _write_csv(staged_attempts, ATTEMPT_FIELDS, _attempt_rows(dataset, attempt_keys, session_keys, response_keys, pseudonymization_key))
+        _write_csv(staged_responses, RESPONSE_FIELDS, _response_rows(dataset, attempt_keys, session_keys, response_keys, pseudonymization_key))
+        manifest = _manifest(release, dataset, staged_attempts, staged_responses)
+        _assert_safe_manifest(manifest, pseudonymization_key)
+        staged_manifest = staging / "manifest.json"
+        staged_manifest.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+        attempts_path = output / "attempts.csv"
+        responses_path = output / "responses.csv"
+        manifest_path = output / "manifest.json"
+        staged_attempts.replace(attempts_path)
+        staged_responses.replace(responses_path)
+        staged_manifest.replace(manifest_path)
+        return {"attempts": attempts_path, "responses": responses_path, "manifest": manifest_path}
+    finally:
+        rmtree(staging, ignore_errors=True)
 
 
 def export_anonymized_attempts(*args, **kwargs):

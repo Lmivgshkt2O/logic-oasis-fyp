@@ -40,17 +40,48 @@ class ReleaseDeletionRequest:
             raise ValueError("retention_review_at must include a timezone")
 
 
+@dataclass(frozen=True)
+class StorageDeletionEvidence:
+    """Verified result of deleting the protected release objects."""
+
+    storage_path: str
+    operation_id: str
+    object_count: int
+    completed_at: datetime
+    verified_by: str
+
+    def __post_init__(self) -> None:
+        if not self.storage_path.startswith(PROTECTED_RELEASE_PREFIX):
+            raise ValueError("deletion evidence must name a protected release path")
+        if not self.operation_id or not self.verified_by:
+            raise ValueError("deletion evidence operation and verifier are required")
+        if isinstance(self.object_count, bool) or not isinstance(self.object_count, int) or self.object_count < 0:
+            raise ValueError("deletion evidence object_count must be a non-negative integer")
+        if self.completed_at.tzinfo is None:
+            raise ValueError("deletion evidence completed_at must include a timezone")
+
+    def to_document(self) -> dict[str, object]:
+        return {
+            "storagePath": self.storage_path,
+            "operationId": self.operation_id,
+            "objectCount": self.object_count,
+            "completedAt": self.completed_at.isoformat(),
+            "verifiedBy": self.verified_by,
+        }
+
+
 def create_deletion_certificate(
     request: ReleaseDeletionRequest,
     *,
     manifest: dict[str, object],
-    deleted_at: datetime | None = None,
+    storage_deletion_evidence: StorageDeletionEvidence | None = None,
 ) -> dict[str, object]:
     """Return safe evidence that must exist before key-version destruction."""
     _validate_manifest_for_deletion(request, manifest)
-    timestamp = deleted_at or datetime.now(timezone.utc)
-    if timestamp.tzinfo is None:
-        raise ValueError("deleted_at must include a timezone")
+    if storage_deletion_evidence is None:
+        raise ValueError("verified storage deletion evidence is required")
+    if storage_deletion_evidence.storage_path != request.storage_path:
+        raise ValueError("deletion evidence does not match request storage path")
     payload = {
         "certificateVersion": DELETION_CERTIFICATE_VERSION,
         "releaseId": request.release_id,
@@ -59,7 +90,8 @@ def create_deletion_certificate(
         "dataSteward": request.data_steward,
         "retentionActor": request.retention_actor,
         "retentionReviewAt": request.retention_review_at.isoformat(),
-        "deletedAt": timestamp.isoformat(),
+        "deletedAt": storage_deletion_evidence.completed_at.isoformat(),
+        "storageDeletion": storage_deletion_evidence.to_document(),
         "manifestSha256": sha256(json.dumps(manifest, sort_keys=True).encode("utf-8")).hexdigest(),
         "keyDestructionAuthorized": True,
     }
@@ -103,3 +135,13 @@ def _validate_certificate(certificate: dict[str, object]) -> None:
         raise ValueError("unsupported deletion certificate version")
     if certificate.get("keyDestructionAuthorized") is not True:
         raise ValueError("deletion certificate does not authorize key destruction")
+    deletion = certificate.get("storageDeletion")
+    if not isinstance(deletion, dict):
+        raise ValueError("deletion certificate lacks storage deletion evidence")
+    required_deletion_fields = ("storagePath", "operationId", "objectCount", "completedAt", "verifiedBy")
+    if any(not deletion.get(field) for field in required_deletion_fields if field != "objectCount"):
+        raise ValueError("deletion certificate has incomplete storage deletion evidence")
+    if deletion.get("storagePath") != certificate.get("storagePath"):
+        raise ValueError("deletion certificate storage evidence path does not match")
+    if isinstance(deletion.get("objectCount"), bool) or not isinstance(deletion.get("objectCount"), int):
+        raise ValueError("deletion certificate storage evidence object count is invalid")

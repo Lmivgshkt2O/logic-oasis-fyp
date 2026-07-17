@@ -1,11 +1,15 @@
 from datetime import datetime, timezone
+import importlib
 import json
+from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 
 from logic_oasis_ai.sources.firestore_source import load_firestore_dataset
 from training.delete_real_data_release import (
     ReleaseDeletionRequest,
+    StorageDeletionEvidence,
     create_deletion_certificate,
     may_destroy_key_version,
 )
@@ -68,6 +72,29 @@ class RealDataReleaseGovernanceTests(unittest.TestCase):
         self.assertNotIn(temporary_directory, json.dumps(manifest))
         self.assertFalse(manifest["containsRawIdentifiers"])
 
+    def test_failed_export_does_not_publish_partial_release_files(self):
+        dataset = load_firestore_dataset(firestore_attempts(), firestore_responses(), provenance="real")
+        exporter = importlib.import_module("training.export_real_attempts")
+        original_write = exporter._write_csv
+        write_count = 0
+
+        def fail_second_write(*args, **kwargs):
+            nonlocal write_count
+            write_count += 1
+            if write_count == 2:
+                raise OSError("simulated response export failure")
+            return original_write(*args, **kwargs)
+
+        with TemporaryDirectory() as temporary_directory:
+            with patch("training.export_real_attempts._write_csv", side_effect=fail_second_write):
+                with self.assertRaisesRegex(OSError, "simulated response export failure"):
+                    export_real_attempts(
+                        dataset, temporary_directory, release=approved_release(), pseudonymization_key="test-key"
+                    )
+            self.assertFalse((Path(temporary_directory) / "attempts.csv").exists())
+            self.assertFalse((Path(temporary_directory) / "responses.csv").exists())
+            self.assertFalse((Path(temporary_directory) / "manifest.json").exists())
+
     def test_deletion_evidence_must_precede_matching_key_destruction(self):
         release = approved_release()
         manifest = {
@@ -82,7 +109,19 @@ class RealDataReleaseGovernanceTests(unittest.TestCase):
             retention_actor="logic-oasis-data-retention@logic-oasis-fyp.iam.gserviceaccount.com",
             retention_review_at=release.retention_review_at,
         )
-        certificate = create_deletion_certificate(request, manifest=manifest, deleted_at=NOW)
+        with self.assertRaisesRegex(ValueError, "verified storage deletion evidence"):
+            create_deletion_certificate(request, manifest=manifest)
+        certificate = create_deletion_certificate(
+            request,
+            manifest=manifest,
+            storage_deletion_evidence=StorageDeletionEvidence(
+                storage_path=release.storage_path,
+                operation_id="storage-delete-operation-1",
+                object_count=2,
+                completed_at=NOW,
+                verified_by=release.data_steward,
+            ),
+        )
         self.assertTrue(may_destroy_key_version(certificate, release_id=release.release_id, export_key_version=release.export_key_version))
         self.assertFalse(may_destroy_key_version(certificate, release_id=release.release_id, export_key_version="logic-oasis-export-pseudonymization-key-v2"))
 
