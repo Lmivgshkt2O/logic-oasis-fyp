@@ -52,6 +52,12 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // U3-R's monotonic sequence is allocated by the callable finalization
+    // transaction only. It must never become a client or parent data source.
+    match /studentSubtopicSequenceStates/{studentId}/subtopics/{subtopicId} {
+      allow read, write: if false;
+    }
+
     match /subtopics/{subtopicId} {
       allow read: if signedIn();
       allow write: if false;

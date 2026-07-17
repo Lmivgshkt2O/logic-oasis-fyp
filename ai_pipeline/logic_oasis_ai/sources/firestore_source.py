@@ -34,7 +34,9 @@ class AttemptContext:
 @dataclass(frozen=True)
 class ResponseMetrics:
     response_time_ms: int
+    response_time_quality: str
     hint_count: int
+    hint_telemetry_status: str
 
 
 @dataclass(frozen=True)
@@ -73,7 +75,10 @@ def load_firestore_dataset(
     contexts: dict[str, AttemptContext] = {}
     for attempt_id, data in attempts.items():
         _assert_document_id(data, "attemptId", attempt_id)
-        parsed_attempts.append(FinalizedQuizAttemptRecord.from_firestore(attempt_id, data))
+        attempt = FinalizedQuizAttemptRecord.from_firestore(attempt_id, data)
+        if attempt.evidence_status == "legacy_no_sequence":
+            raise ValueError("attempt is legacy_no_sequence and cannot be used as trusted final evidence")
+        parsed_attempts.append(attempt)
         contexts[attempt_id] = AttemptContext(
             topic_id=_required_string(data, "topicId"),
             subtopic_id=_required_string(data, "subtopicId"),
@@ -91,12 +96,18 @@ def load_firestore_dataset(
             raise ValueError(f"duplicate response ID: {response_id}")
         responses_by_attempt[response.attempt_id].append(response)
         metrics[response_id] = ResponseMetrics(
-            response_time_ms=_required_non_negative_int(data, "responseTimeMs"),
-            hint_count=_required_non_negative_int(data, "hintCount"),
+            response_time_ms=_required_response_time_ms(data),
+            response_time_quality=_required_exact_string(
+                data, "responseTimeQuality", "client_reported_unverified"
+            ),
+            hint_count=_required_zero(data, "hintCount"),
+            hint_telemetry_status=_required_exact_string(
+                data, "hintTelemetryStatus", "not_supported"
+            ),
         )
 
     _assert_no_orphan_responses(responses_by_attempt, attempts)
-    ordered_attempts = tuple(sorted(parsed_attempts, key=lambda item: (item.finalized_at, item.attempt_id)))
+    ordered_attempts = tuple(sorted(parsed_attempts, key=lambda item: (item.source_attempt_sequence or 0, item.attempt_id)))
     frozen_responses: dict[str, tuple[ValidatedResponseRecord, ...]] = {}
     for attempt in ordered_attempts:
         rows = tuple(sorted(responses_by_attempt[attempt.attempt_id], key=lambda row: row.sequence_index))
@@ -175,4 +186,25 @@ def _required_non_negative_int(data: Mapping[str, Any], field: str) -> int:
     value = data.get(field)
     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
         raise ValueError(f"{field} must be a non-negative integer")
+    return value
+
+
+def _required_response_time_ms(data: Mapping[str, Any]) -> int:
+    value = _required_non_negative_int(data, "responseTimeMs")
+    if value > 900_000:
+        raise ValueError("responseTimeMs must be between 0 and 900000")
+    return value
+
+
+def _required_zero(data: Mapping[str, Any], field: str) -> int:
+    value = _required_non_negative_int(data, field)
+    if value != 0:
+        raise ValueError(f"{field} must be 0 while hint telemetry is not supported")
+    return value
+
+
+def _required_exact_string(data: Mapping[str, Any], field: str, expected: str) -> str:
+    value = _required_string(data, field)
+    if value != expected:
+        raise ValueError(f"{field} must be {expected}")
     return value

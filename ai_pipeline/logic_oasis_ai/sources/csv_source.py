@@ -67,7 +67,7 @@ def _parse_attempt_row(row: Mapping[str, str]) -> tuple[str, dict[str, Any]]:
     response_ids = tuple(item for item in _string(row, "responseIds").split("|") if item)
     if not response_ids:
         raise ValueError("responseIds is required")
-    return attempt_id, {
+    attempt = {
         "attemptId": attempt_id,
         "sessionId": _string(row, "sessionId"),
         "studentId": _student_identity(row),
@@ -85,6 +85,10 @@ def _parse_attempt_row(row: Mapping[str, str]) -> tuple[str, dict[str, Any]]:
         "difficultyLevel": _string(row, "difficultyLevel"),
         "contentVersion": _string(row, "contentVersion"),
     }
+    sequence = _optional_integer(row, "sourceAttemptSequence")
+    if sequence is not None:
+        attempt["sourceAttemptSequence"] = sequence
+    return attempt_id, attempt
 
 
 def _parse_response_row(row: Mapping[str, str]) -> tuple[str, dict[str, Any]]:
@@ -101,7 +105,9 @@ def _parse_response_row(row: Mapping[str, str]) -> tuple[str, dict[str, Any]]:
         "validationStatus": _string(row, "validationStatus"),
         "createdAt": _timestamp(row, "createdAt"),
         "responseTimeMs": _integer(row, "responseTimeMs"),
+        "responseTimeQuality": _string(row, "responseTimeQuality"),
         "hintCount": _integer(row, "hintCount"),
+        "hintTelemetryStatus": _string(row, "hintTelemetryStatus"),
     }
 
 
@@ -136,6 +142,13 @@ def _integer(row: Mapping[str, str], field: str) -> int:
     if parsed < 0:
         raise ValueError(f"{field} must be non-negative")
     return parsed
+
+
+def _optional_integer(row: Mapping[str, str], field: str) -> int | None:
+    value = row.get(field)
+    if value in (None, ""):
+        return None
+    return _integer(row, field)
 
 
 def _boolean(row: Mapping[str, str], field: str) -> bool:

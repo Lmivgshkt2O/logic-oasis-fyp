@@ -16,12 +16,13 @@ EXPORT_SCHEMA_VERSION = "anonymized-attempt-export-v1"
 ATTEMPT_FIELDS = (
     "attemptId", "sessionId", "studentKey", "totalQuestions", "correctCount", "score",
     "responseIds", "finalizationStatus", "validationStatus", "dataSource", "finalizedAt",
+    "sourceAttemptSequence",
     "topicId", "subtopicId", "bankId", "difficultyLevel", "contentVersion", "provenance",
 )
 RESPONSE_FIELDS = (
     "responseId", "sessionId", "attemptId", "studentKey", "questionId", "skillId",
     "sequenceIndex", "serverIsCorrect", "validationStatus", "createdAt", "responseTimeMs",
-    "hintCount", "provenance",
+    "responseTimeQuality", "hintCount", "hintTelemetryStatus", "provenance",
 )
 
 
@@ -74,6 +75,7 @@ def _attempt_rows(dataset, attempt_keys, session_keys, response_keys, salt) -> I
             "responseIds": "|".join(response_keys[value] for value in attempt.response_ids),
             "finalizationStatus": attempt.finalization_status, "validationStatus": attempt.validation_status,
             "dataSource": attempt.data_source, "finalizedAt": attempt.finalized_at.isoformat(),
+            "sourceAttemptSequence": attempt.source_attempt_sequence,
             "topicId": context.topic_id, "subtopicId": context.subtopic_id, "bankId": context.bank_id,
             "difficultyLevel": context.difficulty_level, "contentVersion": context.content_version,
             "provenance": dataset.provenance,
@@ -90,7 +92,10 @@ def _response_rows(dataset, attempt_keys, session_keys, response_keys, salt) -> 
                 "questionId": response.question_id, "skillId": response.skill_id, "sequenceIndex": response.sequence_index,
                 "serverIsCorrect": str(response.is_correct).lower(), "validationStatus": response.validation_status,
                 "createdAt": response.created_at.isoformat(), "responseTimeMs": metrics.response_time_ms,
-                "hintCount": metrics.hint_count, "provenance": dataset.provenance,
+                "responseTimeQuality": metrics.response_time_quality,
+                "hintCount": metrics.hint_count,
+                "hintTelemetryStatus": metrics.hint_telemetry_status,
+                "provenance": dataset.provenance,
             }
 
 

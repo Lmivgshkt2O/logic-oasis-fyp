@@ -22,6 +22,15 @@ from quiz_session import (
 QUESTION_COUNT = 5
 SESSION_TTL_MINUTES = 30
 FUNCTION_REGION = "asia-southeast1"
+MAX_RESPONSE_TIME_MS = 900_000
+CLIENT_REPORTED_UNVERIFIED = "client_reported_unverified"
+HINT_TELEMETRY_NOT_SUPPORTED = "not_supported"
+_TELEMETRY_FIELDS = frozenset({
+    "responseTimeMs",
+    "hintCount",
+    "responseTimeQuality",
+    "hintTelemetryStatus",
+})
 
 try:
     firebase_admin.get_app()
@@ -81,6 +90,27 @@ def _int(data: dict[str, Any], key: str) -> int:
         # invalid at this boundary.
         return int(value.strip())
     raise QuizSessionError("invalid-argument", f"{key} must be an integer.")
+
+
+def _response_time_ms(data: dict[str, Any]) -> int:
+    """Validate the only client-observed telemetry accepted by U3-R."""
+    value = _int(data, "responseTimeMs")
+    if value < 0 or value > MAX_RESPONSE_TIME_MS:
+        raise QuizSessionError(
+            "invalid-argument",
+            f"responseTimeMs must be between 0 and {MAX_RESPONSE_TIME_MS}.",
+        )
+    return value
+
+
+def _reject_finalization_telemetry(data: dict[str, Any]) -> None:
+    """Finalization consumes sealed responses; it never accepts telemetry."""
+    supplied = sorted(_TELEMETRY_FIELDS.intersection(data))
+    if supplied:
+        raise QuizSessionError(
+            "invalid-argument",
+            "finalizeQuizSession does not accept response telemetry.",
+        )
 
 
 def _active_easy_bank(topic_id: str, subtopic_id: str, year_level: int) -> tuple[dict[str, Any], list[dict[str, Any]]]:
@@ -161,8 +191,7 @@ def submit_quiz_response(data: dict[str, Any], student_id: str) -> dict[str, Any
     selected_index = _int(data, "selectedIndex")
     sequence_index = _int(data, "sequenceIndex")
     idempotency_key = _string(data, "idempotencyKey")
-    response_time_ms = max(0, _int(data, "responseTimeMs"))
-    hint_count = max(0, _int(data, "hintCount"))
+    response_time_ms = _response_time_ms(data)
     if selected_index < 0:
         raise QuizSessionError("invalid-argument", "selectedIndex must not be negative.")
     database = firestore_db()
@@ -260,7 +289,11 @@ def submit_quiz_response(data: dict[str, Any], student_id: str) -> dict[str, Any
             "explanationBm": answer_key.get("explanationBm", ""),
             "validationStatus": "validated",
             "responseTimeMs": response_time_ms,
-            "hintCount": hint_count,
+            # This is client-observed timing, never trusted correctness data.
+            "responseTimeQuality": CLIENT_REPORTED_UNVERIFIED,
+            # FYP1 has no auditable hint action. Never accept client hint data.
+            "hintCount": 0,
+            "hintTelemetryStatus": HINT_TELEMETRY_NOT_SUPPORTED,
             "sequenceIndex": sequence_index,
             "idempotencyKey": idempotency_key,
             "createdAt": firestore.SERVER_TIMESTAMP,
@@ -274,6 +307,7 @@ def submit_quiz_response(data: dict[str, Any], student_id: str) -> dict[str, Any
 
 def finalize_quiz_session(data: dict[str, Any], student_id: str) -> dict[str, Any]:
     session_id = _string(data, "sessionId")
+    _reject_finalization_telemetry(data)
     database = firestore_db()
     session_ref = database.collection("quizSessions").document(session_id)
 
@@ -286,6 +320,8 @@ def finalize_quiz_session(data: dict[str, Any], student_id: str) -> dict[str, An
         if session.get("studentId") != student_id:
             raise QuizSessionError("permission-denied", "This quiz session belongs to another student.")
         attempt_ref = database.collection("quizAttempts").document(session["attemptId"])
+        # Idempotent duplicate finalization must return before touching the
+        # per-subtopic sequence counter.
         if session.get("status") == "finalized":
             attempt_snapshot = attempt_ref.get(transaction=transaction)
             if not attempt_snapshot.exists:
@@ -325,6 +361,18 @@ def finalize_quiz_session(data: dict[str, Any], student_id: str) -> dict[str, An
             responses.append(response)
         correct_count = sum(1 for response in responses if response.get("serverIsCorrect") is True)
         total = len(responses)
+        sequence_ref = (
+            database.collection("studentSubtopicSequenceStates")
+            .document(student_id)
+            .collection("subtopics")
+            .document(session["subtopicId"])
+        )
+        sequence_snapshot = sequence_ref.get(transaction=transaction)
+        sequence_state = dict(sequence_snapshot.to_dict() or {}) if sequence_snapshot.exists else {}
+        previous_sequence = sequence_state.get("lastAllocatedSequence", 0)
+        if isinstance(previous_sequence, bool) or not isinstance(previous_sequence, int) or previous_sequence < 0:
+            raise QuizSessionError("failed-precondition", "Attempt sequence state is invalid.")
+        source_attempt_sequence = previous_sequence + 1
         attempt = {
             "attemptId": session["attemptId"], "sessionId": session_id, "studentId": student_id,
             "topicId": session["topicId"], "subtopicId": session["subtopicId"],
@@ -340,12 +388,22 @@ def finalize_quiz_session(data: dict[str, Any], student_id: str) -> dict[str, An
             "finalizationStatus": "finalized",
             "processingStatus": "pending",
             "dataSource": "runtime_callable",
+            "sourceAttemptSequence": source_attempt_sequence,
             "startedAt": session["startedAt"],
             "deviceSessionId": "not_recorded",
             "createdAt": firestore.SERVER_TIMESTAMP,
             "finalizedAt": firestore.SERVER_TIMESTAMP,
         }
         transaction.create(attempt_ref, attempt)
+        transaction.set(
+            sequence_ref,
+            {
+                "studentId": student_id,
+                "subtopicId": session["subtopicId"],
+                "lastAllocatedSequence": source_attempt_sequence,
+                "updatedAt": firestore.SERVER_TIMESTAMP,
+            },
+        )
         transaction.update(session_ref, {"status": "finalized", "finalizedAt": firestore.SERVER_TIMESTAMP})
         return attempt
 

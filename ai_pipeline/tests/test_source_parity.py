@@ -20,6 +20,7 @@ def firestore_attempts():
         "id": "attempt-1", "attemptId": "attempt-1", "sessionId": "session-1", "studentId": "student-1",
         "totalQuestions": 2, "correctCount": 1, "score": 50, "responseIds": ["response-1", "response-2"],
         "finalizationStatus": "finalized", "validationStatus": "finalized", "dataSource": "runtime_callable",
+        "sourceAttemptSequence": 1,
         "finalizedAt": NOW, "topicId": "topic-1", "subtopicId": "subtopic-1", "bankId": "bank-1",
         "difficultyLevel": "Easy", "contentVersion": "v1",
     }]
@@ -31,13 +32,15 @@ def firestore_responses():
             "id": "response-1", "responseId": "response-1", "sessionId": "session-1", "attemptId": "attempt-1",
             "studentId": "student-1", "questionId": "question-1", "skillId": "skill-1", "sequenceIndex": 0,
             "serverIsCorrect": True, "validationStatus": "validated", "createdAt": NOW,
-            "responseTimeMs": 1000, "hintCount": 0,
+            "responseTimeMs": 1000, "responseTimeQuality": "client_reported_unverified",
+            "hintCount": 0, "hintTelemetryStatus": "not_supported",
         },
         {
             "id": "response-2", "responseId": "response-2", "sessionId": "session-1", "attemptId": "attempt-1",
             "studentId": "student-1", "questionId": "question-2", "skillId": "skill-1", "sequenceIndex": 1,
             "serverIsCorrect": False, "validationStatus": "validated", "createdAt": NOW,
-            "responseTimeMs": 3000, "hintCount": 2,
+            "responseTimeMs": 3000, "responseTimeQuality": "client_reported_unverified",
+            "hintCount": 0, "hintTelemetryStatus": "not_supported",
         },
     ]
 
@@ -79,6 +82,34 @@ class SourceParityTests(unittest.TestCase):
         invalid_attempt[0]["dataSource"] = "legacy_client"
         with self.assertRaisesRegex(ValueError, "trusted finalized runtime"):
             load_firestore_dataset(invalid_attempt, firestore_responses(), provenance="real")
+
+    def test_sequence_less_attempt_is_legacy_and_rejected_from_final_evidence(self):
+        legacy = firestore_attempts()
+        del legacy[0]["sourceAttemptSequence"]
+        with self.assertRaisesRegex(ValueError, "legacy_no_sequence"):
+            load_firestore_dataset(legacy, firestore_responses(), provenance="real")
+
+    def test_u3r_telemetry_contract_rejects_invalid_values(self):
+        excessive_time = firestore_responses()
+        excessive_time[0]["responseTimeMs"] = 900_001
+        with self.assertRaisesRegex(ValueError, "between 0 and 900000"):
+            load_firestore_dataset(firestore_attempts(), excessive_time, provenance="real")
+
+        client_defined_hint_state = firestore_responses()
+        client_defined_hint_state[0]["hintTelemetryStatus"] = "available"
+        with self.assertRaisesRegex(ValueError, "hintTelemetryStatus"):
+            load_firestore_dataset(firestore_attempts(), client_defined_hint_state, provenance="real")
+
+    def test_csv_preserves_u3r_sequence_and_server_owned_telemetry(self):
+        dataset = load_csv_dataset(
+            csv_rows(firestore_attempts()), csv_rows(firestore_responses()), provenance="real"
+        )
+        attempt = dataset.attempts[0]
+        response = dataset.responses_by_attempt[attempt.attempt_id][0]
+        metrics = dataset.response_metrics_by_id[response.response_id]
+        self.assertEqual(1, attempt.source_attempt_sequence)
+        self.assertEqual("client_reported_unverified", metrics.response_time_quality)
+        self.assertEqual("not_supported", metrics.hint_telemetry_status)
 
     def test_synthetic_rows_are_rejected_from_final_evaluation(self):
         with self.assertRaisesRegex(ValueError, "only approved real records"):

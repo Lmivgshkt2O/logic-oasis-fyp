@@ -29,6 +29,11 @@ class QuizSessionPolicy:
     expiry_minutes: int = 30
 
 
+MAX_RESPONSE_TIME_MS = 900_000
+CLIENT_REPORTED_UNVERIFIED = "client_reported_unverified"
+HINT_TELEMETRY_NOT_SUPPORTED = "not_supported"
+
+
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -115,6 +120,7 @@ class InMemoryQuizSessionService:
         self.sessions: dict[str, dict[str, Any]] = {}
         self.responses: dict[str, dict[str, Any]] = {}
         self.attempts: dict[str, dict[str, Any]] = {}
+        self.sequence_states: dict[tuple[str, str], int] = {}
 
     def start_session(
         self,
@@ -182,6 +188,16 @@ class InMemoryQuizSessionService:
         self._validate_expected_question(session, question_id, sequence_index)
         if not isinstance(selected_index, int) or selected_index < 0:
             raise QuizSessionError("invalid-argument", "The selected option is invalid.")
+        if (
+            isinstance(response_time_ms, bool)
+            or not isinstance(response_time_ms, int)
+            or response_time_ms < 0
+            or response_time_ms > MAX_RESPONSE_TIME_MS
+        ):
+            raise QuizSessionError(
+                "invalid-argument",
+                f"responseTimeMs must be between 0 and {MAX_RESPONSE_TIME_MS}.",
+            )
         if not idempotency_key:
             raise QuizSessionError("invalid-argument", "A response idempotency key is required.")
 
@@ -230,8 +246,12 @@ class InMemoryQuizSessionService:
             "explanation": answer_key.get("explanation", ""),
             "explanationBm": answer_key.get("explanationBm", ""),
             "validationStatus": "validated",
-            "responseTimeMs": max(0, int(response_time_ms)),
-            "hintCount": max(0, int(hint_count)),
+            "responseTimeMs": response_time_ms,
+            "responseTimeQuality": CLIENT_REPORTED_UNVERIFIED,
+            # Keep the parameter only for older test/client call sites. It is
+            # deliberately ignored because FYP1 does not collect hints.
+            "hintCount": 0,
+            "hintTelemetryStatus": HINT_TELEMETRY_NOT_SUPPORTED,
             "sequenceIndex": sequence_index,
             "idempotencyKey": idempotency_key,
             "createdAt": now,
@@ -266,6 +286,8 @@ class InMemoryQuizSessionService:
             raise QuizSessionError("failed-precondition", "Every response must be validated.")
         correct_count = sum(1 for item in ordered if item["serverIsCorrect"])
         total = len(ordered)
+        sequence_key = (student_id, session["subtopicId"])
+        source_attempt_sequence = self.sequence_states.get(sequence_key, 0) + 1
         attempt = {
             "attemptId": session["attemptId"],
             "sessionId": session_id,
@@ -287,11 +309,13 @@ class InMemoryQuizSessionService:
             "finalizationStatus": "finalized",
             "processingStatus": "pending",
             "dataSource": "runtime_callable",
+            "sourceAttemptSequence": source_attempt_sequence,
             "startedAt": session["startedAt"],
             "deviceSessionId": "not_recorded",
             "finalizedAt": now,
         }
         self.attempts[attempt["attemptId"]] = attempt
+        self.sequence_states[sequence_key] = source_attempt_sequence
         session["status"] = "finalized"
         session["finalizedAt"] = now
         return self._client_completion(attempt)

@@ -7,6 +7,9 @@ from typing import Sequence
 FINALIZED_STATUS = "finalized"
 VALIDATED_STATUS = "validated"
 RUNTIME_CALLABLE_DATA_SOURCE = "runtime_callable"
+CLIENT_REPORTED_UNVERIFIED = "client_reported_unverified"
+HINT_TELEMETRY_NOT_SUPPORTED = "not_supported"
+MAX_RESPONSE_TIME_MS = 900_000
 
 
 def validate_response_lineage(
@@ -19,6 +22,8 @@ def validate_response_lineage(
         or attempt.data_source != RUNTIME_CALLABLE_DATA_SOURCE
     ):
         raise ValueError("attempt is not a trusted finalized runtime attempt")
+    if attempt.source_attempt_sequence is None:
+        raise ValueError("attempt is legacy_no_sequence and cannot be trusted final evidence")
     if len(responses) != attempt.total_questions:
         raise ValueError("attempt response count does not match")
     ordered = sorted(responses, key=lambda response: response.sequence_index)
@@ -34,5 +39,13 @@ def validate_response_lineage(
             or response.validation_status != VALIDATED_STATUS
         ):
             raise ValueError("response was not securely validated in order")
+        if (
+            response.response_time_ms < 0
+            or response.response_time_ms > MAX_RESPONSE_TIME_MS
+            or response.response_time_quality != CLIENT_REPORTED_UNVERIFIED
+            or response.hint_count != 0
+            or response.hint_telemetry_status != HINT_TELEMETRY_NOT_SUPPORTED
+        ):
+            raise ValueError("response telemetry does not satisfy the U3-R contract")
     if sum(response.is_correct for response in ordered) != attempt.correct_count:
         raise ValueError("attempt correct count does not match validated responses")
