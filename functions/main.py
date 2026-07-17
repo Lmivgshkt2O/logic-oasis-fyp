@@ -150,7 +150,14 @@ def _active_easy_bank(topic_id: str, subtopic_id: str, year_level: int) -> tuple
     questions.sort(key=lambda item: (item.get("order", 0), item["questionId"]))
     if len(questions) < QUESTION_COUNT:
         raise QuizSessionError("failed-precondition", "The active question bank has too few valid prompts.")
-    return bank, questions[:QUESTION_COUNT]
+    selected = questions[:QUESTION_COUNT]
+    skill_ids = {question.get("skillId") for question in selected}
+    if None in skill_ids or len(skill_ids) != 1:
+        raise QuizSessionError(
+            "failed-precondition",
+            "The active question bank must contain one skill per quiz session.",
+        )
+    return bank, selected
 
 
 def start_quiz_session(data: dict[str, Any], student_id: str) -> dict[str, Any]:

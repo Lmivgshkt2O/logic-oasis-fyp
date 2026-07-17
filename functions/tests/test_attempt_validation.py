@@ -136,6 +136,14 @@ class AttemptValidationTests(unittest.TestCase):
         self.assertEqual("v1", sealed["contentVersion"])
         self.assertIsNone(sealed["priorExposureCount"])
 
+    def test_mixed_skill_questions_cannot_start_a_bkt_incompatible_session(self) -> None:
+        self.service._questions["q4"]["skillId"] = "another-skill"
+        with self.assertRaisesRegex(QuizSessionError, "one skill"):
+            self.service.start_session(
+                student_id="student-a", topic_id="y4_whole_numbers",
+                subtopic_id="read_write_numbers", year_level=4, now=NOW,
+            )
+
     def test_expired_complete_session_cannot_finalize(self) -> None:
         self._submit_all()
         with self.assertRaisesRegex(QuizSessionError, "session expired"):

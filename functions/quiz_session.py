@@ -145,6 +145,10 @@ class InMemoryQuizSessionService:
             raise QuizSessionError("failed-precondition", "No complete active question bank is available.")
 
         selected = candidates[: self._policy.question_count]
+        skill_ids = {question.get("skillId") for question in selected}
+        if None in skill_ids or len(skill_ids) != 1:
+            raise QuizSessionError(
+                "failed-precondition", "A quiz session must contain one skill.")
         session_id = f"session_{uuid4().hex}"
         attempt_id = f"attempt_{uuid4().hex}"
         session = {

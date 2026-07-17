@@ -10,6 +10,7 @@ from logic_oasis_ai.sources.firestore_source import load_firestore_dataset
 from training.delete_real_data_release import (
     ReleaseDeletionRequest,
     StorageDeletionEvidence,
+    cleanup_unpublished_release,
     create_deletion_certificate,
     may_destroy_key_version,
 )
@@ -113,6 +114,19 @@ class RealDataReleaseGovernanceTests(unittest.TestCase):
             self.assertTrue((Path(temporary_directory) / "attempts.csv").exists())
             self.assertFalse((Path(temporary_directory) / "responses.csv").exists())
             self.assertFalse((Path(temporary_directory) / "manifest.json").exists())
+            request = ReleaseDeletionRequest(
+                release_id="release-governance-v1",
+                storage_path=approved_release().storage_path,
+                export_key_version=approved_release().export_key_version,
+                data_steward=approved_release().data_steward,
+                retention_actor="logic-oasis-data-retention@logic-oasis-fyp.iam.gserviceaccount.com",
+                retention_review_at=approved_release().retention_review_at,
+            )
+            self.assertEqual(("attempts.csv",), cleanup_unpublished_release(request, temporary_directory))
+            self.assertFalse((Path(temporary_directory) / "attempts.csv").exists())
+            export_real_attempts(
+                dataset, temporary_directory, release=approved_release(), pseudonymization_key="test-key"
+            )
 
     def test_deletion_evidence_must_precede_matching_key_destruction(self):
         release = approved_release()

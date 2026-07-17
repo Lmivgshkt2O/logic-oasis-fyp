@@ -13,11 +13,13 @@ from datetime import datetime, timezone
 from hashlib import sha256
 import json
 from pathlib import Path
+from shutil import rmtree
 
 from .export_real_attempts import PROTECTED_RELEASE_PREFIX
 
 
 DELETION_CERTIFICATE_VERSION = "real-data-deletion-certificate-v1"
+RETENTION_IDENTITY = "logic-oasis-data-retention@logic-oasis-fyp.iam.gserviceaccount.com"
 
 
 @dataclass(frozen=True)
@@ -36,6 +38,8 @@ class ReleaseDeletionRequest:
             raise ValueError("deletion may target only its protected release path")
         if not self.export_key_version.startswith("logic-oasis-export-pseudonymization-key-v"):
             raise ValueError("deletion must name the versioned export HMAC key")
+        if self.retention_actor != RETENTION_IDENTITY:
+            raise ValueError("only the declared retention identity may perform release cleanup")
         if self.retention_review_at.tzinfo is None:
             raise ValueError("retention_review_at must include a timezone")
 
@@ -114,6 +118,33 @@ def may_destroy_key_version(certificate: dict[str, object], *, release_id: str, 
         and certificate["exportKeyVersion"] == export_key_version
         and certificate["keyDestructionAuthorized"] is True
     )
+
+
+def cleanup_unpublished_release(
+    request: ReleaseDeletionRequest,
+    output_directory: str | Path,
+) -> tuple[str, ...]:
+    """Remove a manifest-less partial export before retrying its release path.
+
+    This is deliberately separate from deletion certification: a directory
+    without its manifest was never published as a governed release. Deployment
+    must invoke it only under the retention service identity declared in the
+    IAM contract.
+    """
+    output = Path(output_directory)
+    manifest = output / "manifest.json"
+    if manifest.exists():
+        raise ValueError("a published release requires its deletion certificate workflow")
+    removed: list[str] = []
+    for path in (output / "attempts.csv", output / "responses.csv"):
+        if path.exists():
+            path.unlink()
+            removed.append(path.name)
+    for staging in output.glob(".release-staging-*"):
+        if staging.is_dir():
+            rmtree(staging)
+            removed.append(staging.name)
+    return tuple(removed)
 
 
 def _validate_manifest_for_deletion(request: ReleaseDeletionRequest, manifest: dict[str, object]) -> None:
