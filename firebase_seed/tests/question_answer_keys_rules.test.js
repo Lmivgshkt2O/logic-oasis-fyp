@@ -45,6 +45,23 @@ async function main() {
         ),
         { lastAllocatedSequence: 2 },
       );
+
+      await setDoc(doc(adminDb, "studentAiStatuses", "attempt_safe"), {
+        attemptId: "attempt_safe", studentId: "student_aiman_y4",
+        analysisState: "completed", displayCode: "analysis_completed",
+      });
+      await setDoc(doc(adminDb, "adaptiveAssignments", "student_aiman_y4_read_write_numbers"), {
+        studentId: "student_aiman_y4", subtopicId: "read_write_numbers", bankId: "bank_2",
+      });
+      await setDoc(doc(adminDb, "aiJobs", "attempt_safe"), {
+        studentId: "student_aiman_y4", errorCode: "model_load_failed",
+      });
+      await setDoc(doc(adminDb, "aiModelRuns", "attempt_safe"), {
+        studentId: "student_aiman_y4", shapValues: { correct_rate: -0.2 },
+      });
+      await setDoc(doc(adminDb, "modelRegistry", "xgboost_v1"), {
+        artifactPath: "models/private.joblib", artifactSha256: "private",
+      });
     });
 
     const studentDb = testEnv.authenticatedContext("student_aiman_y4").firestore();
@@ -82,8 +99,13 @@ async function main() {
         { lastAllocatedSequence: 99 },
       ),
     );
+    await assertSucceeds(getDoc(doc(studentDb, "studentAiStatuses", "attempt_safe")));
+    await assertSucceeds(getDoc(doc(studentDb, "adaptiveAssignments", "student_aiman_y4_read_write_numbers")));
+    await assertFails(getDoc(doc(studentDb, "aiJobs", "attempt_safe")));
+    await assertFails(getDoc(doc(studentDb, "aiModelRuns", "attempt_safe")));
+    await assertFails(getDoc(doc(studentDb, "modelRegistry", "xgboost_v1")));
 
-    console.log("PASS: student can read safe questions but cannot access answer keys or U3-R sequence state.");
+    console.log("PASS: student can read safe questions/projections but cannot access answer keys, U3-R state, or U8 raw AI data.");
   } finally {
     await testEnv.cleanup();
   }

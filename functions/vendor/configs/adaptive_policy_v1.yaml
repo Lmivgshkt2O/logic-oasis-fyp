@@ -1,0 +1,30 @@
+policyVersion: adaptive-policy-v1
+thresholds:
+  mastery:
+    moveUpAtLeast: 0.72
+    moveDownAtMost: 0.45
+  supportRisk:
+    moveUpAtMost: 0.35
+    moveDownAtLeast: 0.65
+minimumEvidence:
+  moveUp: 2
+  hard: 6
+guardrails:
+  oneLevelMovement: true
+  preventImmediateReversal: true
+bankSelection:
+  preferUnseenBanks: true
+coldStart:
+  difficulty: Easy
+reasonTexts:
+  cold_start_easy: Let us begin with a friendly practice set.
+  move_up_mastery: You are ready for a gentle new challenge.
+  move_up_bkt_fallback: You are ready for a gentle new challenge.
+  move_down_support: Let us practise a friendlier level while building confidence.
+  stay_easy_support: Let us keep building confidence with a fresh practice set.
+  stay_hard_mastery: You are doing well at this challenge level. Let us try fresh questions.
+  stay_build_evidence: Let us keep practising this level with a fresh question set.
+  stay_target_zone: Let us keep practising this level with a fresh question set.
+  anti_oscillation_stay: Let us build confidence at this level before the next change.
+  hard_requires_more_evidence: You are progressing well. Let us practise a little more before a bigger challenge.
+  no_eligible_bank: This practice set is being prepared. Please try again soon.

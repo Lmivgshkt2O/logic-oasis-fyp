@@ -1,0 +1,4 @@
+policyVersion: weak-topic-ranking-v1
+formula: severity_times_evidence_reliability
+minimumEvidenceForHighConfidence: 6
+source: bkt-v1

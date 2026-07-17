@@ -3,12 +3,29 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from functools import lru_cache
+import os
+from pathlib import Path
+import sys
 from typing import Any, Callable
 from uuid import uuid4
 
 import firebase_admin
 from firebase_admin import firestore
 from firebase_functions import https_fn
+from firebase_functions import firestore_fn
+
+# Deployments import only the generated vendor bundle.  The source-tree fallback
+# is intentionally development/emulator-only and lets focused tests exercise
+# the exact handler before the bundle has been built.
+_FUNCTIONS_ROOT = Path(__file__).resolve().parent
+_VENDOR_ROOT = _FUNCTIONS_ROOT / "vendor"
+_AI_SOURCE_ROOT = _FUNCTIONS_ROOT.parent / "ai_pipeline"
+_PACKAGE_ROOT = _VENDOR_ROOT if _VENDOR_ROOT.exists() else _AI_SOURCE_ROOT
+if str(_PACKAGE_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PACKAGE_ROOT))
+
+from ai_runtime import AI_RUNTIME_SERVICE_ACCOUNT, FirestoreRuntimeGateway, RuntimeBundle, process_finalized_attempt
 
 from quiz_session import (
     CLIENT_REPORTED_UNVERIFIED,
@@ -52,6 +69,12 @@ def firestore_db() -> Any:
     if _db is None:
         _db = firestore.client()
     return _db
+
+
+@lru_cache(maxsize=2)
+def _runtime_bundle(runtime_root: Path) -> RuntimeBundle:
+    """Hash one immutable deployed bundle once per warm Functions instance."""
+    return RuntimeBundle.from_runtime_root(runtime_root)
 
 
 def _auth_uid(request: https_fn.CallableRequest) -> str:
@@ -460,3 +483,31 @@ def submitQuizResponse(request: https_fn.CallableRequest) -> dict[str, Any]:
 @https_fn.on_call(region=FUNCTION_REGION)
 def finalizeQuizSession(request: https_fn.CallableRequest) -> dict[str, Any]:
     return _call(finalize_quiz_session, request)
+
+
+@firestore_fn.on_document_created(
+    document="quizAttempts/{attemptId}",
+    region=FUNCTION_REGION,
+    service_account=AI_RUNTIME_SERVICE_ACCOUNT,
+)
+def processFinalizedQuizAttempt(event: firestore_fn.Event[Any]) -> None:
+    """Run U8 automatically for a newly finalized trusted quiz attempt."""
+    snapshot = event.data
+    if snapshot is None or not snapshot.exists:
+        return
+    # The runtime itself performs the trusted source gate before any model work.
+    # The trigger intentionally shares this entry point in emulator and cloud.
+    runtime_root = _VENDOR_ROOT if _VENDOR_ROOT.exists() else _AI_SOURCE_ROOT
+    process_finalized_attempt(
+        snapshot.id,
+        gateway=FirestoreRuntimeGateway(firestore_db()),
+        bundle=_runtime_bundle(runtime_root),
+        provenance="emulator_verified" if os.environ.get("FUNCTIONS_EMULATOR") == "true" else "real",
+    )
+
+
+# firebase-functions-python 0.6 exposes the Firestore trigger retry field in
+# the generated manifest but not in ``FirestoreOptions``.  Set the manifest
+# flag explicitly so deployed Eventarc delivery retries the same handler; the
+# runtime still caps its own server claims at three.
+getattr(processFinalizedQuizAttempt, "__firebase_endpoint__").eventTrigger["retry"] = True

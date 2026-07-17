@@ -1,0 +1,7 @@
+{
+  "adaptivePolicySha256": "1c782e3ca08fb021427af2a42eda1df4350d583b301f3ff79a7df529c6cf9d4b",
+  "bundleVersion": "u8-ai-runtime-v1",
+  "featureSchemaSha256": "8427a6bcfd695d32a798f2411f71ab759a1f4cf38b1b42001d301dc78a6de3a9",
+  "packageSha256": "b581f828ba082284db06cedb6103b810ba54c9f045b057c9baa509443555cb3f",
+  "weakTopicRankingPolicySha256": "f7bfd255956c0c99e197fc8a690eed075b6de1e2e6c7cbee76d3f28b299f1b7c"
+}
