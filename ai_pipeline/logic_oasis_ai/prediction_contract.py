@@ -12,7 +12,9 @@ from datetime import datetime
 from math import isfinite
 from typing import Iterable, Mapping
 
-from .features import AttemptFeatureRow, BASE_FEATURE_NAMES, FEATURE_SCHEMA_VERSION
+from .bkt import build_bkt_ablation_evidence
+from .features import AttemptFeatureRow, BASE_FEATURE_NAMES, FEATURE_SCHEMA_VERSION, build_attempt_features
+from .sources.firestore_source import SourceDataset
 from .time_utils import parse_timestamp
 
 
@@ -144,6 +146,56 @@ class DataSufficiency:
     @property
     def can_compare(self) -> bool:
         return self.claim_level in {"preliminary_comparison", "held_out_comparison"}
+
+
+def build_bkt_attempt_evidence(
+    dataset: SourceDataset,
+    *,
+    anonymization_salt: str,
+) -> dict[str, BktAttemptEvidence]:
+    """Bridge typed U4 response evidence to U7's pseudonymized attempt rows.
+
+    U7 permits the BKT ablation only when an attempt represents exactly one
+    skill state. A mixed-skill attempt has no declared single BKT feature, so
+    it is rejected rather than silently averaging unrelated states.
+    """
+    feature_rows = build_attempt_features(dataset, anonymization_salt=anonymization_salt)
+    feature_by_source_attempt_id = {
+        source.attempt_id: row for source, row in zip(dataset.attempts, feature_rows)
+    }
+    evidence_by_source_attempt_id: dict[str, list[object]] = {}
+    for evidence in build_bkt_ablation_evidence(dataset.attempts, dataset.responses_by_attempt):
+        evidence_by_source_attempt_id.setdefault(evidence.source_attempt_id, []).append(evidence)
+
+    result: dict[str, BktAttemptEvidence] = {}
+    for source_attempt_id, row in feature_by_source_attempt_id.items():
+        response_evidence = sorted(
+            evidence_by_source_attempt_id.get(source_attempt_id, ()),
+            key=lambda item: item.sequence_index,
+        )
+        if not response_evidence:
+            raise ValueError("BKT ablation evidence is missing a trusted attempt")
+        skill_ids = {item.skill_id for item in response_evidence}
+        source_response_ids = tuple(item.source_response_id for item in response_evidence)
+        if (
+            len(skill_ids) != 1
+            or tuple(sorted(source_response_ids)) != tuple(sorted(row.response_ids))
+            or row.source_attempt_sequence is None
+            or response_evidence[-1].source_attempt_sequence != row.source_attempt_sequence
+        ):
+            raise ValueError("BKT ablation requires one complete single-skill attempt lineage")
+        latest = response_evidence[-1]
+        result[row.attempt_id] = BktAttemptEvidence(
+            attempt_id=row.attempt_id,
+            source_attempt_sequence=row.source_attempt_sequence,
+            student_key=row.student_key,
+            subtopic_id=row.subtopic_id,
+            skill_id=latest.skill_id,
+            source_response_ids=source_response_ids,
+            bkt_version=latest.model_version,
+            p_known_after_attempt=latest.p_known_after_attempt,
+        )
+    return result
 
 
 def build_prediction_dataset(

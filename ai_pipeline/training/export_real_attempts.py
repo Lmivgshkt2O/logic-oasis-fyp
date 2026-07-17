@@ -107,6 +107,11 @@ def export_real_attempts(
         raise ValueError("only approved real records may be exported for final evaluation")
     output = Path(output_directory)
     output.mkdir(parents=True, exist_ok=True)
+    attempts_path = output / "attempts.csv"
+    responses_path = output / "responses.csv"
+    manifest_path = output / "manifest.json"
+    if any(path.exists() for path in (attempts_path, responses_path, manifest_path)):
+        raise FileExistsError("a governed release path is immutable once publication starts")
 
     attempt_keys = {
         attempt.attempt_id: hmac_pseudonym("attempt", attempt.attempt_id, pseudonymization_key)
@@ -131,9 +136,8 @@ def export_real_attempts(
         staged_manifest = staging / "manifest.json"
         staged_manifest.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
-        attempts_path = output / "attempts.csv"
-        responses_path = output / "responses.csv"
-        manifest_path = output / "manifest.json"
+        # Manifest publication is the release commit marker. If a prior move
+        # fails, no complete release is discoverable at this immutable path.
         staged_attempts.replace(attempts_path)
         staged_responses.replace(responses_path)
         staged_manifest.replace(manifest_path)

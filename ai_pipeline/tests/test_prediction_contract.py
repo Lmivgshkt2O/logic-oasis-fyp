@@ -4,18 +4,20 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
-from logic_oasis_ai.features import AttemptFeatureRow, FEATURE_SCHEMA_VERSION
+from logic_oasis_ai.features import AttemptFeatureRow, FEATURE_SCHEMA_VERSION, build_attempt_features
 from logic_oasis_ai.model_registry import ModelArtifact, ModelRegistry
 from logic_oasis_ai.prediction_contract import (
     BktAttemptEvidence, PredictionContract, SupervisedExample, assess_data_sufficiency,
-    build_prediction_dataset, build_supervised_examples, feature_names,
+    build_bkt_attempt_evidence, build_prediction_dataset, build_supervised_examples, feature_names,
 )
+from logic_oasis_ai.sources.firestore_source import load_firestore_dataset
 from training.common import grouped_holdout_split
 from training.evaluate_models import (
     RANDOM_SEED, evaluate_bkt_ablation, evaluate_fair_comparison, load_xgboost_bundle,
     save_xgboost_bundle,
 )
 from training.train_mlp import train_mlp
+from test_source_parity import firestore_attempts, firestore_responses
 
 
 NOW = datetime(2026, 7, 16, tzinfo=timezone.utc)
@@ -139,6 +141,36 @@ class PredictionContractTests(unittest.TestCase):
         changed = replace(bkt[0], features={**bkt[0].features, "correct_rate": 0.1})
         with self.assertRaisesRegex(ValueError, "may differ only"):
             evaluate_bkt_ablation(base, (changed, *bkt[1:]), allow_synthetic_test=True)
+
+    def test_u4_bkt_evidence_bridges_to_pseudonymized_u7_attempt_features(self):
+        attempts = firestore_attempts()
+        next_attempt = dict(attempts[0])
+        next_attempt.update({
+            "id": "attempt-2", "attemptId": "attempt-2", "sessionId": "session-2",
+            "responseIds": ["response-3", "response-4"], "correctCount": 0,
+            "score": 0, "sourceAttemptSequence": 2,
+        })
+        attempts.append(next_attempt)
+        responses = firestore_responses()
+        next_responses = []
+        for index, response in enumerate(responses):
+            copied = dict(response)
+            copied.update({
+                "id": f"response-{index + 3}", "responseId": f"response-{index + 3}",
+                "sessionId": "session-2", "attemptId": "attempt-2",
+                "questionId": f"question-{index + 3}", "serverIsCorrect": False,
+            })
+            next_responses.append(copied)
+        dataset = load_firestore_dataset(attempts, responses + next_responses, provenance="real")
+        rows = build_attempt_features(dataset, anonymization_salt="release-salt")
+        evidence = build_bkt_attempt_evidence(dataset, anonymization_salt="release-salt")
+
+        comparison = build_prediction_dataset(rows, bkt_evidence_by_attempt_id=evidence)
+
+        self.assertEqual(1, len(comparison.examples))
+        first = rows[0]
+        self.assertIn(first.attempt_id, evidence)
+        self.assertEqual(first.response_ids, evidence[first.attempt_id].source_response_ids)
 
     def test_mlp_early_stopping_is_disabled(self):
         model, _ = train_mlp(synthetic_examples(), random_seed=RANDOM_SEED)

@@ -84,6 +84,19 @@ class AdaptivePolicyTests(unittest.TestCase):
         self.assertEqual(decision.difficulty, Difficulty.MODERATE)
         self.assertEqual(decision.reason_code, "hard_requires_more_evidence")
 
+    def test_existing_hard_assignment_steps_down_without_hard_evidence(self):
+        decision = self.choose(
+            context(
+                current_difficulty=Difficulty.HARD,
+                mastery_probability=0.90,
+                evidence_count=3,
+                support_risk=0.10,
+            )
+        )
+
+        self.assertEqual(decision.difficulty, Difficulty.MODERATE)
+        self.assertEqual(decision.reason_code, "hard_requires_more_evidence")
+
     def test_high_support_risk_moves_down_once(self):
         decision = self.choose(
             context(

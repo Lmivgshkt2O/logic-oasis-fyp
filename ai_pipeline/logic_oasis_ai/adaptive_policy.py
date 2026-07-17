@@ -249,7 +249,11 @@ def select_next_bank(
         reason_code = "anti_oscillation_stay"
 
     if target is Difficulty.HARD and context.evidence_count < policy.thresholds.minimum_evidence_for_hard:
-        target = context.current_difficulty
+        target = (
+            Difficulty.MODERATE
+            if context.current_difficulty is Difficulty.HARD
+            else context.current_difficulty
+        )
         reason_code = "hard_requires_more_evidence"
 
     return _choose(

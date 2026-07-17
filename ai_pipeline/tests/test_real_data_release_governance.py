@@ -95,6 +95,25 @@ class RealDataReleaseGovernanceTests(unittest.TestCase):
             self.assertFalse((Path(temporary_directory) / "responses.csv").exists())
             self.assertFalse((Path(temporary_directory) / "manifest.json").exists())
 
+    def test_failed_final_promotion_never_publishes_a_completion_manifest(self):
+        dataset = load_firestore_dataset(firestore_attempts(), firestore_responses(), provenance="real")
+        original_replace = Path.replace
+
+        def fail_response_promotion(source, target):
+            if source.name == "responses.csv" and source.parent.name.startswith(".release-staging-"):
+                raise OSError("simulated response promotion failure")
+            return original_replace(source, target)
+
+        with TemporaryDirectory() as temporary_directory:
+            with patch.object(Path, "replace", new=fail_response_promotion):
+                with self.assertRaisesRegex(OSError, "simulated response promotion failure"):
+                    export_real_attempts(
+                        dataset, temporary_directory, release=approved_release(), pseudonymization_key="test-key"
+                    )
+            self.assertTrue((Path(temporary_directory) / "attempts.csv").exists())
+            self.assertFalse((Path(temporary_directory) / "responses.csv").exists())
+            self.assertFalse((Path(temporary_directory) / "manifest.json").exists())
+
     def test_deletion_evidence_must_precede_matching_key_destruction(self):
         release = approved_release()
         manifest = {
