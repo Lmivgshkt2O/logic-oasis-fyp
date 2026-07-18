@@ -20,18 +20,59 @@ service cloud.firestore {
         resource.data.studentId == request.auth.uid;
     }
 
+    // U8 exposes only bounded derived projections.  Link creation/revocation
+    // is owned by the U9 callable administration flow; this predicate merely
+    // enforces a server-created active relationship when it exists.
+    function isActiveLinkedParent(studentId) {
+      return signedIn() &&
+        exists(/databases/$(database)/documents/parentLinks/$(request.auth.uid + '_' + studentId)) &&
+        get(/databases/$(database)/documents/parentLinks/$(request.auth.uid + '_' + studentId)).data.status == 'active';
+    }
+
+    function ownsOrActiveLinkedParent(studentId) {
+      return signedIn() && (request.auth.uid == studentId || isActiveLinkedParent(studentId));
+    }
+
     match /topics/{topicId} {
-      allow read: if true;
+      allow read: if signedIn();
       allow write: if false;
     }
 
     match /questions/{questionId} {
-      allow read: if true;
+      allow read: if signedIn();
       allow write: if false;
     }
 
+    match /questionBanks/{bankId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    // Correctness and explanations are server-only. Callable quiz-session
+    // functions use the Admin SDK and are not constrained by these rules.
+    match /questionAnswerKeys/{questionId} {
+      allow read, write: if false;
+    }
+
+    // U3 session and response documents are created and finalized only by
+    // callable Functions through the Admin SDK. The app receives safe return
+    // payloads, not direct document access.
+    match /quizSessions/{sessionId} {
+      allow read, write: if false;
+    }
+
+    match /questionResponses/{responseId} {
+      allow read, write: if false;
+    }
+
+    // U3-R's monotonic sequence is allocated by the callable finalization
+    // transaction only. It must never become a client or parent data source.
+    match /studentSubtopicSequenceStates/{studentId}/subtopics/{subtopicId} {
+      allow read, write: if false;
+    }
+
     match /subtopics/{subtopicId} {
-      allow read: if true;
+      allow read: if signedIn();
       allow write: if false;
     }
 
@@ -49,20 +90,27 @@ service cloud.firestore {
 
     match /quizAttempts/{attemptId} {
       allow read: if ownsExistingStudentField();
-      allow create, update: if ownsStudentField();
-      allow delete: if false;
+      allow write: if false;
     }
 
     match /topicMastery/{masteryId} {
       allow read: if ownsExistingStudentField();
-      allow create, update: if ownsStudentField();
-      allow delete: if false;
+      allow write: if false;
     }
 
     match /subtopicMastery/{masteryId} {
-      allow read: if ownsExistingStudentField();
-      allow create, update: if ownsStudentField();
-      allow delete: if false;
+      allow read: if ownsOrActiveLinkedParent(resource.data.studentId);
+      allow write: if false;
+    }
+
+    match /studentAiStatuses/{attemptId} {
+      allow read: if ownsOrActiveLinkedParent(resource.data.studentId);
+      allow write: if false;
+    }
+
+    match /adaptiveAssignments/{assignmentId} {
+      allow read: if ownsOrActiveLinkedParent(resource.data.studentId);
+      allow write: if false;
     }
 
     match /oasisProgress/{progressId} {
@@ -72,9 +120,26 @@ service cloud.firestore {
     }
 
     match /aiModelRuns/{runId} {
-      allow read: if ownsExistingStudentField();
-      allow create, update: if ownsStudentField();
-      allow delete: if false;
+      // Includes raw feature values and SHAP arrays; always server-only.
+      allow read, write: if false;
+    }
+
+    match /aiJobs/{attemptId} {
+      allow read, write: if false;
+    }
+
+    match /masterySnapshots/{snapshotId} {
+      allow read, write: if false;
+    }
+
+    match /modelRegistry/{modelId} {
+      allow read, write: if false;
+    }
+
+    match /parentLinks/{linkId} {
+      // Clients cannot establish, reactivate, or inspect relationships.
+      allow write: if false;
+      allow read: if false;
     }
 
     match /{document=**} {

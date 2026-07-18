@@ -24,5 +24,33 @@
   },
   "firestore": {
     "rules": "firestore.rules"
+  },
+  "functions": {
+    "source": "functions",
+    "runtime": "python311",
+    "ignore": [
+      "venv",
+      "venv/**",
+      ".venv",
+      ".venv/**",
+      "tests",
+      "tests/**",
+      "__pycache__",
+      "__pycache__/**",
+      "**/__pycache__/**",
+      "**/*.pyc"
+    ]
+  },
+  "emulators": {
+    "functions": {
+      "port": 5001
+    },
+    "firestore": {
+      "port": 8080
+    },
+    "ui": {
+      "enabled": true
+    },
+    "singleProjectMode": true
   }
 }

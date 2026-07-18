@@ -52,6 +52,9 @@ firebase_seed/node_modules/
 firebase_seed/serviceAccountKey*.json
 firebase_seed/.env
 
+# Firebase Python Functions local runtime
+functions/venv/
+
 # Generated planning/report artifacts
 outputs/
 
