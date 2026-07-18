@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:logic_oasis/app/logic_oasis_design.dart';
-import 'package:logic_oasis/features/settings/parent_auth_page.dart';
-import 'package:logic_oasis/features/settings/parent_link_page.dart';
 import 'package:logic_oasis/l10n/app_localizations.dart';
 import 'package:logic_oasis/shared/repositories/auth_repository.dart';
 import 'package:logic_oasis/shared/state/app_state.dart';
@@ -443,66 +441,23 @@ class SettingsPage extends StatelessWidget {
   }
 
   Future<void> _openParentAccess(BuildContext context) async {
-    final navigator = Navigator.of(context);
-    final messenger = ScaffoldMessenger.of(context);
-    final repository = authRepository ?? AuthRepository();
-
-    try {
-      final parentAccount = await repository.fetchLinkedParentAccount(
-        studentId: state.currentStudentId,
-      );
-      if (!context.mounted) return;
-
-      if (parentAccount == null) {
-        final shouldRegister = await showDialog<bool>(
-          context: context,
-          builder: (context) {
-            final l10n = AppLocalizations.of(context)!;
-            return AlertDialog(
-              title: Text(l10n.parentAccountNotLinked),
-              content: Text(l10n.parentAccountNotLinkedBody),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(false),
-                  child: Text(l10n.cancel),
-                ),
-                FilledButton(
-                  onPressed: () => Navigator.of(context).pop(true),
-                  child: Text(l10n.createParentAccount),
-                ),
-              ],
-            );
-          },
-        );
-
-        if (shouldRegister != true || !context.mounted) return;
-        navigator.push(
-          MaterialPageRoute(
-            builder: (_) => ParentLinkPage(state: state, authRepository: repository),
-          ),
-        );
-        return;
-      }
-
-      navigator.push(
-        MaterialPageRoute(
-          builder: (_) => ParentAuthPage(
-            state: state,
-            parentAccount: parentAccount,
-            authRepository: repository,
-          ),
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Parent access is protected'),
+        content: const Text(
+          'A supervisor-approved administrator must link a parent Firebase account to this student. '
+          'Students cannot create, choose, or reactivate parent links in the app. '
+          'The parent then signs in with their own Firebase account to view safe learning updates.',
         ),
-      );
-    } catch (_) {
-      if (!context.mounted) return;
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(
-            content: Text('Unable to check linked parent account. Please try again.'),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('OK'),
           ),
-        );
-    }
+        ],
+      ),
+    );
   }
 
   void _showMessage(BuildContext context, String message) {

@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:logic_oasis/features/quiz/widgets/answer_tile.dart';
+import 'package:logic_oasis/features/quiz/result_page.dart';
 import 'package:logic_oasis/l10n/app_localizations.dart';
 import 'package:logic_oasis/shared/models/question_response.dart';
 import 'package:logic_oasis/shared/models/quiz_completion.dart';
 import 'package:logic_oasis/shared/models/quiz_question.dart';
 import 'package:logic_oasis/shared/models/quiz_session.dart';
 import 'package:logic_oasis/shared/services/quiz_session_service.dart';
+import 'package:logic_oasis/shared/services/ai_status_service.dart';
 import 'package:logic_oasis/shared/widgets/logic_oasis_figma_components.dart';
 import 'package:logic_oasis/shared/widgets/recommendation_box.dart';
 
@@ -35,6 +37,7 @@ class _QuizPageState extends State<QuizPage> {
   QuestionResponse? _validatedResponse;
   bool _submitting = false;
   bool _finalizing = false;
+  late final AiStatusService _aiStatusService;
 
   QuizQuestion get currentQuestion => widget.session.questions[questionIndex];
   bool get _hasSelection =>
@@ -44,6 +47,7 @@ class _QuizPageState extends State<QuizPage> {
   void initState() {
     super.initState();
     _sessionService = widget.sessionService ?? QuizSessionService();
+    _aiStatusService = AiStatusService();
     _questionStartedAt = DateTime.now();
   }
 
@@ -150,15 +154,42 @@ class _QuizPageState extends State<QuizPage> {
     final correct = completion.correctCount;
     final total = completion.totalQuestions ?? widget.session.questions.length;
     final score = completion.score ?? 0;
+    final attemptId = completion.attemptId;
     return showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         title: Text(widget.isBahasaMelayu ? 'Kuiz selesai!' : 'Quiz complete!'),
-        content: Text(
-          widget.isBahasaMelayu
-              ? 'Semakan pelayan mengesahkan $correct daripada $total betul ($score%).'
-              : 'The server confirmed $correct out of $total correct ($score%).',
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              widget.isBahasaMelayu
+                  ? 'Semakan pelayan mengesahkan $correct daripada $total betul ($score%).'
+                  : 'The server confirmed $correct out of $total correct ($score%).',
+            ),
+            if (attemptId != null && attemptId.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              StreamBuilder(
+                stream: _aiStatusService.watchAttempt(attemptId),
+                builder: (context, snapshot) {
+                  final diagnosis = snapshot.data;
+                  if (diagnosis == null) {
+                    return Text(
+                      widget.isBahasaMelayu
+                          ? 'Markah anda disimpan. Analisis sedang bermula…'
+                          : 'Your score is saved. Analysis is starting…',
+                    );
+                  }
+                  return AiAnalysisStatusCard(
+                    diagnosis: diagnosis,
+                    isBahasaMelayu: widget.isBahasaMelayu,
+                  );
+                },
+              ),
+            ],
+          ],
         ),
         actions: [
           FilledButton(

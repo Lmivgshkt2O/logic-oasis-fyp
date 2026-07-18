@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/l10n/app_localizations.dart';
+import 'package:logic_oasis/shared/models/ai_diagnosis.dart';
 import 'package:logic_oasis/shared/models/quiz_reward.dart';
 import 'package:logic_oasis/shared/widgets/logic_oasis_figma_components.dart';
 import 'package:logic_oasis/shared/widgets/recommendation_box.dart';
@@ -16,6 +17,7 @@ class ResultPage extends StatelessWidget {
     required this.reward,
     required this.onBackToForge,
     this.backActionLabel,
+    this.aiDiagnosis,
   });
 
   final int correctCount;
@@ -25,6 +27,7 @@ class ResultPage extends StatelessWidget {
   final QuizReward reward;
   final VoidCallback onBackToForge;
   final String? backActionLabel;
+  final AiDiagnosis? aiDiagnosis;
 
   @override
   Widget build(BuildContext context) {
@@ -106,6 +109,13 @@ class ResultPage extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           RecommendationBox(text: _nextAction(wrongCount)),
+          if (aiDiagnosis != null) ...[
+            const SizedBox(height: 12),
+            AiAnalysisStatusCard(
+              diagnosis: aiDiagnosis!,
+              isBahasaMelayu: isBahasaMelayu,
+            ),
+          ],
           const SizedBox(height: 22),
           FilledButton.icon(
             onPressed: onBackToForge,
@@ -163,6 +173,61 @@ class ResultPage extends StatelessWidget {
       return 'Next action: Review the mistakes and repeat one short practice to strengthen this topic.';
     }
     return 'Next action: Revisit the basics for this topic, then retry the same quiz.';
+  }
+}
+
+/// A small safe projection card shared by immediate quiz results and future
+/// result screens. It must receive only [AiDiagnosis.fromSafeProjection].
+class AiAnalysisStatusCard extends StatelessWidget {
+  const AiAnalysisStatusCard({
+    super.key,
+    required this.diagnosis,
+    required this.isBahasaMelayu,
+  });
+
+  final AiDiagnosis diagnosis;
+  final bool isBahasaMelayu;
+
+  @override
+  Widget build(BuildContext context) {
+    final isReady = diagnosis.isCompleted || diagnosis.isFallback;
+    final title = isBahasaMelayu
+        ? (isReady ? 'Langkah latihan seterusnya' : 'Analisis pembelajaran')
+        : (isReady ? 'Next practice step' : 'Learning analysis');
+    final status = isBahasaMelayu
+        ? switch (diagnosis.analysisState) {
+            'completed' => 'Latihan seterusnya sudah sedia.',
+            'fallback' => 'Cadangan latihan sedia menggunakan kemajuan kuiz.',
+            'failed' => 'Markah anda disimpan. Cadangan akan tersedia kemudian.',
+            _ => 'Markah anda disimpan. Sedang menyediakan latihan seterusnya…',
+          }
+        : diagnosis.childFacingStatus;
+    final evidence = diagnosis.evidenceLevel == 'preliminary'
+        ? (isBahasaMelayu ? 'Bukti awal — teruskan latihan ringkas.' : 'Preliminary evidence — keep practising in short steps.')
+        : null;
+    return SectionCard(
+      title: title,
+      icon: isReady ? Icons.route_outlined : Icons.hourglass_top_outlined,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(status),
+          if (diagnosis.supportingReason != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              diagnosis.supportingReason!,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+          ],
+          if (evidence != null) ...[
+            const SizedBox(height: 8),
+            Text(evidence, style: Theme.of(context).textTheme.bodySmall),
+          ],
+        ],
+      ),
+    );
   }
 }
 

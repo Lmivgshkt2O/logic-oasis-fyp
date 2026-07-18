@@ -160,13 +160,11 @@ class _ParentDashboardContent extends StatelessWidget {
                 const SizedBox(height: 12),
                 _AiDiagnosisDetails(
                   masteryProbability: aiDiagnosis.bktMasteryProbability,
-                  weaknessProbability: aiDiagnosis.weaknessProbability,
-                  confidence: aiDiagnosis.confidence,
                   finalLabel: aiDiagnosis.finalMasteryLabel,
-                  modelName: aiDiagnosis.modelName,
                   attemptsCount: aiDiagnosis.attemptsCount,
                   createdAt: aiDiagnosis.createdAt,
                   shapReasons: aiDiagnosis.explanationReasons,
+                  evidenceLevel: aiDiagnosis.evidenceLevel,
                   isBahasaMelayu: state.isBahasaMelayu,
                 ),
               ],
@@ -242,21 +240,20 @@ class _ParentLearningStory {
     if (aiDiagnosis != null) {
       final weaknessPercent = (aiDiagnosis.weaknessProbability * 100).round();
       final masteryPercent = (aiDiagnosis.bktMasteryProbability * 100).round();
-      final confidencePercent = (aiDiagnosis.confidence * 100).round();
 
       return _ParentLearningStory(
-        status: state.t('AI focus found', 'Fokus AI ditemui'),
+        status: state.t('Practice focus ready', 'Fokus latihan sedia'),
         statusDetail: state.t(
-          'Grey Box AI marks ${insight.topicTitle} as ${aiDiagnosis.finalMasteryLabel}: $weaknessPercent% weakness risk, $masteryPercent% BKT mastery, $confidencePercent% confidence.',
-          'AI Grey Box menanda ${insight.topicTitle} sebagai ${aiDiagnosis.finalMasteryLabel}: risiko kelemahan $weaknessPercent%, penguasaan BKT $masteryPercent%, keyakinan $confidencePercent%.',
+          'The latest server analysis suggests supportive practice for ${insight.topicTitle}. It is based on $masteryPercent% current mastery and $weaknessPercent% priority.',
+          'Analisis pelayan terkini mencadangkan latihan sokongan untuk ${insight.topicTitle}. Ia berdasarkan $masteryPercent% penguasaan semasa dan keutamaan $weaknessPercent%.',
         ),
         priority: state.t(
           'Main focus: ${insight.topicTitle}.',
           'Fokus utama: ${insight.topicTitle}.',
         ),
         parentMeaning: state.t(
-          'For FYP1, this combines seeded/offline AI evidence with quiz-history fallback, so the recommendation remains explainable during the demo.',
-          'Untuk FYP1, ini menggabungkan bukti AI berbenih/luar talian dengan sandaran sejarah kuiz supaya cadangan kekal boleh diterangkan semasa demo.',
+          'This advice comes from the latest protected learning projection. Low evidence is shown as preliminary, not as a confirmed weakness.',
+          'Nasihat ini datang daripada unjuran pembelajaran terlindung terkini. Bukti rendah ditunjukkan sebagai awal, bukan kelemahan yang disahkan.',
         ),
         tonightAction: aiDiagnosis.recommendedAction,
         conversationPrompt: state.t(
@@ -568,33 +565,26 @@ class _ParentActionStep extends StatelessWidget {
 class _AiDiagnosisDetails extends StatelessWidget {
   const _AiDiagnosisDetails({
     required this.masteryProbability,
-    required this.weaknessProbability,
-    required this.confidence,
     required this.finalLabel,
-    required this.modelName,
     required this.attemptsCount,
     required this.createdAt,
     required this.shapReasons,
+    required this.evidenceLevel,
     required this.isBahasaMelayu,
   });
 
   final double masteryProbability;
-  final double weaknessProbability;
-  final double confidence;
   final String finalLabel;
-  final String modelName;
   final int attemptsCount;
   final DateTime createdAt;
   final List<String> shapReasons;
+  final String? evidenceLevel;
   final bool isBahasaMelayu;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final l10n = AppLocalizations.of(context)!;
     final masteryText = (masteryProbability * 100).round();
-    final weaknessText = (weaknessProbability * 100).round();
-    final confidenceText = (confidence * 100).round();
 
     return SoftCard(
       padding: const EdgeInsets.all(12),
@@ -603,14 +593,14 @@ class _AiDiagnosisDetails extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            l10n.greyBoxAiResult,
+            isBahasaMelayu ? 'Kemas kini pembelajaran selamat' : 'Safe learning update',
             style: theme.textTheme.titleMedium,
           ),
           const SizedBox(height: 8),
           Text(
             isBahasaMelayu
-                ? 'Bukti AI FYP1: $modelName, ${attemptsCount.clamp(0, 999)} rekod cubaan.'
-                : 'FYP1 AI evidence: $modelName, ${attemptsCount.clamp(0, 999)} attempt records.',
+                ? 'Status pelayan: ${attemptsCount.clamp(0, 999)} pemerhatian pembelajaran.'
+                : 'Server status: ${attemptsCount.clamp(0, 999)} learning observations.',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: LogicOasisTheme.ink,
               fontWeight: FontWeight.w700,
@@ -618,14 +608,20 @@ class _AiDiagnosisDetails extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            l10n.aiResultSummary(
-              finalLabel,
-              masteryText,
-              weaknessText,
-              confidenceText,
-            ),
+            isBahasaMelayu
+                ? 'Tahap pembelajaran: $finalLabel. Penguasaan semasa: $masteryText%.'
+                : 'Learning status: $finalLabel. Current mastery: $masteryText%.',
             style: theme.textTheme.bodyMedium,
           ),
+          if (evidenceLevel != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              isBahasaMelayu
+                  ? 'Tahap bukti: $evidenceLevel.'
+                  : 'Evidence level: $evidenceLevel.',
+              style: theme.textTheme.bodySmall,
+            ),
+          ],
           if (createdAt.millisecondsSinceEpoch > 0) ...[
             const SizedBox(height: 6),
             Text(
@@ -641,15 +637,17 @@ class _AiDiagnosisDetails extends StatelessWidget {
           if (shapReasons.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(
-              l10n.shapReasons(shapReasons.take(3).join(', ')),
+              isBahasaMelayu
+                  ? 'Sebab sokongan: ${shapReasons.take(3).join(', ')}'
+                  : 'Supportive reason: ${shapReasons.take(3).join(', ')}',
               style: theme.textTheme.bodyMedium,
             ),
           ],
           const SizedBox(height: 8),
           Text(
             isBahasaMelayu
-                ? 'Jika rekod AI tiada, papan pemuka menggunakan logik topik lemah berdasarkan markah kuiz.'
-                : 'If AI records are unavailable, the dashboard falls back to weak-topic logic from quiz scores.',
+                ? 'Nasihat sandaran menggunakan kemajuan kuiz yang disahkan oleh pelayan.'
+                : 'Fallback advice uses server-confirmed quiz progress.',
             style: theme.textTheme.bodySmall?.copyWith(
               color: LogicOasisTheme.deepLeaf,
               fontWeight: FontWeight.w700,

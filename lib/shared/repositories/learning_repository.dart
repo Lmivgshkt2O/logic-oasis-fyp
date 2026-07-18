@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:logic_oasis/shared/models/ai_diagnosis.dart';
+import 'package:logic_oasis/shared/models/adaptive_assignment.dart';
 import 'package:logic_oasis/shared/models/parent_dashboard_snapshot.dart';
 import 'package:logic_oasis/shared/models/quiz_attempt.dart';
 import 'package:logic_oasis/shared/models/topic.dart';
@@ -259,59 +260,64 @@ class LearningRepository {
     required List<Topic> topics,
   }) async {
     final normalizedYearLevel = yearLevel.clamp(4, 6);
-    final attemptsSnapshot = await _firestore
-        .collection('quizAttempts')
-        .where('studentId', isEqualTo: studentId)
-        .get(const GetOptions(source: Source.server));
-    final masterySnapshot = await _firestore
-        .collection('topicMastery')
-        .where('studentId', isEqualTo: studentId)
-        .get(const GetOptions(source: Source.server));
-    final aiSnapshot = await _firestore
-        .collection('aiModelRuns')
-        .where('studentId', isEqualTo: studentId)
-        .get(const GetOptions(source: Source.server));
-
-    final topicTitles = {for (final topic in topics) topic.id: topic.title};
-    final topicYearLevels = {
-      for (final topic in topics) topic.id: topic.yearLevel,
-    };
-
-    final attempts =
-        attemptsSnapshot.docs
-            .map(
-              (doc) => _attemptFromData(
-                doc.id,
-                doc.data(),
-                topicTitles,
-                topicYearLevels,
-              ),
-            )
-            .whereType<QuizAttempt>()
-            .where((attempt) => attempt.yearLevel == normalizedYearLevel)
-            .toList()
-          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    final aiDiagnoses =
-        aiSnapshot.docs
-            .map((doc) => AiDiagnosis.fromFirestore(doc.id, doc.data()))
-            .whereType<AiDiagnosis>()
-            .where(
-              (diagnosis) =>
-                  diagnosis.yearLevel == null ||
-                  diagnosis.yearLevel == normalizedYearLevel,
-            )
-            .toList()
-          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    final masteryRecordCount = masterySnapshot.docs.where((doc) {
-      final data = doc.data();
-      final recordYearLevel =
-          _intValue(data['yearLevel']) ??
-          _yearFromTopicId(data['topicId'] as String?);
-      return recordYearLevel == null || recordYearLevel == normalizedYearLevel;
-    }).length;
+    // Parents are intentionally unable to read raw quiz attempts and raw AI
+    // runs. Compose the dashboard entirely from the bounded U8 projections.
+    final results = await Future.wait([
+      _firestore
+          .collection('studentAiStatuses')
+          .where('studentId', isEqualTo: studentId)
+          .get(const GetOptions(source: Source.server)),
+      _firestore
+          .collection('subtopicMastery')
+          .where('studentId', isEqualTo: studentId)
+          .where('yearLevel', isEqualTo: normalizedYearLevel)
+          .get(const GetOptions(source: Source.server)),
+      _firestore
+          .collection('adaptiveAssignments')
+          .where('studentId', isEqualTo: studentId)
+          .get(const GetOptions(source: Source.server)),
+    ]);
+    final statusSnapshot = results[0];
+    final masterySnapshot = results[1];
+    final assignmentSnapshot = results[2];
+    final masteryByAttempt = <String, Map<String, dynamic>>{};
+    for (final document in masterySnapshot.docs) {
+      final data = document.data();
+      final attemptId = data['lastSourceAttemptId'];
+      if (attemptId is String && attemptId.isNotEmpty) {
+        masteryByAttempt[attemptId] = data;
+      }
+    }
+    final assignmentsByAttempt = <String, AdaptiveAssignment>{};
+    for (final document in assignmentSnapshot.docs) {
+      final data = document.data();
+      final attemptId = data['sourceAttemptId'];
+      if (attemptId is! String || attemptId.isEmpty) continue;
+      try {
+        assignmentsByAttempt[attemptId] =
+            AdaptiveAssignment.fromFirestoreData(document.id, data);
+      } on FormatException {
+        // A malformed projection is ignored rather than turned into advice.
+      }
+    }
+    final aiDiagnoses = statusSnapshot.docs
+        .map(
+          (document) => AiDiagnosis.fromSafeProjection(
+            document.id,
+            document.data(),
+            mastery: masteryByAttempt[document.id],
+            assignment: assignmentsByAttempt[document.id],
+          ),
+        )
+        .whereType<AiDiagnosis>()
+        .where((diagnosis) =>
+            diagnosis.yearLevel == null || diagnosis.yearLevel == normalizedYearLevel)
+        .toList()
+      ..sort((a, b) => b.sourceAttemptSequence.compareTo(a.sourceAttemptSequence));
+    final masteryRecordCount = masterySnapshot.docs.length;
 
     return ParentDashboardSnapshot(
-      attempts: attempts,
+      attempts: const <QuizAttempt>[],
       masteryRecordCount: masteryRecordCount,
       aiDiagnoses: _latestDiagnosisPerTopic(aiDiagnoses),
     );
@@ -320,66 +326,14 @@ class LearningRepository {
   List<AiDiagnosis> _latestDiagnosisPerTopic(List<AiDiagnosis> diagnoses) {
     final latestByTopic = <String, AiDiagnosis>{};
     for (final diagnosis in diagnoses) {
-      final existing = latestByTopic[diagnosis.topicId];
+      final topicId = diagnosis.topicId;
+      if (topicId.isEmpty) continue;
+      final existing = latestByTopic[topicId];
       if (existing == null || diagnosis.isNewerThan(existing)) {
-        latestByTopic[diagnosis.topicId] = diagnosis;
+        latestByTopic[topicId] = diagnosis;
       }
     }
     return latestByTopic.values.toList(growable: false);
-  }
-
-  QuizAttempt? _attemptFromData(
-    String id,
-    Map<String, dynamic> data,
-    Map<String, String> topicTitles,
-    Map<String, int> topicYearLevels,
-  ) {
-    final topicId = data['topicId'];
-    final score = data['score'];
-    final correctCount = data['correctCount'];
-    final totalQuestions = data['totalQuestions'];
-
-    if (topicId is! String ||
-        score is! num ||
-        correctCount is! num ||
-        totalQuestions is! num) {
-      return null;
-    }
-
-    final createdAt = data['createdAt'];
-    final topicTitle = data['topicTitle'];
-    final subtopicId = data['subtopicId'];
-    final subtopicTitle = data['subtopicTitle'];
-    final yearLevel =
-        _intValue(data['yearLevel']) ??
-        topicYearLevels[topicId] ??
-        _yearFromTopicId(topicId) ??
-        4;
-    final mastery = data['masteryLevel'] ?? data['mastery'];
-    final earnedCrystals = data['earnedCrystals'];
-
-    return QuizAttempt(
-      id: id,
-      topicId: topicId,
-      topicTitle: topicTitle is String && topicTitle.isNotEmpty
-          ? topicTitle
-          : topicTitles[topicId] ?? topicId,
-      subtopicId: subtopicId is String && subtopicId.isNotEmpty
-          ? subtopicId
-          : null,
-      subtopicTitle: subtopicTitle is String && subtopicTitle.isNotEmpty
-          ? subtopicTitle
-          : null,
-      yearLevel: yearLevel.clamp(4, 6),
-      score: score.round(),
-      correctCount: correctCount.round(),
-      totalQuestions: totalQuestions.round(),
-      earnedCrystals: earnedCrystals is num ? earnedCrystals.round() : 0,
-      mastery: mastery is String && mastery.isNotEmpty
-          ? mastery
-          : _masteryForScore(score.round()),
-      createdAt: createdAt is Timestamp ? createdAt.toDate() : DateTime.now(),
-    );
   }
 
   static List<QuizAttempt> _latestFirst(List<QuizAttempt> attempts) {
@@ -468,9 +422,4 @@ class LearningRepository {
     return parsed;
   }
 
-  int? _yearFromTopicId(String? topicId) {
-    if (topicId == null) return null;
-    final match = RegExp(r'(?:^|_)y([456])(?:_|$)').firstMatch(topicId);
-    return match == null ? null : int.tryParse(match.group(1)!);
-  }
 }
