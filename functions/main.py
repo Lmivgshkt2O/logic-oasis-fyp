@@ -33,6 +33,11 @@ from parent_link_admin import (
     revoke_parent_link,
     verify_parent_link_admin,
 )
+from parent_link_context import (
+    ParentLinkContextError,
+    list_active_linked_children,
+    verify_authenticated_parent,
+)
 
 from quiz_session import (
     CLIENT_REPORTED_UNVERIFIED,
@@ -510,6 +515,30 @@ def _parent_link_call(
             _ERROR_CODES.get(error.code, https_fn.FunctionsErrorCode.INTERNAL),
             str(error),
         )
+
+
+def _parent_context_call(request: https_fn.CallableRequest) -> dict[str, Any]:
+    try:
+        parent = verify_authenticated_parent(request)
+        return list_active_linked_children(_data(request), parent, firestore_db())
+    except ParentLinkContextError as error:
+        raise https_fn.HttpsError(
+            _ERROR_CODES.get(error.code, https_fn.FunctionsErrorCode.INTERNAL),
+            str(error),
+        )
+    except QuizSessionError as error:
+        raise https_fn.HttpsError(
+            _ERROR_CODES.get(error.code, https_fn.FunctionsErrorCode.INTERNAL),
+            str(error),
+        )
+
+
+@https_fn.on_call(
+    region=FUNCTION_REGION,
+    service_account=PARENT_LINK_ADMIN_SERVICE_ACCOUNT,
+)
+def getLinkedChildren(request: https_fn.CallableRequest) -> dict[str, Any]:
+    return _parent_context_call(request)
 
 
 @https_fn.on_call(

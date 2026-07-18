@@ -26,7 +26,9 @@ service cloud.firestore {
     function isActiveLinkedParent(studentId) {
       return signedIn() &&
         exists(/databases/$(database)/documents/parentLinks/$(request.auth.uid + '_' + studentId)) &&
-        get(/databases/$(database)/documents/parentLinks/$(request.auth.uid + '_' + studentId)).data.status == 'active';
+        get(/databases/$(database)/documents/parentLinks/$(request.auth.uid + '_' + studentId)).data.status == 'active' &&
+        get(/databases/$(database)/documents/parentLinks/$(request.auth.uid + '_' + studentId)).data.parentId == request.auth.uid &&
+        get(/databases/$(database)/documents/parentLinks/$(request.auth.uid + '_' + studentId)).data.studentId == studentId;
     }
 
     function ownsOrActiveLinkedParent(studentId) {
@@ -155,6 +157,10 @@ service cloud.firestore {
     }
 
     match /adminRoleAudits/{auditId} {
+      allow read, write: if false;
+    }
+
+    match /parentLinkAudits/{auditId} {
       allow read, write: if false;
     }
 

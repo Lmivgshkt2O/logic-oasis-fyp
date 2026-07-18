@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:logic_oasis/shared/models/ai_diagnosis.dart';
 import 'package:logic_oasis/shared/models/adaptive_assignment.dart';
+import 'package:logic_oasis/shared/models/forum_participation_summary.dart';
 import 'package:logic_oasis/shared/models/parent_dashboard_snapshot.dart';
 import 'package:logic_oasis/shared/models/quiz_attempt.dart';
 import 'package:logic_oasis/shared/models/topic.dart';
@@ -262,7 +263,7 @@ class LearningRepository {
     final normalizedYearLevel = yearLevel.clamp(4, 6);
     // Parents are intentionally unable to read raw quiz attempts and raw AI
     // runs. Compose the dashboard entirely from the bounded U8 projections.
-    final results = await Future.wait([
+    final results = await Future.wait<Object>([
       _firestore
           .collection('studentAiStatuses')
           .where('studentId', isEqualTo: studentId)
@@ -276,10 +277,16 @@ class LearningRepository {
           .collection('adaptiveAssignments')
           .where('studentId', isEqualTo: studentId)
           .get(const GetOptions(source: Source.server)),
+      _firestore
+          .collection('forumParticipationSummaries')
+          .doc(studentId)
+          .get(const GetOptions(source: Source.server)),
     ]);
-    final statusSnapshot = results[0];
-    final masterySnapshot = results[1];
-    final assignmentSnapshot = results[2];
+    final statusSnapshot = results[0] as QuerySnapshot<Map<String, dynamic>>;
+    final masterySnapshot = results[1] as QuerySnapshot<Map<String, dynamic>>;
+    final assignmentSnapshot =
+        results[2] as QuerySnapshot<Map<String, dynamic>>;
+    final forumSnapshot = results[3] as DocumentSnapshot<Map<String, dynamic>>;
     final masteryByAttempt = <String, Map<String, dynamic>>{};
     for (final document in masterySnapshot.docs) {
       final data = document.data();
@@ -294,32 +301,48 @@ class LearningRepository {
       final attemptId = data['sourceAttemptId'];
       if (attemptId is! String || attemptId.isEmpty) continue;
       try {
-        assignmentsByAttempt[attemptId] =
-            AdaptiveAssignment.fromFirestoreData(document.id, data);
+        assignmentsByAttempt[attemptId] = AdaptiveAssignment.fromFirestoreData(
+          document.id,
+          data,
+        );
       } on FormatException {
         // A malformed projection is ignored rather than turned into advice.
       }
     }
-    final aiDiagnoses = statusSnapshot.docs
-        .map(
-          (document) => AiDiagnosis.fromSafeProjection(
-            document.id,
-            document.data(),
-            mastery: masteryByAttempt[document.id],
-            assignment: assignmentsByAttempt[document.id],
-          ),
-        )
-        .whereType<AiDiagnosis>()
-        .where((diagnosis) =>
-            diagnosis.yearLevel == null || diagnosis.yearLevel == normalizedYearLevel)
-        .toList()
-      ..sort((a, b) => b.sourceAttemptSequence.compareTo(a.sourceAttemptSequence));
+    final aiDiagnoses =
+        statusSnapshot.docs
+            .map(
+              (document) => AiDiagnosis.fromSafeProjection(
+                document.id,
+                document.data(),
+                mastery: masteryByAttempt[document.id],
+                assignment: assignmentsByAttempt[document.id],
+              ),
+            )
+            .whereType<AiDiagnosis>()
+            .where(
+              (diagnosis) =>
+                  diagnosis.yearLevel == null ||
+                  diagnosis.yearLevel == normalizedYearLevel,
+            )
+            .toList()
+          ..sort(
+            (a, b) =>
+                b.sourceAttemptSequence.compareTo(a.sourceAttemptSequence),
+          );
     final masteryRecordCount = masterySnapshot.docs.length;
 
     return ParentDashboardSnapshot(
       attempts: const <QuizAttempt>[],
       masteryRecordCount: masteryRecordCount,
       aiDiagnoses: _latestDiagnosisPerTopic(aiDiagnoses),
+      forumParticipationSummary:
+          forumSnapshot.exists && forumSnapshot.data() != null
+          ? ForumParticipationSummary.fromFirestore(
+              studentId,
+              forumSnapshot.data()!,
+            )
+          : null,
     );
   }
 
@@ -421,5 +444,4 @@ class LearningRepository {
     }
     return parsed;
   }
-
 }

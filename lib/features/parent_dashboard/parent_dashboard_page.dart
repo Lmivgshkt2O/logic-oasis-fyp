@@ -1,68 +1,211 @@
 import 'package:flutter/material.dart';
 import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/l10n/app_localizations.dart';
+import 'package:logic_oasis/shared/models/ai_diagnosis.dart';
+import 'package:logic_oasis/shared/models/linked_child_context.dart';
+import 'package:logic_oasis/shared/models/parent_dashboard_snapshot.dart';
+import 'package:logic_oasis/shared/repositories/learning_repository.dart';
+import 'package:logic_oasis/shared/services/parent_link_context_service.dart';
 import 'package:logic_oasis/shared/state/app_state.dart';
-import 'package:logic_oasis/shared/widgets/attempt_row.dart';
 import 'package:logic_oasis/shared/widgets/logic_oasis_figma_components.dart';
 import 'package:logic_oasis/shared/widgets/metric_card.dart';
 import 'package:logic_oasis/shared/widgets/recommendation_box.dart';
 import 'package:logic_oasis/shared/widgets/section_card.dart';
 
+typedef ParentDashboardLoader =
+    Future<ParentDashboardSnapshot> Function(LinkedChildContext child);
+
 class ParentDashboardPage extends StatefulWidget {
-  const ParentDashboardPage({super.key, required this.state});
+  const ParentDashboardPage({
+    super.key,
+    required this.state,
+    this.linkedChildrenGateway,
+    this.dashboardLoader,
+  });
 
   final AppState state;
+  final ParentLinkedChildrenGateway? linkedChildrenGateway;
+  final ParentDashboardLoader? dashboardLoader;
 
   @override
   State<ParentDashboardPage> createState() => _ParentDashboardPageState();
 }
 
 class _ParentDashboardPageState extends State<ParentDashboardPage> {
+  late final ParentLinkedChildrenGateway _linkedChildrenGateway;
+  List<LinkedChildContext> _children = const [];
+  LinkedChildContext? _selectedChild;
+  ParentDashboardSnapshot? _snapshot;
+  bool _isLoading = true;
+  String? _message;
+
   @override
   void initState() {
     super.initState();
-    widget.state.loadParentDashboardFromFirebase();
+    _linkedChildrenGateway =
+        widget.linkedChildrenGateway ?? ParentLinkedChildrenService();
+    _loadLinkedChildren();
+  }
+
+  Future<void> _loadLinkedChildren() async {
+    setState(() {
+      _isLoading = true;
+      _message = null;
+    });
+    try {
+      final children = await _linkedChildrenGateway.loadLinkedChildren();
+      if (!mounted) return;
+      setState(() {
+        _children = children;
+        _selectedChild = children.isEmpty ? null : children.first;
+      });
+      if (_selectedChild != null) {
+        await _loadSelectedChild();
+      } else if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _message = 'No active linked learner is available for this account.';
+        });
+      }
+    } on ParentLinkContextException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _message = error.message;
+      });
+    }
+  }
+
+  Future<void> _loadSelectedChild() async {
+    final child = _selectedChild;
+    if (child == null) return;
+    setState(() {
+      _isLoading = true;
+      _message = null;
+    });
+    try {
+      final loader =
+          widget.dashboardLoader ??
+          (LinkedChildContext selectedChild) =>
+              LearningRepository().fetchParentDashboardSnapshot(
+                studentId: selectedChild.studentId,
+                yearLevel: selectedChild.yearLevel,
+                topics: widget.state.topics,
+              );
+      final snapshot = await loader(child);
+      if (!mounted || child.studentId != _selectedChild?.studentId) return;
+      setState(() {
+        _snapshot = snapshot;
+        _isLoading = false;
+        _message = null;
+      });
+    } catch (_) {
+      if (!mounted || child.studentId != _selectedChild?.studentId) return;
+      setState(() {
+        _isLoading = false;
+        _message = 'Safe learner updates are temporarily unavailable.';
+      });
+    }
+  }
+
+  void _selectChild(LinkedChildContext? child) {
+    if (child == null || child.studentId == _selectedChild?.studentId) return;
+    setState(() {
+      _selectedChild = child;
+      _snapshot = null;
+    });
+    _loadSelectedChild();
   }
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: widget.state,
-      builder: (context, _) => _ParentDashboardContent(state: widget.state),
+      builder: (context, _) => _ParentDashboardContent(
+        state: widget.state,
+        children: _children,
+        selectedChild: _selectedChild,
+        snapshot: _snapshot,
+        isLoading: _isLoading,
+        message: _message,
+        onChildSelected: _selectChild,
+      ),
     );
   }
 }
 
 class _ParentDashboardContent extends StatelessWidget {
-  const _ParentDashboardContent({required this.state});
+  const _ParentDashboardContent({
+    required this.state,
+    required this.children,
+    required this.selectedChild,
+    required this.snapshot,
+    required this.isLoading,
+    required this.message,
+    required this.onChildSelected,
+  });
 
   final AppState state;
+  final List<LinkedChildContext> children;
+  final LinkedChildContext? selectedChild;
+  final ParentDashboardSnapshot? snapshot;
+  final bool isLoading;
+  final String? message;
+  final ValueChanged<LinkedChildContext?> onChildSelected;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
-    final latestAttempt = state.latestAttempt;
-    final insight = state.weakTopicInsight;
-    final aiDiagnosis = state.recommendedAiDiagnosis;
-    final story = _ParentLearningStory.fromState(state);
+    final diagnoses = snapshot?.aiDiagnoses ?? const <AiDiagnosis>[];
+    final aiDiagnosis = diagnoses.isEmpty ? null : diagnoses.first;
+    final story = _ParentLearningStory.fromSafeProjection(
+      state,
+      child: selectedChild,
+      diagnosis: aiDiagnosis,
+    );
 
     return LogicOasisScaffold(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
       children: [
-        Text(
-          l10n.parentDashboard,
-          style: theme.textTheme.headlineLarge,
-        ),
+        Text(l10n.parentDashboard, style: theme.textTheme.headlineLarge),
         const SizedBox(height: 8),
         Text(
-          l10n.parentDashboardSummary(state.studentName),
+          selectedChild == null
+              ? state.t(
+                  'Sign in with a linked parent account to view safe learner updates.',
+                  'Log masuk dengan akaun ibu bapa yang dipautkan untuk melihat kemas kini pembelajaran selamat.',
+                )
+              : state.t(
+                  'Safe learning updates for ${selectedChild!.displayName}.',
+                  'Kemas kini pembelajaran selamat untuk ${selectedChild!.displayName}.',
+                ),
           style: theme.textTheme.bodyLarge,
         ),
-        if (state.isLoadingParentDashboard ||
-            state.parentDashboardMessage != null) ...[
+        if (children.length > 1) ...[
           const SizedBox(height: 14),
-          _ParentDashboardStatusBanner(state: state),
+          DropdownButtonFormField<LinkedChildContext>(
+            value: selectedChild,
+            decoration: const InputDecoration(labelText: 'Linked learner'),
+            items: children
+                .map(
+                  (child) => DropdownMenuItem(
+                    value: child,
+                    child: Text(
+                      '${child.displayName} (Year ${child.yearLevel})',
+                    ),
+                  ),
+                )
+                .toList(growable: false),
+            onChanged: onChildSelected,
+          ),
+        ],
+        if (isLoading || message != null) ...[
+          const SizedBox(height: 14),
+          _ParentDashboardSafeStatusBanner(
+            isLoading: isLoading,
+            message: message,
+          ),
         ],
         const SizedBox(height: 18),
         _ParentInsightSummary(
@@ -72,23 +215,18 @@ class _ParentDashboardContent extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         SectionCard(
-          title: l10n.overallRestoration,
-          icon: Icons.eco_outlined,
+          title: state.t(
+            'Safe learning boundary',
+            'Sempadan pembelajaran selamat',
+          ),
+          icon: Icons.verified_user_outlined,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              LinearProgressIndicator(value: state.restorationProgress),
-              const SizedBox(height: 10),
-              Text(
-                l10n.oasisRestoredSummary(
-                  (state.restorationProgress * 100).round(),
-                ),
-              ),
-              const SizedBox(height: 8),
               Text(
                 state.t(
-                  'Use this as a motivation signal: higher restoration means more consistent quiz effort and repair progress.',
-                  'Gunakan ini sebagai isyarat motivasi: pemulihan lebih tinggi bermaksud usaha kuiz dan pembaikan lebih konsisten.',
+                  'This dashboard uses only protected status, mastery, assignment, and count-only participation projections.',
+                  'Papan pemuka ini menggunakan hanya unjuran status, penguasaan, tugasan dan penyertaan kiraan sahaja yang dilindungi.',
                 ),
                 style: theme.textTheme.bodyMedium,
               ),
@@ -101,8 +239,8 @@ class _ParentDashboardContent extends StatelessWidget {
             Expanded(
               child: MetricCard(
                 icon: Icons.trending_up,
-                label: l10n.averageScore,
-                value: '${state.averageScore}%',
+                label: state.t('Safe updates', 'Kemas kini selamat'),
+                value: '${diagnoses.length}',
                 color: LogicOasisTheme.leaf,
               ),
             ),
@@ -110,8 +248,8 @@ class _ParentDashboardContent extends StatelessWidget {
             Expanded(
               child: MetricCard(
                 icon: Icons.history,
-                label: l10n.latestQuiz,
-                value: latestAttempt == null ? '-' : '${latestAttempt.score}%',
+                label: state.t('Mastery records', 'Rekod penguasaan'),
+                value: '${snapshot?.masteryRecordCount ?? 0}',
                 color: LogicOasisTheme.clay,
               ),
             ),
@@ -119,44 +257,20 @@ class _ParentDashboardContent extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         SectionCard(
-          title: l10n.recentActivity,
+          title: state.t('Latest safe analysis', 'Analisis selamat terkini'),
           icon: Icons.history_outlined,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (state.recentAttempts.isEmpty)
+              if (aiDiagnosis == null)
                 Text(
                   state.t(
-                    'No quiz activity yet. Ask ${state.studentName} to complete one Formula Forge mission so the dashboard can form a clearer learning picture.',
-                    'Belum ada aktiviti kuiz. Minta ${state.studentName} menyiapkan satu misi Formula Forge supaya papan pemuka dapat membentuk gambaran pembelajaran yang lebih jelas.',
+                    'No safe analysis is available yet. It will appear after a linked learner completes a server-validated quiz.',
+                    'Belum ada analisis selamat. Ia akan dipaparkan selepas pelajar yang dipautkan melengkapkan kuiz yang disahkan pelayan.',
                   ),
                 )
-              else
-                for (final attempt in state.recentAttempts.take(3)) ...[
-                  AttemptRow(
-                    attempt: attempt,
-                    isBahasaMelayu: state.isBahasaMelayu,
-                  ),
-                  if (attempt != state.recentAttempts.take(3).last)
-                    const Divider(height: 24),
-                ],
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        SectionCard(
-          title: l10n.predictionSummary,
-          icon: Icons.lightbulb_outline,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                l10n.weakTopic(insight.topicTitle),
-                style: theme.textTheme.titleMedium,
-              ),
-              const SizedBox(height: 8),
-              Text(insight.reason),
-              if (aiDiagnosis != null) ...[
+              else ...[
+                Text(aiDiagnosis.childFacingStatus),
                 const SizedBox(height: 12),
                 _AiDiagnosisDetails(
                   masteryProbability: aiDiagnosis.bktMasteryProbability,
@@ -168,9 +282,33 @@ class _ParentDashboardContent extends StatelessWidget {
                   isBahasaMelayu: state.isBahasaMelayu,
                 ),
               ],
-              const SizedBox(height: 12),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        SectionCard(
+          title: l10n.predictionSummary,
+          icon: Icons.lightbulb_outline,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                aiDiagnosis == null
+                    ? state.t(
+                        'Advice is updating',
+                        'Nasihat sedang dikemas kini',
+                      )
+                    : aiDiagnosis.finalMasteryLabel,
+                style: theme.textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
               RecommendationBox(
-                text: l10n.suggestedAction(insight.recommendation),
+                text:
+                    aiDiagnosis?.recommendedAction ??
+                    state.t(
+                      'Complete one short server-validated practice to prepare safe advice.',
+                      'Lengkapkan satu latihan ringkas yang disahkan pelayan untuk menyediakan nasihat selamat.',
+                    ),
               ),
             ],
           ),
@@ -202,6 +340,19 @@ class _ParentDashboardContent extends StatelessWidget {
             ],
           ),
         ),
+        if (snapshot?.forumParticipationSummary != null) ...[
+          const SizedBox(height: 16),
+          SectionCard(
+            title: state.t('Participation summary', 'Ringkasan penyertaan'),
+            icon: Icons.forum_outlined,
+            child: Text(
+              state.t(
+                '${snapshot!.forumParticipationSummary!.questionsPostedCount} questions, ${snapshot!.forumParticipationSummary!.answersSubmittedCount} answers, and ${snapshot!.forumParticipationSummary!.helpfulReceivedCount} helpful marks.',
+                '${snapshot!.forumParticipationSummary!.questionsPostedCount} soalan, ${snapshot!.forumParticipationSummary!.answersSubmittedCount} jawapan dan ${snapshot!.forumParticipationSummary!.helpfulReceivedCount} tanda membantu.',
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -230,200 +381,77 @@ class _ParentLearningStory {
   final Color statusColor;
   final IconData statusIcon;
 
-  factory _ParentLearningStory.fromState(AppState state) {
-    final insight = state.weakTopicInsight;
-    final aiDiagnosis = state.recommendedAiDiagnosis;
-    final average = state.averageScore;
-    final trend = _trendText(state);
-    final hasAttempts = state.currentYearAttempts.isNotEmpty;
-
-    if (aiDiagnosis != null) {
-      final weaknessPercent = (aiDiagnosis.weaknessProbability * 100).round();
-      final masteryPercent = (aiDiagnosis.bktMasteryProbability * 100).round();
-
+  factory _ParentLearningStory.fromSafeProjection(
+    AppState state, {
+    required LinkedChildContext? child,
+    required AiDiagnosis? diagnosis,
+  }) {
+    final learnerName =
+        child?.displayName ??
+        state.t('your linked learner', 'pelajar yang dipautkan');
+    if (diagnosis == null) {
       return _ParentLearningStory(
-        status: state.t('Practice focus ready', 'Fokus latihan sedia'),
+        status: state.t(
+          'Waiting for safe updates',
+          'Menunggu kemas kini selamat',
+        ),
         statusDetail: state.t(
-          'The latest server analysis suggests supportive practice for ${insight.topicTitle}. It is based on $masteryPercent% current mastery and $weaknessPercent% priority.',
-          'Analisis pelayan terkini mencadangkan latihan sokongan untuk ${insight.topicTitle}. Ia berdasarkan $masteryPercent% penguasaan semasa dan keutamaan $weaknessPercent%.',
+          'Complete one server-validated quiz for $learnerName to prepare a protected learning update.',
+          'Lengkapkan satu kuiz yang disahkan pelayan untuk $learnerName bagi menyediakan kemas kini pembelajaran terlindung.',
         ),
         priority: state.t(
-          'Main focus: ${insight.topicTitle}.',
-          'Fokus utama: ${insight.topicTitle}.',
+          'First focus: one short practice.',
+          'Fokus pertama: satu latihan ringkas.',
         ),
         parentMeaning: state.t(
-          'This advice comes from the latest protected learning projection. Low evidence is shown as preliminary, not as a confirmed weakness.',
-          'Nasihat ini datang daripada unjuran pembelajaran terlindung terkini. Bukti rendah ditunjukkan sebagai awal, bukan kelemahan yang disahkan.',
+          'No local or seeded quiz history is used in this parent view.',
+          'Tiada sejarah kuiz setempat atau benih digunakan dalam paparan ibu bapa ini.',
         ),
-        tonightAction: aiDiagnosis.recommendedAction,
+        tonightAction: state.t(
+          'Encourage one short practice without pressure.',
+          'Galakkan satu latihan ringkas tanpa tekanan.',
+        ),
         conversationPrompt: state.t(
-          'Which part of ${insight.topicTitle} should we practise slowly together?',
-          'Bahagian mana dalam ${insight.topicTitle} patut kita latih perlahan-lahan bersama?',
+          'Which part would feel good to practise together?',
+          'Bahagian mana yang sesuai untuk dilatih bersama?',
         ),
         weekGoal: state.t(
-          'Complete 2 focused attempts and compare the next AI update with this one.',
-          'Lengkapkan 2 cubaan berfokus dan bandingkan kemas kini AI seterusnya dengan yang ini.',
+          'Wait for the first safe update before drawing conclusions.',
+          'Tunggu kemas kini selamat pertama sebelum membuat kesimpulan.',
         ),
         statusColor: LogicOasisTheme.water,
-        statusIcon: Icons.psychology_alt_outlined,
+        statusIcon: Icons.hourglass_top_outlined,
       );
     }
-
-    if (!hasAttempts) {
-      return _ParentLearningStory(
-        status: state.t('Getting started', 'Mula membina rentak'),
-        statusDetail: state.t(
-          'The dashboard needs at least one completed quiz before it can identify a reliable pattern.',
-          'Papan pemuka memerlukan sekurang-kurangnya satu kuiz lengkap sebelum corak pembelajaran yang boleh dipercayai dapat dikenal pasti.',
-        ),
-        priority: state.t(
-          'First mission: complete one Year ${state.yearLevel} quiz.',
-          'Misi pertama: lengkapkan satu kuiz Tahun ${state.yearLevel}.',
-        ),
-        parentMeaning: state.t(
-          'At this stage, focus on helping ${state.studentName} begin without pressure.',
-          'Pada tahap ini, bantu ${state.studentName} bermula tanpa tekanan.',
-        ),
-        tonightAction: state.t(
-          'Sit nearby for 10 minutes and let ${state.studentName} try one short mission.',
-          'Duduk berdekatan selama 10 minit dan biarkan ${state.studentName} mencuba satu misi pendek.',
-        ),
-        conversationPrompt: state.t(
-          'Which question felt easiest, and which one should we look at together?',
-          'Soalan mana yang paling mudah, dan soalan mana yang patut kita lihat bersama?',
-        ),
-        weekGoal: state.t(
-          'Complete 2 short quiz attempts so the weak-topic insight becomes clearer.',
-          'Lengkapkan 2 cubaan kuiz pendek supaya insight topik lemah menjadi lebih jelas.',
-        ),
-        statusColor: LogicOasisTheme.water,
-        statusIcon: Icons.explore_outlined,
-      );
-    }
-
-    if (average >= 80) {
-      return _ParentLearningStory(
-        status: state.t('On track', 'Berada di landasan baik'),
-        statusDetail: state.t(
-          'Average score is strong at $average%. $trend',
-          'Purata markah kukuh pada $average%. $trend',
-        ),
-        priority: state.t(
-          'Keep momentum on ${insight.topicTitle}.',
-          'Kekalkan momentum untuk ${insight.topicTitle}.',
-        ),
-        parentMeaning: state.t(
-          '${state.studentName} is showing good control. The best support now is consistency, not extra pressure.',
-          '${state.studentName} menunjukkan kawalan yang baik. Sokongan terbaik sekarang ialah konsistensi, bukan tekanan tambahan.',
-        ),
-        tonightAction: state.t(
-          'Let ${state.studentName} explain one solved question in their own words.',
-          'Minta ${state.studentName} menerangkan satu soalan yang telah diselesaikan dengan ayat sendiri.',
-        ),
-        conversationPrompt: state.t(
-          'What method helped you most today?',
-          'Kaedah mana yang paling membantu hari ini?',
-        ),
-        weekGoal: state.t(
-          'Complete one revision attempt and maintain 80% or above.',
-          'Lengkapkan satu cubaan ulang kaji dan kekalkan 80% atau lebih.',
-        ),
-        statusColor: LogicOasisTheme.leaf,
-        statusIcon: Icons.check_circle_outline,
-      );
-    }
-
-    if (average >= 50) {
-      return _ParentLearningStory(
-        status: state.t('Needs steady practice', 'Perlu latihan konsisten'),
-        statusDetail: state.t(
-          'Average score is $average%. $trend',
-          'Purata markah ialah $average%. $trend',
-        ),
-        priority: state.t(
-          'Main focus: ${insight.topicTitle}.',
-          'Fokus utama: ${insight.topicTitle}.',
-        ),
-        parentMeaning: state.t(
-          '${state.studentName} understands some parts but may still be inconsistent. Short review works better than long drilling.',
-          '${state.studentName} memahami sebahagian konsep tetapi mungkin belum konsisten. Ulang kaji pendek lebih sesuai daripada latihan terlalu panjang.',
-        ),
-        tonightAction: state.t(
-          'Review 2 wrong answers together, then stop while the session still feels manageable.',
-          'Semak 2 jawapan salah bersama-sama, kemudian berhenti sementara sesi masih terasa terkawal.',
-        ),
-        conversationPrompt: state.t(
-          'Where did the question become confusing?',
-          'Di bahagian mana soalan mula mengelirukan?',
-        ),
-        weekGoal: state.t(
-          'Do 2 focused attempts on ${insight.topicTitle} and aim for a small score increase.',
-          'Buat 2 cubaan berfokus pada ${insight.topicTitle} dan sasarkan peningkatan markah kecil.',
-        ),
-        statusColor: LogicOasisTheme.clay,
-        statusIcon: Icons.trending_up,
-      );
-    }
-
+    final masteryPercent = (diagnosis.bktMasteryProbability * 100).round();
     return _ParentLearningStory(
-      status: state.t('Needs guided support', 'Perlu bimbingan rapat'),
+      status: state.t('Practice focus ready', 'Fokus latihan sedia'),
       statusDetail: state.t(
-        'Average score is $average%. $trend',
-        'Purata markah ialah $average%. $trend',
+        'The latest protected update for $learnerName shows $masteryPercent% current mastery.',
+        'Kemas kini terlindung terkini untuk $learnerName menunjukkan $masteryPercent% penguasaan semasa.',
       ),
       priority: state.t(
-        'Start with ${insight.topicTitle}; it is currently the clearest learning gap.',
-        'Mulakan dengan ${insight.topicTitle}; ini jurang pembelajaran paling jelas buat masa ini.',
+        'Follow the assigned next practice.',
+        'Ikut latihan seterusnya yang ditugaskan.',
       ),
       parentMeaning: state.t(
-        '${state.studentName} may need the concept broken into smaller steps. Avoid treating the score as failure.',
-        '${state.studentName} mungkin perlu konsep dipecahkan kepada langkah lebih kecil. Elakkan melihat markah sebagai kegagalan.',
+        'This advice comes only from a compatible server projection. Low evidence remains preliminary.',
+        'Nasihat ini datang hanya daripada unjuran pelayan yang serasi. Bukti rendah kekal sebagai awal.',
       ),
-      tonightAction: state.t(
-        'Choose one easy example first, solve it together, then let ${state.studentName} try one similar question.',
-        'Pilih satu contoh mudah dahulu, selesaikan bersama, kemudian biarkan ${state.studentName} cuba satu soalan yang serupa.',
-      ),
+      tonightAction: diagnosis.recommendedAction,
       conversationPrompt: state.t(
-        'What part should we practise slowly together?',
-        'Bahagian mana yang patut kita latih perlahan-lahan bersama?',
+        'Which step should we practise slowly together?',
+        'Langkah mana yang patut kita latih perlahan-lahan bersama?',
       ),
       weekGoal: state.t(
-        'Build confidence with 3 short practices, even if the first scores are low.',
-        'Bina keyakinan dengan 3 latihan pendek, walaupun markah awal masih rendah.',
+        'Complete two focused practices and compare the next safe update.',
+        'Lengkapkan dua latihan berfokus dan bandingkan kemas kini selamat seterusnya.',
       ),
-      statusColor: const Color(0xFFC45B45),
-      statusIcon: Icons.support_outlined,
+      statusColor: LogicOasisTheme.water,
+      statusIcon: Icons.psychology_alt_outlined,
     );
   }
 
-  static String _trendText(AppState state) {
-    final attempts = state.recentAttempts;
-    if (attempts.length < 2) {
-      return state.t(
-        'More attempts are needed to confirm the trend.',
-        'Lebih banyak cubaan diperlukan untuk mengesahkan trend.',
-      );
-    }
-
-    final latest = attempts[0].score;
-    final previous = attempts[1].score;
-    if (latest >= previous + 5) {
-      return state.t(
-        'Recent performance is improving.',
-        'Prestasi terkini sedang meningkat.',
-      );
-    }
-    if (latest <= previous - 5) {
-      return state.t(
-        'Recent performance has dropped, so gentle review is useful.',
-        'Prestasi terkini menurun, jadi ulang kaji secara lembut adalah berguna.',
-      );
-    }
-    return state.t(
-      'Recent performance is stable.',
-      'Prestasi terkini stabil.',
-    );
-  }
 }
 
 class _ParentInsightSummary extends StatelessWidget {
@@ -593,7 +621,9 @@ class _AiDiagnosisDetails extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            isBahasaMelayu ? 'Kemas kini pembelajaran selamat' : 'Safe learning update',
+            isBahasaMelayu
+                ? 'Kemas kini pembelajaran selamat'
+                : 'Safe learning update',
             style: theme.textTheme.titleMedium,
           ),
           const SizedBox(height: 8),
@@ -662,7 +692,11 @@ class _AiDiagnosisDetails extends StatelessWidget {
 String formatAiUpdatedAt(DateTime value) {
   final malaysiaTime = _malaysiaTime(value);
   final hour = malaysiaTime.hour;
-  final displayHour = hour == 0 ? 12 : hour > 12 ? hour - 12 : hour;
+  final displayHour = hour == 0
+      ? 12
+      : hour > 12
+      ? hour - 12
+      : hour;
   final minute = malaysiaTime.minute.toString().padLeft(2, '0');
   final period = hour >= 12 ? 'PM' : 'AM';
   return '${malaysiaTime.day}/${malaysiaTime.month}/${malaysiaTime.year} '
@@ -676,50 +710,32 @@ DateTime _malaysiaTime(DateTime value) {
   return value.toUtc().add(const Duration(hours: 8));
 }
 
-class _ParentDashboardStatusBanner extends StatelessWidget {
-  const _ParentDashboardStatusBanner({required this.state});
+class _ParentDashboardSafeStatusBanner extends StatelessWidget {
+  const _ParentDashboardSafeStatusBanner({
+    required this.isLoading,
+    required this.message,
+  });
 
-  final AppState state;
+  final bool isLoading;
+  final String? message;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final l10n = AppLocalizations.of(context)!;
-    final isSuccess = state.loadedParentDashboardFromFirebase;
-    final message = state.isLoadingParentDashboard
-        ? l10n.loadingParentDashboard
-        : state.parentDashboardMessage ?? '';
-
+    final text = isLoading ? 'Loading linked learner updates…' : message ?? '';
     return SoftCard(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      color: isSuccess ? LogicOasisTheme.mint : LogicOasisTheme.sand,
+      color: isLoading ? LogicOasisTheme.mint : LogicOasisTheme.sand,
       child: Row(
         children: [
           SizedBox(
             width: 20,
             height: 20,
-            child: state.isLoadingParentDashboard
+            child: isLoading
                 ? const CircularProgressIndicator(strokeWidth: 2.4)
-                : Icon(
-                    isSuccess
-                        ? Icons.cloud_done_outlined
-                        : Icons.cloud_off_outlined,
-                    size: 20,
-                    color: isSuccess
-                        ? const Color(0xFF4F8F72)
-                        : const Color(0xFF9A6514),
-                  ),
+                : const Icon(Icons.cloud_off_outlined, size: 20),
           ),
           const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              message,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: const Color(0xFF33433D),
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
+          Expanded(child: Text(text)),
         ],
       ),
     );

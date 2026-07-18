@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:logic_oasis/app/logic_oasis_design.dart';
+import 'package:logic_oasis/features/parent_dashboard/parent_dashboard_page.dart';
 import 'package:logic_oasis/l10n/app_localizations.dart';
 import 'package:logic_oasis/shared/repositories/auth_repository.dart';
 import 'package:logic_oasis/shared/state/app_state.dart';
@@ -234,7 +235,9 @@ class SettingsPage extends StatelessWidget {
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text(AppLocalizations.of(settingsContext)!.studentProfileUpdated),
+          content: Text(
+            AppLocalizations.of(settingsContext)!.studentProfileUpdated,
+          ),
         ),
       );
   }
@@ -295,7 +298,9 @@ class SettingsPage extends StatelessWidget {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context)!.languageSet(selected))),
+        SnackBar(
+          content: Text(AppLocalizations.of(context)!.languageSet(selected)),
+        ),
       );
   }
 
@@ -387,7 +392,10 @@ class SettingsPage extends StatelessWidget {
                 const SizedBox(height: 12),
                 _SafetyTile(
                   icon: 'lock_outline',
-                  title: state.t('Protected parent access', 'Akses ibu bapa dilindungi'),
+                  title: state.t(
+                    'Protected parent access',
+                    'Akses ibu bapa dilindungi',
+                  ),
                   body: state.t(
                     'Parent dashboard opens through a linked parent account and password gate.',
                     'Papan pemuka ibu bapa dibuka melalui akaun ibu bapa terpaut dan laluan kata laluan.',
@@ -411,7 +419,10 @@ class SettingsPage extends StatelessWidget {
                 ),
                 _SafetyTile(
                   icon: 'shield',
-                  title: state.t('Child-safe scope', 'Skop selamat kanak-kanak'),
+                  title: state.t(
+                    'Child-safe scope',
+                    'Skop selamat kanak-kanak',
+                  ),
                   body: state.t(
                     'The app avoids open chat and keeps student-facing navigation limited to Home, Forge, and Settings.',
                     'Aplikasi mengelakkan sembang terbuka dan mengehadkan navigasi murid kepada Home, Forge dan Settings.',
@@ -430,7 +441,9 @@ class SettingsPage extends StatelessWidget {
                     color: Colors.white,
                     size: 20,
                   ),
-                  label: Text(state.t('Open parent access', 'Buka akses ibu bapa')),
+                  label: Text(
+                    state.t('Open parent access', 'Buka akses ibu bapa'),
+                  ),
                 ),
               ],
             ),
@@ -441,22 +454,8 @@ class SettingsPage extends StatelessWidget {
   }
 
   Future<void> _openParentAccess(BuildContext context) async {
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Parent access is protected'),
-        content: const Text(
-          'A supervisor-approved administrator must link a parent Firebase account to this student. '
-          'Students cannot create, choose, or reactivate parent links in the app. '
-          'The parent then signs in with their own Firebase account to view safe learning updates.',
-        ),
-        actions: [
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => ParentDashboardPage(state: state)),
     );
   }
 
@@ -810,7 +809,11 @@ class _SettingsSection extends StatelessWidget {
       children: [
         Row(
           children: [
-            const Icon(Icons.eco_rounded, color: LogicOasisDesign.leaf, size: 15),
+            const Icon(
+              Icons.eco_rounded,
+              color: LogicOasisDesign.leaf,
+              size: 15,
+            ),
             const SizedBox(width: 5),
             Text(
               title,
@@ -959,7 +962,10 @@ class _StudentProfileSheetState extends State<_StudentProfileSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(l10n.editStudentProfile, style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              l10n.editStudentProfile,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
             const SizedBox(height: 16),
             TextField(
               controller: nameController,

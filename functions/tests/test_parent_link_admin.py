@@ -130,14 +130,24 @@ class ParentLinkAdminTests(unittest.TestCase):
         get_user = lambda _: SimpleNamespace(uid="present")
         with patch.object(links.firestore, "transactional", lambda function: function):
             created = links.manage_parent_link(
-                {"parentId": "parent_uid", "studentId": "student_uid"},
+                {
+                    "parentId": "parent_uid",
+                    "studentId": "student_uid",
+                    "supervisorApprovalId": "SUP-LINK-01",
+                    "rationale": "Approved temporary link.",
+                },
                 admin,
                 database,
                 get_user=get_user,
                 now=datetime(2026, 7, 18, tzinfo=timezone.utc),
             )
             revoked = links.revoke_parent_link(
-                {"parentId": "parent_uid", "studentId": "student_uid"},
+                {
+                    "parentId": "parent_uid",
+                    "studentId": "student_uid",
+                    "supervisorApprovalId": "SUP-LINK-02",
+                    "rationale": "Approved temporary unlink.",
+                },
                 admin,
                 database,
                 now=datetime(2026, 7, 19, tzinfo=timezone.utc),
@@ -148,6 +158,33 @@ class ParentLinkAdminTests(unittest.TestCase):
         self.assertEqual(link["status"], "revoked")
         self.assertEqual(link["linkedBy"], "admin_uid")
         self.assertEqual(link["revokedBy"], "admin_uid")
+        self.assertEqual(link["supervisorApprovalRef"], "SUP-LINK-01")
+        self.assertEqual(len(database.collection("parentLinkAudits").refs), 2)
+
+    def test_manage_rejects_an_ambiguous_existing_link_identity(self) -> None:
+        database = _Db()
+        admin = links.VerifiedAdmin(uid="admin_uid", claims={links.PARENT_LINK_ADMIN_CLAIM: True})
+        get_user = lambda _: SimpleNamespace(uid="present")
+        payload = {
+            "parentId": "a_b",
+            "studentId": "c",
+            "supervisorApprovalId": "SUP-LINK-03",
+            "rationale": "Approved collision test link.",
+        }
+        with patch.object(links.firestore, "transactional", lambda function: function):
+            links.manage_parent_link(payload, admin, database, get_user=get_user)
+            with self.assertRaisesRegex(links.ParentLinkAdminError, "identity is invalid"):
+                links.manage_parent_link(
+                    {
+                        "parentId": "a",
+                        "studentId": "b_c",
+                        "supervisorApprovalId": "SUP-LINK-04",
+                        "rationale": "Must not reuse an ambiguous link ID.",
+                    },
+                    admin,
+                    database,
+                    get_user=get_user,
+                )
 
 
 if __name__ == "__main__":

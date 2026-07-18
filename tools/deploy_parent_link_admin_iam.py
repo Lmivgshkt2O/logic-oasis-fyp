@@ -16,13 +16,21 @@ PARENT_LINK_ADMIN_SERVICE_ACCOUNT = (
 IDENTITY_ADMIN_SERVICE_ACCOUNT = (
     f"logic-oasis-identity-admin@{PROJECT_ID}.iam.gserviceaccount.com"
 )
-PARENT_LINK_ADMIN_ROLES = ("roles/datastore.user", "roles/logging.logWriter")
+PARENT_LINK_ADMIN_ROLES = (
+    "roles/firebaseauth.viewer",
+    "roles/datastore.user",
+    "roles/logging.logWriter",
+)
 IDENTITY_ADMIN_ROLES = (
     "roles/firebaseauth.admin",
     "roles/datastore.user",
     "roles/logging.logWriter",
 )
-PARENT_LINK_ADMIN_SERVICES = ("manageparentlink", "revokeparentlink")
+PARENT_LINK_ADMIN_SERVICES = (
+    "getlinkedchildren",
+    "manageparentlink",
+    "revokeparentlink",
+)
 
 
 def commands(*, deployer_member: str) -> list[list[str]]:

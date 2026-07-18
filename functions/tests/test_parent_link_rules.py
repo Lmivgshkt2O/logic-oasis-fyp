@@ -16,6 +16,10 @@ from parent_link_admin import PARENT_LINK_ADMIN_SERVICE_ACCOUNT
 class ParentLinkRulesContractTests(unittest.TestCase):
     def test_parent_link_callables_declare_the_narrow_runtime_identity(self) -> None:
         self.assertEqual(
+            main.getLinkedChildren.__firebase_endpoint__.serviceAccountEmail,
+            PARENT_LINK_ADMIN_SERVICE_ACCOUNT,
+        )
+        self.assertEqual(
             main.manageParentLink.__firebase_endpoint__.serviceAccountEmail,
             PARENT_LINK_ADMIN_SERVICE_ACCOUNT,
         )
@@ -29,6 +33,9 @@ class ParentLinkRulesContractTests(unittest.TestCase):
         self.assertIn("function isActiveLinkedParent(studentId)", rules)
         self.assertIn("match /forumParticipationSummaries/{studentId}", rules)
         self.assertIn("match /parentLinks/{linkId}", rules)
+        self.assertIn("match /parentLinkAudits/{auditId}", rules)
+        self.assertIn(".data.parentId == request.auth.uid", rules)
+        self.assertIn(".data.studentId == studentId", rules)
         self.assertIn("allow write: if false;", rules)
         self.assertIn("match /aiModelRuns/{runId}", rules)
 
@@ -45,10 +52,14 @@ class ParentLinkRulesContractTests(unittest.TestCase):
         }
         self.assertEqual(
             parent_runtime_roles,
-            {"roles/datastore.user", "roles/logging.logWriter"},
+            {
+                "roles/firebaseauth.viewer",
+                "roles/datastore.user",
+                "roles/logging.logWriter",
+            },
         )
 
-    def test_u9_iam_manifest_exposes_only_the_two_callable_entrypoints(self) -> None:
+    def test_u9_iam_manifest_exposes_only_the_declared_callable_entrypoints(self) -> None:
         tools_root = REPOSITORY / "tools"
         sys.path.insert(0, str(tools_root))
         import deploy_parent_link_admin_iam as iam
@@ -62,6 +73,11 @@ class ParentLinkRulesContractTests(unittest.TestCase):
         self.assertEqual(
             invoker_commands,
             [
+                [
+                    "gcloud", "run", "services", "add-iam-policy-binding", "getlinkedchildren",
+                    "--region", "asia-southeast1", "--project", iam.PROJECT_ID,
+                    "--member", "allUsers", "--role", "roles/run.invoker",
+                ],
                 [
                     "gcloud", "run", "services", "add-iam-policy-binding", "manageparentlink",
                     "--region", "asia-southeast1", "--project", iam.PROJECT_ID,

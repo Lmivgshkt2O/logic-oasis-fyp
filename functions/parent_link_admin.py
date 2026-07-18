@@ -41,6 +41,24 @@ def _required_uid(data: Mapping[str, Any], key: str) -> str:
     return value.strip()
 
 
+def _required_approval(data: Mapping[str, Any]) -> tuple[str, str]:
+    approval = data.get("supervisorApprovalId")
+    rationale = data.get("rationale")
+    if not isinstance(approval, str) or not approval.strip():
+        raise ParentLinkAdminError(
+            "invalid-argument", "supervisorApprovalId is required for an audited parent link."
+        )
+    if not isinstance(rationale, str) or not rationale.strip():
+        raise ParentLinkAdminError(
+            "invalid-argument", "rationale is required for an audited parent link."
+        )
+    return approval.strip(), rationale.strip()
+
+
+def _link_audit_document_id(link_id: str, action: str) -> str:
+    return f"{link_id}_{action}"
+
+
 def verify_parent_link_admin(
     request: Any,
     *,
@@ -83,19 +101,28 @@ def manage_parent_link(
 ) -> dict[str, str]:
     parent_id = _required_uid(data, "parentId")
     student_id = _required_uid(data, "studentId")
+    approval_id, rationale = _required_approval(data)
     if parent_id == student_id:
         raise ParentLinkAdminError("invalid-argument", "Parent and student accounts must be different.")
     _verify_user(parent_id, get_user=get_user)
     _verify_user(student_id, get_user=get_user)
     link_ref = database.collection("parentLinks").document(link_document_id(parent_id, student_id))
+    audit_ref = database.collection("parentLinkAudits").document(
+        _link_audit_document_id(link_ref.id, "grant")
+    )
     timestamp = now or datetime.now(timezone.utc)
 
     @firestore.transactional
     def create_link(transaction: Any) -> dict[str, str]:
         snapshot = link_ref.get(transaction=transaction)
         existing = dict(snapshot.to_dict() or {}) if snapshot.exists else None
+        if existing and (
+            existing.get("parentId") != parent_id
+            or existing.get("studentId") != student_id
+        ):
+            raise ParentLinkAdminError("failed-precondition", "Parent link identity is invalid.")
         if existing and existing.get("status") == "active":
-            return {"linkId": link_ref.id, "status": "active"}
+            return {"linkId": link_ref.id, "status": "active", "auditId": audit_ref.id}
         if existing:
             # A revocation is retained for audit and deliberately cannot be
             # silently turned back into access by a client retry.
@@ -112,10 +139,25 @@ def manage_parent_link(
                 "linkVersion": 1,
                 "createdAt": timestamp,
                 "linkedBy": admin.uid,
+                "supervisorApprovalRef": approval_id,
+                "approvalRationale": rationale,
                 "updatedAt": timestamp,
             },
         )
-        return {"linkId": link_ref.id, "status": "active"}
+        transaction.create(
+            audit_ref,
+            {
+                "linkId": link_ref.id,
+                "parentId": parent_id,
+                "studentId": student_id,
+                "action": "grant",
+                "supervisorApprovalRef": approval_id,
+                "rationale": rationale,
+                "performedBy": admin.uid,
+                "createdAt": timestamp,
+            },
+        )
+        return {"linkId": link_ref.id, "status": "active", "auditId": audit_ref.id}
 
     return create_link(database.transaction())
 
@@ -129,7 +171,11 @@ def revoke_parent_link(
 ) -> dict[str, str]:
     parent_id = _required_uid(data, "parentId")
     student_id = _required_uid(data, "studentId")
+    approval_id, rationale = _required_approval(data)
     link_ref = database.collection("parentLinks").document(link_document_id(parent_id, student_id))
+    audit_ref = database.collection("parentLinkAudits").document(
+        _link_audit_document_id(link_ref.id, "revoke")
+    )
     timestamp = now or datetime.now(timezone.utc)
 
     @firestore.transactional
@@ -153,6 +199,19 @@ def revoke_parent_link(
                     "updatedAt": timestamp,
                 },
             )
-        return {"linkId": link_ref.id, "status": "revoked"}
+            transaction.create(
+                audit_ref,
+                {
+                    "linkId": link_ref.id,
+                    "parentId": parent_id,
+                    "studentId": student_id,
+                    "action": "revoke",
+                    "supervisorApprovalRef": approval_id,
+                    "rationale": rationale,
+                    "performedBy": admin.uid,
+                    "createdAt": timestamp,
+                },
+            )
+        return {"linkId": link_ref.id, "status": "revoked", "auditId": audit_ref.id}
 
     return revoke_link(database.transaction())
