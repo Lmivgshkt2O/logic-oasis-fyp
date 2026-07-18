@@ -48,6 +48,33 @@ class ParentLinkRulesContractTests(unittest.TestCase):
             {"roles/datastore.user", "roles/logging.logWriter"},
         )
 
+    def test_u9_iam_manifest_exposes_only_the_two_callable_entrypoints(self) -> None:
+        tools_root = REPOSITORY / "tools"
+        sys.path.insert(0, str(tools_root))
+        import deploy_parent_link_admin_iam as iam
+
+        rendered = iam.commands(deployer_member="user:deployer@example.com")
+        invoker_commands = [
+            command
+            for command in rendered
+            if command[:5] == ["gcloud", "run", "services", "add-iam-policy-binding", command[4]]
+        ]
+        self.assertEqual(
+            invoker_commands,
+            [
+                [
+                    "gcloud", "run", "services", "add-iam-policy-binding", "manageparentlink",
+                    "--region", "asia-southeast1", "--project", iam.PROJECT_ID,
+                    "--member", "allUsers", "--role", "roles/run.invoker",
+                ],
+                [
+                    "gcloud", "run", "services", "add-iam-policy-binding", "revokeparentlink",
+                    "--region", "asia-southeast1", "--project", iam.PROJECT_ID,
+                    "--member", "allUsers", "--role", "roles/run.invoker",
+                ],
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -9,6 +9,7 @@ import subprocess
 
 
 PROJECT_ID = "logic-oasis-fyp"
+FUNCTION_REGION = "asia-southeast1"
 PARENT_LINK_ADMIN_SERVICE_ACCOUNT = (
     f"logic-oasis-parent-link-admin@{PROJECT_ID}.iam.gserviceaccount.com"
 )
@@ -21,6 +22,7 @@ IDENTITY_ADMIN_ROLES = (
     "roles/datastore.user",
     "roles/logging.logWriter",
 )
+PARENT_LINK_ADMIN_SERVICES = ("manageparentlink", "revokeparentlink")
 
 
 def commands(*, deployer_member: str) -> list[list[str]]:
@@ -47,6 +49,16 @@ def commands(*, deployer_member: str) -> list[list[str]]:
          "--member", deployer_member, "--role", "roles/iam.serviceAccountUser"],
         ["gcloud", "iam", "service-accounts", "add-iam-policy-binding", IDENTITY_ADMIN_SERVICE_ACCOUNT,
          "--member", deployer_member, "--role", "roles/iam.serviceAccountUser"],
+    ]
+    # Firebase callable requests reach Cloud Run before the handler can verify
+    # the Firebase ID token and parentLinkAdmin claim.  These are the only two
+    # U9 services opened at the transport layer; every operation remains
+    # guarded by the callable's server-side verification.
+    bindings += [
+        ["gcloud", "run", "services", "add-iam-policy-binding", service,
+         "--region", FUNCTION_REGION, "--project", PROJECT_ID,
+         "--member", "allUsers", "--role", "roles/run.invoker"]
+        for service in PARENT_LINK_ADMIN_SERVICES
     ]
     return [*create, *bindings]
 
