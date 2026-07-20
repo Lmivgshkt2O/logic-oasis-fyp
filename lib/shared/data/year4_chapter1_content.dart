@@ -43,6 +43,28 @@ final List<QuestionBank> year4ReadWriteNumberBanks = <QuestionBank>[
   ),
 ];
 
+/// Local metadata reserves the server-seeded follow-on banks. They remain
+/// unplayable offline until Firestore confirms an active server bank.
+final List<QuestionBank> year4WholeNumbersBanks = <QuestionBank>[
+  ...year4ReadWriteNumberBanks,
+  _catalogueBank(
+    subtopicId: 'place_digit_value',
+    skillId: 'y4_whole_numbers_place_value',
+  ),
+  _catalogueBank(
+    subtopicId: 'compare_order_numbers',
+    skillId: 'y4_whole_numbers_compare_order',
+  ),
+  _catalogueBank(
+    subtopicId: 'odd_even_numbers',
+    skillId: 'y4_whole_numbers_odd_even',
+  ),
+  _catalogueBank(
+    subtopicId: 'number_patterns',
+    skillId: 'y4_whole_numbers_patterns',
+  ),
+];
+
 final List<Topic> year4Chapter1Topics = <Topic>[
   Topic(
     id: _topicId,
@@ -79,6 +101,9 @@ final List<Topic> year4Chapter1Topics = <Topic>[
         descriptionBm: 'Kenal nilai tempat dan nilai digit.',
         standardCode: 'KSSR Year 4: Whole Numbers 1.1.2',
         sourcePages: 'Buku Teks Matematik Tahun 4, pp. 4-5',
+        skillIds: const <String>['y4_whole_numbers_place_value'],
+        contentVersion: '2026.07.20',
+        activeBankCount: 0,
       ),
       const Subtopic(
         id: 'compare_order_numbers',
@@ -89,6 +114,9 @@ final List<Topic> year4Chapter1Topics = <Topic>[
         descriptionBm: 'Banding nombor dan susun mengikut tertib.',
         standardCode: 'KSSR Year 4: Whole Numbers 1.1.2',
         sourcePages: 'Buku Teks Matematik Tahun 4, pp. 6-8',
+        skillIds: const <String>['y4_whole_numbers_compare_order'],
+        contentVersion: '2026.07.20',
+        activeBankCount: 0,
       ),
       const Subtopic(
         id: 'odd_even_numbers',
@@ -99,6 +127,9 @@ final List<Topic> year4Chapter1Topics = <Topic>[
         descriptionBm: 'Kelaskan nombor bulat sebagai ganjil atau genap.',
         standardCode: 'KSSR Year 4: Whole Numbers 1.4.1',
         sourcePages: 'Buku Teks Matematik Tahun 4, pp. 9-10',
+        skillIds: const <String>['y4_whole_numbers_odd_even'],
+        contentVersion: '2026.07.20',
+        activeBankCount: 0,
       ),
       const Subtopic(
         id: 'number_patterns',
@@ -109,10 +140,30 @@ final List<Topic> year4Chapter1Topics = <Topic>[
         descriptionBm: 'Kenal dan sambung pola nombor.',
         standardCode: 'KSSR Year 4: Whole Numbers 1.5.1',
         sourcePages: 'Buku Teks Matematik Tahun 4, p. 11',
+        skillIds: const <String>['y4_whole_numbers_patterns'],
+        contentVersion: '2026.07.20',
+        activeBankCount: 0,
       ),
     ],
   ),
 ];
+
+QuestionBank _catalogueBank({
+  required String subtopicId,
+  required String skillId,
+}) {
+  final bankId = 'y4_whole_${subtopicId}_easy_v1';
+  return QuestionBank(
+    id: bankId,
+    topicId: _topicId,
+    subtopicId: subtopicId,
+    skillId: skillId,
+    yearLevel: 4,
+    difficulty: QuestionDifficulty.easy,
+    contentVersion: '2026.07.20',
+    questions: const <QuizQuestion>[],
+  );
+}
 
 final List<QuizQuestion> _easyQuestions = <QuizQuestion>[
   _question(

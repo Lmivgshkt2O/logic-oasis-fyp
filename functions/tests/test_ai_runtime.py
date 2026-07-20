@@ -100,6 +100,12 @@ class AiRuntimeTests(unittest.TestCase):
         self.assertEqual("fallback", self.gateway.statuses["attempt-1"]["analysisState"])
         self.assertEqual(1, len(self.gateway.finalized))
         self.assertNotIn("featureValues", self.gateway.statuses["attempt-1"])
+        mastery = self.gateway.finalized[0]["mastery"]
+        self.assertEqual(0.6, mastery["lastCorrectRate"])
+        projected = ai_runtime._merged_subtopic_mastery(None, mastery)
+        self.assertEqual(0.6, projected["bestCorrectRate"])
+        self.assertTrue(projected["completed"])
+        self.assertEqual("Moderate", projected["masteryLevel"])
         self.assertEqual("fallback", process_finalized_attempt("attempt-1", gateway=self.gateway, bundle=self.bundle))
         self.assertEqual(1, len(self.gateway.finalized))
 
@@ -215,7 +221,7 @@ class AiRuntimeTests(unittest.TestCase):
         gateway = FirestoreRuntimeGateway(database)
         snapshot = {"studentId": "student-1", "subtopicId": "subtopic-1", "skillId": "skill-1"}
         assignment = {"studentId": "student-1", "subtopicId": "subtopic-1"}
-        mastery = {"studentId": "student-1", "yearLevel": 4, "topicId": "topic-1", "subtopicId": "subtopic-1"}
+        mastery = {"studentId": "student-1", "yearLevel": 4, "topicId": "topic-1", "subtopicId": "subtopic-1", "lastCorrectRate": 0.6}
         with patch("firebase_admin.firestore.transactional", lambda function: lambda transaction: function(transaction)):
             self.assertEqual("fallback", gateway.finalize(trusted_attempt(), state="fallback", code="approval_missing",
                 raw_run={"status": "fallback"}, snapshots=[snapshot], assignment=assignment, mastery=mastery))

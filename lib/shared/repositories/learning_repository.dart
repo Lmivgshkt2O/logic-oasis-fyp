@@ -5,6 +5,7 @@ import 'package:logic_oasis/shared/models/forum_participation_summary.dart';
 import 'package:logic_oasis/shared/models/parent_dashboard_snapshot.dart';
 import 'package:logic_oasis/shared/models/quiz_attempt.dart';
 import 'package:logic_oasis/shared/models/topic.dart';
+import 'package:logic_oasis/shared/models/trusted_subtopic_progress.dart';
 
 class OasisProgressSnapshot {
   const OasisProgressSnapshot({
@@ -40,6 +41,29 @@ class LearningRepository {
     : _firestore = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _firestore;
+
+  /// Loads only the student-readable completion projection written by trusted
+  /// quiz finalization. This is a read path; clients never write this data.
+  Future<List<TrustedSubtopicProgress>> fetchTrustedSubtopicProgress({
+    required String studentId,
+    required int yearLevel,
+  }) async {
+    final snapshot = await _firestore
+        .collection('subtopicMastery')
+        .where('studentId', isEqualTo: studentId)
+        .where('yearLevel', isEqualTo: yearLevel.clamp(4, 6))
+        .get(const GetOptions(source: Source.server));
+    return snapshot.docs
+        .map((document) {
+          try {
+            return TrustedSubtopicProgress.fromFirestore(document.data());
+          } on FormatException {
+            return null;
+          }
+        })
+        .whereType<TrustedSubtopicProgress>()
+        .toList(growable: false);
+  }
 
   Future<void> saveQuizAttemptAndMastery({
     required String studentId,

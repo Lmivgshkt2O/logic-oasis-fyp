@@ -5,6 +5,33 @@ import 'package:logic_oasis/l10n/app_localizations.dart';
 import 'package:logic_oasis/shared/models/quiz_reward.dart';
 
 void main() {
+  testWidgets('server-confirmed result does not display a client reward', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: ResultPage(
+          correctCount: 3,
+          totalQuestions: 5,
+          topicArea: 'Whole Numbers',
+          isBahasaMelayu: false,
+          onBackToForge: () {},
+        ),
+      ),
+    );
+
+    expect(find.text('60%'), findsOneWidget);
+    expect(
+      find.text(
+        'This score was confirmed by the server and your learning progress is being updated.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Crystals'), findsNothing);
+  });
+
   testWidgets('quiz result shows a back to forge action', (tester) async {
     var returnedToForge = false;
 

@@ -11,6 +11,7 @@ import 'package:logic_oasis/shared/models/quiz_reward.dart';
 import 'package:logic_oasis/shared/models/recommended_mission.dart';
 import 'package:logic_oasis/shared/models/subtopic.dart';
 import 'package:logic_oasis/shared/models/topic.dart';
+import 'package:logic_oasis/shared/models/trusted_subtopic_progress.dart';
 import 'package:logic_oasis/shared/models/weak_topic_insight.dart';
 import 'package:logic_oasis/shared/repositories/learning_repository.dart';
 import 'package:logic_oasis/shared/repositories/topic_repository.dart';
@@ -283,7 +284,7 @@ class AppState extends ChangeNotifier {
     required Topic topic,
     required Subtopic subtopic,
   }) {
-    final matchingBanks = year4ReadWriteNumberBanks.where(
+    final matchingBanks = year4WholeNumbersBanks.where(
       (bank) =>
           bank.topicId == topic.id &&
           bank.subtopicId == subtopic.id &&
@@ -361,20 +362,27 @@ class AppState extends ChangeNotifier {
     screenTimeLimitMinutes =
         preferences.getInt(_screenTimeLimitKey) ?? screenTimeLimitMinutes;
     screenTimeLimitMinutes = screenTimeLimitMinutes.clamp(15, 120).toInt();
-    _unlockedTopicIds
-      ..clear()
-      ..addAll(preferences.getStringList(_unlockedTopicIdsKey) ?? const []);
-    _unlockedSubtopicIds
-      ..clear()
-      ..addAll(preferences.getStringList(_unlockedSubtopicIdsKey) ?? const []);
+    _unlockedTopicIds.clear();
+    _unlockedSubtopicIds.clear();
     claimedRecommendedMissionTopicIds
       ..clear()
       ..addAll(
         preferences.getStringList(_claimedMissionTopicIdsKey) ?? const [],
       );
-    _restoreSavedAttempts(preferences.getString(_savedAttemptsKey));
-    _applyAttemptProgressToTopics();
-    _recordUnlockedProgression();
+    // Production progress is scoped to the authenticated student and comes
+    // from server-owned subtopicMastery projections. Legacy local attempts are
+    // retained only for offline/prototype tests, never the signed-in runtime.
+    if (!persistQuizResults) {
+      _unlockedTopicIds.addAll(
+        preferences.getStringList(_unlockedTopicIdsKey) ?? const [],
+      );
+      _unlockedSubtopicIds.addAll(
+        preferences.getStringList(_unlockedSubtopicIdsKey) ?? const [],
+      );
+      _restoreSavedAttempts(preferences.getString(_savedAttemptsKey));
+      _applyAttemptProgressToTopics();
+      _recordUnlockedProgression();
+    }
     notifyListeners();
   }
 
@@ -443,6 +451,9 @@ class AppState extends ChangeNotifier {
           'Loaded ${firebaseTopics.length} Year $yearLevel topics from Firebase.',
           'Memuat ${firebaseTopics.length} topik Tahun $yearLevel daripada Firebase.',
         );
+      }
+      if (persistQuizResults && currentStudentId != demoStudentId) {
+        await refreshTrustedProgress();
       }
     } catch (_) {
       _resetTopicsForCurrentYear();
@@ -585,15 +596,19 @@ class AppState extends ChangeNotifier {
     String? name,
     int? year,
   }) {
+    final studentChanged = uid != currentStudentId;
     final nextYearLevel = (year ?? yearLevel).clamp(4, 6);
     final yearChanged = nextYearLevel != yearLevel;
+    if (studentChanged) {
+      _clearSignedInStudentRuntimeState();
+    }
     currentStudentId = uid;
     currentStudentEmail = email;
     if (name != null && name.trim().isNotEmpty) {
       studentName = name.trim();
     }
     yearLevel = nextYearLevel;
-    if (yearChanged) {
+    if (studentChanged || yearChanged) {
       _resetTopicsForCurrentYear();
       unawaited(loadTopicsFromFirebase());
     }
@@ -602,7 +617,136 @@ class AppState extends ChangeNotifier {
     if (persistQuizResults) {
       unawaited(loadOasisProgressFromFirebase());
       unawaited(loadParentDashboardFromFirebase());
+      if (!yearChanged) {
+        unawaited(refreshTrustedProgress());
+      }
     }
+  }
+
+  /// Prevents a prior Firebase identity's in-memory prototype state from ever
+  /// appearing for the next signed-in learner. Trusted projections reload
+  /// after [updateSignedInStudent] assigns the replacement identity.
+  void clearSignedInStudentRuntimeState() {
+    _clearSignedInStudentRuntimeState();
+    currentStudentId = demoStudentId;
+    currentStudentEmail = null;
+    notifyListeners();
+  }
+
+  void _clearSignedInStudentRuntimeState() {
+    attempts.clear();
+    aiDiagnoses.clear();
+    _recentQuestionIdsBySubtopic.clear();
+    _unlockedTopicIds.clear();
+    _unlockedSubtopicIds.clear();
+    _resetTopicsForCurrentYear();
+  }
+
+  /// Applies a trusted callable completion immediately, then the caller can
+  /// refresh the same state from Firestore. It never writes a quiz attempt,
+  /// mastery record, reward, or correctness field from the client.
+  void applyTrustedQuizCompletion({
+    required String topicId,
+    required String subtopicId,
+    required int correctCount,
+    required int totalQuestions,
+  }) {
+    if (totalQuestions <= 0) return;
+    final rate = (correctCount.clamp(0, totalQuestions) / totalQuestions)
+        .clamp(0.0, 1.0)
+        .toDouble();
+    final mastery = _masteryForScore((rate * 100).round());
+    applyTrustedSubtopicProgress(<TrustedSubtopicProgress>[
+      TrustedSubtopicProgress(
+        studentId: currentStudentId,
+        topicId: topicId,
+        subtopicId: subtopicId,
+        yearLevel: yearLevel,
+        completed: rate > .5 || mastery == 'Moderate' || mastery == 'Strong',
+        masteryLevel: mastery,
+        bestCorrectRate: rate,
+      ),
+    ], replaceAll: false);
+  }
+
+  Future<void> refreshTrustedProgress({bool replaceAll = true}) async {
+    if (!persistQuizResults || currentStudentId == demoStudentId) return;
+    final requestedStudentId = currentStudentId;
+    try {
+      final repository = _learningRepository ?? LearningRepository();
+      final records = await repository.fetchTrustedSubtopicProgress(
+        studentId: requestedStudentId,
+        yearLevel: yearLevel,
+      );
+      // A Firebase account can change while this server request is in flight.
+      // Never let one learner's projection reset another learner's UI state.
+      if (currentStudentId != requestedStudentId) return;
+      applyTrustedSubtopicProgress(records, replaceAll: replaceAll);
+    } catch (_) {
+      // The immediate callable result remains visible while an offline refresh
+      // is retried on the next authenticated app load.
+    }
+  }
+
+  void applyTrustedSubtopicProgress(
+    List<TrustedSubtopicProgress> records, {
+    bool replaceAll = true,
+  }) {
+    final bySubtopic = <String, TrustedSubtopicProgress>{
+      for (final record in records)
+        if (record.studentId == currentStudentId &&
+            record.yearLevel == yearLevel)
+          '${record.topicId}::${record.subtopicId}': record,
+    };
+    var changed = false;
+    for (var topicIndex = 0; topicIndex < topics.length; topicIndex += 1) {
+      final topic = topics[topicIndex];
+      final subtopics = subtopicsForTopic(topic);
+      if (subtopics.isEmpty) continue;
+      var topicChanged = false;
+      final updated = subtopics
+          .map((subtopic) {
+            final record = bySubtopic['${topic.id}::${subtopic.id}'];
+            if (record == null && replaceAll) {
+              if (subtopic.progress != 0 || subtopic.mastery != 'New') {
+                topicChanged = true;
+                return subtopic.copyWith(progress: 0, mastery: 'New');
+              }
+              return subtopic;
+            }
+            if (record == null) return subtopic;
+            final trustedProgress = record.completed
+                ? record.bestCorrectRate.clamp(.6, 1.0).toDouble()
+                : record.bestCorrectRate;
+            if (subtopic.progress != trustedProgress ||
+                subtopic.mastery != record.masteryLevel) {
+              topicChanged = true;
+            }
+            return subtopic.copyWith(
+              progress: trustedProgress,
+              mastery: record.masteryLevel,
+            );
+          })
+          .toList(growable: false);
+      final progress = _topicProgressFromSubtopics(updated);
+      final mastery = _topicMasteryFromSubtopics(updated);
+      if (topic.progress != progress || topic.mastery != mastery) {
+        topicChanged = true;
+      }
+      if (topicChanged) {
+        changed = true;
+        topics[topicIndex] = topic.copyWith(
+          progress: progress,
+          mastery: mastery,
+          subtopics: updated,
+        );
+      }
+    }
+    if (!changed) return;
+    _unlockedTopicIds.clear();
+    _unlockedSubtopicIds.clear();
+    _recordUnlockedProgression();
+    notifyListeners();
   }
 
   void updateLanguage(String value) {

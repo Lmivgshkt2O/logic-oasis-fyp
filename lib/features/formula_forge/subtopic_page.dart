@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:logic_oasis/app/logic_oasis_design.dart';
 import 'package:logic_oasis/features/quiz/quiz_page.dart';
@@ -65,6 +67,7 @@ class SubtopicPage extends StatelessWidget {
     Subtopic subtopic,
   ) async {
     if (!state.isSubtopicUnlocked(topic, subtopic) ||
+        subtopic.activeBankCount <= 0 ||
         subtopic.questions.isEmpty) {
       return;
     }
@@ -84,6 +87,20 @@ class SubtopicPage extends StatelessWidget {
             session: session,
             title: topic.localizedTitle(state.isBahasaMelayu),
             isBahasaMelayu: state.isBahasaMelayu,
+            onFinalized: (completion) {
+              state.applyTrustedQuizCompletion(
+                topicId: topic.id,
+                subtopicId: subtopic.id,
+                correctCount: completion.correctCount,
+                totalQuestions:
+                    completion.totalQuestions ?? session.questions.length,
+              );
+              // The callable completion has already been confirmed. Reconcile
+              // with its projection without holding the result page hostage to
+              // a separate Firestore read.
+              unawaited(state.refreshTrustedProgress(replaceAll: false));
+              return Future<void>.value();
+            },
           ),
         ),
       );
@@ -182,11 +199,17 @@ class _SubtopicCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final unlocked = state.isSubtopicUnlocked(topic, subtopic);
     final lockedReason = state.lockedReasonForSubtopic(topic, subtopic);
-    final canStart = unlocked && subtopic.questions.isNotEmpty;
+    // A client-side question preview alone is not sufficient for the U3
+    // callable workflow: the selected bank must also be active on the server.
+    // This avoids offering a playable card that would fail at quiz start while
+    // its Firestore bank deployment is still pending.
+    final hasActiveServerBank = subtopic.activeBankCount > 0;
+    final canStart =
+        unlocked && hasActiveServerBank && subtopic.questions.isNotEmpty;
     final masteryLabel = unlocked ? subtopic.mastery : 'Lock';
     final description =
         lockedReason ??
-        (subtopic.questions.isEmpty
+        (!hasActiveServerBank || subtopic.questions.isEmpty
             ? state.t(
                 'Question bank is not ready yet.',
                 'Bank soalan belum tersedia.',

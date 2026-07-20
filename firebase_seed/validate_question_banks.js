@@ -8,8 +8,8 @@ delete source._seedMetadata;
 const secure = buildSecureQuestionSeed(source);
 
 const banks = Object.values(secure.questionBanks);
-if (banks.length !== 3 || new Set(banks.map((bank) => bank.difficultyLevel)).size !== 3) {
-  throw new Error('Expected exactly one Easy, Moderate, and Hard bank.');
+if (banks.length !== 7) {
+  throw new Error('Expected the three read/write banks and four follow-on Easy banks.');
 }
 for (const bank of banks) {
   if (bank.questionIds.length < 8 || bank.questionIds.length > 10) {

@@ -2,10 +2,18 @@ const fs = require("node:fs");
 const path = require("node:path");
 const admin = require("firebase-admin");
 const {
-  questionBanks,
+  questionBanks: readWriteQuestionBanks,
   questions: bankQuestions,
   validateQuestionBankSeed,
 } = require("./year4_read_write_question_banks");
+const {
+  questionBanks: additionalQuestionBanks,
+  questions: additionalBankQuestions,
+  validateAdditionalQuestionBanks,
+} = require("./year4_whole_numbers_additional_banks");
+
+const questionBanks = { ...readWriteQuestionBanks, ...additionalQuestionBanks };
+const allBankQuestions = [...bankQuestions, ...additionalBankQuestions];
 
 const seedPath = path.join(__dirname, "seed_data.json");
 const credentialCandidates = [
@@ -120,6 +128,7 @@ function clientSafeLegacyQuestion(documentData) {
 
 function buildSecureQuestionSeed(seedData) {
   validateQuestionBankSeed();
+  validateAdditionalQuestionBanks();
   const legacyQuestions = Object.fromEntries(
     Object.entries(seedData.questions ?? {}).map(([id, data]) => [
       id,
@@ -127,24 +136,31 @@ function buildSecureQuestionSeed(seedData) {
     ]),
   );
   const activeQuestions = Object.fromEntries(
-    bankQuestions.map((item) => [item.id, item.client]),
+    allBankQuestions.map((item) => [item.id, item.client]),
   );
   const answerKeys = Object.fromEntries(
-    bankQuestions.map((item) => [item.id, item.answerKey]),
+    allBankQuestions.map((item) => [item.id, item.answerKey]),
   );
-  const adaptiveSubtopicDocumentId = 'whole_numbers_y4_read_write_numbers';
-  const adaptiveSubtopic = seedData.subtopics?.[adaptiveSubtopicDocumentId];
-  const firstBank = Object.values(questionBanks)[0];
+  const banksBySubtopic = Object.values(questionBanks).reduce((result, bank) => {
+    const documentId = `${bank.topicId}_${bank.subtopicId}`;
+    (result[documentId] ??= []).push(bank);
+    return result;
+  }, {});
+  const subtopicUpdates = Object.entries(banksBySubtopic).reduce((result, [documentId, matchingBanks]) => {
+    const current = seedData.subtopics?.[documentId] ?? {};
+    result[documentId] = {
+      ...current,
+      skillIds: [...new Set(matchingBanks.map((candidate) => candidate.skillId))],
+      contentVersion: matchingBanks[0].version,
+      activeBankCount: matchingBanks.length,
+    };
+    return result;
+  }, {});
   return {
     ...seedData,
     subtopics: {
       ...seedData.subtopics,
-      [adaptiveSubtopicDocumentId]: {
-        ...adaptiveSubtopic,
-        skillIds: [firstBank.skillId],
-        contentVersion: firstBank.version,
-        activeBankCount: Object.keys(questionBanks).length,
-      },
+      ...subtopicUpdates,
     },
     questions: { ...legacyQuestions, ...activeQuestions },
     questionBanks,

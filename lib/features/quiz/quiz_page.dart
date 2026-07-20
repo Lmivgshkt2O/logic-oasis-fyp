@@ -7,7 +7,6 @@ import 'package:logic_oasis/shared/models/quiz_completion.dart';
 import 'package:logic_oasis/shared/models/quiz_question.dart';
 import 'package:logic_oasis/shared/models/quiz_session.dart';
 import 'package:logic_oasis/shared/services/quiz_session_service.dart';
-import 'package:logic_oasis/shared/services/ai_status_service.dart';
 import 'package:logic_oasis/shared/widgets/logic_oasis_figma_components.dart';
 import 'package:logic_oasis/shared/widgets/recommendation_box.dart';
 
@@ -18,26 +17,27 @@ class QuizPage extends StatefulWidget {
     required this.title,
     required this.isBahasaMelayu,
     this.sessionService,
+    this.onFinalized,
   });
 
   final QuizSession session;
   final String title;
   final bool isBahasaMelayu;
-  final QuizSessionService? sessionService;
+  final QuizSessionGateway? sessionService;
+  final Future<void> Function(QuizCompletion completion)? onFinalized;
 
   @override
   State<QuizPage> createState() => _QuizPageState();
 }
 
 class _QuizPageState extends State<QuizPage> {
-  late final QuizSessionService _sessionService;
+  late final QuizSessionGateway _sessionService;
   int questionIndex = 0;
   DateTime? _questionStartedAt;
   QuestionResponse? _pendingResponse;
   QuestionResponse? _validatedResponse;
   bool _submitting = false;
   bool _finalizing = false;
-  late final AiStatusService _aiStatusService;
 
   QuizQuestion get currentQuestion => widget.session.questions[questionIndex];
   bool get _hasSelection =>
@@ -47,7 +47,6 @@ class _QuizPageState extends State<QuizPage> {
   void initState() {
     super.initState();
     _sessionService = widget.sessionService ?? QuizSessionService();
-    _aiStatusService = AiStatusService();
     _questionStartedAt = DateTime.now();
   }
 
@@ -133,8 +132,21 @@ class _QuizPageState extends State<QuizPage> {
         widget.session.id,
       );
       if (!mounted) return;
-      await _showCompletion(completion);
-      if (mounted) Navigator.of(context).pop(completion);
+      await widget.onFinalized?.call(completion);
+      if (!mounted) return;
+      await Navigator.of(context).pushReplacement<void, void>(
+        MaterialPageRoute(
+          builder: (_) => ResultPage(
+            correctCount: completion.correctCount,
+            totalQuestions:
+                completion.totalQuestions ?? widget.session.questions.length,
+            topicArea: widget.title,
+            isBahasaMelayu: widget.isBahasaMelayu,
+            attemptId: completion.attemptId,
+            onBackToForge: () => Navigator.of(context).pop(),
+          ),
+        ),
+      );
     } on QuizSessionException catch (error) {
       if (!mounted) return;
       setState(() => _finalizing = false);
@@ -148,57 +160,6 @@ class _QuizPageState extends State<QuizPage> {
             : 'Your score could not be finalized yet. Please retry.',
       );
     }
-  }
-
-  Future<void> _showCompletion(QuizCompletion completion) {
-    final correct = completion.correctCount;
-    final total = completion.totalQuestions ?? widget.session.questions.length;
-    final score = completion.score ?? 0;
-    final attemptId = completion.attemptId;
-    return showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: Text(widget.isBahasaMelayu ? 'Kuiz selesai!' : 'Quiz complete!'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              widget.isBahasaMelayu
-                  ? 'Semakan pelayan mengesahkan $correct daripada $total betul ($score%).'
-                  : 'The server confirmed $correct out of $total correct ($score%).',
-            ),
-            if (attemptId != null && attemptId.isNotEmpty) ...[
-              const SizedBox(height: 14),
-              StreamBuilder(
-                stream: _aiStatusService.watchAttempt(attemptId),
-                builder: (context, snapshot) {
-                  final diagnosis = snapshot.data;
-                  if (diagnosis == null) {
-                    return Text(
-                      widget.isBahasaMelayu
-                          ? 'Markah anda disimpan. Analisis sedang bermula…'
-                          : 'Your score is saved. Analysis is starting…',
-                    );
-                  }
-                  return AiAnalysisStatusCard(
-                    diagnosis: diagnosis,
-                    isBahasaMelayu: widget.isBahasaMelayu,
-                  );
-                },
-              ),
-            ],
-          ],
-        ),
-        actions: [
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(widget.isBahasaMelayu ? 'Selesai' : 'Done'),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
