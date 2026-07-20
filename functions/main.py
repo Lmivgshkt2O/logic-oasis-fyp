@@ -26,6 +26,18 @@ if str(_PACKAGE_ROOT) not in sys.path:
     sys.path.insert(0, str(_PACKAGE_ROOT))
 
 from ai_runtime import AI_RUNTIME_SERVICE_ACCOUNT, FirestoreRuntimeGateway, RuntimeBundle, process_finalized_attempt
+from parent_link_admin import (
+    PARENT_LINK_ADMIN_SERVICE_ACCOUNT,
+    ParentLinkAdminError,
+    manage_parent_link,
+    revoke_parent_link,
+    verify_parent_link_admin,
+)
+from parent_link_context import (
+    ParentLinkContextError,
+    list_active_linked_children,
+    verify_authenticated_parent,
+)
 
 from quiz_session import (
     CLIENT_REPORTED_UNVERIFIED,
@@ -483,6 +495,66 @@ def submitQuizResponse(request: https_fn.CallableRequest) -> dict[str, Any]:
 @https_fn.on_call(region=FUNCTION_REGION)
 def finalizeQuizSession(request: https_fn.CallableRequest) -> dict[str, Any]:
     return _call(finalize_quiz_session, request)
+
+
+def _parent_link_call(
+    handler: Callable[[dict[str, Any], Any, Any], dict[str, str]],
+    request: https_fn.CallableRequest,
+) -> dict[str, str]:
+    try:
+        admin = verify_parent_link_admin(request)
+        data = _data(request)
+        return handler(data, admin, firestore_db())
+    except ParentLinkAdminError as error:
+        raise https_fn.HttpsError(
+            _ERROR_CODES.get(error.code, https_fn.FunctionsErrorCode.INTERNAL),
+            str(error),
+        )
+    except QuizSessionError as error:
+        raise https_fn.HttpsError(
+            _ERROR_CODES.get(error.code, https_fn.FunctionsErrorCode.INTERNAL),
+            str(error),
+        )
+
+
+def _parent_context_call(request: https_fn.CallableRequest) -> dict[str, Any]:
+    try:
+        parent = verify_authenticated_parent(request)
+        return list_active_linked_children(_data(request), parent, firestore_db())
+    except ParentLinkContextError as error:
+        raise https_fn.HttpsError(
+            _ERROR_CODES.get(error.code, https_fn.FunctionsErrorCode.INTERNAL),
+            str(error),
+        )
+    except QuizSessionError as error:
+        raise https_fn.HttpsError(
+            _ERROR_CODES.get(error.code, https_fn.FunctionsErrorCode.INTERNAL),
+            str(error),
+        )
+
+
+@https_fn.on_call(
+    region=FUNCTION_REGION,
+    service_account=PARENT_LINK_ADMIN_SERVICE_ACCOUNT,
+)
+def getLinkedChildren(request: https_fn.CallableRequest) -> dict[str, Any]:
+    return _parent_context_call(request)
+
+
+@https_fn.on_call(
+    region=FUNCTION_REGION,
+    service_account=PARENT_LINK_ADMIN_SERVICE_ACCOUNT,
+)
+def manageParentLink(request: https_fn.CallableRequest) -> dict[str, str]:
+    return _parent_link_call(manage_parent_link, request)
+
+
+@https_fn.on_call(
+    region=FUNCTION_REGION,
+    service_account=PARENT_LINK_ADMIN_SERVICE_ACCOUNT,
+)
+def revokeParentLink(request: https_fn.CallableRequest) -> dict[str, str]:
+    return _parent_link_call(revoke_parent_link, request)
 
 
 @firestore_fn.on_document_created(

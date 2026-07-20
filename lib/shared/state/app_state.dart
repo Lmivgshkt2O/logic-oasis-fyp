@@ -35,8 +35,7 @@ class AppState extends ChangeNotifier {
   static const String _missionRemindersKey = 'logic_oasis_mission_reminders';
   static const String _eyeComfortKey = 'logic_oasis_eye_comfort';
   static const String _soundEnabledKey = 'logic_oasis_sound_enabled';
-  static const String _accessibilityModeKey =
-      'logic_oasis_accessibility_mode';
+  static const String _accessibilityModeKey = 'logic_oasis_accessibility_mode';
   static const String _screenTimeLimitKey = 'logic_oasis_screen_time_limit';
   static const String _unlockedTopicIdsKey = 'logic_oasis_unlocked_topics';
   static const String _unlockedSubtopicIdsKey =
@@ -52,443 +51,44 @@ class AppState extends ChangeNotifier {
       id: 'fractions_y4',
       title: 'Fractions',
       titleBm: 'Pecahan',
-      area: 'Understand and compare fractions',
+      area: 'Understand and compare fractions.',
+      areaBm: 'Fahami dan bandingkan pecahan.',
       yearLevel: 4,
       progress: 0,
       mastery: 'Locked',
-      subtopics: [
-        Subtopic(
-          id: 'equivalent_fractions',
-          title: 'Equivalent Fractions',
-          titleBm: 'Pecahan Setara',
-          order: 1,
-          description: 'Recognise fractions with the same value.',
-          descriptionBm: 'Kenal pecahan yang mempunyai nilai yang sama.',
-          progress: 1,
-          mastery: 'Strong',
-          questions: [
-            QuizQuestion(
-              subtopicId: 'equivalent_fractions',
-              question: 'Which fraction is equal to 1/2?',
-              options: ['1/4', '2/4', '3/4', '4/4'],
-              answerIndex: 1,
-              explanation:
-                  '2/4 can be simplified by dividing both numbers by 2.',
-            ),
-            QuizQuestion(
-              subtopicId: 'equivalent_fractions',
-              question: 'Which fraction is equivalent to 3/6?',
-              questionBm: 'Pecahan manakah yang setara dengan 3/6?',
-              options: ['1/2', '1/3', '2/3', '3/4'],
-              optionsBm: ['1/2', '1/3', '2/3', '3/4'],
-              answerIndex: 0,
-              explanation: '3/6 simplifies to 1/2.',
-              explanationBm: '3/6 diringkaskan kepada 1/2.',
-            ),
-          ],
-        ),
-        Subtopic(
-          id: 'compare_unit_fractions',
-          title: 'Compare Unit Fractions',
-          titleBm: 'Banding Pecahan Unit',
-          order: 2,
-          description: 'Compare unit fractions by denominator size.',
-          descriptionBm: 'Banding pecahan unit mengikut saiz penyebut.',
-          progress: 1,
-          mastery: 'Strong',
-          questions: [
-            QuizQuestion(
-              subtopicId: 'compare_unit_fractions',
-              question: 'Which fraction is larger?',
-              options: ['1/3', '1/5', '1/8', '1/10'],
-              answerIndex: 0,
-              explanation:
-                  'For unit fractions, the smaller denominator is larger.',
-            ),
-            QuizQuestion(
-              subtopicId: 'compare_unit_fractions',
-              question: 'Which is smaller?',
-              questionBm: 'Yang manakah lebih kecil?',
-              options: ['1/2', '1/4', '1/6', '1/8'],
-              optionsBm: ['1/2', '1/4', '1/6', '1/8'],
-              answerIndex: 3,
-              explanation:
-                  'For unit fractions, the larger denominator is smaller.',
-              explanationBm:
-                  'Bagi pecahan unit, penyebut yang lebih besar memberi nilai lebih kecil.',
-            ),
-          ],
-        ),
-        Subtopic(
-          id: 'add_like_denominators',
-          title: 'Add Like Denominators',
-          titleBm: 'Tambah Penyebut Sama',
-          order: 3,
-          description: 'Add fractions that share the same denominator.',
-          descriptionBm: 'Tambah pecahan yang mempunyai penyebut yang sama.',
-          progress: .4,
-          mastery: 'Weak',
-          questions: [
-            QuizQuestion(
-              subtopicId: 'add_like_denominators',
-              question: 'What is 1/4 + 1/4?',
-              options: ['1/8', '1/4', '1/2', '1'],
-              answerIndex: 2,
-              explanation:
-                  'One quarter plus one quarter makes two quarters, or 1/2.',
-            ),
-            QuizQuestion(
-              subtopicId: 'add_like_denominators',
-              question: 'What is 2/5 + 1/5?',
-              questionBm: 'Berapakah 2/5 + 1/5?',
-              options: ['2/10', '3/5', '3/10', '1/5'],
-              optionsBm: ['2/10', '3/5', '3/10', '1/5'],
-              answerIndex: 1,
-              explanation: 'Keep the denominator 5 and add 2 + 1.',
-              explanationBm: 'Kekalkan penyebut 5 dan tambah 2 + 1.',
-            ),
-          ],
-        ),
-      ],
     ),
     const Topic(
       id: 'decimals_y4',
       title: 'Decimals',
       titleBm: 'Perpuluhan',
-      area: 'Decimals and place value',
+      area: 'Read, compare, and calculate with decimal values.',
+      areaBm: 'Baca, banding dan kira nilai perpuluhan.',
       yearLevel: 4,
       progress: 0,
       mastery: 'Locked',
-      subtopics: [
-        Subtopic(
-          id: 'decimal_place_value',
-          title: 'Decimal Place Value',
-          titleBm: 'Nilai Tempat Perpuluhan',
-          order: 1,
-          description: 'Read tenths and hundredths.',
-          descriptionBm: 'Baca persepuluh dan perseratus.',
-          progress: 1,
-          mastery: 'Moderate',
-          questions: [
-            QuizQuestion(
-              subtopicId: 'decimal_place_value',
-              question: 'What is the value of the digit 5 in 3.52?',
-              questionBm: 'Apakah nilai digit 5 dalam 3.52?',
-              options: ['5 ones', '5 tenths', '5 hundredths', '5 tens'],
-              optionsBm: ['5 sa', '5 persepuluh', '5 perseratus', '5 puluh'],
-              answerIndex: 1,
-              explanation: 'The digit 5 is in the tenths place.',
-              explanationBm: 'Digit 5 berada di tempat persepuluh.',
-            ),
-          ],
-        ),
-        Subtopic(
-          id: 'compare_decimals',
-          title: 'Compare Decimals',
-          titleBm: 'Banding Perpuluhan',
-          order: 2,
-          description: 'Compare decimal values.',
-          descriptionBm: 'Banding nilai perpuluhan.',
-          questions: [
-            QuizQuestion(
-              subtopicId: 'compare_decimals',
-              question: 'Which decimal is the largest?',
-              questionBm: 'Perpuluhan manakah yang paling besar?',
-              options: ['0.4', '0.35', '0.09', '0.3'],
-              optionsBm: ['0.4', '0.35', '0.09', '0.3'],
-              answerIndex: 0,
-              explanation: '0.4 is the same as 0.40, which is largest.',
-              explanationBm: '0.4 sama dengan 0.40, iaitu paling besar.',
-            ),
-          ],
-        ),
-      ],
     ),
     const Topic(
       id: 'percentages_y4',
       title: 'Percentages',
       titleBm: 'Peratus',
-      area: 'Percentages in real life',
+      area: 'Connect percentages with parts of one hundred.',
+      areaBm: 'Hubungkan peratus dengan bahagian daripada seratus.',
       yearLevel: 4,
       progress: 0,
       mastery: 'Locked',
-      subtopics: [
-        Subtopic(
-          id: 'percentage_meaning',
-          title: 'Meaning of Percentage',
-          titleBm: 'Maksud Peratus',
-          order: 1,
-          description: 'Connect percentage with parts out of 100.',
-          descriptionBm: 'Hubungkan peratus dengan bahagian daripada 100.',
-          questions: [
-            QuizQuestion(
-              subtopicId: 'percentage_meaning',
-              question: '50% is the same as which fraction?',
-              options: ['1/4', '1/3', '1/2', '3/4'],
-              answerIndex: 2,
-              explanation: '50% means half of the whole.',
-            ),
-          ],
-        ),
-        Subtopic(
-          id: 'percentage_of_quantity',
-          title: 'Percentage of Quantity',
-          titleBm: 'Peratus daripada Kuantiti',
-          order: 2,
-          description: 'Find common percentages of a number.',
-          descriptionBm: 'Cari peratus lazim daripada suatu nombor.',
-          questions: [
-            QuizQuestion(
-              subtopicId: 'percentage_of_quantity',
-              question: 'What is 25% of 80?',
-              options: ['10', '20', '25', '40'],
-              answerIndex: 1,
-              explanation: '25% is one quarter. One quarter of 80 is 20.',
-            ),
-          ],
-        ),
-      ],
     ),
     const Topic(
       id: 'money_y4',
       title: 'Money',
       titleBm: 'Wang',
-      area: 'Money and daily spending',
+      area: 'Solve daily spending problems using ringgit and sen.',
+      areaBm:
+          'Selesaikan masalah perbelanjaan harian menggunakan ringgit dan sen.',
       yearLevel: 4,
       progress: 0,
       mastery: 'Locked',
-      subtopics: [
-        Subtopic(
-          id: 'money_addition',
-          title: 'Add Money',
-          titleBm: 'Tambah Wang',
-          order: 1,
-          description: 'Add ringgit and sen in daily spending.',
-          descriptionBm: 'Tambah ringgit dan sen dalam perbelanjaan harian.',
-          questions: [
-            QuizQuestion(
-              subtopicId: 'money_addition',
-              question:
-                  'A pencil costs RM1.25 and an eraser costs RM0.50. What is the total?',
-              questionBm:
-                  'Sebatang pensel berharga RM1.25 dan pemadam berharga RM0.50. Berapakah jumlahnya?',
-              options: ['RM1.50', 'RM1.75', 'RM2.25', 'RM0.75'],
-              optionsBm: ['RM1.50', 'RM1.75', 'RM2.25', 'RM0.75'],
-              answerIndex: 1,
-              explanation: 'RM1.25 + RM0.50 = RM1.75.',
-              explanationBm: 'RM1.25 + RM0.50 = RM1.75.',
-            ),
-          ],
-        ),
-        Subtopic(
-          id: 'money_change',
-          title: 'Find Change',
-          titleBm: 'Cari Baki Wang',
-          order: 2,
-          description: 'Subtract spending from the amount paid.',
-          descriptionBm: 'Tolak perbelanjaan daripada jumlah bayaran.',
-          questions: [
-            QuizQuestion(
-              subtopicId: 'money_change',
-              question: 'You pay RM10 for an item costing RM6.40. What is the change?',
-              questionBm:
-                  'Anda membayar RM10 untuk barang berharga RM6.40. Berapakah bakinya?',
-              options: ['RM2.60', 'RM3.60', 'RM4.40', 'RM16.40'],
-              optionsBm: ['RM2.60', 'RM3.60', 'RM4.40', 'RM16.40'],
-              answerIndex: 1,
-              explanation: 'RM10.00 - RM6.40 = RM3.60.',
-              explanationBm: 'RM10.00 - RM6.40 = RM3.60.',
-            ),
-          ],
-        ),
-      ],
-    ),
-    const Topic(
-      id: 'fractions_y5',
-      title: 'Fractions',
-      titleBm: 'Pecahan',
-      area: 'Mixed numbers and fraction operations',
-      yearLevel: 5,
-      progress: 0,
-      mastery: 'New',
-      questions: [
-        QuizQuestion(
-          question: 'What is 1 1/2 + 1/2?',
-          options: ['1', '1 1/2', '2', '2 1/2'],
-          answerIndex: 2,
-          explanation: '1 1/2 plus 1/2 makes 2 wholes.',
-        ),
-        QuizQuestion(
-          question: 'Which fraction is equivalent to 3/5?',
-          options: ['6/10', '3/10', '5/3', '9/10'],
-          answerIndex: 0,
-          explanation: 'Multiply both numerator and denominator by 2.',
-        ),
-      ],
-    ),
-    const Topic(
-      id: 'decimals_y5',
-      title: 'Decimals',
-      titleBm: 'Perpuluhan',
-      area: 'Decimal addition and subtraction',
-      yearLevel: 5,
-      progress: 0,
-      mastery: 'New',
-      questions: [
-        QuizQuestion(
-          question: 'What is 2.35 + 1.4?',
-          options: ['2.49', '3.39', '3.75', '4.35'],
-          answerIndex: 2,
-          explanation: 'Line up decimal places: 2.35 + 1.40 = 3.75.',
-        ),
-        QuizQuestion(
-          question: 'What is 5.0 - 0.75?',
-          options: ['4.25', '4.35', '5.75', '3.25'],
-          answerIndex: 0,
-          explanation: '5.00 minus 0.75 equals 4.25.',
-        ),
-      ],
-    ),
-    const Topic(
-      id: 'percentages_y5',
-      title: 'Percentages',
-      titleBm: 'Peratus',
-      area: 'Percentage of quantities',
-      yearLevel: 5,
-      progress: 0,
-      mastery: 'New',
-      questions: [
-        QuizQuestion(
-          question: 'What is 25% of 80?',
-          options: ['10', '20', '25', '40'],
-          answerIndex: 1,
-          explanation: '25% is one quarter. One quarter of 80 is 20.',
-        ),
-        QuizQuestion(
-          question: '50% is the same as which fraction?',
-          options: ['1/4', '1/3', '1/2', '3/4'],
-          answerIndex: 2,
-          explanation: '50% means half of the whole.',
-        ),
-      ],
-    ),
-    const Topic(
-      id: 'measurement_y5',
-      title: 'Measurement',
-      titleBm: 'Ukuran',
-      area: 'Length, mass, and volume conversion',
-      yearLevel: 5,
-      progress: 0,
-      mastery: 'New',
-      questions: [
-        QuizQuestion(
-          question: 'How many centimetres are in 2.5 metres?',
-          options: ['25 cm', '250 cm', '2500 cm', '0.25 cm'],
-          answerIndex: 1,
-          explanation: '1 metre is 100 cm, so 2.5 metres is 250 cm.',
-        ),
-        QuizQuestion(
-          question: 'How many grams are in 3 kg?',
-          options: ['30 g', '300 g', '3000 g', '30000 g'],
-          answerIndex: 2,
-          explanation: '1 kg is 1000 g, so 3 kg is 3000 g.',
-        ),
-      ],
-    ),
-    const Topic(
-      id: 'fractions_y6',
-      title: 'Fractions',
-      titleBm: 'Pecahan',
-      area: 'Fraction problem solving',
-      yearLevel: 6,
-      progress: 0,
-      mastery: 'New',
-      questions: [
-        QuizQuestion(
-          question: 'What is 2/3 of 24?',
-          options: ['8', '12', '16', '18'],
-          answerIndex: 2,
-          explanation: 'One third of 24 is 8, so two thirds is 16.',
-        ),
-        QuizQuestion(
-          question: 'What is 3/4 x 20?',
-          options: ['10', '12', '15', '18'],
-          answerIndex: 2,
-          explanation: 'A quarter of 20 is 5, so three quarters is 15.',
-        ),
-      ],
-    ),
-    const Topic(
-      id: 'percentages_y6',
-      title: 'Percentages',
-      titleBm: 'Peratus',
-      area: 'Discounts, profit, and loss',
-      yearLevel: 6,
-      progress: 0,
-      mastery: 'New',
-      questions: [
-        QuizQuestion(
-          question: 'A RM50 bag has a 10% discount. What is the discount?',
-          options: ['RM5', 'RM10', 'RM15', 'RM45'],
-          answerIndex: 0,
-          explanation: '10% of RM50 is RM5.',
-        ),
-        QuizQuestion(
-          question: 'A price increases from RM40 to RM50. What is the increase?',
-          options: ['10%', '20%', '25%', '50%'],
-          answerIndex: 2,
-          explanation: 'The increase is RM10. RM10 out of RM40 is 25%.',
-        ),
-      ],
-    ),
-    const Topic(
-      id: 'ratio_y6',
-      title: 'Ratio',
-      titleBm: 'Nisbah',
-      area: 'Compare quantities using ratios',
-      yearLevel: 6,
-      progress: 0,
-      mastery: 'New',
-      questions: [
-        QuizQuestion(
-          question: 'The ratio of red to blue beads is 2:3. If there are 10 red beads, how many blue beads are there?',
-          options: ['12', '15', '20', '30'],
-          answerIndex: 1,
-          explanation: '2 parts equals 10, so 1 part equals 5. Blue is 3 parts, so 15.',
-        ),
-        QuizQuestion(
-          question: 'Simplify the ratio 12:18.',
-          options: ['2:3', '3:2', '4:9', '6:9'],
-          answerIndex: 0,
-          explanation: 'Divide both numbers by 6 to get 2:3.',
-        ),
-      ],
-    ),
-    const Topic(
-      id: 'data_y6',
-      title: 'Data Handling',
-      titleBm: 'Pengendalian Data',
-      area: 'Read charts and calculate averages',
-      yearLevel: 6,
-      progress: 0,
-      mastery: 'New',
-      questions: [
-        QuizQuestion(
-          question: 'Find the average of 6, 8, and 10.',
-          options: ['7', '8', '9', '10'],
-          answerIndex: 1,
-          explanation: '6 + 8 + 10 = 24, and 24 divided by 3 is 8.',
-        ),
-        QuizQuestion(
-          question: 'The mode of 3, 5, 5, 7, 8 is...',
-          options: ['3', '5', '7', '8'],
-          answerIndex: 1,
-          explanation: 'The mode is the value that appears most often.',
-        ),
-      ],
     ),
   ];
-
   static List<Topic> _localTopicsForYear(int yearLevel) {
     final normalizedYearLevel = yearLevel.clamp(4, 6);
     return _localTopicBank
@@ -525,10 +125,11 @@ class AppState extends ChangeNotifier {
   int screenTimeLimitMinutes = 30;
   int crystals = 124;
   int mutualAidEnergy = 36;
-  int? latestFractionsScore;
   final Set<String> claimedRecommendedMissionTopicIds = <String>{};
   final Set<String> _unlockedTopicIds = <String>{};
   final Set<String> _unlockedSubtopicIds = <String>{};
+  final Map<String, List<String>> _recentQuestionIdsBySubtopic =
+      <String, List<String>>{};
   final List<AiDiagnosis> aiDiagnoses = <AiDiagnosis>[];
   final List<OasisArea> oasisAreas = [
     const OasisArea(
@@ -540,11 +141,16 @@ class AppState extends ChangeNotifier {
       repairCost: 30,
       progress: 0.25,
       markerPosition: Offset(0.40, 0.55),
-      damagedImage: 'assets/illustrations/oasis_parts/fraction_bridge_damaged.png',
-      repairingImage: 'assets/illustrations/oasis_parts/fraction_bridge_repairing_50.png',
-      restoredImage: 'assets/illustrations/oasis_parts/fraction_bridge_restored_100.png',
-      homeOverlay50: 'assets/illustrations/oasis_parts/home_overlay_fraction_bridge_50.png',
-      homeOverlay100: 'assets/illustrations/oasis_parts/home_overlay_fraction_bridge_100.png',
+      damagedImage:
+          'assets/illustrations/oasis_parts/fraction_bridge_damaged.png',
+      repairingImage:
+          'assets/illustrations/oasis_parts/fraction_bridge_repairing_50.png',
+      restoredImage:
+          'assets/illustrations/oasis_parts/fraction_bridge_restored_100.png',
+      homeOverlay50:
+          'assets/illustrations/oasis_parts/home_overlay_fraction_bridge_50.png',
+      homeOverlay100:
+          'assets/illustrations/oasis_parts/home_overlay_fraction_bridge_100.png',
     ),
     const OasisArea(
       id: 'decimal_waterway',
@@ -555,11 +161,16 @@ class AppState extends ChangeNotifier {
       repairCost: 35,
       progress: 0,
       markerPosition: Offset(0.72, 0.35),
-      damagedImage: 'assets/illustrations/oasis_parts/decimal_waterway_damaged.png',
-      repairingImage: 'assets/illustrations/oasis_parts/decimal_waterway_repairing_50.png',
-      restoredImage: 'assets/illustrations/oasis_parts/decimal_waterway_restored_100.png',
-      homeOverlay50: 'assets/illustrations/oasis_parts/home_overlay_decimal_waterway_50.png',
-      homeOverlay100: 'assets/illustrations/oasis_parts/home_overlay_decimal_waterway_100.png',
+      damagedImage:
+          'assets/illustrations/oasis_parts/decimal_waterway_damaged.png',
+      repairingImage:
+          'assets/illustrations/oasis_parts/decimal_waterway_repairing_50.png',
+      restoredImage:
+          'assets/illustrations/oasis_parts/decimal_waterway_restored_100.png',
+      homeOverlay50:
+          'assets/illustrations/oasis_parts/home_overlay_decimal_waterway_50.png',
+      homeOverlay100:
+          'assets/illustrations/oasis_parts/home_overlay_decimal_waterway_100.png',
     ),
     const OasisArea(
       id: 'percentage_garden',
@@ -570,11 +181,16 @@ class AppState extends ChangeNotifier {
       repairCost: 40,
       progress: 0,
       markerPosition: Offset(0.14, 0.70),
-      damagedImage: 'assets/illustrations/oasis_parts/percentage_garden_damaged.png',
-      repairingImage: 'assets/illustrations/oasis_parts/percentage_garden_repairing_50.png',
-      restoredImage: 'assets/illustrations/oasis_parts/percentage_garden_restored_100.png',
-      homeOverlay50: 'assets/illustrations/oasis_parts/home_overlay_percentage_garden_50.png',
-      homeOverlay100: 'assets/illustrations/oasis_parts/home_overlay_percentage_garden_100.png',
+      damagedImage:
+          'assets/illustrations/oasis_parts/percentage_garden_damaged.png',
+      repairingImage:
+          'assets/illustrations/oasis_parts/percentage_garden_repairing_50.png',
+      restoredImage:
+          'assets/illustrations/oasis_parts/percentage_garden_restored_100.png',
+      homeOverlay50:
+          'assets/illustrations/oasis_parts/home_overlay_percentage_garden_50.png',
+      homeOverlay100:
+          'assets/illustrations/oasis_parts/home_overlay_percentage_garden_100.png',
     ),
     const OasisArea(
       id: 'market_corner',
@@ -585,11 +201,16 @@ class AppState extends ChangeNotifier {
       repairCost: 20,
       progress: 0.25,
       markerPosition: Offset(0.78, 0.62),
-      damagedImage: 'assets/illustrations/oasis_parts/market_corner_damaged.png',
-      repairingImage: 'assets/illustrations/oasis_parts/market_corner_repairing_50.png',
-      restoredImage: 'assets/illustrations/oasis_parts/market_corner_restored_100.png',
-      homeOverlay50: 'assets/illustrations/oasis_parts/home_overlay_market_corner_50.png',
-      homeOverlay100: 'assets/illustrations/oasis_parts/home_overlay_market_corner_100.png',
+      damagedImage:
+          'assets/illustrations/oasis_parts/market_corner_damaged.png',
+      repairingImage:
+          'assets/illustrations/oasis_parts/market_corner_repairing_50.png',
+      restoredImage:
+          'assets/illustrations/oasis_parts/market_corner_restored_100.png',
+      homeOverlay50:
+          'assets/illustrations/oasis_parts/home_overlay_market_corner_50.png',
+      homeOverlay100:
+          'assets/illustrations/oasis_parts/home_overlay_market_corner_100.png',
     ),
   ];
   final List<QuizAttempt> attempts = [];
@@ -616,7 +237,8 @@ class AppState extends ChangeNotifier {
   List<QuizAttempt> get recentAttempts => currentYearAttempts.take(4).toList();
 
   int get estimatedScreenTimeMinutesToday {
-    final minutes = (currentYearAttempts.length * 8) + (completedQuizzes > 0 ? 4 : 0);
+    final minutes =
+        (currentYearAttempts.length * 8) + (completedQuizzes > 0 ? 4 : 0);
     return minutes.clamp(0, screenTimeLimitMinutes).toInt();
   }
 
@@ -655,6 +277,32 @@ class AppState extends ChangeNotifier {
     ];
   }
 
+  /// Selects the U2 cold-start form without exposing any answer key. U3 moves
+  /// this assignment and exposure history to the authenticated server session.
+  List<QuizQuestion> selectQuestionForm({
+    required Topic topic,
+    required Subtopic subtopic,
+  }) {
+    final matchingBanks = year4ReadWriteNumberBanks.where(
+      (bank) =>
+          bank.topicId == topic.id &&
+          bank.subtopicId == subtopic.id &&
+          bank.isActive,
+    );
+    if (matchingBanks.isEmpty) return const <QuizQuestion>[];
+    final bank = matchingBanks.firstWhere(
+      (candidate) => candidate.difficulty.label == 'Easy',
+      orElse: () => matchingBanks.first,
+    );
+    final recentIds =
+        _recentQuestionIdsBySubtopic[subtopic.id] ?? const <String>[];
+    final form = bank.sampleFive(recentlySeenQuestionIds: recentIds);
+    _recentQuestionIdsBySubtopic[subtopic.id] = form
+        .map((question) => question.id)
+        .toList(growable: false);
+    return form;
+  }
+
   bool isTopicUnlocked(Topic topic) {
     final topicIndex = topics.indexWhere((item) => item.id == topic.id);
     if (topicIndex <= 0) return true;
@@ -676,7 +324,9 @@ class AppState extends ChangeNotifier {
 
   bool isSubtopicUnlocked(Topic topic, Subtopic subtopic) {
     final subtopics = subtopicsForTopic(topic);
-    final subtopicIndex = subtopics.indexWhere((item) => item.id == subtopic.id);
+    final subtopicIndex = subtopics.indexWhere(
+      (item) => item.id == subtopic.id,
+    );
     if (subtopicIndex <= 0) return true;
     if (_unlockedSubtopicIds.contains(_subtopicUnlockKey(topic, subtopic))) {
       return true;
@@ -687,7 +337,9 @@ class AppState extends ChangeNotifier {
   String? lockedReasonForSubtopic(Topic topic, Subtopic subtopic) {
     if (isSubtopicUnlocked(topic, subtopic)) return null;
     final subtopics = subtopicsForTopic(topic);
-    final subtopicIndex = subtopics.indexWhere((item) => item.id == subtopic.id);
+    final subtopicIndex = subtopics.indexWhere(
+      (item) => item.id == subtopic.id,
+    );
     if (subtopicIndex <= 0) return null;
     final previousSubtopic = subtopics[subtopicIndex - 1];
     return t(
@@ -1034,9 +686,6 @@ class AppState extends ChangeNotifier {
         ? newMastery
         : _topicMasteryFromSubtopics(updatedSubtopics);
 
-    latestFractionsScore = topicId == 'fractions_y4'
-        ? score
-        : latestFractionsScore;
     crystals += earnedCrystals;
     topics[topicIndex] = topic.copyWith(
       progress: learningProgress,
@@ -1295,15 +944,13 @@ class AppState extends ChangeNotifier {
     for (var index = 0; index < oasisAreas.length; index += 1) {
       final area = oasisAreas[index];
       // Force reset for testing!
-      oasisAreas[index] = area.copyWith(
-        progress: 0.0,
-      );
+      oasisAreas[index] = area.copyWith(progress: 0.0);
     }
-    
+
     // Give plenty of resources to test
     crystals = 800;
     mutualAidEnergy = 800;
-    
+
     // Sync the reset back to Firebase
     unawaited(_saveOasisProgressToFirebase());
   }
@@ -1461,11 +1108,12 @@ class AppState extends ChangeNotifier {
       final decoded = jsonDecode(encodedAttempts);
       if (decoded is! List) return;
 
-      final restoredAttempts = decoded
-          .map(_attemptFromSavedJson)
-          .whereType<QuizAttempt>()
-          .toList(growable: false)
-        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      final restoredAttempts =
+          decoded
+              .map(_attemptFromSavedJson)
+              .whereType<QuizAttempt>()
+              .toList(growable: false)
+            ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
       if (restoredAttempts.isEmpty) return;
 
       attempts
@@ -1477,7 +1125,9 @@ class AppState extends ChangeNotifier {
   }
 
   String _encodedSavedAttempts() {
-    final encodedAttempts = attempts.map(_attemptToJson).toList(growable: false);
+    final encodedAttempts = attempts
+        .map(_attemptToJson)
+        .toList(growable: false);
     return jsonEncode(encodedAttempts);
   }
 
@@ -1543,9 +1193,7 @@ class AppState extends ChangeNotifier {
       yearLevel: yearLevel.round().clamp(4, 6).toInt(),
       score: score.round().clamp(0, 100).toInt(),
       correctCount: correctCount.round(),
-      totalQuestions: totalQuestions.round() <= 0
-          ? 1
-          : totalQuestions.round(),
+      totalQuestions: totalQuestions.round() <= 0 ? 1 : totalQuestions.round(),
       earnedCrystals: earnedCrystals.round(),
       mastery: mastery,
       createdAt: parsedCreatedAt,

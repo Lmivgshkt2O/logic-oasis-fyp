@@ -39,7 +39,9 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.tap(find.text('Back to Forge'));
+    final backToForge = find.text('Back to Forge');
+    await tester.ensureVisible(backToForge);
+    await tester.tap(backToForge);
 
     expect(returnedToForge, isTrue);
   });

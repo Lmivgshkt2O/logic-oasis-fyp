@@ -6,6 +6,8 @@ This folder seeds the FYP1 demo Firestore database.
 
 - `seed_data.json`: demo data for the Logic Oasis AI-driven FYP1 prototype.
 - `seed_firestore.js`: script that uploads the demo data to Cloud Firestore.
+- `year4_read_write_question_banks.js`: trusted seed source for the three
+  FYP1 read/write-number banks and their server-only answer keys.
 - `package.json`: Node dependency setup for `firebase-admin`.
 - `serviceAccountKey.json`: your private Firebase key. Keep this local only.
 
@@ -25,6 +27,12 @@ npm install
 npm run seed
 ```
 
+Before seeding, validate the client/server content split:
+
+```powershell
+npm run validate:question-banks
+```
+
 The script uses `merge: true`, so rerunning it updates the same demo documents instead of creating random duplicates.
 
 ## Demo Collections
@@ -34,6 +42,8 @@ The script uses `merge: true`, so rerunning it updates the same demo documents i
 - `topics`
 - `subtopics`
 - `questions`
+- `questionBanks`
+- `questionAnswerKeys` (server-only; Firestore rules deny every client read)
 - `quizAttempts`
 - `topicMastery`
 - `subtopicMastery`
@@ -48,12 +58,13 @@ The script uses `merge: true`, so rerunning it updates the same demo documents i
 
 ## Current Learning Seed
 
-The current Year 4 seed mirrors the app's local Chapter 1 content:
+The current Year 4 adaptive evidence slice is:
 
 - Topic: `whole_numbers_y4` / Whole Numbers up to 100 000.
-- Subtopics: 5 bilingual KSSR-aligned subtopics.
-- Questions: 50 bilingual quiz questions, 10 per subtopic.
-- Bloom order per subtopic: Remember, Remember, Understand, Understand, Apply, Apply, Analyze, Analyze, Evaluate, Create.
+- One complete subtopic: `read_write_numbers`.
+- Exactly three bilingual banks: Easy, Moderate, and Hard.
+- Eight active prompts per bank; forms sample five and avoid recent prompts when alternatives exist.
+- Firestore `questions` documents contain prompts/options only. The seed script writes answer indexes and explanations separately to `questionAnswerKeys`.
 - Attempts and mastery: 3 seeded attempts for `whole_numbers_y4`, with 2 of 5 subtopics completed and subtopic mastery documents for the attempted subtopics.
 - Oasis persistence: one `oasisProgress` document with repaired area progress and saved settings fields.
 - Parent/AI evidence: one active parent link, one parent report, and one AI model run aligned to the same Whole Numbers topic.

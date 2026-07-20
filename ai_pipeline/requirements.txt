@@ -1,0 +1,7 @@
+firebase-admin
+pandas
+scikit-learn
+xgboost
+shap
+joblib
+PyYAML>=6.0

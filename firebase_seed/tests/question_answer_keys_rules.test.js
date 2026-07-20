@@ -53,6 +53,19 @@ async function main() {
       await setDoc(doc(adminDb, "adaptiveAssignments", "student_aiman_y4_read_write_numbers"), {
         studentId: "student_aiman_y4", subtopicId: "read_write_numbers", bankId: "bank_2",
       });
+      await setDoc(doc(adminDb, "subtopicMastery", "student_aiman_y4_y4_whole_numbers_read_write_numbers"), {
+        studentId: "student_aiman_y4", topicId: "whole_numbers_y4", subtopicId: "read_write_numbers",
+      });
+      await setDoc(doc(adminDb, "forumParticipationSummaries", "student_aiman_y4"), {
+        studentId: "student_aiman_y4", questionsPostedCount: 1, answersSubmittedCount: 2,
+        acceptedAnswersCount: 0, helpfulReceivedCount: 1,
+      });
+      await setDoc(doc(adminDb, "parentLinks", "parent_active_student_aiman_y4"), {
+        parentId: "parent_active", studentId: "student_aiman_y4", status: "active",
+      });
+      await setDoc(doc(adminDb, "parentLinks", "parent_revoked_student_aiman_y4"), {
+        parentId: "parent_revoked", studentId: "student_aiman_y4", status: "revoked",
+      });
       await setDoc(doc(adminDb, "aiJobs", "attempt_safe"), {
         studentId: "student_aiman_y4", errorCode: "model_load_failed",
       });
@@ -65,6 +78,9 @@ async function main() {
     });
 
     const studentDb = testEnv.authenticatedContext("student_aiman_y4").firestore();
+    const linkedParentDb = testEnv.authenticatedContext("parent_active").firestore();
+    const revokedParentDb = testEnv.authenticatedContext("parent_revoked").firestore();
+    const otherParentDb = testEnv.authenticatedContext("parent_other").firestore();
     const anonymousDb = testEnv.unauthenticatedContext().firestore();
 
     await assertSucceeds(getDoc(doc(studentDb, "questions", "safe_q1")));
@@ -101,6 +117,17 @@ async function main() {
     );
     await assertSucceeds(getDoc(doc(studentDb, "studentAiStatuses", "attempt_safe")));
     await assertSucceeds(getDoc(doc(studentDb, "adaptiveAssignments", "student_aiman_y4_read_write_numbers")));
+    await assertSucceeds(getDoc(doc(linkedParentDb, "studentAiStatuses", "attempt_safe")));
+    await assertSucceeds(getDoc(doc(linkedParentDb, "adaptiveAssignments", "student_aiman_y4_read_write_numbers")));
+    await assertSucceeds(getDoc(doc(linkedParentDb, "subtopicMastery", "student_aiman_y4_y4_whole_numbers_read_write_numbers")));
+    await assertSucceeds(getDoc(doc(linkedParentDb, "forumParticipationSummaries", "student_aiman_y4")));
+    await assertFails(getDoc(doc(revokedParentDb, "studentAiStatuses", "attempt_safe")));
+    await assertFails(getDoc(doc(otherParentDb, "forumParticipationSummaries", "student_aiman_y4")));
+    await assertFails(getDoc(doc(linkedParentDb, "aiModelRuns", "attempt_safe")));
+    await assertFails(getDoc(doc(linkedParentDb, "parentLinks", "parent_active_student_aiman_y4")));
+    await assertFails(setDoc(doc(studentDb, "parentLinks", "student_aiman_y4_parent_other"), {
+      parentId: "student_aiman_y4", studentId: "parent_other", status: "active",
+    }));
     await assertFails(getDoc(doc(studentDb, "aiJobs", "attempt_safe")));
     await assertFails(getDoc(doc(studentDb, "aiModelRuns", "attempt_safe")));
     await assertFails(getDoc(doc(studentDb, "modelRegistry", "xgboost_v1")));

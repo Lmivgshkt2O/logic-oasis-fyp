@@ -26,7 +26,9 @@ service cloud.firestore {
     function isActiveLinkedParent(studentId) {
       return signedIn() &&
         exists(/databases/$(database)/documents/parentLinks/$(request.auth.uid + '_' + studentId)) &&
-        get(/databases/$(database)/documents/parentLinks/$(request.auth.uid + '_' + studentId)).data.status == 'active';
+        get(/databases/$(database)/documents/parentLinks/$(request.auth.uid + '_' + studentId)).data.status == 'active' &&
+        get(/databases/$(database)/documents/parentLinks/$(request.auth.uid + '_' + studentId)).data.parentId == request.auth.uid &&
+        get(/databases/$(database)/documents/parentLinks/$(request.auth.uid + '_' + studentId)).data.studentId == studentId;
     }
 
     function ownsOrActiveLinkedParent(studentId) {
@@ -85,7 +87,9 @@ service cloud.firestore {
     }
 
     match /parentAccounts/{parentId} {
-      allow read, write: if signedIn();
+      // Superseded prototype records included password-derived data. U9 uses
+      // Firebase Auth plus the server-owned parentLinks relationship instead.
+      allow read, write: if false;
     }
 
     match /quizAttempts/{attemptId} {
@@ -113,6 +117,14 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // U10 will own this deliberately count-only projection. U9 reserves the
+    // safe read surface now; forum text, identities and moderation data have
+    // no client-readable rule.
+    match /forumParticipationSummaries/{studentId} {
+      allow read: if ownsOrActiveLinkedParent(studentId);
+      allow write: if false;
+    }
+
     match /oasisProgress/{progressId} {
       allow read: if ownsExistingStudentField();
       allow create, update: if ownsStudentField();
@@ -137,9 +149,19 @@ service cloud.firestore {
     }
 
     match /parentLinks/{linkId} {
-      // Clients cannot establish, reactivate, or inspect relationships.
+      // Clients cannot establish, reactivate, update, delete, or inspect
+      // relationships. U9's audited callable administration flow uses Admin
+      // SDK writes and is intentionally outside Rules.
       allow write: if false;
       allow read: if false;
+    }
+
+    match /adminRoleAudits/{auditId} {
+      allow read, write: if false;
+    }
+
+    match /parentLinkAudits/{auditId} {
+      allow read, write: if false;
     }
 
     match /{document=**} {

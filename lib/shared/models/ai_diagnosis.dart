@@ -1,181 +1,137 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:logic_oasis/shared/models/adaptive_assignment.dart';
 
+/// Safe, display-only composition of U8 projections.
+///
+/// This model intentionally has no raw feature values, SHAP arrays, artifact
+/// metadata, job errors, or model-registry values. A supportive reason is
+/// supplied only by the compatible, server-written adaptive assignment.
 class AiDiagnosis {
   const AiDiagnosis({
-    required this.id,
+    required this.attemptId,
     required this.studentId,
-    required this.topicId,
+    required this.sourceAttemptSequence,
+    required this.analysisState,
+    required this.displayCode,
+    String? topicId,
     this.yearLevel,
-    required this.modelName,
-    required this.xgboostPrediction,
-    required this.weaknessProbability,
-    required this.confidence,
-    required this.shapReasons,
-    required this.shapDetails,
-    required this.bktPriorKnowledge,
-    required this.bktLearnRate,
-    required this.bktGuessRate,
-    required this.bktSlipRate,
-    required this.bktMasteryProbability,
-    required this.finalMasteryLabel,
-    required this.recommendedAction,
-    required this.attemptsCount,
-    required this.createdAt,
-  });
+    this.masteryProbability,
+    this.weakTopicPriorityScore,
+    this.evidenceLevel,
+    this.observationCount,
+    this.rankingVersion,
+    this.assignment,
+    this.updatedAt,
+  }) : _topicId = topicId;
 
-  final String id;
+  final String attemptId;
   final String studentId;
-  final String topicId;
+  final int sourceAttemptSequence;
+  final String analysisState;
+  final String displayCode;
+  final String? _topicId;
+  String get topicId => _topicId ?? '';
   final int? yearLevel;
-  final String modelName;
-  final String xgboostPrediction;
-  final double weaknessProbability;
-  final double confidence;
-  final List<String> shapReasons;
-  final List<ShapDetail> shapDetails;
-  final double bktPriorKnowledge;
-  final double bktLearnRate;
-  final double bktGuessRate;
-  final double bktSlipRate;
-  final double bktMasteryProbability;
-  final String finalMasteryLabel;
-  final String recommendedAction;
-  final int attemptsCount;
-  final DateTime createdAt;
+  final double? masteryProbability;
+  final double? weakTopicPriorityScore;
+  final String? evidenceLevel;
+  final int? observationCount;
+  final String? rankingVersion;
+  final AdaptiveAssignment? assignment;
+  final DateTime? updatedAt;
 
-  double get priorityScore {
-    final masteryGap = 1 - bktMasteryProbability;
-    return (weaknessProbability * 0.65) + (masteryGap * 0.35);
+  double get priorityScore => weakTopicPriorityScore ?? 0;
+  double get bktMasteryProbability => masteryProbability ?? 0;
+  double get weaknessProbability => weakTopicPriorityScore ?? 0;
+  double get confidence => evidenceLevel == 'established' ? 1 : 0.5;
+  String get finalMasteryLabel {
+    final mastery = masteryProbability;
+    if (mastery == null) return 'Updating';
+    if (mastery >= 0.8) return 'Strong';
+    if (mastery >= 0.5) return 'Building';
+    return 'Needs practice';
   }
-
-  List<String> get explanationReasons {
-    if (shapReasons.isNotEmpty) return shapReasons;
-    return shapDetails
-        .map((detail) => detail.reason)
-        .where((reason) => reason.trim().isNotEmpty)
-        .toList(growable: false);
-  }
+  String get modelName => isCompleted ? 'Approved server analysis' : 'BKT guidance';
+  int get attemptsCount => observationCount ?? 0;
+  DateTime get createdAt => updatedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+  List<String> get explanationReasons =>
+      supportingReason == null ? const [] : <String>[supportingReason!];
+  String get recommendedAction => supportingReason ?? childFacingStatus;
 
   bool isNewerThan(AiDiagnosis other) {
-    final createdAtComparison = createdAt.compareTo(other.createdAt);
-    if (createdAtComparison != 0) return createdAtComparison > 0;
-    if (attemptsCount != other.attemptsCount) {
-      return attemptsCount > other.attemptsCount;
+    if (sourceAttemptSequence != other.sourceAttemptSequence) {
+      return sourceAttemptSequence > other.sourceAttemptSequence;
     }
-    return id.compareTo(other.id) > 0;
+    return createdAt.isAfter(other.createdAt);
   }
 
-  static AiDiagnosis? fromFirestore(String id, Map<String, dynamic> data) {
-    final studentId = data['studentId'];
-    final topicId = data['topicId'];
-    if (studentId is! String || topicId is! String) return null;
+  bool get isProcessing => analysisState == 'queued' || analysisState == 'processing';
+  bool get isCompleted => analysisState == 'completed';
+  bool get isFallback => analysisState == 'fallback';
+  bool get isFailed => analysisState == 'failed';
+  bool get hasCompatibleRanking =>
+      rankingVersion != null && rankingVersion!.isNotEmpty && masteryProbability != null;
 
+  /// Only server-projected child-friendly text may be shown as an explanation.
+  String? get supportingReason => assignment?.reasonText;
+
+  String get childFacingStatus => switch (analysisState) {
+    'completed' => 'Your next practice is ready.',
+    'fallback' => 'Your next practice is ready using your quiz progress.',
+    'failed' => 'Your quiz score is saved. Practice advice will be available later.',
+    _ => 'Your quiz score is saved. Preparing your next practice…',
+  };
+
+  static AiDiagnosis? fromSafeProjection(
+    String attemptId,
+    Map<String, dynamic> status, {
+    Map<String, dynamic>? mastery,
+    AdaptiveAssignment? assignment,
+  }) {
+    final studentId = status['studentId'];
+    final sourceAttemptSequence = _int(status['sourceAttemptSequence']);
+    final analysisState = status['analysisState'];
+    final displayCode = status['displayCode'];
+    if (studentId is! String ||
+        studentId.isEmpty ||
+        sourceAttemptSequence == null ||
+        sourceAttemptSequence < 1 ||
+        analysisState is! String ||
+        displayCode is! String) {
+      return null;
+    }
     return AiDiagnosis(
-      id: id,
+      attemptId: attemptId,
       studentId: studentId,
-      topicId: topicId,
-      yearLevel: _intValue(data['yearLevel']) ?? _yearFromTopicId(topicId),
-      modelName: _stringValue(data['modelName'], 'xgboost_shap_bkt_v1'),
-      xgboostPrediction: _stringValue(data['xgboostPrediction'], 'Moderate'),
-      weaknessProbability: _probabilityValue(data['weaknessProbability']),
-      confidence: _probabilityValue(data['confidence']),
-      shapReasons: _stringList(data['shapReasons']),
-      shapDetails: _shapDetails(data['shapDetails']),
-      bktPriorKnowledge: _probabilityValue(data['bktPriorKnowledge']),
-      bktLearnRate: _probabilityValue(data['bktLearnRate']),
-      bktGuessRate: _probabilityValue(data['bktGuessRate']),
-      bktSlipRate: _probabilityValue(data['bktSlipRate']),
-      bktMasteryProbability: _probabilityValue(data['bktMasteryProbability']),
-      finalMasteryLabel: _stringValue(data['finalMasteryLabel'], 'Moderate'),
-      recommendedAction: _stringValue(
-        data['recommendedAction'],
-        'Complete one guided practice mission.',
-      ),
-      attemptsCount: _intValue(data['attemptsCount']) ?? 0,
-      createdAt: data['createdAt'] is Timestamp
-          ? (data['createdAt'] as Timestamp).toDate()
-          : DateTime.fromMillisecondsSinceEpoch(0),
+      sourceAttemptSequence: sourceAttemptSequence,
+      analysisState: analysisState,
+      displayCode: displayCode,
+      topicId: _string(mastery?['topicId']),
+      yearLevel: _int(mastery?['yearLevel']),
+      masteryProbability: _probability(mastery?['masteryProbability']),
+      weakTopicPriorityScore: _probability(mastery?['weakTopicPriorityScore']),
+      evidenceLevel: _string(mastery?['evidenceLevel']),
+      observationCount: _int(mastery?['observationCount']),
+      rankingVersion: _string(mastery?['rankingVersion']),
+      assignment: assignment,
+      updatedAt: status['updatedAt'] is Timestamp
+          ? (status['updatedAt'] as Timestamp).toDate()
+          : null,
     );
   }
 
-  static String _stringValue(dynamic value, String fallback) {
-    return value is String && value.isNotEmpty ? value : fallback;
-  }
-
-  static double _doubleValue(dynamic value) {
-    return value is num ? value.toDouble() : 0;
-  }
-
-  static double _probabilityValue(dynamic value) {
-    final parsed = _doubleValue(value);
-    final normalized = parsed > 1 && parsed <= 100 ? parsed / 100 : parsed;
-    return normalized.clamp(0.0, 1.0).toDouble();
-  }
-
-  static int? _intValue(dynamic value) {
+  static int? _int(Object? value) {
     if (value is int) return value;
-    if (value is num) return value.round();
-    if (value is String) return int.tryParse(value);
+    if (value is num && value == value.roundToDouble()) return value.toInt();
     return null;
   }
 
-  static int? _yearFromTopicId(String topicId) {
-    final match = RegExp(r'(?:^|_)y([456])(?:_|$)').firstMatch(topicId);
-    return match == null ? null : int.tryParse(match.group(1)!);
+  static double? _probability(Object? value) {
+    if (value is! num) return null;
+    final normalized = value.toDouble();
+    return normalized >= 0 && normalized <= 1 ? normalized : null;
   }
 
-  static List<String> _stringList(dynamic value) {
-    if (value is! List) return const [];
-    return value.whereType<String>().toList(growable: false);
-  }
-
-  static List<ShapDetail> _shapDetails(dynamic value) {
-    if (value is! List) return const [];
-    return value
-        .whereType<Map>()
-        .map(ShapDetail.fromMap)
-        .whereType<ShapDetail>()
-        .toList(growable: false);
-  }
-}
-
-class ShapDetail {
-  const ShapDetail({
-    required this.feature,
-    required this.value,
-    required this.shapValue,
-    required this.direction,
-    required this.reason,
-    required this.source,
-  });
-
-  final String feature;
-  final Object? value;
-  final double? shapValue;
-  final String direction;
-  final String reason;
-  final String source;
-
-  static ShapDetail? fromMap(Map<dynamic, dynamic> data) {
-    final feature = data['feature'];
-    final reason = data['reason'];
-    if (feature is! String || reason is! String) return null;
-
-    return ShapDetail(
-      feature: feature,
-      value: data['value'],
-      shapValue: _nullableDoubleValue(data['shapValue']),
-      direction: _stringValue(data['direction'], 'unknown'),
-      reason: reason,
-      source: _stringValue(data['source'], 'unknown'),
-    );
-  }
-
-  static String _stringValue(dynamic value, String fallback) {
-    return value is String && value.isNotEmpty ? value : fallback;
-  }
-
-  static double? _nullableDoubleValue(dynamic value) {
-    return value is num ? value.toDouble() : null;
-  }
+  static String? _string(Object? value) =>
+      value is String && value.isNotEmpty ? value : null;
 }

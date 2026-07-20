@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:logic_oasis/app/logic_oasis_design.dart';
-import 'package:logic_oasis/features/settings/parent_auth_page.dart';
-import 'package:logic_oasis/features/settings/parent_link_page.dart';
+import 'package:logic_oasis/features/parent_dashboard/parent_dashboard_page.dart';
 import 'package:logic_oasis/l10n/app_localizations.dart';
 import 'package:logic_oasis/shared/repositories/auth_repository.dart';
 import 'package:logic_oasis/shared/state/app_state.dart';
@@ -236,7 +235,9 @@ class SettingsPage extends StatelessWidget {
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text(AppLocalizations.of(settingsContext)!.studentProfileUpdated),
+          content: Text(
+            AppLocalizations.of(settingsContext)!.studentProfileUpdated,
+          ),
         ),
       );
   }
@@ -297,7 +298,9 @@ class SettingsPage extends StatelessWidget {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context)!.languageSet(selected))),
+        SnackBar(
+          content: Text(AppLocalizations.of(context)!.languageSet(selected)),
+        ),
       );
   }
 
@@ -389,7 +392,10 @@ class SettingsPage extends StatelessWidget {
                 const SizedBox(height: 12),
                 _SafetyTile(
                   icon: 'lock_outline',
-                  title: state.t('Protected parent access', 'Akses ibu bapa dilindungi'),
+                  title: state.t(
+                    'Protected parent access',
+                    'Akses ibu bapa dilindungi',
+                  ),
                   body: state.t(
                     'Parent dashboard opens through a linked parent account and password gate.',
                     'Papan pemuka ibu bapa dibuka melalui akaun ibu bapa terpaut dan laluan kata laluan.',
@@ -413,7 +419,10 @@ class SettingsPage extends StatelessWidget {
                 ),
                 _SafetyTile(
                   icon: 'shield',
-                  title: state.t('Child-safe scope', 'Skop selamat kanak-kanak'),
+                  title: state.t(
+                    'Child-safe scope',
+                    'Skop selamat kanak-kanak',
+                  ),
                   body: state.t(
                     'The app avoids open chat and keeps student-facing navigation limited to Home, Forge, and Settings.',
                     'Aplikasi mengelakkan sembang terbuka dan mengehadkan navigasi murid kepada Home, Forge dan Settings.',
@@ -432,7 +441,9 @@ class SettingsPage extends StatelessWidget {
                     color: Colors.white,
                     size: 20,
                   ),
-                  label: Text(state.t('Open parent access', 'Buka akses ibu bapa')),
+                  label: Text(
+                    state.t('Open parent access', 'Buka akses ibu bapa'),
+                  ),
                 ),
               ],
             ),
@@ -443,66 +454,9 @@ class SettingsPage extends StatelessWidget {
   }
 
   Future<void> _openParentAccess(BuildContext context) async {
-    final navigator = Navigator.of(context);
-    final messenger = ScaffoldMessenger.of(context);
-    final repository = authRepository ?? AuthRepository();
-
-    try {
-      final parentAccount = await repository.fetchLinkedParentAccount(
-        studentId: state.currentStudentId,
-      );
-      if (!context.mounted) return;
-
-      if (parentAccount == null) {
-        final shouldRegister = await showDialog<bool>(
-          context: context,
-          builder: (context) {
-            final l10n = AppLocalizations.of(context)!;
-            return AlertDialog(
-              title: Text(l10n.parentAccountNotLinked),
-              content: Text(l10n.parentAccountNotLinkedBody),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(false),
-                  child: Text(l10n.cancel),
-                ),
-                FilledButton(
-                  onPressed: () => Navigator.of(context).pop(true),
-                  child: Text(l10n.createParentAccount),
-                ),
-              ],
-            );
-          },
-        );
-
-        if (shouldRegister != true || !context.mounted) return;
-        navigator.push(
-          MaterialPageRoute(
-            builder: (_) => ParentLinkPage(state: state, authRepository: repository),
-          ),
-        );
-        return;
-      }
-
-      navigator.push(
-        MaterialPageRoute(
-          builder: (_) => ParentAuthPage(
-            state: state,
-            parentAccount: parentAccount,
-            authRepository: repository,
-          ),
-        ),
-      );
-    } catch (_) {
-      if (!context.mounted) return;
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(
-            content: Text('Unable to check linked parent account. Please try again.'),
-          ),
-        );
-    }
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => ParentDashboardPage(state: state)),
+    );
   }
 
   void _showMessage(BuildContext context, String message) {
@@ -855,7 +809,11 @@ class _SettingsSection extends StatelessWidget {
       children: [
         Row(
           children: [
-            const Icon(Icons.eco_rounded, color: LogicOasisDesign.leaf, size: 15),
+            const Icon(
+              Icons.eco_rounded,
+              color: LogicOasisDesign.leaf,
+              size: 15,
+            ),
             const SizedBox(width: 5),
             Text(
               title,
@@ -1004,7 +962,10 @@ class _StudentProfileSheetState extends State<_StudentProfileSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(l10n.editStudentProfile, style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              l10n.editStudentProfile,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
             const SizedBox(height: 16),
             TextField(
               controller: nameController,
