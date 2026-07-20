@@ -1,5 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:logic_oasis/shared/models/adaptive_assignment.dart';
 import 'package:logic_oasis/shared/models/ai_diagnosis.dart';
+import 'package:logic_oasis/shared/models/question_bank.dart';
 import 'package:logic_oasis/shared/state/app_state.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -24,25 +26,30 @@ void main() {
     );
     state.aiDiagnoses.add(
       AiDiagnosis(
-        id: 'ai_fractions_focus',
+        attemptId: 'ai_fractions_focus',
         studentId: AppState.demoStudentId,
+        sourceAttemptSequence: 1,
+        analysisState: 'completed',
+        displayCode: 'analysis_complete',
         topicId: 'fractions_y4',
         yearLevel: 4,
-        modelName: 'xgboost_shap_bkt_v1',
-        xgboostPrediction: 'Weak',
-        weaknessProbability: 0.82,
-        confidence: 0.77,
-        shapReasons: const ['Low recent mastery probability'],
-        shapDetails: const [],
-        bktPriorKnowledge: 0.35,
-        bktLearnRate: 0.18,
-        bktGuessRate: 0.2,
-        bktSlipRate: 0.1,
-        bktMasteryProbability: 0.34,
-        finalMasteryLabel: 'Weak',
-        recommendedAction: 'Practise equivalent fractions.',
-        attemptsCount: 4,
-        createdAt: DateTime(2026, 7, 7, 10),
+        masteryProbability: 0.34,
+        weakTopicPriorityScore: 0.82,
+        evidenceLevel: 'preliminary',
+        observationCount: 4,
+        rankingVersion: 'weak-topic-ranking-v1',
+        assignment: const AdaptiveAssignment(
+          id: 'assignment_fractions_focus',
+          subtopicId: 'equivalent_fractions',
+          bankId: 'fractions_equivalent_easy_v1',
+          difficulty: QuestionDifficulty.easy,
+          policyVersion: 'adaptive-policy-v1',
+          reasonCode: 'practice_equivalent_fractions',
+          reasonText: 'Practise equivalent fractions.',
+          evidenceCount: 4,
+          usedBktFallback: false,
+        ),
+        updatedAt: DateTime(2026, 7, 7, 10),
       ),
     );
 
@@ -52,7 +59,7 @@ void main() {
     expect(state.recommendedMission.topicId, 'fractions_y4');
   });
 
-  test('year 4 first chapter has Bloom-sequenced complete subtopic quizzes', () {
+  test('year 4 FYP1 content exposes one secure adaptive-bank subtopic', () {
     final state = AppState();
     final wholeNumbers = state.topics.firstWhere(
       (topic) => topic.id == 'whole_numbers_y4',
@@ -60,14 +67,36 @@ void main() {
     final subtopics = state.subtopicsForTopic(wholeNumbers);
 
     expect(subtopics, hasLength(5));
-    for (final subtopic in subtopics) {
-      expect(subtopic.questions, hasLength(10));
-      expect(subtopic.questions.first.explanation, startsWith('Remember:'));
-      expect(subtopic.questions[2].explanation, startsWith('Understand:'));
-      expect(subtopic.questions[4].explanation, startsWith('Apply:'));
-      expect(subtopic.questions[6].explanation, startsWith('Analyze:'));
-      expect(subtopic.questions[8].explanation, startsWith('Evaluate:'));
-    }
+    final adaptiveSubtopic = subtopics.first;
+    expect(adaptiveSubtopic.id, 'read_write_numbers');
+    expect(adaptiveSubtopic.questions, hasLength(24));
+    expect(
+      adaptiveSubtopic.questions.map((question) => question.bankId).toSet(),
+      containsAll(<String>[
+        'y4_whole_read_write_easy_v1',
+        'y4_whole_read_write_moderate_v1',
+        'y4_whole_read_write_hard_v1',
+      ]),
+    );
+  });
+
+  test('cold-start selection returns a five-question Easy form', () {
+    final state = AppState();
+    final wholeNumbers = state.topics.firstWhere(
+      (topic) => topic.id == 'whole_numbers_y4',
+    );
+    final readWrite = state.subtopicsForTopic(wholeNumbers).first;
+
+    final form = state.selectQuestionForm(
+      topic: wholeNumbers,
+      subtopic: readWrite,
+    );
+
+    expect(form, hasLength(5));
+    expect(form.map((question) => question.id).toSet(), hasLength(5));
+    expect(form.map((question) => question.bankId).toSet(), <String>{
+      'y4_whole_read_write_easy_v1',
+    });
   });
 
   test('recommended mission becomes claimable after enough topic attempts', () {
@@ -125,80 +154,92 @@ void main() {
     );
   });
 
-  test('claimed recommended mission reward is restored from saved session', () async {
-    SharedPreferences.setMockInitialValues({
-      'logic_oasis_claimed_mission_topics': <String>['whole_numbers_y4'],
-    });
-    final state = AppState();
+  test(
+    'claimed recommended mission reward is restored from saved session',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        'logic_oasis_claimed_mission_topics': <String>['whole_numbers_y4'],
+      });
+      final state = AppState();
 
-    state.saveQuizResult(
-      topicId: 'whole_numbers_y4',
-      correctCount: 5,
-      totalQuestions: 5,
-    );
-    state.saveQuizResult(
-      topicId: 'whole_numbers_y4',
-      correctCount: 5,
-      totalQuestions: 5,
-    );
+      state.saveQuizResult(
+        topicId: 'whole_numbers_y4',
+        correctCount: 5,
+        totalQuestions: 5,
+      );
+      state.saveQuizResult(
+        topicId: 'whole_numbers_y4',
+        correctCount: 5,
+        totalQuestions: 5,
+      );
 
-    await state.loadSavedAppPreferences();
+      await state.loadSavedAppPreferences();
 
-    expect(state.recommendedMission.isReadyToClaim, isFalse);
-    expect(state.recommendedMission.rewardClaimed, isTrue);
-    expect(state.claimRecommendedMissionReward(), isFalse);
-  });
+      expect(state.recommendedMission.isReadyToClaim, isFalse);
+      expect(state.recommendedMission.rewardClaimed, isTrue);
+      expect(state.claimRecommendedMissionReward(), isFalse);
+    },
+  );
 
-  test('settings controls persist sound accessibility screen time and eye mode', () async {
-    SharedPreferences.setMockInitialValues({});
-    final state = AppState();
+  test(
+    'settings controls persist sound accessibility screen time and eye mode',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final state = AppState();
 
-    expect(state.eyeComfortMode, isFalse);
-    state.updateSoundEnabled(false);
-    state.updateAccessibilityMode(true);
-    state.updateMissionReminders(false);
-    state.updateScreenTimeLimit(45);
-    state.updateEyeComfortMode(true);
-    await state.saveAppSession();
+      expect(state.eyeComfortMode, isFalse);
+      state.updateSoundEnabled(false);
+      state.updateAccessibilityMode(true);
+      state.updateMissionReminders(false);
+      state.updateScreenTimeLimit(45);
+      state.updateEyeComfortMode(true);
+      await state.saveAppSession();
 
-    final restoredState = AppState();
-    await restoredState.loadSavedAppPreferences();
+      final restoredState = AppState();
+      await restoredState.loadSavedAppPreferences();
 
-    expect(restoredState.soundEnabled, isFalse);
-    expect(restoredState.accessibilityMode, isTrue);
-    expect(restoredState.missionReminders, isFalse);
-    expect(restoredState.screenTimeLimitMinutes, 45);
-    expect(restoredState.eyeComfortMode, isTrue);
-  });
+      expect(restoredState.soundEnabled, isFalse);
+      expect(restoredState.accessibilityMode, isTrue);
+      expect(restoredState.missionReminders, isFalse);
+      expect(restoredState.screenTimeLimitMinutes, 45);
+      expect(restoredState.eyeComfortMode, isTrue);
+    },
+  );
 
-  test('quiz attempts restore topic and subtopic progress after restart', () async {
-    SharedPreferences.setMockInitialValues({});
-    final state = AppState();
+  test(
+    'quiz attempts restore topic and subtopic progress after restart',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final state = AppState();
 
-    state.saveQuizResult(
-      topicId: 'whole_numbers_y4',
-      subtopicId: 'read_write_numbers',
-      correctCount: 6,
-      totalQuestions: 10,
-    );
-    await state.saveAppSession();
+      state.saveQuizResult(
+        topicId: 'whole_numbers_y4',
+        subtopicId: 'read_write_numbers',
+        correctCount: 6,
+        totalQuestions: 10,
+      );
+      await state.saveAppSession();
 
-    final restoredState = AppState();
-    await restoredState.loadSavedAppPreferences();
-    final wholeNumbers = restoredState.topics.firstWhere(
-      (topic) => topic.id == 'whole_numbers_y4',
-    );
-    final readWrite = restoredState
-        .subtopicsForTopic(wholeNumbers)
-        .firstWhere((subtopic) => subtopic.id == 'read_write_numbers');
+      final restoredState = AppState();
+      await restoredState.loadSavedAppPreferences();
+      final wholeNumbers = restoredState.topics.firstWhere(
+        (topic) => topic.id == 'whole_numbers_y4',
+      );
+      final readWrite = restoredState
+          .subtopicsForTopic(wholeNumbers)
+          .firstWhere((subtopic) => subtopic.id == 'read_write_numbers');
 
-    expect(restoredState.recentAttempts, hasLength(1));
-    expect(restoredState.recentAttempts.first.subtopicId, 'read_write_numbers');
-    expect(readWrite.progress, 0.6);
-    expect(readWrite.mastery, 'Moderate');
-    expect(wholeNumbers.progress, 0.2);
-    expect(restoredState.averageScore, 60);
-  });
+      expect(restoredState.recentAttempts, hasLength(1));
+      expect(
+        restoredState.recentAttempts.first.subtopicId,
+        'read_write_numbers',
+      );
+      expect(readWrite.progress, 0.6);
+      expect(readWrite.mastery, 'Moderate');
+      expect(wholeNumbers.progress, 0.2);
+      expect(restoredState.averageScore, 60);
+    },
+  );
 
   test('quiz result creates a valid first attempt for the selected topic', () {
     final state = AppState();
@@ -316,34 +357,39 @@ void main() {
     expect(state.isSubtopicUnlocked(refreshedTopic, subtopics[1]), isTrue);
   });
 
-  test('saved unlocks remain open even before current progress qualifies', () async {
-    SharedPreferences.setMockInitialValues({
-      'logic_oasis_unlocked_topics': <String>['fractions_y4'],
-      'logic_oasis_unlocked_subtopics': <String>[
-        'whole_numbers_y4::place_digit_value',
-      ],
-    });
-    final state = AppState();
+  test(
+    'saved unlocks remain open even before current progress qualifies',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        'logic_oasis_unlocked_topics': <String>['fractions_y4'],
+        'logic_oasis_unlocked_subtopics': <String>[
+          'whole_numbers_y4::place_digit_value',
+        ],
+      });
+      final state = AppState();
 
-    await state.loadSavedAppPreferences();
+      await state.loadSavedAppPreferences();
 
-    final wholeNumbers = state.topics.firstWhere(
-      (topic) => topic.id == 'whole_numbers_y4',
-    );
-    final subtopics = state.subtopicsForTopic(wholeNumbers);
-    final fractions = state.topics.firstWhere(
-      (topic) => topic.id == 'fractions_y4',
-    );
+      final wholeNumbers = state.topics.firstWhere(
+        (topic) => topic.id == 'whole_numbers_y4',
+      );
+      final subtopics = state.subtopicsForTopic(wholeNumbers);
+      final fractions = state.topics.firstWhere(
+        (topic) => topic.id == 'fractions_y4',
+      );
 
-    expect(subtopics.first.progress, 0);
-    expect(state.isSubtopicUnlocked(wholeNumbers, subtopics[1]), isTrue);
-    expect(fractions.mastery, 'Locked');
-    expect(state.isTopicUnlocked(fractions), isTrue);
-  });
+      expect(subtopics.first.progress, 0);
+      expect(state.isSubtopicUnlocked(wholeNumbers, subtopics[1]), isTrue);
+      expect(fractions.mastery, 'Locked');
+      expect(state.isTopicUnlocked(fractions), isTrue);
+    },
+  );
 
   test('main topics unlock only after previous topic completion', () {
     final state = AppState();
-    final fractions = state.topics.firstWhere((topic) => topic.id == 'fractions_y4');
+    final fractions = state.topics.firstWhere(
+      (topic) => topic.id == 'fractions_y4',
+    );
 
     expect(state.isTopicUnlocked(fractions), isFalse);
 
