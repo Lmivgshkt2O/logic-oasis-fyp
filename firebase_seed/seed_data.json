@@ -1,4 +1,7 @@
 {
+  "_seedMetadata": {
+    "questionBankSchemaVersion": "2026.07.15"
+  },
   "users": {
     "student_aiman_y4": {
       "displayName": "Aiman",
