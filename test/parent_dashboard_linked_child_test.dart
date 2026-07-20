@@ -135,10 +135,17 @@ void main() {
     );
     await tester.pump();
 
-    await tester.tap(find.byType(DropdownButtonFormField<LinkedChildContext>));
-    await tester.pumpAndSettle();
+    final childSelector = find.byType(
+      DropdownButtonFormField<LinkedChildContext>,
+    );
+    await tester.ensureVisible(childSelector);
+    await tester.tap(childSelector);
+    // The first child's snapshot intentionally remains pending, so the loading
+    // indicator never settles. Advance only the dropdown's entrance animation.
+    await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.text('Bela (Year 5)').last);
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
     firstLoad.completeError(StateError('stale A request failed'));
     await tester.pump();
 

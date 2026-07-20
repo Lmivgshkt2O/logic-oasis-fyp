@@ -65,17 +65,32 @@ link record required by U9 auditing. The developer's temporary
 `logic-oasis-identity-admin` was removed immediately after the run; the normal
 `roles/iam.serviceAccountUser` deployment binding remains.
 
+## Flutter UI smoke â€” 2026-07-19
+
+A separate disposable parent/student pair was created for one Flutter Web UI
+smoke test. The parent was authenticated through the local Flutter app, opened
+**Settings â†’ Parent Dashboard**, and the deployed callable returned exactly the
+linked disposable child. The screen displayed only that child's safe
+projections: one safe update, one mastery record, preliminary 60% mastery, and
+the assigned next practice. It did not display raw attempts, response text, AI
+jobs, model runs, SHAP detail, artifacts, or a parent-link document.
+
+The smoke link was revoked immediately after the check. Both disposable Auth
+accounts, both temporary `users` profiles, and all four safe projection
+documents were deleted. Its immutable grant/revoke audit records and revoked
+link remain as U9 audit evidence. The setup used the existing project-owner
+credential with the project quota attached; it did not restore the removed
+temporary service-account impersonation grant.
+
 ## Focused automated evidence
 
 - Python U9 contracts: 10 tests passed.
 - Python compilation for the callable context and live verifier: passed.
 - Dart format validation for the U9 Dart files: passed.
-- Flutter focused widget tests could not be accepted as passing in this Codex
-  environment: `flutter test` produced no output and hung twice. The orphaned
-  test processes were terminated without touching active editor tooling. The
-  test files remain ready to run locally:
-  `test/linked_child_context_test.dart` and
-  `test/parent_dashboard_linked_child_test.dart`.
-- The Flutter test runner and `flutter analyze` both hung without output in
-  this Codex environment; neither was recorded as passing. The isolated Dart
-  processes they left behind were terminated without touching editor tooling.
+- A stale Flutter SDK cache lock was cleared after confirming no active Flutter
+  CLI process held it. Flutter 3.35.6 then started normally.
+- Focused U9 widget tests passed: `flutter test --no-pub --reporter expanded
+  --concurrency=1 test/linked_child_context_test.dart
+  test/parent_dashboard_linked_child_test.dart` completed with **5 tests
+  passed**. The dashboard's linked-child selector was also exercised through
+  its pending-load race case.
