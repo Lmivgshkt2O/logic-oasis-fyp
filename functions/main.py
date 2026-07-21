@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
+from hashlib import sha256
 import os
 from pathlib import Path
 import sys
@@ -28,6 +29,7 @@ if str(_PACKAGE_ROOT) not in sys.path:
     sys.path.insert(0, str(_PACKAGE_ROOT))
 
 from ai_runtime import AI_RUNTIME_SERVICE_ACCOUNT, FirestoreRuntimeGateway, RuntimeBundle, process_finalized_attempt
+from logic_oasis_ai.sinks.firestore_sink import adaptive_assignment_id, subtopic_mastery_id
 from parent_link_admin import (
     PARENT_LINK_ADMIN_SERVICE_ACCOUNT,
     ParentLinkAdminError,
@@ -64,6 +66,8 @@ from quiz_session import (
 
 
 QUESTION_COUNT = 5
+MIN_BANK_QUESTION_COUNT = 8
+MAX_BANK_QUESTION_COUNT = 10
 SESSION_TTL_MINUTES = 30
 FUNCTION_REGION = "asia-southeast1"
 _TELEMETRY_FIELDS = frozenset({
@@ -191,27 +195,42 @@ def _reject_finalization_telemetry(data: dict[str, Any]) -> None:
         )
 
 
-def _active_easy_bank(topic_id: str, subtopic_id: str, year_level: int) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    bank_docs = list(
-        firestore_db().collection("questionBanks")
-        .where("topicId", "==", topic_id)
-        .where("subtopicId", "==", subtopic_id)
-        .where("yearLevel", "==", year_level)
-        .where("difficultyLevel", "==", "Easy")
-        .where("isActive", "==", True)
-        .limit(1)
-        .stream()
-    )
-    if not bank_docs:
-        raise QuizSessionError("failed-precondition", "No active Easy question bank is available.")
-    bank = dict(bank_docs[0].to_dict() or {})
-    bank["bankId"] = bank_docs[0].id
+def _bank_questions(
+    bank: dict[str, Any],
+    *,
+    topic_id: str,
+    subtopic_id: str,
+    year_level: int,
+    database: Any,
+) -> list[dict[str, Any]]:
+    """Return a complete, internally consistent server-owned bank only."""
+    bank_id = bank.get("bankId")
+    version = bank.get("version")
+    difficulty = bank.get("difficultyLevel")
+    if (
+        not isinstance(bank_id, str)
+        or not bank_id
+        or not isinstance(version, str)
+        or not version
+        or difficulty not in {"Easy", "Moderate", "Hard"}
+        or bank.get("topicId") != topic_id
+        or bank.get("subtopicId") != subtopic_id
+        or bank.get("yearLevel") != year_level
+        or bank.get("isActive") is not True
+    ):
+        raise QuizSessionError("failed-precondition", "The selected question bank is not compatible.")
+
     question_ids = bank.get("questionIds")
-    if not isinstance(question_ids, list) or len(question_ids) < QUESTION_COUNT:
+    if (
+        not isinstance(question_ids, list)
+        or len(question_ids) < MIN_BANK_QUESTION_COUNT
+        or len(question_ids) > MAX_BANK_QUESTION_COUNT
+        or any(not isinstance(item, str) or not item for item in question_ids)
+        or len(set(question_ids)) != len(question_ids)
+    ):
         raise QuizSessionError("failed-precondition", "The active question bank is incomplete.")
-    database = firestore_db()
     snapshots = database.get_all(
-        [database.collection("questions").document(str(item)) for item in question_ids]
+        [database.collection("questions").document(question_id) for question_id in question_ids]
     )
     questions = []
     for snapshot in snapshots:
@@ -221,56 +240,464 @@ def _active_easy_bank(topic_id: str, subtopic_id: str, year_level: int) -> tuple
             questions.append(question)
     questions = [
         question for question in questions
-        if question.get("bankId") == bank["bankId"]
-        and question.get("contentVersion") == bank.get("version")
+        if question.get("bankId") == bank_id
+        and question.get("topicId") == topic_id
+        and question.get("subtopicId") == subtopic_id
+        and question.get("yearLevel") == year_level
+        and question.get("difficultyLevel") == difficulty
+        and question.get("contentVersion") == version
         and question.get("isActive") is True
     ]
-    questions.sort(key=lambda item: (item.get("order", 0), item["questionId"]))
-    if len(questions) < QUESTION_COUNT:
+    if {question["questionId"] for question in questions} != set(question_ids):
         raise QuizSessionError("failed-precondition", "The active question bank has too few valid prompts.")
-    selected = questions[:QUESTION_COUNT]
-    skill_ids = {question.get("skillId") for question in selected}
-    if None in skill_ids or len(skill_ids) != 1:
+    if any(
+        isinstance(question.get("order"), bool)
+        or not isinstance(question.get("order"), int)
+        or question["order"] < 0
+        for question in questions
+    ):
+        raise QuizSessionError("failed-precondition", "The active question bank has invalid prompt order.")
+    questions.sort(key=lambda item: (item["order"], item["questionId"]))
+    skill_ids = {question.get("skillId") for question in questions}
+    if (
+        len(skill_ids) != 1
+        or any(not isinstance(skill_id, str) or not skill_id for skill_id in skill_ids)
+    ):
         raise QuizSessionError(
             "failed-precondition",
             "The active question bank must contain one skill per quiz session.",
         )
-    return bank, selected
+    key_snapshots = database.get_all(
+        [database.collection("questionAnswerKeys").document(question["questionId"]) for question in questions]
+    )
+    keys = {snapshot.id: dict(snapshot.to_dict() or {}) for snapshot in key_snapshots if snapshot.exists}
+    for question in questions:
+        options = question.get("options")
+        options_bm = question.get("optionsBm")
+        key = keys.get(question["questionId"])
+        answer_index = key.get("answerIndex") if key else None
+        if (
+            not isinstance(options, list)
+            or not isinstance(options_bm, list)
+            or len(options) != 4
+            or len(options_bm) != 4
+            or any(not isinstance(option, str) or not option for option in [*options, *options_bm])
+            or not key
+            or key.get("questionId") != question["questionId"]
+            or key.get("contentVersion") != version
+            or key.get("isActive") is not True
+            or isinstance(answer_index, bool)
+            or not isinstance(answer_index, int)
+            or answer_index < 0
+            or answer_index >= len(options)
+            or not isinstance(key.get("explanation"), str)
+            or not key.get("explanation")
+            or not isinstance(key.get("explanationBm"), str)
+            or not key.get("explanationBm")
+        ):
+            raise QuizSessionError("failed-precondition", "The active question bank has invalid answer content.")
+    return questions
+
+
+def _select_question_form(questions: list[dict[str, Any]], source_sequence: int) -> list[dict[str, Any]]:
+    """Produce a bounded deterministic form from server-owned attempt order."""
+    offset = (max(0, source_sequence - 1) * QUESTION_COUNT) % len(questions)
+    rotated = [*questions[offset:], *questions[:offset]]
+    return rotated[:QUESTION_COUNT]
+
+
+def _next_form_sequence(student_id: str, subtopic_id: str, database: Any) -> int:
+    """Read the server-owned completed-attempt counter without allocating it."""
+    snapshot = (
+        database.collection("studentSubtopicSequenceStates")
+        .document(student_id)
+        .collection("subtopics")
+        .document(subtopic_id)
+        .get()
+    )
+    if not snapshot.exists:
+        return 1
+    last_allocated = (snapshot.to_dict() or {}).get("lastAllocatedSequence")
+    if isinstance(last_allocated, bool) or not isinstance(last_allocated, int) or last_allocated < 0:
+        return 1
+    return last_allocated + 1
+
+
+def _active_easy_bank(topic_id: str, subtopic_id: str, year_level: int, *, database: Any) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    bank_docs = list(
+        database.collection("questionBanks")
+        .where("topicId", "==", topic_id)
+        .where("subtopicId", "==", subtopic_id)
+        .where("yearLevel", "==", year_level)
+        .where("difficultyLevel", "==", "Easy")
+        .where("isActive", "==", True)
+        .stream()
+    )
+    for snapshot in sorted(bank_docs, key=lambda item: item.id):
+        bank = dict(snapshot.to_dict() or {})
+        bank["bankId"] = snapshot.id
+        try:
+            return bank, _bank_questions(
+                bank,
+                topic_id=topic_id,
+                subtopic_id=subtopic_id,
+                year_level=year_level,
+                database=database,
+            )
+        except QuizSessionError:
+            continue
+    raise QuizSessionError("failed-precondition", "No complete active Easy question bank is available.")
+
+
+def _compatible_adaptive_assignment(
+    *,
+    student_id: str,
+    topic_id: str,
+    subtopic_id: str,
+    year_level: int,
+    database: Any,
+) -> dict[str, Any] | None:
+    """Accept only a current U8 runtime-created assignment for this learner.
+
+    A document is not treated as trustworthy merely because it occupies the
+    predictable projection path. Its source must be the matching finalized
+    runtime attempt, and its sequence must still match the current safe
+    mastery projection. This prevents seed/demo or stale data from becoming a
+    normal quiz-start path.
+    """
+    assignment_id = adaptive_assignment_id(student_id, subtopic_id)
+    snapshot = database.collection("adaptiveAssignments").document(assignment_id).get()
+    if not snapshot.exists:
+        return None
+    assignment = dict(snapshot.to_dict() or {})
+    source_attempt_id = assignment.get("sourceAttemptId")
+    source_sequence = assignment.get("sourceAttemptSequence")
+    bank_id = assignment.get("bankId")
+    policy_version = assignment.get("policyVersion")
+    difficulty = assignment.get("difficultyLevel")
+    if (
+        assignment.get("studentId") != student_id
+        or assignment.get("subtopicId") != subtopic_id
+        or assignment.get("status") != "assigned"
+        or assignment.get("dataSource") != "runtime_callable"
+        or not isinstance(source_attempt_id, str)
+        or not source_attempt_id
+        or isinstance(source_sequence, bool)
+        or not isinstance(source_sequence, int)
+        or source_sequence < 1
+        or not isinstance(bank_id, str)
+        or not bank_id
+        or difficulty not in {"Easy", "Moderate", "Hard"}
+        or not isinstance(policy_version, str)
+        or not policy_version
+    ):
+        return None
+
+    attempt_snapshot = database.collection("quizAttempts").document(source_attempt_id).get()
+    if not attempt_snapshot.exists:
+        return None
+    attempt = dict(attempt_snapshot.to_dict() or {})
+    if (
+        attempt.get("attemptId") != source_attempt_id
+        or attempt.get("studentId") != student_id
+        or attempt.get("topicId") != topic_id
+        or attempt.get("subtopicId") != subtopic_id
+        or attempt.get("yearLevel") != year_level
+        or attempt.get("sourceAttemptSequence") != source_sequence
+        or attempt.get("validationStatus") != "finalized"
+        or attempt.get("finalizationStatus") != "finalized"
+        or attempt.get("dataSource") != "runtime_callable"
+    ):
+        return None
+
+    mastery_id = subtopic_mastery_id(student_id, year_level, topic_id, subtopic_id)
+    mastery_snapshot = database.collection("subtopicMastery").document(mastery_id).get()
+    if not mastery_snapshot.exists:
+        return None
+    mastery = dict(mastery_snapshot.to_dict() or {})
+    if (
+        mastery.get("studentId") != student_id
+        or mastery.get("yearLevel") != year_level
+        or mastery.get("topicId") != topic_id
+        or mastery.get("subtopicId") != subtopic_id
+        or mastery.get("lastSourceAttemptId") != source_attempt_id
+        or mastery.get("sourceAttemptSequence") != source_sequence
+    ):
+        return None
+
+    return {
+        "assignmentId": assignment_id,
+        "assignmentSource": "runtime_adaptive",
+        "adaptivePolicyVersion": policy_version,
+        "bankId": bank_id,
+        "difficultyLevel": difficulty,
+        "assignedFromAttemptId": source_attempt_id,
+        "assignedFromAttemptSequence": source_sequence,
+        "formSequence": source_sequence + 1,
+    }
+
+
+def _start_bank_selection(
+    *,
+    student_id: str,
+    topic_id: str,
+    subtopic_id: str,
+    year_level: int,
+    database: Any,
+) -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, Any]]:
+    assignment = _compatible_adaptive_assignment(
+        student_id=student_id,
+        topic_id=topic_id,
+        subtopic_id=subtopic_id,
+        year_level=year_level,
+        database=database,
+    )
+    if assignment is not None:
+        try:
+            snapshot = database.collection("questionBanks").document(assignment["bankId"]).get()
+            if snapshot.exists:
+                bank = dict(snapshot.to_dict() or {})
+                bank["bankId"] = snapshot.id
+                if bank.get("difficultyLevel") == assignment["difficultyLevel"]:
+                    questions = _bank_questions(
+                        bank,
+                        topic_id=topic_id,
+                        subtopic_id=subtopic_id,
+                        year_level=year_level,
+                        database=database,
+                    )
+                    return bank, questions, assignment
+        except QuizSessionError:
+            # A malformed/stale server projection must not block the learner or
+            # turn into a client-controlled bank choice.
+            pass
+
+    bank, questions = _active_easy_bank(
+        topic_id,
+        subtopic_id,
+        year_level,
+        database=database,
+    )
+    return bank, questions, {
+        "assignmentId": "cold_start_easy",
+        "assignmentSource": "cold_start_easy",
+        "adaptivePolicyVersion": "adaptive-policy-v1",
+        "bankId": bank["bankId"],
+        "difficultyLevel": "Easy",
+        "assignedFromAttemptId": None,
+        "assignedFromAttemptSequence": None,
+        "formSequence": _next_form_sequence(student_id, subtopic_id, database),
+    }
+
+
+def _active_session_reservation_id(
+    *, student_id: str, topic_id: str, subtopic_id: str, year_level: int
+) -> str:
+    """Return an opaque server-owned key for one learner's active quiz scope."""
+    material = "\x00".join((student_id, topic_id, subtopic_id, str(year_level)))
+    return sha256(material.encode("utf-8")).hexdigest()
+
+
+def _session_questions(session: dict[str, Any], database: Any) -> list[dict[str, Any]]:
+    """Rehydrate the already sealed prompt order for an idempotent start retry."""
+    question_ids = session.get("questionIds")
+    expected_count = session.get("expectedResponseCount")
+    if (
+        not isinstance(question_ids, list)
+        or not question_ids
+        or any(not isinstance(question_id, str) or not question_id for question_id in question_ids)
+        or len(set(question_ids)) != len(question_ids)
+        or expected_count != len(question_ids)
+    ):
+        raise QuizSessionError("failed-precondition", "The active quiz session is invalid. Start a new quiz.")
+    snapshots = database.get_all(
+        [database.collection("questions").document(question_id) for question_id in question_ids]
+    )
+    by_id = {
+        snapshot.id: {**dict(snapshot.to_dict() or {}), "questionId": snapshot.id}
+        for snapshot in snapshots
+        if snapshot.exists
+    }
+    if set(by_id) != set(question_ids):
+        raise QuizSessionError("failed-precondition", "The active quiz content is unavailable. Start a new quiz.")
+    return [by_id[question_id] for question_id in question_ids]
+
+
+def _is_active_session(session: dict[str, Any], *, now: datetime) -> bool:
+    expires_at = session.get("expiresAt")
+    return (
+        session.get("status") == "active"
+        and isinstance(expires_at, datetime)
+        and now < expires_at
+    )
+
+
+def _active_session_from_reservation(
+    *,
+    reservation: dict[str, Any],
+    student_id: str,
+    topic_id: str,
+    subtopic_id: str,
+    year_level: int,
+    now: datetime,
+    database: Any,
+    transaction: Any | None = None,
+) -> dict[str, Any] | None:
+    """Return only a still-live reservation whose server-owned scope matches."""
+    session_id = reservation.get("sessionId")
+    if (
+        reservation.get("studentId") != student_id
+        or reservation.get("topicId") != topic_id
+        or reservation.get("subtopicId") != subtopic_id
+        or reservation.get("yearLevel") != year_level
+        or not isinstance(session_id, str)
+        or not session_id
+    ):
+        return None
+    session_ref = database.collection("quizSessions").document(session_id)
+    snapshot = session_ref.get(transaction=transaction) if transaction is not None else session_ref.get()
+    if not snapshot.exists:
+        return None
+    session = dict(snapshot.to_dict() or {})
+    if (
+        session.get("sessionId") != session_id
+        or session.get("studentId") != student_id
+        or session.get("topicId") != topic_id
+        or session.get("subtopicId") != subtopic_id
+        or session.get("yearLevel") != year_level
+        or not _is_active_session(session, now=now)
+    ):
+        return None
+    return session
+
+
+def _reserve_or_reuse_active_session(
+    *,
+    session: dict[str, Any],
+    student_id: str,
+    topic_id: str,
+    subtopic_id: str,
+    year_level: int,
+    now: datetime,
+    database: Any,
+) -> tuple[dict[str, Any], bool]:
+    """Atomically create one active session or return the existing retry target."""
+    reservation_ref = database.collection("activeQuizSessionStarts").document(
+        _active_session_reservation_id(
+            student_id=student_id,
+            topic_id=topic_id,
+            subtopic_id=subtopic_id,
+            year_level=year_level,
+        )
+    )
+    session_ref = database.collection("quizSessions").document(session["sessionId"])
+    reservation = {
+        "sessionId": session["sessionId"],
+        "studentId": student_id,
+        "topicId": topic_id,
+        "subtopicId": subtopic_id,
+        "yearLevel": year_level,
+        "expiresAt": session["expiresAt"],
+        "updatedAt": firestore.SERVER_TIMESTAMP,
+    }
+
+    @firestore.transactional
+    def reserve(transaction: firestore.Transaction) -> tuple[dict[str, Any], bool]:
+        current_snapshot = reservation_ref.get(transaction=transaction)
+        if current_snapshot.exists:
+            existing = _active_session_from_reservation(
+                reservation=dict(current_snapshot.to_dict() or {}),
+                student_id=student_id,
+                topic_id=topic_id,
+                subtopic_id=subtopic_id,
+                year_level=year_level,
+                now=now,
+                database=database,
+                transaction=transaction,
+            )
+            if existing is not None:
+                return existing, False
+        transaction.create(session_ref, session)
+        transaction.set(reservation_ref, reservation)
+        return session, True
+
+    return reserve(database.transaction())
 
 
 def start_quiz_session(data: dict[str, Any], student_id: str) -> dict[str, Any]:
     topic_id = _string(data, "topicId")
     subtopic_id = _string(data, "subtopicId")
     year_level = _int(data, "yearLevel")
-    bank, questions = _active_easy_bank(topic_id, subtopic_id, year_level)
+    database = firestore_db()
     now = datetime.now(timezone.utc)
+    reservation_ref = database.collection("activeQuizSessionStarts").document(
+        _active_session_reservation_id(
+            student_id=student_id,
+            topic_id=topic_id,
+            subtopic_id=subtopic_id,
+            year_level=year_level,
+        )
+    )
+    existing_reservation = reservation_ref.get()
+    if existing_reservation.exists:
+        existing = _active_session_from_reservation(
+            reservation=dict(existing_reservation.to_dict() or {}),
+            student_id=student_id,
+            topic_id=topic_id,
+            subtopic_id=subtopic_id,
+            year_level=year_level,
+            now=now,
+            database=database,
+        )
+        if existing is not None:
+            return client_session(existing, _session_questions(existing, database))
+    bank, questions, assignment = _start_bank_selection(
+        student_id=student_id,
+        topic_id=topic_id,
+        subtopic_id=subtopic_id,
+        year_level=year_level,
+        database=database,
+    )
+    selected_questions = _select_question_form(questions, assignment["formSequence"])
     session_id = f"session_{uuid4().hex}"
     session = {
         "sessionId": session_id,
         "attemptId": f"attempt_{uuid4().hex}",
         "studentId": student_id,
-        # U5 may replace this cold-start source with an active assignment.
-        "assignmentId": "cold_start_easy",
-        "assignmentSource": "cold_start_easy",
-        # This is an audit label for the cold-start decision, not a client
-        # supplied policy or a runtime model result.
-        "adaptivePolicyVersion": "adaptive-policy-v1",
+        "assignmentId": assignment["assignmentId"],
+        "assignmentSource": assignment["assignmentSource"],
+        # The policy version is selected only from the trusted runtime
+        # assignment; clients cannot choose a policy or bank.
+        "adaptivePolicyVersion": assignment["adaptivePolicyVersion"],
+        "assignedFromAttemptId": assignment["assignedFromAttemptId"],
+        "assignedFromAttemptSequence": assignment["assignedFromAttemptSequence"],
+        "formSequence": assignment["formSequence"],
         "bankId": bank["bankId"],
         "topicId": topic_id,
         "subtopicId": subtopic_id,
         "yearLevel": year_level,
-        "difficultyLevel": "Easy",
+        "difficultyLevel": assignment["difficultyLevel"],
         "contentVersion": bank["version"],
-        "questionIds": [question["questionId"] for question in questions],
-        "expectedResponseCount": len(questions),
+        "questionIds": [question["questionId"] for question in selected_questions],
+        "expectedResponseCount": len(selected_questions),
         "status": "active",
         "validatedResponseCount": 0,
         "startedAt": now,
         "expiresAt": now + timedelta(minutes=SESSION_TTL_MINUTES),
         "finalizedAt": None,
     }
-    firestore_db().collection("quizSessions").document(session_id).create(session)
-    return client_session(session, questions)
+    active_session, created = _reserve_or_reuse_active_session(
+        session=session,
+        student_id=student_id,
+        topic_id=topic_id,
+        subtopic_id=subtopic_id,
+        year_level=year_level,
+        now=now,
+        database=database,
+    )
+    if not created:
+        return client_session(active_session, _session_questions(active_session, database))
+    return client_session(active_session, selected_questions)
 
 
 def submit_quiz_response(data: dict[str, Any], student_id: str) -> dict[str, Any]:
@@ -490,6 +917,9 @@ def finalize_quiz_session(data: dict[str, Any], student_id: str) -> dict[str, An
             "assignmentId": session["assignmentId"],
             "assignmentSource": session["assignmentSource"],
             "adaptivePolicyVersion": session["adaptivePolicyVersion"],
+            "assignedFromAttemptId": session.get("assignedFromAttemptId"),
+            "assignedFromAttemptSequence": session.get("assignedFromAttemptSequence"),
+            "formSequence": session.get("formSequence"),
             "correctCount": correct_count, "totalQuestions": total,
             "score": round(correct_count * 100 / total),
             "trustedCorrectCount": correct_count,

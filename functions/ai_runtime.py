@@ -277,7 +277,11 @@ def _assignment(attempt: Mapping[str, Any], mastery: float, evidence: int, suppo
     if not decision.is_assignable:
         return None
     return {**decision.to_firestore_document(), "studentId": attempt["studentId"], "subtopicId": attempt["subtopicId"],
-            "sourceAttemptId": attempt["attemptId"], "sourceAttemptSequence": attempt["sourceAttemptSequence"]}
+            "sourceAttemptId": attempt["attemptId"], "sourceAttemptSequence": attempt["sourceAttemptSequence"],
+            # `startQuizSession` consumes only assignments whose lineage can
+            # be traced to this trusted callable-finalized attempt. Seed/demo
+            # rows and manually shaped records are never a normal runtime path.
+            "dataSource": "runtime_callable"}
 
 
 def _subtopic_mastery(attempt: Mapping[str, Any], snapshot: Any, risk: float | None, bundle: RuntimeBundle) -> dict[str, Any]:
@@ -430,9 +434,39 @@ class FirestoreRuntimeGateway:
         return attempts, responses
 
     def banks(self, attempt: Mapping[str, Any]) -> list[Mapping[str, Any]]:
-        return [_snapshot_dict(snapshot) or {} for snapshot in self.db.collection("questionBanks").where(
+        # Exposure belongs to this learner's trusted history, never to a shared
+        # bank document. Including the just-finalized source attempt means the
+        # next policy decision prefers another eligible bank at the same level.
+        exposure_by_bank: dict[str, int] = {}
+        for snapshot in self.db.collection("quizAttempts").where(
+            "studentId", "==", attempt["studentId"]
+        ).where("subtopicId", "==", attempt["subtopicId"]).stream():
+            record = _snapshot_dict(snapshot) or {}
+            sequence = record.get("sourceAttemptSequence")
+            bank_id = record.get("bankId")
+            if (
+                record.get("validationStatus") == "finalized"
+                and record.get("finalizationStatus") == "finalized"
+                and record.get("dataSource") == "runtime_callable"
+                and isinstance(sequence, int)
+                and not isinstance(sequence, bool)
+                and 0 < sequence <= attempt["sourceAttemptSequence"]
+                and isinstance(bank_id, str)
+                and bank_id
+            ):
+                exposure_by_bank[bank_id] = exposure_by_bank.get(bank_id, 0) + 1
+
+        banks = []
+        for snapshot in self.db.collection("questionBanks").where(
             "topicId", "==", attempt["topicId"]).where("subtopicId", "==", attempt["subtopicId"]).where(
-            "yearLevel", "==", attempt["yearLevel"]).stream()]
+            "yearLevel", "==", attempt["yearLevel"]).stream():
+            bank = _snapshot_dict(snapshot) or {}
+            bank_id = bank.get("bankId", snapshot.id)
+            if isinstance(bank_id, str) and bank_id:
+                bank["bankId"] = bank_id
+                bank["exposureCount"] = exposure_by_bank.get(bank_id, 0)
+            banks.append(bank)
+        return banks
 
     def active_registry(self) -> Mapping[str, Any] | None:
         rows = list(self.db.collection("modelRegistry").where("isActive", "==", True).limit(2).stream())
