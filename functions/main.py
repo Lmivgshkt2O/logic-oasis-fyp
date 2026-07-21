@@ -424,6 +424,21 @@ def finalize_quiz_session(data: dict[str, Any], student_id: str) -> dict[str, An
         if isinstance(previous_sequence, bool) or not isinstance(previous_sequence, int) or previous_sequence < 0:
             raise QuizSessionError("failed-precondition", "Attempt sequence state is invalid.")
         source_attempt_sequence = previous_sequence + 1
+        correct_rate = correct_count / total
+        mastery_ref = database.collection("subtopicMastery").document(
+            f'{student_id}_y{session["yearLevel"]}_{session["topicId"]}_{session["subtopicId"]}'
+        )
+        mastery_snapshot = mastery_ref.get(transaction=transaction)
+        existing_mastery = dict(mastery_snapshot.to_dict() or {}) if mastery_snapshot.exists else {}
+        previous_rate = existing_mastery.get("bestCorrectRate", 0.0)
+        if isinstance(previous_rate, bool) or not isinstance(previous_rate, (int, float)):
+            previous_rate = 0.0
+        best_correct_rate = max(float(previous_rate), correct_rate)
+        mastery_level = (
+            "Strong" if best_correct_rate >= 0.8 else
+            "Moderate" if best_correct_rate > 0.5 else
+            "Weak" if best_correct_rate > 0 else "New"
+        )
         attempt = {
             "attemptId": session["attemptId"], "sessionId": session_id, "studentId": student_id,
             "topicId": session["topicId"], "subtopicId": session["subtopicId"],
@@ -449,6 +464,27 @@ def finalize_quiz_session(data: dict[str, Any], student_id: str) -> dict[str, An
             "finalizedAt": firestore.SERVER_TIMESTAMP,
         }
         transaction.create(attempt_ref, attempt)
+        # This bounded completion projection is written in the same trusted
+        # finalization transaction, so a restart cannot wait for the U8 job to
+        # keep progression unlocked. U8 replaces the pending marker with its
+        # BKT-derived, client-safe summary for this same attempt sequence.
+        transaction.set(
+            mastery_ref,
+            {
+                "studentId": student_id,
+                "yearLevel": session["yearLevel"],
+                "topicId": session["topicId"],
+                "subtopicId": session["subtopicId"],
+                "bestCorrectRate": best_correct_rate,
+                "completed": best_correct_rate > 0.5,
+                "masteryLevel": mastery_level,
+                "lastSourceAttemptId": session["attemptId"],
+                "sourceAttemptSequence": source_attempt_sequence,
+                "projectionStatus": "finalized_pending_ai",
+                "updatedAt": firestore.SERVER_TIMESTAMP,
+            },
+            merge=True,
+        )
         transaction.set(
             sequence_ref,
             {

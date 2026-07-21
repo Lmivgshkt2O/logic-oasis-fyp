@@ -42,6 +42,30 @@ void main() {
     );
   });
 
+  test(
+    'follow-on subtopics stay unavailable until their server banks are seeded',
+    () {
+      const followOnSubtopics = <String>[
+        'place_digit_value',
+        'compare_order_numbers',
+        'odd_even_numbers',
+        'number_patterns',
+      ];
+      for (final subtopicId in followOnSubtopics) {
+        final banks = year4WholeNumbersBanks
+            .where((bank) => bank.subtopicId == subtopicId)
+            .toList();
+        expect(banks, hasLength(1));
+        expect(banks.single.difficulty, QuestionDifficulty.easy);
+        expect(banks.single.questions, isEmpty);
+        final subtopic = year4Chapter1Topics.single.subtopics.singleWhere(
+          (item) => item.id == subtopicId,
+        );
+        expect(subtopic.activeBankCount, 0);
+      }
+    },
+  );
+
   test('a malformed bank link fails validation', () {
     final source = year4ReadWriteNumberBanks.first;
     final malformed = QuestionBank(

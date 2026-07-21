@@ -3,6 +3,7 @@ import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/l10n/app_localizations.dart';
 import 'package:logic_oasis/shared/models/ai_diagnosis.dart';
 import 'package:logic_oasis/shared/models/quiz_reward.dart';
+import 'package:logic_oasis/shared/services/ai_status_service.dart';
 import 'package:logic_oasis/shared/widgets/logic_oasis_figma_components.dart';
 import 'package:logic_oasis/shared/widgets/recommendation_box.dart';
 import 'package:logic_oasis/shared/widgets/section_card.dart';
@@ -14,25 +15,29 @@ class ResultPage extends StatelessWidget {
     required this.totalQuestions,
     required this.topicArea,
     required this.isBahasaMelayu,
-    required this.reward,
+    this.reward,
     required this.onBackToForge,
     this.backActionLabel,
     this.aiDiagnosis,
+    this.attemptId,
   });
 
   final int correctCount;
   final int totalQuestions;
   final String topicArea;
   final bool isBahasaMelayu;
-  final QuizReward reward;
+  final QuizReward? reward;
   final VoidCallback onBackToForge;
   final String? backActionLabel;
   final AiDiagnosis? aiDiagnosis;
+  final String? attemptId;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
+    final score =
+        reward?.score ?? ((correctCount / totalQuestions) * 100).round();
     final wrongCount = (totalQuestions - correctCount)
         .clamp(0, totalQuestions)
         .toInt();
@@ -55,33 +60,32 @@ class ResultPage extends StatelessWidget {
           SectionCard(
             title: l10n.score,
             icon: Icons.emoji_events_outlined,
-            child: Text(
-              '${reward.score}%',
-              style: theme.textTheme.headlineLarge,
+            child: Text('$score%', style: theme.textTheme.headlineLarge),
+          ),
+          if (reward != null) ...[
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: _RewardTile(
+                    icon: Icons.diamond_outlined,
+                    label: l10n.crystals,
+                    value: '+${reward!.earnedCrystals}',
+                    color: LogicOasisTheme.water,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _RewardTile(
+                    icon: Icons.construction_outlined,
+                    label: l10n.repairReady,
+                    value: l10n.home,
+                    color: LogicOasisTheme.clay,
+                  ),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: _RewardTile(
-                  icon: Icons.diamond_outlined,
-                  label: l10n.crystals,
-                  value: '+${reward.earnedCrystals}',
-                  color: LogicOasisTheme.water,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _RewardTile(
-                  icon: Icons.construction_outlined,
-                  label: l10n.repairReady,
-                  value: l10n.home,
-                  color: LogicOasisTheme.clay,
-                ),
-              ),
-            ],
-          ),
+          ],
           const SizedBox(height: 14),
           SectionCard(
             title: isBahasaMelayu ? 'Kesilapan' : 'Mistakes',
@@ -95,24 +99,35 @@ class ResultPage extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           RecommendationBox(
-            text: l10n.masteryResultMessage(
-              isBahasaMelayu
-                  ? _encouragementBm(reward.score)
-                  : reward.encouragement,
-              isBahasaMelayu
-                  ? _masteryBm(reward.previousMastery)
-                  : reward.previousMastery,
-              isBahasaMelayu
-                  ? _masteryBm(reward.newMastery)
-                  : reward.newMastery,
-            ),
+            text: reward == null
+                ? (isBahasaMelayu
+                      ? 'Markah ini telah disahkan oleh pelayan dan kemajuan anda sedang dikemas kini.'
+                      : 'This score was confirmed by the server and your learning progress is being updated.')
+                : l10n.masteryResultMessage(
+                    isBahasaMelayu
+                        ? _encouragementBm(reward!.score)
+                        : reward!.encouragement,
+                    isBahasaMelayu
+                        ? _masteryBm(reward!.previousMastery)
+                        : reward!.previousMastery,
+                    isBahasaMelayu
+                        ? _masteryBm(reward!.newMastery)
+                        : reward!.newMastery,
+                  ),
           ),
           const SizedBox(height: 12),
-          RecommendationBox(text: _nextAction(wrongCount)),
+          RecommendationBox(text: _nextAction(wrongCount, score)),
           if (aiDiagnosis != null) ...[
             const SizedBox(height: 12),
             AiAnalysisStatusCard(
               diagnosis: aiDiagnosis!,
+              isBahasaMelayu: isBahasaMelayu,
+            ),
+          ],
+          if (attemptId != null && attemptId!.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _AttemptAnalysisStatus(
+              attemptId: attemptId!,
               isBahasaMelayu: isBahasaMelayu,
             ),
           ],
@@ -148,31 +163,75 @@ class ResultPage extends StatelessWidget {
     };
   }
 
-  String _nextAction(int wrongCount) {
+  String _nextAction(int wrongCount, int score) {
     if (isBahasaMelayu) {
-      if (reward.score >= 80 && wrongCount == 0) {
+      if (score >= 80 && wrongCount == 0) {
         return 'Tindakan seterusnya: Cuba topik lain atau bantu pulihkan kawasan di Laman.';
       }
-      if (reward.score >= 80) {
+      if (score >= 80) {
         return 'Tindakan seterusnya: Semak $wrongCount kesilapan, kemudian cuba topik baharu.';
       }
-      if (reward.score >= 50) {
+      if (score >= 50) {
         return 'Tindakan seterusnya: Semak kesilapan dan ulang satu latihan pendek untuk menguatkan topik ini.';
       }
       return 'Tindakan seterusnya: Ulang asas topik ini, kemudian cuba semula kuiz yang sama.';
     }
 
-    if (reward.score >= 80 && wrongCount == 0) {
+    if (score >= 80 && wrongCount == 0) {
       return 'Next action: Try another topic or repair an area on Home.';
     }
-    if (reward.score >= 80) {
+    if (score >= 80) {
       final mistakeLabel = wrongCount == 1 ? 'mistake' : 'mistakes';
       return 'Next action: Review $wrongCount $mistakeLabel, then try a new topic.';
     }
-    if (reward.score >= 50) {
+    if (score >= 50) {
       return 'Next action: Review the mistakes and repeat one short practice to strengthen this topic.';
     }
     return 'Next action: Revisit the basics for this topic, then retry the same quiz.';
+  }
+}
+
+class _AttemptAnalysisStatus extends StatefulWidget {
+  const _AttemptAnalysisStatus({
+    required this.attemptId,
+    required this.isBahasaMelayu,
+  });
+
+  final String attemptId;
+  final bool isBahasaMelayu;
+
+  @override
+  State<_AttemptAnalysisStatus> createState() => _AttemptAnalysisStatusState();
+}
+
+class _AttemptAnalysisStatusState extends State<_AttemptAnalysisStatus> {
+  late final Stream<AiDiagnosis?> _diagnosisStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _diagnosisStream = AiStatusService().watchAttempt(widget.attemptId);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<AiDiagnosis?>(
+      stream: _diagnosisStream,
+      builder: (context, snapshot) {
+        final diagnosis = snapshot.data;
+        if (diagnosis == null) {
+          return RecommendationBox(
+            text: widget.isBahasaMelayu
+                ? 'Markah anda disimpan. Analisis pembelajaran sedang bermula…'
+                : 'Your score is saved. Learning analysis is starting…',
+          );
+        }
+        return AiAnalysisStatusCard(
+          diagnosis: diagnosis,
+          isBahasaMelayu: widget.isBahasaMelayu,
+        );
+      },
+    );
   }
 }
 
@@ -198,12 +257,15 @@ class AiAnalysisStatusCard extends StatelessWidget {
         ? switch (diagnosis.analysisState) {
             'completed' => 'Latihan seterusnya sudah sedia.',
             'fallback' => 'Cadangan latihan sedia menggunakan kemajuan kuiz.',
-            'failed' => 'Markah anda disimpan. Cadangan akan tersedia kemudian.',
+            'failed' =>
+              'Markah anda disimpan. Cadangan akan tersedia kemudian.',
             _ => 'Markah anda disimpan. Sedang menyediakan latihan seterusnya…',
           }
         : diagnosis.childFacingStatus;
     final evidence = diagnosis.evidenceLevel == 'preliminary'
-        ? (isBahasaMelayu ? 'Bukti awal — teruskan latihan ringkas.' : 'Preliminary evidence — keep practising in short steps.')
+        ? (isBahasaMelayu
+              ? 'Bukti awal — teruskan latihan ringkas.'
+              : 'Preliminary evidence — keep practising in short steps.')
         : null;
     return SectionCard(
       title: title,
@@ -216,9 +278,9 @@ class AiAnalysisStatusCard extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               diagnosis.supportingReason!,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
             ),
           ],
           if (evidence != null) ...[

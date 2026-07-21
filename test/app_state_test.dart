@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:logic_oasis/shared/models/adaptive_assignment.dart';
 import 'package:logic_oasis/shared/models/ai_diagnosis.dart';
 import 'package:logic_oasis/shared/models/question_bank.dart';
+import 'package:logic_oasis/shared/models/trusted_subtopic_progress.dart';
 import 'package:logic_oasis/shared/state/app_state.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -278,6 +279,95 @@ void main() {
     expect(state.isSubtopicUnlocked(wholeNumbers, subtopics[0]), isTrue);
     expect(state.isSubtopicUnlocked(wholeNumbers, subtopics[1]), isFalse);
   });
+
+  test(
+    'trusted finalized completion unlocks the next subtopic without a client write',
+    () {
+      final state = AppState(persistQuizResults: true);
+
+      state.applyTrustedQuizCompletion(
+        topicId: 'whole_numbers_y4',
+        subtopicId: 'read_write_numbers',
+        correctCount: 3,
+        totalQuestions: 5,
+      );
+
+      final topic = state.topics.firstWhere(
+        (item) => item.id == 'whole_numbers_y4',
+      );
+      final subtopics = state.subtopicsForTopic(topic);
+      expect(state.attempts, isEmpty);
+      expect(subtopics.first.isComplete, isTrue);
+      expect(state.isSubtopicUnlocked(topic, subtopics[1]), isTrue);
+      expect(subtopics[1].activeBankCount, 0);
+      expect(topic.progress, .2);
+    },
+  );
+
+  test(
+    'authenticated runtime ignores another learner\'s legacy saved attempts',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        'logic_oasis_saved_attempts':
+            '[{"id":"legacy","topicId":"whole_numbers_y4","topicTitle":"Whole Numbers","subtopicId":"read_write_numbers","subtopicTitle":"Read and Write Numbers","yearLevel":4,"score":100,"correctCount":5,"totalQuestions":5,"earnedCrystals":1,"mastery":"Strong","createdAt":"2026-07-20T00:00:00.000"}]',
+        'logic_oasis_unlocked_subtopics': <String>[
+          'whole_numbers_y4::place_digit_value',
+        ],
+      });
+      final state = AppState(persistQuizResults: true);
+
+      await state.loadSavedAppPreferences();
+      final topic = state.topics.firstWhere(
+        (item) => item.id == 'whole_numbers_y4',
+      );
+      final subtopics = state.subtopicsForTopic(topic);
+      expect(state.attempts, isEmpty);
+      expect(topic.progress, 0);
+      expect(state.isSubtopicUnlocked(topic, subtopics[1]), isFalse);
+    },
+  );
+
+  test('trusted progress rejects an incompatible U8 projection shape', () {
+    expect(
+      () => TrustedSubtopicProgress.fromFirestore(<String, dynamic>{
+        'studentId': 'student-1',
+        'topicId': 'whole_numbers_y4',
+        'subtopicId': 'read_write_numbers',
+        'yearLevel': 4,
+        'masteryProbability': .7,
+      }),
+      throwsFormatException,
+    );
+  });
+
+  test(
+    'switching authenticated students clears prior in-memory progression',
+    () {
+      final state = AppState(persistQuizResults: true);
+      state.applyTrustedQuizCompletion(
+        topicId: 'whole_numbers_y4',
+        subtopicId: 'read_write_numbers',
+        correctCount: 3,
+        totalQuestions: 5,
+      );
+
+      state.updateSignedInStudent(
+        uid: 'different-student',
+        email: 'different@example.com',
+        year: 4,
+      );
+
+    final topic = state.topics.firstWhere(
+      (item) => item.id == 'whole_numbers_y4',
+    );
+      expect(state.attempts, isEmpty);
+      expect(state.subtopicsForTopic(topic).first.isComplete, isFalse);
+      expect(
+        state.isSubtopicUnlocked(topic, state.subtopicsForTopic(topic)[1]),
+        isFalse,
+      );
+    },
+  );
 
   test('subtopic quiz result updates selected subtopic and topic progress', () {
     final state = AppState();

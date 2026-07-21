@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:logic_oasis/app/logic_oasis_design.dart';
-import 'package:logic_oasis/features/parent_dashboard/parent_dashboard_page.dart';
+import 'package:logic_oasis/features/settings/parent_access_page.dart';
 import 'package:logic_oasis/l10n/app_localizations.dart';
 import 'package:logic_oasis/shared/repositories/auth_repository.dart';
 import 'package:logic_oasis/shared/state/app_state.dart';
@@ -397,8 +397,8 @@ class SettingsPage extends StatelessWidget {
                     'Akses ibu bapa dilindungi',
                   ),
                   body: state.t(
-                    'Parent dashboard opens through a linked parent account and password gate.',
-                    'Papan pemuka ibu bapa dibuka melalui akaun ibu bapa terpaut dan laluan kata laluan.',
+                    'Parent dashboard requires a separate Firebase parent sign-in and an active supervisor-approved link.',
+                    'Papan pemuka ibu bapa memerlukan log masuk Firebase ibu bapa berasingan dan pautan aktif yang diluluskan penyelia.',
                   ),
                 ),
                 _SafetyTile(
@@ -455,7 +455,10 @@ class SettingsPage extends StatelessWidget {
 
   Future<void> _openParentAccess(BuildContext context) async {
     await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => ParentDashboardPage(state: state)),
+      MaterialPageRoute(
+        builder: (_) =>
+            ParentAccessPage(state: state, onReturnToStudentLogin: onLogout),
+      ),
     );
   }
 

@@ -283,13 +283,48 @@ def _assignment(attempt: Mapping[str, Any], mastery: float, evidence: int, suppo
 def _subtopic_mastery(attempt: Mapping[str, Any], snapshot: Any, risk: float | None, bundle: RuntimeBundle) -> dict[str, Any]:
     ranking_version, minimum_evidence = _ranking_policy(bundle)
     reliability = min(snapshot.evidence_count / minimum_evidence, 1.0)
+    correct_rate = _attempt_correct_rate(attempt)
     return {"studentId": attempt["studentId"], "yearLevel": attempt["yearLevel"], "topicId": attempt["topicId"],
             "subtopicId": attempt["subtopicId"], "masteryProbability": snapshot.mastery_probability,
             "observationCount": snapshot.evidence_count, "evidenceLevel": "preliminary" if reliability < 1 else "established",
             "weakTopicPriorityScore": round((1.0 - snapshot.mastery_probability) * reliability, 8),
-            "rankingVersion": ranking_version, "rankingPolicySha256": bundle.ranking_policy_sha256,
-            "supportRisk": risk, "lastSourceAttemptId": attempt["attemptId"],
-            "sourceAttemptSequence": attempt["sourceAttemptSequence"]}
+            "rankingVersion": ranking_version, "lastSourceAttemptId": attempt["attemptId"],
+            "sourceAttemptSequence": attempt["sourceAttemptSequence"],
+            # These bounded progression fields are deliberately separate from
+            # the BKT posterior. They let the student UI reflect only a
+            # server-confirmed quiz completion without exposing raw responses
+            # or AI/model evidence.
+            "lastCorrectRate": correct_rate}
+
+
+def _attempt_correct_rate(attempt: Mapping[str, Any]) -> float:
+    total = attempt.get("totalQuestions")
+    correct = attempt.get("correctCount")
+    if isinstance(total, bool) or isinstance(correct, bool) or not isinstance(total, int) or not isinstance(correct, int) or total <= 0:
+        raise RuntimeFailure("trusted_source_invalid")
+    return max(0.0, min(correct, total) / total)
+
+
+def _mastery_level_for_rate(rate: float) -> str:
+    if rate >= 0.8:
+        return "Strong"
+    if rate > 0.5:
+        return "Moderate"
+    if rate > 0:
+        return "Weak"
+    return "New"
+
+
+def _merged_subtopic_mastery(existing: Mapping[str, Any] | None, mastery: Mapping[str, Any]) -> dict[str, Any]:
+    current_rate = mastery.get("lastCorrectRate")
+    if not isinstance(current_rate, (int, float)) or isinstance(current_rate, bool):
+        raise RuntimeFailure("trusted_source_invalid")
+    previous_rate = (existing or {}).get("bestCorrectRate", 0.0)
+    if not isinstance(previous_rate, (int, float)) or isinstance(previous_rate, bool):
+        previous_rate = 0.0
+    best_rate = max(float(previous_rate), float(current_rate))
+    return {**mastery, "bestCorrectRate": best_rate, "completed": best_rate > 0.5,
+            "masteryLevel": _mastery_level_for_rate(best_rate)}
 
 
 def _ranking_policy(bundle: RuntimeBundle) -> tuple[str, int]:
@@ -444,8 +479,23 @@ class FirestoreRuntimeGateway:
                 ref = self.db.collection("subtopicMastery").document(subtopic_mastery_id(
                     str(attempt["studentId"]), int(attempt["yearLevel"]), str(attempt["topicId"]), str(attempt["subtopicId"])))
                 existing = ref.get(transaction=transaction)
-                if is_newer_projection(sequence, _snapshot_dict(existing)):
-                    projection_writes.append((ref, {**mastery, "updatedAt": now}))
+                existing_data = _snapshot_dict(existing)
+                is_pending_same_attempt = (
+                    existing_data is not None and
+                    existing_data.get("sourceAttemptSequence") == sequence and
+                    existing_data.get("projectionStatus") == "finalized_pending_ai"
+                )
+                if is_newer_projection(sequence, existing_data) or is_pending_same_attempt:
+                    projection_writes.append((ref, {
+                        **_merged_subtopic_mastery(existing_data, mastery),
+                        # U8 keeps policy hashes and model scores in server-only
+                        # records. Remove legacy copies from this client-readable
+                        # summary as the next finalized attempt updates it.
+                        "rankingPolicySha256": firestore.DELETE_FIELD,
+                        "supportRisk": firestore.DELETE_FIELD,
+                        "projectionStatus": "ai_enriched",
+                        "updatedAt": now,
+                    }))
             if assignment is not None:
                 ref = self.db.collection("adaptiveAssignments").document(adaptive_assignment_id(
                     str(attempt["studentId"]), str(attempt["subtopicId"])))

@@ -53,8 +53,7 @@ class AuthRepository {
       return StudentAuthProfile(
         uid: user.uid,
         email: user.email ?? profileData['email'] as String? ?? '',
-        displayName:
-            profileData['displayName'] as String? ?? user.displayName,
+        displayName: profileData['displayName'] as String? ?? user.displayName,
         yearLevel: profileData['yearLevel'] as int?,
       );
     } catch (_) {
@@ -112,6 +111,33 @@ class AuthRepository {
       }
       throw AuthFailure(
         error.message ?? 'Unable to sign in. Please try again.',
+      );
+    }
+  }
+
+  /// Parent access uses Firebase Auth, then U9's active parentLinks relation
+  /// decides which safe child projections are available. It intentionally does
+  /// not create a parent account or inspect prototype password documents.
+  Future<void> signInParent({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      final credential = await _auth.signInWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
+      if (credential.user == null) {
+        throw const AuthFailure('Unable to sign in to the parent account.');
+      }
+    } on FirebaseAuthException catch (error) {
+      if (error.code == 'user-not-found' ||
+          error.code == 'wrong-password' ||
+          error.code == 'invalid-credential') {
+        throw const AuthFailure('The parent account details are incorrect.');
+      }
+      throw AuthFailure(
+        error.message ?? 'Unable to sign in to the parent account.',
       );
     }
   }

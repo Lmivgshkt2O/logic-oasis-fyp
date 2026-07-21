@@ -13,8 +13,29 @@ class QuizSessionException implements Exception {
   String toString() => message;
 }
 
+/// The callable session boundary consumed by the quiz UI.
+///
+/// Keeping this contract separate from the Firebase implementation lets the
+/// widget flow be verified without a Firebase app and keeps the trusted
+/// callable path explicit.
+abstract interface class QuizSessionGateway {
+  Future<QuizSession> startSession({
+    required String topicId,
+    required String subtopicId,
+    required int yearLevel,
+  });
+
+  Future<QuestionResponse> submitResponse({
+    required QuestionResponse pendingResponse,
+    required int responseTimeMs,
+    int hintCount = 0,
+  });
+
+  Future<QuizCompletion> finalizeSession(String sessionId);
+}
+
 /// The only Flutter boundary for U3 callable session functions.
-class QuizSessionService {
+class QuizSessionService implements QuizSessionGateway {
   QuizSessionService({FirebaseFunctions? functions})
     : _functions =
           functions ?? FirebaseFunctions.instanceFor(region: 'asia-southeast1');

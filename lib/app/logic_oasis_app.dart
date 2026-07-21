@@ -80,6 +80,7 @@ class _LogicOasisAppState extends State<LogicOasisApp>
 
   Future<void> logout() async {
     await authRepository.signOutStudent();
+    appState.clearSignedInStudentRuntimeState();
     await appState.clearSavedSessionPosition();
     if (!mounted) return;
     loggedInStudentName = null;
