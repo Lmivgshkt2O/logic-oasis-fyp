@@ -10,13 +10,14 @@ const bankIdFor = (difficulty) =>
 
 function question(suffix, difficulty, estimatedDifficulty, questionText, questionTextBm, options, optionsBm, answerIndex, explanation, explanationBm) {
   const questionId = `q_y4_whole_read_write_${suffix}`;
+  const order = Number(suffix.slice(-2)) - 1;
   return {
     id: questionId,
     bankId: bankIdFor(difficulty),
     client: {
       questionId, bankId: bankIdFor(difficulty), topicId, subtopicId, skillId,
       yearLevel: 4, difficultyLevel: difficulty, estimatedDifficulty,
-      contentVersion, language: 'bilingual', createdAt, questionText, questionTextBm, options, optionsBm,
+      contentVersion, language: 'bilingual', createdAt, order, questionText, questionTextBm, options, optionsBm,
       sourceReference, isActive: true,
     },
     answerKey: {
@@ -75,6 +76,7 @@ function validateQuestionBankSeed() {
       if (
         !item || item.bankId !== bankId || item.client.options.length !== 4 ||
         item.client.optionsBm.length !== 4 || item.client.language !== 'bilingual' ||
+        !Number.isInteger(item.client.order) || item.client.order < 0 ||
         !item.client.createdAt || item.answerKey.questionId !== id ||
         item.answerKey.answerIndex < 0 || item.answerKey.answerIndex >= item.client.options.length ||
         !item.answerKey.explanation || !item.answerKey.explanationBm ||
