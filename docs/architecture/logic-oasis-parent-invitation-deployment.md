@@ -20,7 +20,7 @@ email is stored or handled by a Flutter client.
 3. Set the non-secret Functions configuration for the approved mail provider:
    `PARENT_INVITATION_CONTINUE_URL=https://logic-oasis-fyp.web.app/parent-invitation`,
    `PARENT_INVITATION_LINK_DOMAIN=logic-oasis-fyp.web.app`,
-   `PARENT_INVITATION_ANDROID_PACKAGE=ple.logic_oasis`,
+   `PARENT_INVITATION_ANDROID_PACKAGE=com.example.logic_oasis`,
    `PARENT_INVITATION_SMTP_HOST`, `PARENT_INVITATION_SMTP_PORT`,
    `PARENT_INVITATION_SMTP_USERNAME`, and `PARENT_INVITATION_SMTP_FROM`.
    Values must be supplied through the deployment environment, never a tracked
@@ -34,10 +34,14 @@ email is stored or handled by a Flutter client.
 
 5. Publish `https://logic-oasis-fyp.web.app/.well-known/assetlinks.json` with
    the production Android signing certificate SHA-256 and package name
-   `ple.logic_oasis`. Its relation must be
+   `com.example.logic_oasis`. Its relation must be
    `delegate_permission/common.handle_all_urls`. Then deploy Hosting. Until this
-   file is live, Android can still open the browser link but cannot complete
-   automatic verified-app routing.
+file is live, Android can still open the browser link but cannot complete
+automatic verified-app routing.
+
+> The current Android release build is explicitly signed with the debug key.
+> The checked-in asset link therefore supports the present build only. Replace
+> its fingerprint before any real release signing key is introduced.
 
 ## Production validation
 

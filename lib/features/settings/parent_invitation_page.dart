@@ -42,7 +42,10 @@ class _ParentInvitationPageState extends State<ParentInvitationPage> {
       final status = await _service.createInvitation(
         recipientEmail: _emailController.text,
       );
-      if (mounted) setState(() => _status = status);
+      if (mounted) {
+        _emailController.clear();
+        setState(() => _status = status);
+      }
     } on ParentLinkInvitationException catch (error) {
       if (mounted) setState(() => _error = error.message);
     } finally {
