@@ -78,6 +78,24 @@ PARENT_INVITATION_EMAIL_HMAC_KEY = params.SecretParam(
 PARENT_INVITATION_SMTP_PASSWORD = params.SecretParam(
     "PARENT_INVITATION_SMTP_PASSWORD"
 )
+PARENT_INVITATION_CONTINUE_URL = params.StringParam(
+    "PARENT_INVITATION_CONTINUE_URL",
+    default="https://logic-oasis-fyp.web.app/parent-invitation",
+)
+PARENT_INVITATION_LINK_DOMAIN = params.StringParam(
+    "PARENT_INVITATION_LINK_DOMAIN", default="logic-oasis-fyp.web.app"
+)
+PARENT_INVITATION_ANDROID_PACKAGE = params.StringParam(
+    "PARENT_INVITATION_ANDROID_PACKAGE", default="com.example.logic_oasis"
+)
+# SMTP values deliberately have no source-controlled defaults. Firebase CLI
+# requests them during deployment (or reads a local ignored functions/.env).
+PARENT_INVITATION_SMTP_HOST = params.StringParam("PARENT_INVITATION_SMTP_HOST")
+PARENT_INVITATION_SMTP_PORT = params.StringParam("PARENT_INVITATION_SMTP_PORT")
+PARENT_INVITATION_SMTP_USERNAME = params.StringParam(
+    "PARENT_INVITATION_SMTP_USERNAME"
+)
+PARENT_INVITATION_SMTP_FROM = params.StringParam("PARENT_INVITATION_SMTP_FROM")
 
 try:
     firebase_admin.get_app()
