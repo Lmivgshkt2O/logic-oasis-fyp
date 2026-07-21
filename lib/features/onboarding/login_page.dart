@@ -6,9 +6,15 @@ import 'package:logic_oasis/shared/repositories/auth_repository.dart';
 import 'package:logic_oasis/shared/widgets/recommendation_box.dart';
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key, required this.onLogin, this.authRepository});
+  const LoginPage({
+    super.key,
+    required this.onLogin,
+    this.onParentAccess,
+    this.authRepository,
+  });
 
   final ValueChanged<StudentAuthProfile> onLogin;
+  final VoidCallback? onParentAccess;
   final AuthRepository? authRepository;
 
   @override
@@ -294,8 +300,16 @@ class _LoginPageState extends State<LoginPage> {
               const SizedBox(height: 18),
               const RecommendationBox(
                 text:
-                    'Parent Dashboard is available later inside Setting with password or OTP access.',
+                    'Parents can sign in separately to view only safe learning updates for their linked learner.',
               ),
+              if (widget.onParentAccess != null) ...[
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: isLoading ? null : widget.onParentAccess,
+                  icon: const Icon(Icons.family_restroom_outlined),
+                  label: const Text('Parent Dashboard'),
+                ),
+              ],
               ],
             ),
           ),

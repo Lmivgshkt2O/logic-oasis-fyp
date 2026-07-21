@@ -54,6 +54,7 @@ firebase_seed/.env
 
 # Firebase Python Functions local runtime
 functions/venv/
+functions/.env
 
 # Generated planning/report artifacts
 outputs/

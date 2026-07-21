@@ -22,9 +22,10 @@ void main() {
       expect(find.text('Secure parent sign in'), findsOneWidget);
       expect(find.text('Parent email'), findsOneWidget);
       expect(
-        find.textContaining('not created from a student device'),
+        find.textContaining('student sends an invitation'),
         findsOneWidget,
       );
+      expect(find.text('Forgot password? Reset it securely'), findsOneWidget);
       expect(find.textContaining('Register'), findsNothing);
     },
   );
@@ -121,4 +122,7 @@ class _ParentAuthGateway implements ParentAuthenticationGateway {
       throw const AuthFailure('Temporary sign-out failure.');
     }
   }
+
+  @override
+  Future<void> sendPasswordReset({required String email}) async {}
 }

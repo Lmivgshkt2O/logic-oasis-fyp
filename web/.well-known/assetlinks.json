@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.example.logic_oasis",
+      "sha256_cert_fingerprints": [
+        "38:CD:97:D5:69:57:18:96:60:77:04:3B:AC:E6:E7:C6:A9:94:00:83:E5:D8:F1:5A:3C:24:D9:FE:B7:3A:70:2C"
+      ]
+    }
+  }
+]

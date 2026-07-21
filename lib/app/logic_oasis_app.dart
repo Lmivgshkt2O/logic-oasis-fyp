@@ -1,14 +1,21 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:logic_oasis/app/logic_oasis_shell.dart';
 import 'package:logic_oasis/app/theme.dart';
+import 'package:logic_oasis/features/parent_dashboard/parent_dashboard_page.dart';
 import 'package:logic_oasis/features/onboarding/login_page.dart';
 import 'package:logic_oasis/features/onboarding/opening_animation_page.dart';
 import 'package:logic_oasis/features/onboarding/plot_intro_page.dart';
+import 'package:logic_oasis/features/settings/parent_access_page.dart';
+import 'package:logic_oasis/features/settings/parent_invitation_accept_page.dart';
 import 'package:logic_oasis/l10n/app_localizations.dart';
 import 'package:logic_oasis/shared/repositories/auth_repository.dart';
 import 'package:logic_oasis/shared/state/app_state.dart';
 import 'package:logic_oasis/shared/state/app_state_scope.dart';
+import 'package:logic_oasis/shared/services/parent_firebase_session.dart';
+import 'package:logic_oasis/shared/services/parent_invitation_link_service.dart';
 
 class LogicOasisApp extends StatefulWidget {
   const LogicOasisApp({super.key, this.loadFirebaseTopics = true});
@@ -25,11 +32,16 @@ class _LogicOasisAppState extends State<LogicOasisApp>
   final AuthRepository authRepository = AuthRepository();
   _EntryStage stage = _EntryStage.opening;
   String? loggedInStudentName;
+  final _parentInvitationLinks = ParentInvitationLinkService();
+  StreamSubscription<ParentInvitationLink>? _parentInvitationSubscription;
+  ParentInvitationLink? _pendingParentInvitation;
+  _EntryStage? _parentReturnStage;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _listenForParentInvitationLinks();
     if (widget.loadFirebaseTopics) {
       appState.loadTopicsFromFirebase();
     }
@@ -38,6 +50,7 @@ class _LogicOasisAppState extends State<LogicOasisApp>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _parentInvitationSubscription?.cancel();
     appState.saveAppSession();
     super.dispose();
   }
@@ -59,6 +72,10 @@ class _LogicOasisAppState extends State<LogicOasisApp>
 
   Future<void> completeOpening() async {
     await appState.loadSavedAppPreferences();
+    if (_pendingParentInvitation != null) {
+      moveTo(_EntryStage.parentInvitation);
+      return;
+    }
     final profile = await authRepository.loadCurrentStudentProfile();
     if (!mounted) return;
 
@@ -85,6 +102,42 @@ class _LogicOasisAppState extends State<LogicOasisApp>
     if (!mounted) return;
     loggedInStudentName = null;
     moveTo(_EntryStage.login);
+  }
+
+  Future<void> openParentAccess() async {
+    // Parent access uses a named Firebase app.  The default app keeps the
+    // student's authenticated session and current Settings context intact.
+    moveTo(_EntryStage.parentAccess);
+  }
+
+  void _listenForParentInvitationLinks() {
+    _parentInvitationSubscription = _parentInvitationLinks.links.listen(
+      (link) => unawaited(_openParentInvitation(link)),
+      onError: (_) {},
+    );
+    _parentInvitationLinks
+        .initialLink()
+        .then((link) {
+          if (link != null) unawaited(_openParentInvitation(link));
+        })
+        .catchError((_) {});
+  }
+
+  Future<void> _openParentInvitation(ParentInvitationLink link) async {
+    _parentReturnStage = stage == _EntryStage.home
+        ? _EntryStage.home
+        : _EntryStage.login;
+    _pendingParentInvitation = link;
+    moveTo(_EntryStage.parentInvitation);
+  }
+
+  Future<void> _finishParentDashboard() async {
+    await ParentFirebaseSession.signOut();
+    _pendingParentInvitation = null;
+    if (!mounted) return;
+    final returnStage = _parentReturnStage ?? _EntryStage.login;
+    _parentReturnStage = null;
+    moveTo(returnStage);
   }
 
   @override
@@ -139,6 +192,36 @@ class _LogicOasisAppState extends State<LogicOasisApp>
                     );
                     moveTo(_EntryStage.home);
                   },
+                  onParentAccess: openParentAccess,
+                ),
+                _EntryStage.parentAccess => ParentAccessPage(
+                  key: const ValueKey('parent-access'),
+                  state: appState,
+                  onReturnToStudentLogin: () {
+                    moveTo(_EntryStage.login);
+                  },
+                ),
+                _EntryStage.parentInvitation => ParentInvitationAcceptPage(
+                  key: const ValueKey('parent-invitation'),
+                  invitationId: _pendingParentInvitation!.invitationId,
+                  verifier: _pendingParentInvitation!.verifier,
+                  emailLink: _pendingParentInvitation!.emailLink,
+                  onAccepted: () => moveTo(_EntryStage.parentDashboard),
+                  onDeclined: _finishParentDashboard,
+                ),
+                _EntryStage.parentDashboard => Scaffold(
+                  key: const ValueKey('parent-dashboard'),
+                  appBar: AppBar(
+                    title: const Text('Parent Dashboard'),
+                    actions: [
+                      IconButton(
+                        tooltip: 'Sign out',
+                        icon: const Icon(Icons.logout),
+                        onPressed: _finishParentDashboard,
+                      ),
+                    ],
+                  ),
+                  body: SafeArea(child: ParentDashboardPage(state: appState)),
                 ),
                 _EntryStage.intro => PlotIntroPage(
                   key: const ValueKey('intro'),
@@ -161,4 +244,12 @@ class _LogicOasisAppState extends State<LogicOasisApp>
   }
 }
 
-enum _EntryStage { opening, login, intro, home }
+enum _EntryStage {
+  opening,
+  login,
+  parentAccess,
+  parentInvitation,
+  parentDashboard,
+  intro,
+  home,
+}
