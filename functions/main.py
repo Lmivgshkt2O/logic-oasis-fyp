@@ -82,9 +82,6 @@ PARENT_INVITATION_CONTINUE_URL = params.StringParam(
     "PARENT_INVITATION_CONTINUE_URL",
     default="https://logic-oasis-fyp.web.app/parent-invitation",
 )
-PARENT_INVITATION_LINK_DOMAIN = params.StringParam(
-    "PARENT_INVITATION_LINK_DOMAIN", default="logic-oasis-fyp.web.app"
-)
 PARENT_INVITATION_ANDROID_PACKAGE = params.StringParam(
     "PARENT_INVITATION_ANDROID_PACKAGE", default="com.example.logic_oasis"
 )

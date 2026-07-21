@@ -14,12 +14,22 @@ class ParentInvitationLink {
   final String verifier;
 
   static ParentInvitationLink? parse(Uri uri) {
-    final continuation = uri.queryParameters['continueUrl'];
-    final embedded = continuation == null ? uri : Uri.tryParse(continuation);
+    // Modern Firebase mobile email links use a Hosting ``/__/auth/links``
+    // envelope with the complete Auth action URL in its ``link`` parameter.
+    // Keep the original link for FirebaseAuth.signInWithEmailLink, but unwrap
+    // the inner action URL only to recover our opaque continuation state.
+    final actionUri = Uri.tryParse(uri.queryParameters['link'] ?? '') ?? uri;
+    final continuation = actionUri.queryParameters['continueUrl'];
+    final embedded = continuation == null
+        ? actionUri
+        : Uri.tryParse(continuation);
     if (embedded == null || embedded.path != '/parent-invitation') return null;
     final invitationId = embedded.queryParameters['invitationId'];
     final verifier = embedded.queryParameters['verifier'];
-    if (invitationId == null || invitationId.isEmpty || verifier == null || verifier.isEmpty) {
+    if (invitationId == null ||
+        invitationId.isEmpty ||
+        verifier == null ||
+        verifier.isEmpty) {
       return null;
     }
     return ParentInvitationLink(

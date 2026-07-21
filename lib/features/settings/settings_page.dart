@@ -456,7 +456,10 @@ class SettingsPage extends StatelessWidget {
                   },
                   icon: const Icon(Icons.send_outlined),
                   label: Text(
-                    state.t('Invite a parent securely', 'Jemput ibu bapa dengan selamat'),
+                    state.t(
+                      'Invite a parent securely',
+                      'Jemput ibu bapa dengan selamat',
+                    ),
                   ),
                 ),
               ],
@@ -470,16 +473,21 @@ class SettingsPage extends StatelessWidget {
   Future<void> _openParentAccess(BuildContext context) async {
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) =>
-            ParentAccessPage(state: state, onReturnToStudentLogin: onLogout),
+        builder: (_) => ParentAccessPage(
+          state: state,
+          // This nested route is opened from Settings. Its isolated
+          // parent session closes before popping back to the still-signed-
+          // in student, rather than triggering the global student logout.
+          onReturnToStudentLogin: () => Navigator.of(context).pop(),
+        ),
       ),
     );
   }
 
   Future<void> _openParentInvitation(BuildContext context) async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const ParentInvitationPage()),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const ParentInvitationPage()));
   }
 
   void _showMessage(BuildContext context, String message) {

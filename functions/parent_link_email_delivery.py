@@ -9,11 +9,15 @@ audit boundary.
 from __future__ import annotations
 
 from email.message import EmailMessage
+import logging
 import os
 import smtplib
 from urllib.parse import urlencode
 
 from firebase_admin import auth
+
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class ParentInvitationDeliveryError(RuntimeError):
@@ -37,16 +41,30 @@ def deliver_parent_invitation(recipient_email: str, invitation_id: str, verifier
     separator = "&" if "?" in continue_url else "?"
     continue_url = f"{continue_url}{separator}{urlencode({'invitationId': invitation_id, 'verifier': verifier})}"
     try:
+        # ``link_domain`` is only valid for a Firebase-Authentication approved
+        # custom link domain.  The project uses Firebase's verified default
+        # action-link host, while ``continue_url`` stays on Hosting where the
+        # Android App Link is verified.  Supplying a normal ``web.app`` site as
+        # ``link_domain`` makes Admin SDK reject the invitation before SMTP.
         settings = auth.ActionCodeSettings(
             url=continue_url,
             handle_code_in_app=True,
-            # Firebase sends the outer /__/auth/action URL to this verified
-            # Hosting domain; the Flutter parser then extracts continueUrl.
-            link_domain=_required("PARENT_INVITATION_LINK_DOMAIN"),
             android_package_name=_required("PARENT_INVITATION_ANDROID_PACKAGE"),
             android_install_app=True,
         )
         link = auth.generate_sign_in_with_email_link(recipient_email, settings)
+    except ParentInvitationDeliveryError:
+        raise
+    except Exception as error:
+        # Provider text can contain recipient or action-link data, so record
+        # only a stable diagnostic category in protected server logs.
+        _LOGGER.error(
+            "parent_invitation_link_generation_failed error_type=%s",
+            type(error).__name__,
+        )
+        raise ParentInvitationDeliveryError("Unable to prepare parent invitation email.") from None
+
+    try:
         message = EmailMessage()
         message["Subject"] = "Logic Oasis parent invitation"
         message["From"] = _required("PARENT_INVITATION_SMTP_FROM")
@@ -61,4 +79,10 @@ def deliver_parent_invitation(recipient_email: str, invitation_id: str, verifier
     except ParentInvitationDeliveryError:
         raise
     except Exception as error:
-        raise ParentInvitationDeliveryError("Unable to deliver parent invitation email.") from error
+        # As above, never log SMTP/provider text because it may include
+        # protected message or recipient metadata.
+        _LOGGER.error(
+            "parent_invitation_smtp_delivery_failed error_type=%s",
+            type(error).__name__,
+        )
+        raise ParentInvitationDeliveryError("Unable to deliver parent invitation email.") from None

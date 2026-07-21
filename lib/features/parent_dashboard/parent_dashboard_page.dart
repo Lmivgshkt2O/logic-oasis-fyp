@@ -6,6 +6,7 @@ import 'package:logic_oasis/shared/models/linked_child_context.dart';
 import 'package:logic_oasis/shared/models/parent_dashboard_snapshot.dart';
 import 'package:logic_oasis/shared/repositories/learning_repository.dart';
 import 'package:logic_oasis/shared/services/parent_link_context_service.dart';
+import 'package:logic_oasis/shared/services/parent_firebase_session.dart';
 import 'package:logic_oasis/shared/state/app_state.dart';
 import 'package:logic_oasis/shared/widgets/logic_oasis_figma_components.dart';
 import 'package:logic_oasis/shared/widgets/metric_card.dart';
@@ -84,14 +85,7 @@ class _ParentDashboardPageState extends State<ParentDashboardPage> {
       _message = null;
     });
     try {
-      final loader =
-          widget.dashboardLoader ??
-          (LinkedChildContext selectedChild) =>
-              LearningRepository().fetchParentDashboardSnapshot(
-                studentId: selectedChild.studentId,
-                yearLevel: selectedChild.yearLevel,
-                topics: widget.state.topics,
-              );
+      final loader = await _dashboardLoader();
       final snapshot = await loader(child);
       if (!mounted || child.studentId != _selectedChild?.studentId) return;
       setState(() {
@@ -106,6 +100,22 @@ class _ParentDashboardPageState extends State<ParentDashboardPage> {
         _message = 'Safe learner updates are temporarily unavailable.';
       });
     }
+  }
+
+  Future<ParentDashboardLoader> _dashboardLoader() async {
+    final provided = widget.dashboardLoader;
+    if (provided != null) return provided;
+    // Use the named parent Firebase app so Rules evaluate the parent identity,
+    // while the student stays signed in through the default app.
+    final repository = LearningRepository(
+      firestore: await ParentFirebaseSession.firestore(),
+    );
+    return (LinkedChildContext selectedChild) =>
+        repository.fetchParentDashboardSnapshot(
+          studentId: selectedChild.studentId,
+          yearLevel: selectedChild.yearLevel,
+          topics: widget.state.topics,
+        );
   }
 
   void _selectChild(LinkedChildContext? child) {
@@ -451,7 +461,6 @@ class _ParentLearningStory {
       statusIcon: Icons.psychology_alt_outlined,
     );
   }
-
 }
 
 class _ParentInsightSummary extends StatelessWidget {

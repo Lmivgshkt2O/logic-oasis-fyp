@@ -14,6 +14,7 @@ import 'package:logic_oasis/l10n/app_localizations.dart';
 import 'package:logic_oasis/shared/repositories/auth_repository.dart';
 import 'package:logic_oasis/shared/state/app_state.dart';
 import 'package:logic_oasis/shared/state/app_state_scope.dart';
+import 'package:logic_oasis/shared/services/parent_firebase_session.dart';
 import 'package:logic_oasis/shared/services/parent_invitation_link_service.dart';
 
 class LogicOasisApp extends StatefulWidget {
@@ -34,6 +35,7 @@ class _LogicOasisAppState extends State<LogicOasisApp>
   final _parentInvitationLinks = ParentInvitationLinkService();
   StreamSubscription<ParentInvitationLink>? _parentInvitationSubscription;
   ParentInvitationLink? _pendingParentInvitation;
+  _EntryStage? _parentReturnStage;
 
   @override
   void initState() {
@@ -103,13 +105,8 @@ class _LogicOasisAppState extends State<LogicOasisApp>
   }
 
   Future<void> openParentAccess() async {
-    // Firebase Auth has one current user. Clear the student runtime before a
-    // parent account signs in; this prevents a previous learner from being
-    // reused as a dashboard fallback during account switching.
-    appState.clearSignedInStudentRuntimeState();
-    await authRepository.signOutStudent();
-    if (!mounted) return;
-    loggedInStudentName = null;
+    // Parent access uses a named Firebase app.  The default app keeps the
+    // student's authenticated session and current Settings context intact.
     moveTo(_EntryStage.parentAccess);
   }
 
@@ -118,25 +115,29 @@ class _LogicOasisAppState extends State<LogicOasisApp>
       (link) => unawaited(_openParentInvitation(link)),
       onError: (_) {},
     );
-    _parentInvitationLinks.initialLink().then((link) {
-      if (link != null) unawaited(_openParentInvitation(link));
-    }).catchError((_) {});
+    _parentInvitationLinks
+        .initialLink()
+        .then((link) {
+          if (link != null) unawaited(_openParentInvitation(link));
+        })
+        .catchError((_) {});
   }
 
   Future<void> _openParentInvitation(ParentInvitationLink link) async {
+    _parentReturnStage = stage == _EntryStage.home
+        ? _EntryStage.home
+        : _EntryStage.login;
     _pendingParentInvitation = link;
-    await authRepository.signOutStudent();
-    if (!mounted) return;
-    appState.clearSignedInStudentRuntimeState();
-    loggedInStudentName = null;
     moveTo(_EntryStage.parentInvitation);
   }
 
   Future<void> _finishParentDashboard() async {
-    await authRepository.signOutStudent();
+    await ParentFirebaseSession.signOut();
     _pendingParentInvitation = null;
     if (!mounted) return;
-    moveTo(_EntryStage.login);
+    final returnStage = _parentReturnStage ?? _EntryStage.login;
+    _parentReturnStage = null;
+    moveTo(returnStage);
   }
 
   @override
@@ -197,7 +198,6 @@ class _LogicOasisAppState extends State<LogicOasisApp>
                   key: const ValueKey('parent-access'),
                   state: appState,
                   onReturnToStudentLogin: () {
-                    appState.clearSignedInStudentRuntimeState();
                     moveTo(_EntryStage.login);
                   },
                 ),

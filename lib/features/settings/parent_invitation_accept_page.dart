@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:logic_oasis/shared/services/parent_link_invitation_service.dart';
+import 'package:logic_oasis/shared/services/parent_firebase_session.dart';
 
 /// Neutral parent-only confirmation surface reached after email-link sign-in.
 /// The surrounding root/deep-link handler supplies opaque values; this page
@@ -24,10 +25,12 @@ class ParentInvitationAcceptPage extends StatefulWidget {
   final VoidCallback? onDeclined;
 
   @override
-  State<ParentInvitationAcceptPage> createState() => _ParentInvitationAcceptPageState();
+  State<ParentInvitationAcceptPage> createState() =>
+      _ParentInvitationAcceptPageState();
 }
 
-class _ParentInvitationAcceptPageState extends State<ParentInvitationAcceptPage> {
+class _ParentInvitationAcceptPageState
+    extends State<ParentInvitationAcceptPage> {
   late final ParentLinkInvitationGateway _service;
   final _emailController = TextEditingController();
   bool _working = false;
@@ -40,7 +43,7 @@ class _ParentInvitationAcceptPageState extends State<ParentInvitationAcceptPage>
   @override
   void initState() {
     super.initState();
-    _service = widget.service ?? ParentLinkInvitationService();
+    _service = widget.service ?? ParentLinkInvitationService.parentSession();
   }
 
   @override
@@ -60,26 +63,47 @@ class _ParentInvitationAcceptPageState extends State<ParentInvitationAcceptPage>
     try {
       final email = _emailController.text.trim();
       if (email.isEmpty || !email.contains('@')) {
-        setState(() => _error = 'Enter the email address that received the invitation.');
+        setState(
+          () =>
+              _error = 'Enter the email address that received the invitation.',
+        );
         return;
       }
-      final auth = FirebaseAuth.instance;
+      final auth = await ParentFirebaseSession.auth();
       if (!auth.isSignInWithEmailLink(widget.emailLink)) {
-        setState(() => _error = 'This parent invitation link is invalid or expired.');
+        setState(
+          () => _error = 'This parent invitation link is invalid or expired.',
+        );
         return;
       }
       await auth.signInWithEmailLink(email: email, emailLink: widget.emailLink);
       await auth.currentUser?.getIdToken(true);
       if (accepted) {
-        await _service.accept(invitationId: widget.invitationId, verifier: widget.verifier);
+        await _service.accept(
+          invitationId: widget.invitationId,
+          verifier: widget.verifier,
+        );
       } else {
-        await _service.decline(invitationId: widget.invitationId, verifier: widget.verifier);
+        await _service.decline(
+          invitationId: widget.invitationId,
+          verifier: widget.verifier,
+        );
       }
       if (!mounted) return;
       if (accepted) {
         setState(() => _accepted = true);
       } else {
         widget.onDeclined?.call();
+      }
+    } on FirebaseAuthException catch (_) {
+      // Firebase does not expose a safe, user-actionable distinction between
+      // an address mismatch and an expired/replayed email link. Keep the
+      // response generic while telling the parent how to recover.
+      if (mounted) {
+        setState(
+          () => _error =
+              'Use the exact email address that received the newest invitation, then try again.',
+        );
       }
     } on ParentLinkInvitationException catch (error) {
       if (mounted) setState(() => _error = error.message);
@@ -103,12 +127,19 @@ class _ParentInvitationAcceptPageState extends State<ParentInvitationAcceptPage>
       _error = null;
     });
     try {
-      final parent = FirebaseAuth.instance.currentUser;
-      if (parent == null) throw const ParentLinkInvitationException('Your secure sign-in has expired. Open the invitation email again.');
+      final parent = (await ParentFirebaseSession.auth()).currentUser;
+      if (parent == null)
+        throw const ParentLinkInvitationException(
+          'Your secure sign-in has expired. Open the invitation email again.',
+        );
       await parent.updatePassword(password);
       if (mounted) widget.onAccepted?.call();
     } on FirebaseAuthException catch (_) {
-      if (mounted) setState(() => _error = 'Unable to set the password now. Use Forgot password from parent sign in instead.');
+      if (mounted)
+        setState(
+          () => _error =
+              'Unable to set the password now. Use Forgot password from parent sign in instead.',
+        );
     } finally {
       if (mounted) setState(() => _working = false);
     }
@@ -123,25 +154,56 @@ class _ParentInvitationAcceptPageState extends State<ParentInvitationAcceptPage>
           child: ListView(
             padding: const EdgeInsets.all(20),
             children: [
-              Text('Set a password', style: Theme.of(context).textTheme.headlineSmall),
+              Text(
+                'Set a password',
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
               const SizedBox(height: 12),
-              const Text('Your consent is recorded. Set a password now so you can use the secure parent sign-in later.'),
+              const Text(
+                'Your consent is recorded. Set a password now so you can use the secure parent sign-in later.',
+              ),
               const SizedBox(height: 20),
               TextField(
                 controller: _passwordController,
                 obscureText: _obscurePassword,
-                decoration: InputDecoration(labelText: 'New password', prefixIcon: const Icon(Icons.lock_outline), suffixIcon: IconButton(onPressed: () => setState(() => _obscurePassword = !_obscurePassword), icon: Icon(_obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined))),
+                decoration: InputDecoration(
+                  labelText: 'New password',
+                  prefixIcon: const Icon(Icons.lock_outline),
+                  suffixIcon: IconButton(
+                    onPressed: () =>
+                        setState(() => _obscurePassword = !_obscurePassword),
+                    icon: Icon(
+                      _obscurePassword
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                    ),
+                  ),
+                ),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: _confirmPasswordController,
                 obscureText: _obscurePassword,
-                decoration: const InputDecoration(labelText: 'Confirm password', prefixIcon: Icon(Icons.lock_outline)),
+                decoration: const InputDecoration(
+                  labelText: 'Confirm password',
+                  prefixIcon: Icon(Icons.lock_outline),
+                ),
               ),
-              if (_error != null) ...[const SizedBox(height: 12), Text(_error!, style: const TextStyle(color: Colors.red))],
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                Text(_error!, style: const TextStyle(color: Colors.red)),
+              ],
               const SizedBox(height: 20),
-              FilledButton(onPressed: _working ? null : _setPasswordAndContinue, child: Text(_working ? 'Saving password...' : 'Open parent dashboard')),
-              TextButton(onPressed: _working ? null : widget.onAccepted, child: const Text('Skip for now — use Forgot password later')),
+              FilledButton(
+                onPressed: _working ? null : _setPasswordAndContinue,
+                child: Text(
+                  _working ? 'Saving password...' : 'Open parent dashboard',
+                ),
+              ),
+              TextButton(
+                onPressed: _working ? null : widget.onAccepted,
+                child: const Text('Skip for now — use Forgot password later'),
+              ),
             ],
           ),
         ),
@@ -155,7 +217,10 @@ class _ParentInvitationAcceptPageState extends State<ParentInvitationAcceptPage>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Connect to safe learning updates', style: Theme.of(context).textTheme.headlineSmall),
+              Text(
+                'Connect to safe learning updates',
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
               const SizedBox(height: 12),
               const Text(
                 'You are about to connect your parent account. You will only see safe learning summaries for the linked learner.',
@@ -176,7 +241,9 @@ class _ParentInvitationAcceptPageState extends State<ParentInvitationAcceptPage>
               const Spacer(),
               FilledButton(
                 onPressed: _working ? null : () => _complete(accepted: true),
-                child: Text(_working ? 'Checking invitation...' : 'Accept invitation'),
+                child: Text(
+                  _working ? 'Checking invitation...' : 'Accept invitation',
+                ),
               ),
               const SizedBox(height: 10),
               OutlinedButton(

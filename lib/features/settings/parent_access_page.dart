@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:logic_oasis/features/parent_dashboard/parent_dashboard_page.dart';
 import 'package:logic_oasis/shared/repositories/auth_repository.dart';
+import 'package:logic_oasis/shared/services/parent_firebase_session.dart';
 import 'package:logic_oasis/shared/state/app_state.dart';
 
 abstract class ParentAuthenticationGateway {
@@ -14,22 +15,37 @@ abstract class ParentAuthenticationGateway {
 class FirebaseParentAuthenticationGateway
     implements ParentAuthenticationGateway {
   FirebaseParentAuthenticationGateway({AuthRepository? authRepository})
-    : _authRepository = authRepository ?? AuthRepository();
+    : _authRepository = authRepository;
 
-  final AuthRepository _authRepository;
+  AuthRepository? _authRepository;
+
+  Future<AuthRepository> _repository() async {
+    final existing = _authRepository;
+    if (existing != null) return existing;
+    final repository = AuthRepository(
+      auth: await ParentFirebaseSession.auth(),
+      firestore: await ParentFirebaseSession.firestore(),
+    );
+    _authRepository = repository;
+    return repository;
+  }
 
   @override
   Future<void> signIn({required String email, required String password}) {
-    return _authRepository.signInParent(email: email, password: password);
+    return _repository().then(
+      (repository) => repository.signInParent(email: email, password: password),
+    );
   }
 
   @override
   Future<void> sendPasswordReset({required String email}) {
-    return _authRepository.sendParentPasswordResetEmail(email: email);
+    return _repository().then(
+      (repository) => repository.sendParentPasswordResetEmail(email: email),
+    );
   }
 
   @override
-  Future<void> signOut() => _authRepository.signOutStudent();
+  Future<void> signOut() => ParentFirebaseSession.signOut();
 }
 
 /// A separate Firebase-authenticated parent session. Student invitation and

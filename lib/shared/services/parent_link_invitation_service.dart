@@ -1,4 +1,5 @@
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:logic_oasis/shared/services/parent_firebase_session.dart';
 
 class ParentLinkInvitationException implements Exception {
   const ParentLinkInvitationException(this.message);
@@ -19,17 +20,38 @@ class ParentInvitationStatus {
 /// Callable-only bridge for U12. Flutter never reads or writes invitation,
 /// link, audit, email-HMAC, or verifier documents directly.
 abstract class ParentLinkInvitationGateway {
-  Future<ParentInvitationStatus> createInvitation({required String recipientEmail});
+  Future<ParentInvitationStatus> createInvitation({
+    required String recipientEmail,
+  });
   Future<void> accept({required String invitationId, required String verifier});
-  Future<void> decline({required String invitationId, required String verifier});
+  Future<void> decline({
+    required String invitationId,
+    required String verifier,
+  });
   Future<void> unlinkOwnParentLink({required String studentId});
 }
 
 class ParentLinkInvitationService implements ParentLinkInvitationGateway {
   ParentLinkInvitationService({FirebaseFunctions? functions})
-    : _functions = functions ?? FirebaseFunctions.instanceFor(region: 'asia-southeast1');
+    : _functions = functions,
+      _functionsProvider = null;
 
-  final FirebaseFunctions _functions;
+  /// Parent acceptance and unlinking must carry the named parent Auth token,
+  /// not the student's default-app token.
+  ParentLinkInvitationService.parentSession({FirebaseFunctions? functions})
+    : _functions = functions,
+      _functionsProvider = ParentFirebaseSession.functions;
+
+  final FirebaseFunctions? _functions;
+  final Future<FirebaseFunctions> Function()? _functionsProvider;
+
+  Future<FirebaseFunctions> _resolvedFunctions() async {
+    final functions = _functions;
+    if (functions != null) return functions;
+    final provider = _functionsProvider;
+    if (provider != null) return provider();
+    return FirebaseFunctions.instanceFor(region: 'asia-southeast1');
+  }
 
   Future<ParentInvitationStatus> createInvitation({
     required String recipientEmail,
@@ -44,14 +66,20 @@ class ParentLinkInvitationService implements ParentLinkInvitationGateway {
     );
   }
 
-  Future<void> accept({required String invitationId, required String verifier}) async {
+  Future<void> accept({
+    required String invitationId,
+    required String verifier,
+  }) async {
     await _call('acceptParentLinkInvitation', {
       'invitationId': invitationId,
       'verifier': verifier,
     });
   }
 
-  Future<void> decline({required String invitationId, required String verifier}) async {
+  Future<void> decline({
+    required String invitationId,
+    required String verifier,
+  }) async {
     await _call('declineParentLinkInvitation', {
       'invitationId': invitationId,
       'verifier': verifier,
@@ -67,10 +95,14 @@ class ParentLinkInvitationService implements ParentLinkInvitationGateway {
     Map<String, dynamic> payload,
   ) async {
     try {
-      final result = await _functions.httpsCallable(name).call(payload);
+      final result = await (await _resolvedFunctions())
+          .httpsCallable(name)
+          .call(payload);
       final data = result.data;
       if (data is! Map) {
-        throw const ParentLinkInvitationException('Secure parent request returned an invalid response.');
+        throw const ParentLinkInvitationException(
+          'Secure parent request returned an invalid response.',
+        );
       }
       return Map<String, dynamic>.from(data);
     } on FirebaseFunctionsException catch (_) {

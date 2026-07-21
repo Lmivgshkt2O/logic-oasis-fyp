@@ -19,12 +19,14 @@ email is stored or handled by a Flutter client.
 
 3. Set the non-secret Functions configuration for the approved mail provider:
    `PARENT_INVITATION_CONTINUE_URL=https://logic-oasis-fyp.web.app/parent-invitation`,
-   `PARENT_INVITATION_LINK_DOMAIN=logic-oasis-fyp.web.app`,
    `PARENT_INVITATION_ANDROID_PACKAGE=com.example.logic_oasis`,
    `PARENT_INVITATION_SMTP_HOST`, `PARENT_INVITATION_SMTP_PORT`,
    `PARENT_INVITATION_SMTP_USERNAME`, and `PARENT_INVITATION_SMTP_FROM`.
-   Values must be supplied through the deployment environment, never a tracked
-   `.env` file.
+   Firebase Authentication selects its default Firebase Hosting action-link
+   domain (`logic-oasis-fyp.firebaseapp.com`) automatically. Do not configure a
+   default `web.app` or `firebaseapp.com` domain as `linkDomain`; that setting
+   is only for an approved custom Firebase Hosting domain. Values must be
+   supplied through the deployment environment, never a tracked `.env` file.
 4. Deploy the individual-secret IAM bindings before Functions:
 
    ```powershell
@@ -32,7 +34,7 @@ email is stored or handled by a Flutter client.
    firebase deploy --only functions,firestore:rules
    ```
 
-5. Publish `https://logic-oasis-fyp.web.app/.well-known/assetlinks.json` with
+5. Publish `https://logic-oasis-fyp.firebaseapp.com/.well-known/assetlinks.json` with
    the production Android signing certificate SHA-256 and package name
    `com.example.logic_oasis`. Its relation must be
    `delegate_permission/common.handle_all_urls`. Then deploy Hosting. Until this

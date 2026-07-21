@@ -1,5 +1,6 @@
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:logic_oasis/shared/models/linked_child_context.dart';
+import 'package:logic_oasis/shared/services/parent_firebase_session.dart';
 
 abstract class ParentLinkedChildrenGateway {
   Future<List<LinkedChildContext>> loadLinkedChildren();
@@ -17,15 +18,18 @@ class ParentLinkContextException implements Exception {
 /// The sole Flutter boundary for resolving a parent's active linked children.
 class ParentLinkedChildrenService implements ParentLinkedChildrenGateway {
   ParentLinkedChildrenService({FirebaseFunctions? functions})
-    : _functions =
-          functions ?? FirebaseFunctions.instanceFor(region: 'asia-southeast1');
+    : _functions = functions;
 
-  final FirebaseFunctions _functions;
+  final FirebaseFunctions? _functions;
+
+  Future<FirebaseFunctions> _resolvedFunctions() async {
+    return _functions ?? await ParentFirebaseSession.functions();
+  }
 
   @override
   Future<List<LinkedChildContext>> loadLinkedChildren() async {
     try {
-      final result = await _functions
+      final result = await (await _resolvedFunctions())
           .httpsCallable('getLinkedChildren')
           .call<Map<Object?, Object?>>(<String, Object>{});
       final rawChildren = result.data['children'];

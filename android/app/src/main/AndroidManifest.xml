@@ -24,15 +24,17 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-            <!-- U12 parent email-link return. The deployed Hosting site must
-                 publish matching assetlinks.json before autoVerify can pass. -->
+            <!-- U12 parent email-link return. Firebase Auth uses the project's
+                 default Firebase Hosting action-link domain for mobile email
+                 links; the deployed site publishes matching assetlinks.json. -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data
                     android:scheme="https"
-                    android:host="logic-oasis-fyp.web.app" />
+                    android:host="logic-oasis-fyp.firebaseapp.com"
+                    android:pathPrefix="/__/auth/links" />
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
