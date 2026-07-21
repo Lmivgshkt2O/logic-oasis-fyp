@@ -6,6 +6,8 @@ import 'package:logic_oasis/shared/state/app_state.dart';
 abstract class ParentAuthenticationGateway {
   Future<void> signIn({required String email, required String password});
 
+  Future<void> sendPasswordReset({required String email});
+
   Future<void> signOut();
 }
 
@@ -22,11 +24,17 @@ class FirebaseParentAuthenticationGateway
   }
 
   @override
+  Future<void> sendPasswordReset({required String email}) {
+    return _authRepository.sendParentPasswordResetEmail(email: email);
+  }
+
+  @override
   Future<void> signOut() => _authRepository.signOutStudent();
 }
 
-/// A separate Firebase-authenticated parent session. Account provisioning and
-/// the parent-child link remain supervisor-approved server operations.
+/// A separate Firebase-authenticated parent session. Student invitation and
+/// parent email-link consent create the server-owned relationship; this page
+/// is the later secure sign-in and password-recovery entry point.
 class ParentAccessPage extends StatefulWidget {
   const ParentAccessPage({
     super.key,
@@ -53,6 +61,7 @@ class _ParentAccessPageState extends State<ParentAccessPage> {
   bool _isSigningIn = false;
   bool _parentSessionActive = false;
   bool _obscurePassword = true;
+  bool _isSendingReset = false;
   String? _error;
 
   @override
@@ -148,6 +157,33 @@ class _ParentAccessPageState extends State<ParentAccessPage> {
     }
   }
 
+  Future<void> _sendPasswordReset() async {
+    final email = _emailController.text.trim();
+    if (_isSendingReset || !email.contains('@')) {
+      setState(() => _error = 'Enter the parent email address first.');
+      return;
+    }
+    setState(() {
+      _isSendingReset = true;
+      _error = null;
+    });
+    try {
+      await _authGateway.sendPasswordReset(email: email);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'If this email has a parent account, Firebase will send reset instructions.',
+          ),
+        ),
+      );
+    } on AuthFailure catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } finally {
+      if (mounted) setState(() => _isSendingReset = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -166,7 +202,7 @@ class _ParentAccessPageState extends State<ParentAccessPage> {
                 ),
                 const SizedBox(height: 10),
                 const Text(
-                  'Sign in with the parent Firebase account linked to this learner. Only safe learning updates for active, approved links are shown.',
+                  'Sign in with your own Firebase parent account. Only safe learning updates for an active linked learner are shown.',
                 ),
                 const SizedBox(height: 20),
                 TextFormField(
@@ -227,9 +263,22 @@ class _ParentAccessPageState extends State<ParentAccessPage> {
                     _isSigningIn ? 'Signing in…' : 'Secure parent sign in',
                   ),
                 ),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    onPressed: _isSigningIn || _isSendingReset
+                        ? null
+                        : _sendPasswordReset,
+                    child: Text(
+                      _isSendingReset
+                          ? 'Sending reset instructions...'
+                          : 'Forgot password? Reset it securely',
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 16),
                 const Text(
-                  'New parent accounts and links are not created from a student device. Please contact your school or supervisor to provision an approved account and link.',
+                  'To connect a new parent account, the student sends an invitation and the parent accepts it from their own email. Supervisors handle only exceptions and revocation.',
                 ),
               ],
             ),

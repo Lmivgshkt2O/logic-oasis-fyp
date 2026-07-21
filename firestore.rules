@@ -10,6 +10,21 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == userId;
     }
 
+    function createsStudentProfile(userId) {
+      return ownsUserDoc(userId) &&
+        request.resource.data.role == 'student';
+    }
+
+    function keepsStudentAuthorityImmutable(userId) {
+      return ownsUserDoc(userId) &&
+        resource.data.role == 'student' &&
+        request.resource.data.role == 'student' &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'role', 'parentIds', 'linkedParentAccountId', 'linkedParentEmail',
+          'parentAuthority', 'isActive'
+        ]);
+    }
+
     function ownsStudentField() {
       return signedIn() &&
         request.resource.data.studentId == request.auth.uid;
@@ -79,7 +94,13 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow read, write: if ownsUserDoc(userId);
+      // Students create only their own student profile. Parent profiles are
+      // created by the U12 callable after verified invitation consent; neither
+      // role nor parent-authority fields are client-editable.
+      allow read: if ownsUserDoc(userId);
+      allow create: if createsStudentProfile(userId);
+      allow update: if keepsStudentAuthorityImmutable(userId);
+      allow delete: if false;
     }
 
     match /rememberedProfiles/{profileId} {
@@ -154,6 +175,12 @@ service cloud.firestore {
       // SDK writes and is intentionally outside Rules.
       allow write: if false;
       allow read: if false;
+    }
+
+    match /parentLinkInvitations/{invitationId} {
+      // Invitation state, email HMACs, verifiers, and delivery evidence are
+      // callable-only. Student UI receives a masked callable projection.
+      allow read, write: if false;
     }
 
     match /adminRoleAudits/{auditId} {

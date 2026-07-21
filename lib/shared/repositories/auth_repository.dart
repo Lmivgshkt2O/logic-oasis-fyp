@@ -49,6 +49,14 @@ class AuthRepository {
         await _auth.signOut();
         return null;
       }
+      // The root session is a learner session only. A parent who arrives via
+      // an email invitation is routed by the parent entry flow instead of
+      // being silently treated as a learner because both roles use Firebase
+      // Auth's single current-user slot.
+      if (profileData['role'] != 'student') {
+        await _auth.signOut();
+        return null;
+      }
 
       return StudentAuthProfile(
         uid: user.uid,
@@ -88,6 +96,10 @@ class AuthRepository {
       if (!profile.exists) {
         await _auth.signOut();
         throw const AuthFailure("The account doesn't exist");
+      }
+      if (profile.data()?['role'] != 'student') {
+        await _auth.signOut();
+        throw const AuthFailure('Use the parent dashboard to sign in to this account.');
       }
 
       if (rememberProfile) {
@@ -129,6 +141,16 @@ class AuthRepository {
       );
       if (credential.user == null) {
         throw const AuthFailure('Unable to sign in to the parent account.');
+      }
+      final profile = await _firestore
+          .collection('users')
+          .doc(credential.user!.uid)
+          .get();
+      if (!profile.exists || profile.data()?['role'] != 'parent') {
+        await _auth.signOut();
+        throw const AuthFailure(
+          'This account does not have approved parent dashboard access.',
+        );
       }
     } on FirebaseAuthException catch (error) {
       if (error.code == 'user-not-found' ||
@@ -234,6 +256,10 @@ class AuthRepository {
           'lastActiveAt': FieldValue.serverTimestamp(),
         });
       } else {
+        if (profileData?['role'] != 'student') {
+          await _auth.signOut();
+          throw const AuthFailure('Use the parent dashboard to sign in to this account.');
+        }
         await profileRef.set({
           'email': email,
           'displayName': profileData?['displayName'] ?? displayName,
@@ -264,108 +290,19 @@ class AuthRepository {
     }
   }
 
-  Future<LinkedParentAccount?> fetchLinkedParentAccount({
-    required String studentId,
-  }) async {
-    final studentDoc = await _firestore
-        .collection('users')
-        .doc(studentId)
-        .get();
-    final studentData = studentDoc.data();
-    if (studentData == null) return null;
-
-    final linkedParentId = studentData['linkedParentAccountId'] as String?;
-    final linkedParentEmail = studentData['linkedParentEmail'] as String?;
-
-    if (linkedParentId != null && linkedParentEmail != null) {
-      return LinkedParentAccount(id: linkedParentId, email: linkedParentEmail);
+  /// Firebase Auth owns reset delivery and verification. The response shown by
+  /// the UI is deliberately generic so it does not reveal account existence.
+  Future<void> sendParentPasswordResetEmail({required String email}) async {
+    final normalizedEmail = email.trim();
+    if (normalizedEmail.isEmpty || !normalizedEmail.contains('@')) {
+      throw const AuthFailure('Enter a valid parent email address.');
     }
-
-    final parentIds = studentData['parentIds'];
-    if (parentIds is List && parentIds.isNotEmpty) {
-      final parentId = parentIds.first.toString();
-      final parentDoc = await _firestore
-          .collection('parentAccounts')
-          .doc(parentId)
-          .get();
-      final parentData = parentDoc.data();
-      final email = parentData?['email'] as String? ?? linkedParentEmail;
-      if (email != null) {
-        return LinkedParentAccount(id: parentId, email: email);
-      }
+    try {
+      await _auth.sendPasswordResetEmail(email: normalizedEmail);
+    } on FirebaseAuthException catch (_) {
+      // Keep parent-account existence private. Firebase still applies its own
+      // abuse controls and may have delivered a reset message.
     }
-
-    return null;
-  }
-
-  Future<LinkedParentAccount> registerLinkedParentAccount({
-    required String studentId,
-    required String email,
-    required String password,
-  }) async {
-    final normalizedEmail = email.trim().toLowerCase();
-    final parentId = 'parent_${_stableKey(normalizedEmail)}';
-    final parentRef = _firestore.collection('parentAccounts').doc(parentId);
-
-    await parentRef.set({
-      'email': normalizedEmail,
-      'passwordKey': _passwordKey(parentId, password),
-      'studentIds': FieldValue.arrayUnion([studentId]),
-      'createdAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
-
-    await _firestore.collection('users').doc(studentId).set({
-      'linkedParentAccountId': parentId,
-      'linkedParentEmail': normalizedEmail,
-      'parentIds': FieldValue.arrayUnion([parentId]),
-      'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
-
-    return LinkedParentAccount(id: parentId, email: normalizedEmail);
-  }
-
-  Future<void> authenticateLinkedParent({
-    required LinkedParentAccount parent,
-    required String password,
-  }) async {
-    final parentDoc = await _firestore
-        .collection('parentAccounts')
-        .doc(parent.id)
-        .get();
-    final parentData = parentDoc.data();
-
-    if (parentData == null ||
-        parentData['passwordKey'] != _passwordKey(parent.id, password)) {
-      throw const AuthFailure('Parent password is incorrect.');
-    }
-  }
-
-  Future<void> sendParentResetOtp({required LinkedParentAccount parent}) async {
-    await _firestore.collection('parentAccounts').doc(parent.id).set({
-      'resetOtp': '246810',
-      'resetOtpCreatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
-  }
-
-  Future<void> resetLinkedParentPassword({
-    required LinkedParentAccount parent,
-    required String otp,
-    required String newPassword,
-  }) async {
-    final parentRef = _firestore.collection('parentAccounts').doc(parent.id);
-    final parentDoc = await parentRef.get();
-    final parentData = parentDoc.data();
-
-    if (parentData == null || parentData['resetOtp'] != otp.trim()) {
-      throw const AuthFailure('Enter the correct OTP to reset password.');
-    }
-
-    await parentRef.set({
-      'passwordKey': _passwordKey(parent.id, newPassword),
-      'resetOtp': FieldValue.delete(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
   }
 
   Future<void> updateStudentProfile({
@@ -423,18 +360,6 @@ class AuthRepository {
     await preferences.remove(_rememberedEmailKey);
   }
 
-  String _passwordKey(String parentId, String password) {
-    return _stableKey('$parentId:${password.trim()}');
-  }
-
-  String _stableKey(String value) {
-    var hash = 2166136261;
-    for (final unit in value.codeUnits) {
-      hash ^= unit;
-      hash = (hash * 16777619) & 0xFFFFFFFF;
-    }
-    return hash.toRadixString(16).padLeft(8, '0');
-  }
 }
 
 class StudentAuthProfile {
@@ -449,13 +374,6 @@ class StudentAuthProfile {
   final String email;
   final String? displayName;
   final int? yearLevel;
-}
-
-class LinkedParentAccount {
-  const LinkedParentAccount({required this.id, required this.email});
-
-  final String id;
-  final String email;
 }
 
 class RememberedStudentProfile {

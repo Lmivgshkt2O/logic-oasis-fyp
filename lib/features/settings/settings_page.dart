@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:logic_oasis/app/logic_oasis_design.dart';
 import 'package:logic_oasis/features/settings/parent_access_page.dart';
+import 'package:logic_oasis/features/settings/parent_invitation_page.dart';
 import 'package:logic_oasis/l10n/app_localizations.dart';
 import 'package:logic_oasis/shared/repositories/auth_repository.dart';
 import 'package:logic_oasis/shared/state/app_state.dart';
@@ -445,6 +446,19 @@ class SettingsPage extends StatelessWidget {
                     state.t('Open parent access', 'Buka akses ibu bapa'),
                   ),
                 ),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.of(sheetContext).pop();
+                    if (settingsContext.mounted) {
+                      _openParentInvitation(settingsContext);
+                    }
+                  },
+                  icon: const Icon(Icons.send_outlined),
+                  label: Text(
+                    state.t('Invite a parent securely', 'Jemput ibu bapa dengan selamat'),
+                  ),
+                ),
               ],
             ),
           ),
@@ -459,6 +473,12 @@ class SettingsPage extends StatelessWidget {
         builder: (_) =>
             ParentAccessPage(state: state, onReturnToStudentLogin: onLogout),
       ),
+    );
+  }
+
+  Future<void> _openParentInvitation(BuildContext context) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const ParentInvitationPage()),
     );
   }
 

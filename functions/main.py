@@ -11,8 +11,10 @@ from typing import Any, Callable
 from uuid import uuid4
 
 import firebase_admin
+from firebase_admin import auth as admin_auth
 from firebase_admin import firestore
 from firebase_functions import https_fn
+from firebase_functions import params
 from firebase_functions import firestore_fn
 
 # Deployments import only the generated vendor bundle.  The source-tree fallback
@@ -38,6 +40,16 @@ from parent_link_context import (
     list_active_linked_children,
     verify_authenticated_parent,
 )
+from parent_link_email_delivery import deliver_parent_invitation
+from parent_link_invitation import (
+    PARENT_INVITATION_SERVICE_ACCOUNT,
+    ParentInvitationError,
+    VerifiedInvitationActor,
+    accept_parent_link_invitation,
+    create_parent_link_invitation,
+    decline_parent_link_invitation,
+    unlink_own_parent_link,
+)
 
 from quiz_session import (
     CLIENT_REPORTED_UNVERIFIED,
@@ -60,6 +72,12 @@ _TELEMETRY_FIELDS = frozenset({
     "responseTimeQuality",
     "hintTelemetryStatus",
 })
+PARENT_INVITATION_EMAIL_HMAC_KEY = params.SecretParam(
+    "PARENT_INVITATION_EMAIL_HMAC_KEY"
+)
+PARENT_INVITATION_SMTP_PASSWORD = params.SecretParam(
+    "PARENT_INVITATION_SMTP_PASSWORD"
+)
 
 try:
     firebase_admin.get_app()
@@ -93,6 +111,16 @@ def _auth_uid(request: https_fn.CallableRequest) -> str:
     if request.auth is None or not request.auth.uid:
         raise QuizSessionError("unauthenticated", "Sign in before starting a quiz.")
     return request.auth.uid
+
+
+def _student_auth_uid(request: https_fn.CallableRequest) -> str:
+    """Quiz callables accept only server-profiled learner identities."""
+    uid = _auth_uid(request)
+    snapshot = firestore_db().collection("users").document(uid).get()
+    profile = snapshot.to_dict() if snapshot.exists else None
+    if not isinstance(profile, dict) or profile.get("role") != "student":
+        raise QuizSessionError("permission-denied", "Only a student account can take a quiz.")
+    return uid
 
 
 def _data(request: https_fn.CallableRequest) -> dict[str, Any]:
@@ -508,12 +536,14 @@ _ERROR_CODES: dict[str, https_fn.FunctionsErrorCode] = {
     "already-exists": https_fn.FunctionsErrorCode.ALREADY_EXISTS,
     "failed-precondition": https_fn.FunctionsErrorCode.FAILED_PRECONDITION,
     "deadline-exceeded": https_fn.FunctionsErrorCode.DEADLINE_EXCEEDED,
+    "resource-exhausted": https_fn.FunctionsErrorCode.RESOURCE_EXHAUSTED,
+    "unavailable": https_fn.FunctionsErrorCode.UNAVAILABLE,
 }
 
 
 def _call(handler: Callable[[dict[str, Any], str], dict[str, Any]], request: https_fn.CallableRequest) -> dict[str, Any]:
     try:
-        return handler(_data(request), _auth_uid(request))
+        return handler(_data(request), _student_auth_uid(request))
     except QuizSessionError as error:
         raise https_fn.HttpsError(_ERROR_CODES.get(error.code, https_fn.FunctionsErrorCode.INTERNAL), str(error))
 
@@ -562,10 +592,59 @@ def _parent_context_call(request: https_fn.CallableRequest) -> dict[str, Any]:
             _ERROR_CODES.get(error.code, https_fn.FunctionsErrorCode.INTERNAL),
             str(error),
         )
+
+
+def _parent_invitation_actor(request: https_fn.CallableRequest) -> VerifiedInvitationActor:
+    auth_context = getattr(request, "auth", None)
+    uid = getattr(auth_context, "uid", None)
+    token = getattr(auth_context, "token", {}) or {}
+    if not isinstance(uid, str) or not uid:
+        raise ParentInvitationError("unauthenticated", "Sign in before using parent invitations.")
+    # Callable authentication validates the token before this handler runs,
+    # but invitation acceptance changes a durable relationship. Re-check the
+    # bearer token with revocation enabled so a revoked account cannot replay
+    # a previously opened email link.
+    raw_request = getattr(request, "raw_request", None)
+    headers = getattr(raw_request, "headers", {}) or {}
+    authorization = headers.get("Authorization") or headers.get("authorization")
+    if not isinstance(authorization, str) or not authorization.startswith("Bearer "):
+        raise ParentInvitationError("unauthenticated", "Refresh your secure sign-in and try again.")
+    try:
+        verified_token = admin_auth.verify_id_token(
+            authorization.removeprefix("Bearer "), check_revoked=True,
+        )
+    except Exception as error:
+        raise ParentInvitationError("unauthenticated", "Refresh your secure sign-in and try again.") from error
+    if verified_token.get("uid") != uid:
+        raise ParentInvitationError("unauthenticated", "Refresh your secure sign-in and try again.")
+    email = token.get("email")
+    verified = token.get("email_verified") is True
+    profile_snapshot = firestore_db().collection("users").document(uid).get()
+    profile = profile_snapshot.to_dict() if profile_snapshot.exists else None
+    return VerifiedInvitationActor(
+        uid=uid,
+        email=email if isinstance(email, str) else "",
+        email_verified=verified,
+        role=profile.get("role") if isinstance(profile, dict) else None,
+    )
+
+
+def _parent_invitation_call(
+    handler: Callable[..., dict[str, Any]], request: https_fn.CallableRequest, *, delivery: bool = False,
+) -> dict[str, Any]:
+    try:
+        actor = _parent_invitation_actor(request)
+        kwargs: dict[str, Any] = {"email_hmac_key": os.environ.get("PARENT_INVITATION_EMAIL_HMAC_KEY", "")}
+        if delivery:
+            kwargs["deliver"] = deliver_parent_invitation
+        return handler(_data(request), actor, firestore_db(), **kwargs)
+    except ParentInvitationError as error:
+        raise https_fn.HttpsError(
+            _ERROR_CODES.get(error.code, https_fn.FunctionsErrorCode.INTERNAL), str(error)
+        )
     except QuizSessionError as error:
         raise https_fn.HttpsError(
-            _ERROR_CODES.get(error.code, https_fn.FunctionsErrorCode.INTERNAL),
-            str(error),
+            _ERROR_CODES.get(error.code, https_fn.FunctionsErrorCode.INTERNAL), str(error)
         )
 
 
@@ -591,6 +670,48 @@ def manageParentLink(request: https_fn.CallableRequest) -> dict[str, str]:
 )
 def revokeParentLink(request: https_fn.CallableRequest) -> dict[str, str]:
     return _parent_link_call(revoke_parent_link, request)
+
+
+@https_fn.on_call(
+    region=FUNCTION_REGION,
+    service_account=PARENT_INVITATION_SERVICE_ACCOUNT,
+    secrets=[PARENT_INVITATION_EMAIL_HMAC_KEY, PARENT_INVITATION_SMTP_PASSWORD],
+)
+def createParentLinkInvitation(request: https_fn.CallableRequest) -> dict[str, Any]:
+    return _parent_invitation_call(create_parent_link_invitation, request, delivery=True)
+
+
+@https_fn.on_call(
+    region=FUNCTION_REGION,
+    service_account=PARENT_INVITATION_SERVICE_ACCOUNT,
+    secrets=[PARENT_INVITATION_EMAIL_HMAC_KEY],
+)
+def acceptParentLinkInvitation(request: https_fn.CallableRequest) -> dict[str, Any]:
+    return _parent_invitation_call(accept_parent_link_invitation, request)
+
+
+@https_fn.on_call(
+    region=FUNCTION_REGION,
+    service_account=PARENT_INVITATION_SERVICE_ACCOUNT,
+    secrets=[PARENT_INVITATION_EMAIL_HMAC_KEY],
+)
+def declineParentLinkInvitation(request: https_fn.CallableRequest) -> dict[str, Any]:
+    return _parent_invitation_call(decline_parent_link_invitation, request)
+
+
+@https_fn.on_call(
+    region=FUNCTION_REGION,
+    service_account=PARENT_INVITATION_SERVICE_ACCOUNT,
+    secrets=[PARENT_INVITATION_EMAIL_HMAC_KEY],
+)
+def unlinkOwnParentLink(request: https_fn.CallableRequest) -> dict[str, Any]:
+    try:
+        actor = _parent_invitation_actor(request)
+        return unlink_own_parent_link(_data(request), actor, firestore_db())
+    except ParentInvitationError as error:
+        raise https_fn.HttpsError(
+            _ERROR_CODES.get(error.code, https_fn.FunctionsErrorCode.INTERNAL), str(error)
+        )
 
 
 @firestore_fn.on_document_created(
