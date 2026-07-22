@@ -106,6 +106,9 @@ class AiRuntimeTests(unittest.TestCase):
         self.assertEqual(0.6, projected["bestCorrectRate"])
         self.assertTrue(projected["completed"])
         self.assertEqual("Moderate", projected["masteryLevel"])
+        assignment = self.gateway.finalized[0]["assignment"]
+        self.assertEqual("runtime_callable", assignment["dataSource"])
+        self.assertEqual(1, assignment["sourceAttemptSequence"])
         self.assertEqual("fallback", process_finalized_attempt("attempt-1", gateway=self.gateway, bundle=self.bundle))
         self.assertEqual(1, len(self.gateway.finalized))
 
@@ -226,6 +229,57 @@ class AiRuntimeTests(unittest.TestCase):
             self.assertEqual("fallback", gateway.finalize(trusted_attempt(), state="fallback", code="approval_missing",
                 raw_run={"status": "fallback"}, snapshots=[snapshot], assignment=assignment, mastery=mastery))
         self.assertGreater(database.current_transaction.writes, 0)
+
+    def test_firestore_gateway_derives_bank_exposure_from_trusted_student_history(self) -> None:
+        class Snapshot:
+            def __init__(self, document_id, data):
+                self.id = document_id
+                self._data = data
+                self.exists = True
+
+            def to_dict(self):
+                return dict(self._data)
+
+        class Query:
+            def __init__(self, documents, conditions=()):
+                self.documents = documents
+                self.conditions = conditions
+
+            def where(self, field, _operator, value):
+                return Query(self.documents, (*self.conditions, (field, value)))
+
+            def stream(self):
+                return [
+                    Snapshot(document_id, record)
+                    for document_id, record in self.documents.items()
+                    if all(record.get(field) == value for field, value in self.conditions)
+                ]
+
+        class Collection(Query):
+            def __init__(self, documents):
+                super().__init__(documents)
+
+        class Database:
+            def __init__(self, collections):
+                self.collections = collections
+
+            def collection(self, name):
+                return Collection(self.collections[name])
+
+        current = {**trusted_attempt(), "attemptId": "attempt-2", "bankId": "moderate-a", "sourceAttemptSequence": 2}
+        earlier = {**trusted_attempt(), "attemptId": "attempt-1", "bankId": "moderate-a", "sourceAttemptSequence": 1}
+        database = Database({
+            "quizAttempts": {"attempt-1": earlier, "attempt-2": current},
+            "questionBanks": {
+                "moderate-a": {"bankId": "moderate-a", "topicId": "topic-1", "subtopicId": "subtopic-1", "yearLevel": 4},
+                "moderate-b": {"bankId": "moderate-b", "topicId": "topic-1", "subtopicId": "subtopic-1", "yearLevel": 4},
+            },
+        })
+
+        banks = FirestoreRuntimeGateway(database).banks(current)
+
+        exposure = {bank["bankId"]: bank["exposureCount"] for bank in banks}
+        self.assertEqual({"moderate-a": 2, "moderate-b": 0}, exposure)
 
 
 if __name__ == "__main__":
