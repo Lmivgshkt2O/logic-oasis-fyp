@@ -140,7 +140,7 @@ def _dataset_document(prediction_dataset: PredictionDataset) -> dict[str, object
         "rows": [
             {
                 "attemptId": row.attempt_id,
-                "evaluationGroupKey": row.student_key,
+                "evaluationGroupKey": row.evaluation_group_key,
                 "scenarioFamilyId": row.student_key,
                 "features": dict(row.features),
                 "nextAttemptSupportNeeded": row.target,

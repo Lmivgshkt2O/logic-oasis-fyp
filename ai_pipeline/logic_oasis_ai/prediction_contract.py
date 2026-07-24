@@ -126,6 +126,11 @@ class SupervisedExample:
     target: bool
     contract: PredictionContract
     provenance: str
+    evaluation_group_key: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.evaluation_group_key:
+            object.__setattr__(self, "evaluation_group_key", self.student_key)
 
 
 @dataclass(frozen=True)
@@ -249,6 +254,7 @@ def build_prediction_dataset(
                     target=next_attempt.correct_rate < contract.mastery_criterion,
                     contract=contract,
                     provenance=current.provenance,
+                    evaluation_group_key=current.student_key,
                 )
             )
     return PredictionDataset(tuple(examples), tuple(audits), _summarize_audits(audits))

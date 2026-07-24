@@ -14,6 +14,7 @@ from typing import Callable, Iterable, Mapping
 
 from logic_oasis_ai.model_registry import ModelArtifact
 from logic_oasis_ai.prediction_contract import (
+    CONTROLLED_DEMO_PROVENANCE,
     DataSufficiency,
     PredictionContract,
     PairAuditSummary,
@@ -23,13 +24,15 @@ from logic_oasis_ai.prediction_contract import (
     BKT_FEATURE_NAME,
 )
 
-from .common import grouped_holdout_split, matrix_and_target
+from .common import grouped_binary_holdout_split, grouped_holdout_split, matrix_and_target
 from .train_decision_tree import train_decision_tree
 from .train_mlp import train_mlp
 from .train_xgboost import train_xgboost
 
 
 RANDOM_SEED = 20260716
+EVALUATION_STATUS_EVALUATED = "evaluated"
+EVALUATION_STATUS_CATALOGUE_INSUFFICIENT = "catalogue_insufficient"
 
 
 @dataclass(frozen=True)
@@ -50,6 +53,9 @@ class ComparisonReport:
     random_seed: int
     pair_audit_summary: PairAuditSummary | None = None
     telemetry_readiness_status: str = "not_audited"
+    evaluation_status: str = EVALUATION_STATUS_EVALUATED
+    train_evaluation_group_keys: tuple[str, ...] = ()
+    test_evaluation_group_keys: tuple[str, ...] = ()
 
     def to_document(self) -> dict[str, object]:
         return {
@@ -58,6 +64,7 @@ class ComparisonReport:
             "masteryCriterion": self.contract.mastery_criterion,
             "featureSchemaVersion": self.contract.feature_schema_version,
             "claimLevel": self.data_sufficiency.claim_level,
+            "evaluationStatus": self.evaluation_status,
             "limitation": self.data_sufficiency.reason,
             "exampleCount": self.data_sufficiency.example_count,
             "studentCount": self.data_sufficiency.student_count,
@@ -65,6 +72,8 @@ class ComparisonReport:
             "supportNotNeededCount": self.data_sufficiency.support_not_needed_count,
             "trainAttemptIds": list(self.train_attempt_ids),
             "testAttemptIds": list(self.test_attempt_ids),
+            "trainEvaluationGroupKeys": list(self.train_evaluation_group_keys),
+            "testEvaluationGroupKeys": list(self.test_evaluation_group_keys),
             "randomSeed": self.random_seed,
             "telemetryReadinessStatus": self.telemetry_readiness_status,
             "pairAudit": self.pair_audit_summary.to_document() if self.pair_audit_summary else None,
@@ -75,7 +84,10 @@ class ComparisonReport:
         }
 
     def sha256(self) -> str:
-        return sha256(json.dumps(self.to_document(), sort_keys=True).encode("utf-8")).hexdigest()
+        document = self.to_document()
+        for model in document["models"]:
+            model["metrics"].pop("inference_latency_ms", None)
+        return sha256(json.dumps(document, sort_keys=True).encode("utf-8")).hexdigest()
 
 
 def evaluate_fair_comparison(
@@ -85,6 +97,7 @@ def evaluate_fair_comparison(
     pair_audit_summary: PairAuditSummary | None = None,
     telemetry_readiness_status: str = "not_audited",
     allow_synthetic_test: bool = False,
+    allow_controlled_demo: bool = False,
 ) -> ComparisonReport:
     """Evaluate all comparison models on exactly one grouped holdout split."""
     rows = tuple(examples)
@@ -97,9 +110,32 @@ def evaluate_fair_comparison(
         raise ValueError("telemetry_readiness_status is not recognized")
     readiness = assess_data_sufficiency(rows)
     synthetic_execution = allow_synthetic_test and rows and all(row.provenance == "synthetic_test" for row in rows)
-    if not readiness.can_compare and not synthetic_execution:
+    controlled_execution = allow_controlled_demo and rows and all(
+        row.provenance == CONTROLLED_DEMO_PROVENANCE for row in rows
+    )
+    if not readiness.can_compare and not synthetic_execution and not controlled_execution:
         return ComparisonReport(contract, readiness, (), (), (), random_seed, pair_audit_summary, telemetry_readiness_status)
-    train, test = grouped_holdout_split(rows, random_seed=random_seed)
+    if controlled_execution:
+        partition = grouped_binary_holdout_split(rows, random_seed=random_seed)
+        if partition is None:
+            insufficient = replace(
+                readiness,
+                reason="catalogue insufficient: both target classes are required in grouped training and held-out evaluation partitions",
+            )
+            return ComparisonReport(
+                contract=contract,
+                data_sufficiency=insufficient,
+                train_attempt_ids=(),
+                test_attempt_ids=(),
+                results=(),
+                random_seed=random_seed,
+                pair_audit_summary=pair_audit_summary,
+                telemetry_readiness_status=telemetry_readiness_status,
+                evaluation_status=EVALUATION_STATUS_CATALOGUE_INSUFFICIENT,
+            )
+        train, test = partition
+    else:
+        train, test = grouped_holdout_split(rows, random_seed=random_seed)
     if readiness.claim_level == "held_out_comparison" and len({row.target for row in test}) != 2:
         readiness = replace(
             readiness,
@@ -125,6 +161,9 @@ def evaluate_fair_comparison(
         random_seed=random_seed,
         pair_audit_summary=pair_audit_summary,
         telemetry_readiness_status=telemetry_readiness_status,
+        evaluation_status=EVALUATION_STATUS_EVALUATED,
+        train_evaluation_group_keys=tuple(sorted({row.evaluation_group_key for row in train})),
+        test_evaluation_group_keys=tuple(sorted({row.evaluation_group_key for row in test})),
     )
 
 
@@ -142,8 +181,8 @@ def evaluate_bkt_ablation(
         raise ValueError("BKT ablation must use the identical labelled attempt rows")
     for base_row, bkt_row in zip(base_rows, bkt_rows):
         if (
-            (base_row.attempt_id, base_row.student_key, base_row.subtopic_id, base_row.observed_at, base_row.target, base_row.contract)
-            != (bkt_row.attempt_id, bkt_row.student_key, bkt_row.subtopic_id, bkt_row.observed_at, bkt_row.target, bkt_row.contract)
+            (base_row.attempt_id, base_row.student_key, base_row.evaluation_group_key, base_row.subtopic_id, base_row.observed_at, base_row.target, base_row.contract)
+            != (bkt_row.attempt_id, bkt_row.student_key, bkt_row.evaluation_group_key, bkt_row.subtopic_id, bkt_row.observed_at, bkt_row.target, bkt_row.contract)
         ):
             raise ValueError("BKT ablation must use the identical labelled attempt rows")
         bkt_value = bkt_row.features.get(BKT_FEATURE_NAME)

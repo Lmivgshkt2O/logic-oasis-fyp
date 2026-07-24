@@ -96,10 +96,19 @@ class PredictionContractTests(unittest.TestCase):
         example = SupervisedExample(
             attempt_id="a", student_key="student", subtopic_id="subtopic", observed_at=NOW,
             features={"correct_rate": 0.6, "mean_response_time_ms": 1000.0, "hint_count": 0.0},
-            target=False, contract=PredictionContract(), provenance="synthetic_test",
+            target=False, contract=PredictionContract(), provenance="synthetic_test", evaluation_group_key="student",
         )
         with self.assertRaisesRegex(ValueError, "future or undeclared"):
             feature_names((example,))
+
+    def test_evaluation_group_defaults_to_student_for_existing_callers(self):
+        example = SupervisedExample(
+            attempt_id="a", student_key="student", subtopic_id="subtopic", observed_at=NOW,
+            features={"correct_rate": 0.6, "mean_response_time_ms": 1000.0},
+            target=False, contract=PredictionContract(), provenance="synthetic_test",
+        )
+
+        self.assertEqual(example.evaluation_group_key, "student")
 
     def test_grouped_split_never_shares_student_and_uses_declared_seed(self):
         examples = synthetic_examples()
