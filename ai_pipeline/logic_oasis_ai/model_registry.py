@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
+import re
 from typing import Mapping
 
 from .prediction_contract import (
@@ -18,6 +19,15 @@ from .prediction_contract import (
 
 CANDIDATE = "candidate"
 PROMOTED = "promoted"
+CONTROLLED_DEMO_PROVENANCE = "expert_authored_controlled_demo"
+CONTROLLED_DEMO_EVIDENCE_LEVEL = "controlled_demonstration"
+CONTROLLED_DEMO_APPROVAL_SCOPE = "fyp1_controlled_demo"
+CONTROLLED_DEMO_DEPLOYMENT_SCOPE = "controlled_demo"
+REAL_EVALUATED_DEPLOYMENT_SCOPE = "real_evaluated"
+CONTROLLED_DEMO_RATIONALE_MARKER = "not real-world validated"
+SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
+MODEL_VERSION_PATTERN = re.compile(r"[a-z0-9](?:[a-z0-9._-]{0,62}[a-z0-9])?")
+BUCKET_PATTERN = re.compile(r"[a-z0-9][a-z0-9._-]{1,221}[a-z0-9]")
 
 
 @dataclass(frozen=True)
@@ -41,6 +51,12 @@ class ModelArtifact:
     approved_at: datetime | None = None
     approval_rationale: str | None = None
     promoted_at: datetime | None = None
+    training_data_provenance: str | None = None
+    evidence_level: str | None = None
+    approval_scope: str | None = None
+    deployment_scope: str | None = None
+    scenario_catalogue_sha256: str | None = None
+    controlled_demo_config_sha256: str | None = None
 
     def __post_init__(self) -> None:
         for field in (
@@ -70,6 +86,8 @@ class ModelArtifact:
             raise ValueError("approval metadata must be complete when supplied")
         if self.approved_at is not None and self.approved_at.tzinfo is None:
             raise ValueError("approved_at must include a timezone")
+        if self.deployment_scope == CONTROLLED_DEMO_DEPLOYMENT_SCOPE:
+            validate_controlled_demo_artifact(self)
 
     def to_registry_document(self) -> dict[str, object]:
         return {
@@ -92,6 +110,12 @@ class ModelArtifact:
             "approvedAt": self.approved_at,
             "approvalRationale": self.approval_rationale,
             "promotedAt": self.promoted_at,
+            "trainingDataProvenance": self.training_data_provenance,
+            "evidenceLevel": self.evidence_level,
+            "approvalScope": self.approval_scope,
+            "deploymentScope": self.deployment_scope,
+            "scenarioCatalogueSha256": self.scenario_catalogue_sha256,
+            "controlledDemoConfigSha256": self.controlled_demo_config_sha256,
         }
 
 
@@ -154,3 +178,47 @@ class ModelRegistry:
 
     def artifacts(self) -> Mapping[str, ModelArtifact]:
         return dict(self._artifacts)
+
+
+def validate_controlled_demo_artifact(artifact: ModelArtifact) -> None:
+    """Require the complete model-specific approval boundary for demo evidence."""
+    expected = {
+        "training_data_provenance": CONTROLLED_DEMO_PROVENANCE,
+        "evidence_level": CONTROLLED_DEMO_EVIDENCE_LEVEL,
+        "approval_scope": CONTROLLED_DEMO_APPROVAL_SCOPE,
+        "deployment_scope": CONTROLLED_DEMO_DEPLOYMENT_SCOPE,
+    }
+    if any(getattr(artifact, field) != value for field, value in expected.items()):
+        raise ValueError("controlled-demo artifact metadata does not match its approved scope")
+    if any(
+        not isinstance(value, str) or not SHA256_PATTERN.fullmatch(value)
+        for value in (artifact.scenario_catalogue_sha256, artifact.controlled_demo_config_sha256)
+    ):
+        raise ValueError("controlled-demo catalogue and configuration hashes are required")
+    if (
+        not isinstance(artifact.approval_rationale, str)
+        or CONTROLLED_DEMO_RATIONALE_MARKER not in artifact.approval_rationale.lower()
+    ):
+        raise ValueError("controlled-demo approval must state that it is not real-world validated")
+
+
+def validate_model_bucket_uri(value: str) -> str:
+    if not isinstance(value, str) or not value.startswith("gs://"):
+        raise ValueError("model bucket must be a gs:// bucket root")
+    bucket_name = value[5:]
+    if "/" in bucket_name or ".." in bucket_name or not BUCKET_PATTERN.fullmatch(bucket_name):
+        raise ValueError("model bucket must not contain an object prefix or traversal")
+    return bucket_name
+
+
+def validate_model_version(value: object) -> str:
+    if not isinstance(value, str) or not MODEL_VERSION_PATTERN.fullmatch(value) or ".." in value:
+        raise ValueError("model version must be a safe lowercase token")
+    return value
+
+
+def controlled_demo_object_paths(model_bucket: str, model_version: object) -> tuple[str, str]:
+    bucket_name = validate_model_bucket_uri(model_bucket)
+    version = validate_model_version(model_version)
+    prefix = f"gs://{bucket_name}/controlled-demo/{version}"
+    return f"{prefix}/model.ubj", f"{prefix}/manifest.json"

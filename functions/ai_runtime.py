@@ -26,6 +26,16 @@ from logic_oasis_ai.bkt import build_bkt_materialization
 from logic_oasis_ai.explain import explain_prediction
 from logic_oasis_ai.features import BASE_FEATURE_NAMES, FEATURE_SCHEMA_VERSION, build_attempt_features
 from logic_oasis_ai.inference import InferenceContractError, predict_support_risk
+from logic_oasis_ai.model_registry import (
+    CONTROLLED_DEMO_APPROVAL_SCOPE,
+    CONTROLLED_DEMO_DEPLOYMENT_SCOPE,
+    CONTROLLED_DEMO_EVIDENCE_LEVEL,
+    CONTROLLED_DEMO_PROVENANCE,
+    CONTROLLED_DEMO_RATIONALE_MARKER,
+    REAL_EVALUATED_DEPLOYMENT_SCOPE,
+    SHA256_PATTERN,
+    controlled_demo_object_paths,
+)
 from logic_oasis_ai.sinks.firestore_sink import (
     adaptive_assignment_id, is_newer_projection, mastery_snapshot_id,
     safe_status_document, subtopic_mastery_id,
@@ -42,8 +52,12 @@ FALLBACK_CODES = frozenset({
     "bundle_mismatch", "artifact_hash_mismatch", "model_load_failed",
     "shap_load_failed", "feature_schema_incompatible", "model_target_incompatible",
     "policy_unavailable", "artifact_unavailable", "artifact_hash_invalid", "model_prediction_invalid", "shap_output_invalid",
+    "model_evidence_incompatible",
 })
 SAFE_ERROR_CODES = FALLBACK_CODES | frozenset({"trusted_source_invalid", "runtime_exhausted"})
+CONTROLLED_DEMO_MODE = "controlled_demo"
+REAL_EVALUATED_ONLY_MODE = "real_evaluated_only"
+ALLOWED_EVIDENCE_MODES = frozenset({CONTROLLED_DEMO_MODE, REAL_EVALUATED_ONLY_MODE})
 
 
 class RuntimeFailure(RuntimeError):
@@ -68,9 +82,17 @@ class RuntimeBundle:
     ranking_policy_sha256: str
     adaptive_policy_path: Path
     artifact_root: Path
+    evidence_mode: str
+    model_bucket: str
 
     @classmethod
-    def from_runtime_root(cls, root: str | Path) -> "RuntimeBundle":
+    def from_runtime_root(
+        cls,
+        root: str | Path,
+        *,
+        evidence_mode: str = REAL_EVALUATED_ONLY_MODE,
+        model_bucket: str = "",
+    ) -> "RuntimeBundle":
         root_path = Path(root).resolve()
         package = root_path / "logic_oasis_ai"
         feature_schema = root_path / "configs" / "feature_schema.yaml"
@@ -85,6 +107,8 @@ class RuntimeBundle:
             ranking_policy_sha256=_file_sha256(ranking),
             adaptive_policy_path=adaptive,
             artifact_root=(root_path / "models").resolve(),
+            evidence_mode=evidence_mode,
+            model_bucket=model_bucket.removeprefix("gs://").rstrip("/"),
         )
 
 
@@ -196,7 +220,7 @@ def _registry_mismatch(registry: Mapping[str, Any], bundle: RuntimeBundle) -> st
         return "model_registry_inactive"
     if not all(registry.get(key) for key in (
         "approvalId", "approvedBy", "approvedAt", "approvalRationale", "evaluationReportSha256",
-        "artifactManifestSha256",
+        "artifactManifestSha256", "promotedAt",
     )):
         return "approval_missing"
     expected = {
@@ -212,6 +236,65 @@ def _registry_mismatch(registry: Mapping[str, Any], bundle: RuntimeBundle) -> st
     if registry.get("predictionTarget") != "next_attempt_support_needed" or registry.get("labelVersion") != "next-attempt-support-needed-v1":
         return "model_target_incompatible"
     if not registry.get("artifactSha256") or not registry.get("artifactPath"):
+        return "artifact_unavailable"
+    return _evidence_mismatch(registry, bundle)
+
+
+def _evidence_mismatch(registry: Mapping[str, Any], bundle: RuntimeBundle) -> str | None:
+    if bundle.evidence_mode not in ALLOWED_EVIDENCE_MODES:
+        return "model_evidence_incompatible"
+    if bundle.evidence_mode == CONTROLLED_DEMO_MODE:
+        return _controlled_demo_evidence_mismatch(registry, bundle)
+    return _real_evidence_mismatch(registry, bundle)
+
+
+def _controlled_demo_evidence_mismatch(
+    registry: Mapping[str, Any], bundle: RuntimeBundle
+) -> str | None:
+    expected = {
+        "trainingDataProvenance": CONTROLLED_DEMO_PROVENANCE,
+        "evidenceLevel": CONTROLLED_DEMO_EVIDENCE_LEVEL,
+        "approvalScope": CONTROLLED_DEMO_APPROVAL_SCOPE,
+        "deploymentScope": CONTROLLED_DEMO_DEPLOYMENT_SCOPE,
+    }
+    if any(registry.get(field) != value for field, value in expected.items()):
+        return "model_evidence_incompatible"
+    if any(
+        not isinstance(registry.get(field), str)
+        or not SHA256_PATTERN.fullmatch(str(registry[field]))
+        for field in ("scenarioCatalogueSha256", "controlledDemoConfigSha256")
+    ):
+        return "model_evidence_incompatible"
+    rationale = registry.get("approvalRationale")
+    if not isinstance(rationale, str) or CONTROLLED_DEMO_RATIONALE_MARKER not in rationale.lower():
+        return "model_evidence_incompatible"
+    try:
+        paths = controlled_demo_object_paths(
+            f"gs://{bundle.model_bucket}", registry.get("modelVersion")
+        )
+    except ValueError:
+        return "artifact_unavailable"
+    if (registry.get("artifactPath"), registry.get("artifactManifestPath")) != paths:
+        return "artifact_unavailable"
+    return None
+
+
+def _real_evidence_mismatch(registry: Mapping[str, Any], bundle: RuntimeBundle) -> str | None:
+    if registry.get("deploymentScope") == CONTROLLED_DEMO_DEPLOYMENT_SCOPE:
+        return "model_evidence_incompatible"
+    expected_real = {
+        "trainingDataProvenance": "approved_pseudonymized_real",
+        "evidenceLevel": "real_evaluated",
+        "approvalScope": "real_evaluated",
+        "deploymentScope": REAL_EVALUATED_DEPLOYMENT_SCOPE,
+    }
+    evidence_values = tuple(registry.get(field) for field in expected_real)
+    if any(value is not None for value in evidence_values) and any(
+        registry.get(field) != value for field, value in expected_real.items()
+    ):
+        return "model_evidence_incompatible"
+    artifact_path = str(registry.get("artifactPath", ""))
+    if not bundle.model_bucket or not artifact_path.startswith(f"gs://{bundle.model_bucket}/"):
         return "artifact_unavailable"
     return None
 
@@ -232,9 +315,19 @@ def _approved_artifact_path(bundle: RuntimeBundle, registry: Mapping[str, Any]):
             try:
                 from firebase_admin import storage
                 bucket_name, object_name = artifact_path[5:].split("/", 1)
+                manifest_path = registry.get("artifactManifestPath")
+                if manifest_path:
+                    manifest_prefix = f"gs://{bucket_name}/"
+                    if not isinstance(manifest_path, str) or not manifest_path.startswith(manifest_prefix):
+                        raise ValueError("manifest must use the approved artifact bucket")
+                    manifest_object = manifest_path.removeprefix(manifest_prefix)
+                    if not manifest_object:
+                        raise ValueError("manifest object path is missing")
+                else:
+                    manifest_object = object_name + ".manifest.json"
                 bucket = storage.bucket(bucket_name)
                 candidate.write_bytes(bucket.blob(object_name).download_as_bytes())
-                manifest.write_bytes(bucket.blob(object_name + ".manifest.json").download_as_bytes())
+                manifest.write_bytes(bucket.blob(manifest_object).download_as_bytes())
             except Exception as error:
                 raise RuntimeFailure("artifact_unavailable", fallback_available=True) from error
         else:

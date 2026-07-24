@@ -86,6 +86,10 @@ PARENT_INVITATION_CONTINUE_URL = params.StringParam(
     "PARENT_INVITATION_CONTINUE_URL",
     default="https://logic-oasis-fyp.web.app/parent-invitation",
 )
+AI_MODEL_EVIDENCE_MODE = params.StringParam(
+    "AI_MODEL_EVIDENCE_MODE", default="real_evaluated_only"
+)
+AI_MODEL_BUCKET = params.StringParam("AI_MODEL_BUCKET", default="")
 PARENT_INVITATION_ANDROID_PACKAGE = params.StringParam(
     "PARENT_INVITATION_ANDROID_PACKAGE", default="com.example.logic_oasis"
 )
@@ -120,10 +124,12 @@ def firestore_db() -> Any:
     return _db
 
 
-@lru_cache(maxsize=2)
-def _runtime_bundle(runtime_root: Path) -> RuntimeBundle:
+@lru_cache(maxsize=4)
+def _runtime_bundle(runtime_root: Path, evidence_mode: str, model_bucket: str) -> RuntimeBundle:
     """Hash one immutable deployed bundle once per warm Functions instance."""
-    return RuntimeBundle.from_runtime_root(runtime_root)
+    return RuntimeBundle.from_runtime_root(
+        runtime_root, evidence_mode=evidence_mode, model_bucket=model_bucket
+    )
 
 
 def _auth_uid(request: https_fn.CallableRequest) -> str:
@@ -1175,7 +1181,11 @@ def processFinalizedQuizAttempt(event: firestore_fn.Event[Any]) -> None:
     process_finalized_attempt(
         snapshot.id,
         gateway=FirestoreRuntimeGateway(firestore_db()),
-        bundle=_runtime_bundle(runtime_root),
+        bundle=_runtime_bundle(
+            runtime_root,
+            AI_MODEL_EVIDENCE_MODE.value(),
+            AI_MODEL_BUCKET.value(),
+        ),
         provenance="emulator_verified" if os.environ.get("FUNCTIONS_EMULATOR") == "true" else "real",
     )
 

@@ -11,11 +11,13 @@ sys.path.insert(0, str(ROOT / "functions"))
 
 from deploy_u8_runtime_iam import (
     ALLOWED_PROJECT_ROLES,
+    FUNCTIONS_ROOT,
     MODEL_BUCKET_ROLE,
     RUN_INVOKER_ROLE,
     SERVICE_ACCOUNT,
     _gcloud_executable,
     commands,
+    runtime_deploy_command,
     run_invoker_command,
 )
 
@@ -49,6 +51,32 @@ class RuntimeIdentityContractTests(unittest.TestCase):
     def test_apply_resolves_explicit_cloud_cli_path(self) -> None:
         with patch.dict("os.environ", {"GCLOUD_BIN": r"C:\Cloud SDK\bin\gcloud.cmd"}, clear=False):
             self.assertEqual(r"C:\Cloud SDK\bin\gcloud.cmd", _gcloud_executable())
+
+    def test_runtime_deploy_declares_evidence_mode_and_approved_bucket(self) -> None:
+        command = " ".join(runtime_deploy_command(
+            model_bucket="gs://logic-oasis-models",
+            evidence_mode="controlled_demo",
+        ))
+        self.assertIn("AI_MODEL_EVIDENCE_MODE=controlled_demo", command)
+        self.assertIn("AI_MODEL_BUCKET=logic-oasis-models", command)
+        self.assertIn(f"--source {FUNCTIONS_ROOT}", command)
+        self.assertIn("--runtime python311", command)
+        self.assertIn("--entry-point processFinalizedQuizAttempt", command)
+        self.assertIn("type=google.cloud.firestore.document.v1.written", command)
+        self.assertIn("document=quizAttempts/{attemptId}", command)
+        with self.assertRaises(ValueError):
+            runtime_deploy_command(
+                model_bucket="gs://logic-oasis-models/subdirectory",
+                evidence_mode="controlled_demo",
+            )
+
+    def test_function_parameters_default_fail_closed(self) -> None:
+        import main
+
+        self.assertEqual(main.AI_MODEL_EVIDENCE_MODE.name, "AI_MODEL_EVIDENCE_MODE")
+        self.assertEqual(main.AI_MODEL_EVIDENCE_MODE.default, "real_evaluated_only")
+        self.assertEqual(main.AI_MODEL_BUCKET.name, "AI_MODEL_BUCKET")
+        self.assertEqual(main.AI_MODEL_BUCKET.default, "")
 
 
 if __name__ == "__main__":
