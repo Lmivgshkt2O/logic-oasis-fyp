@@ -24,6 +24,7 @@ DEFAULT_MASTERY_CRITERION = 0.60
 BKT_FEATURE_NAME = "bkt_mastery_probability"
 RUNTIME_PROVENANCE = "real"
 SYNTHETIC_TEST_PROVENANCE = "synthetic_test"
+CONTROLLED_DEMO_PROVENANCE = "expert_authored_controlled_demo"
 
 
 @dataclass(frozen=True)
@@ -204,10 +205,16 @@ def build_prediction_dataset(
     contract: PredictionContract = PredictionContract(),
     bkt_evidence_by_attempt_id: Mapping[str, BktAttemptEvidence] | None = None,
     allow_synthetic_test: bool = False,
+    allow_controlled_demo: bool = False,
 ) -> PredictionDataset:
     """Create direct chronological labels and retain every pair decision for audit."""
     rows = tuple(attempts)
-    _validate_rows(rows, contract=contract, allow_synthetic_test=allow_synthetic_test)
+    _validate_rows(
+        rows,
+        contract=contract,
+        allow_synthetic_test=allow_synthetic_test,
+        allow_controlled_demo=allow_controlled_demo,
+    )
     grouped: dict[tuple[str, str], list[AttemptFeatureRow]] = {}
     for row in rows:
         grouped.setdefault((row.student_key, row.subtopic_id), []).append(row)
@@ -253,6 +260,7 @@ def build_supervised_examples(
     contract: PredictionContract = PredictionContract(),
     bkt_evidence_by_attempt_id: Mapping[str, BktAttemptEvidence] | None = None,
     allow_synthetic_test: bool = False,
+    allow_controlled_demo: bool = False,
 ) -> tuple[SupervisedExample, ...]:
     """Compatibility convenience wrapper; use ``build_prediction_dataset`` for reports."""
     return build_prediction_dataset(
@@ -260,6 +268,7 @@ def build_supervised_examples(
         contract=contract,
         bkt_evidence_by_attempt_id=bkt_evidence_by_attempt_id,
         allow_synthetic_test=allow_synthetic_test,
+        allow_controlled_demo=allow_controlled_demo,
     ).examples
 
 
@@ -281,6 +290,13 @@ def assess_data_sufficiency(examples: Iterable[SupervisedExample]) -> DataSuffic
     support_needed_count = sum(row.target for row in rows)
     support_not_needed_count = len(rows) - support_needed_count
     students = {row.student_key for row in rows}
+    provenances = {row.provenance for row in rows}
+    if provenances == {CONTROLLED_DEMO_PROVENANCE}:
+        return DataSufficiency(
+            "controlled_demonstration_only",
+            "expert-authored controlled scenarios demonstrate mechanics, not real-world performance",
+            len(rows), len(students), support_needed_count, support_not_needed_count,
+        )
     if any(row.provenance != RUNTIME_PROVENANCE for row in rows):
         return DataSufficiency("synthetic_test_only", "synthetic test rows cannot support a model claim", len(rows), len(students), support_needed_count, support_not_needed_count)
     if not rows:
@@ -294,11 +310,22 @@ def assess_data_sufficiency(examples: Iterable[SupervisedExample]) -> DataSuffic
     return DataSufficiency("held_out_comparison", "grouped held-out evaluation is possible; report uncertainty", len(rows), len(students), support_needed_count, support_not_needed_count)
 
 
-def _validate_rows(rows: tuple[AttemptFeatureRow, ...], *, contract: PredictionContract, allow_synthetic_test: bool) -> None:
+def _validate_rows(
+    rows: tuple[AttemptFeatureRow, ...],
+    *,
+    contract: PredictionContract,
+    allow_synthetic_test: bool,
+    allow_controlled_demo: bool,
+) -> None:
     for row in rows:
         if row.feature_schema_version != contract.feature_schema_version:
             raise ValueError("feature schema does not match the prediction contract")
-        if row.provenance != RUNTIME_PROVENANCE and not (allow_synthetic_test and row.provenance == SYNTHETIC_TEST_PROVENANCE):
+        explicitly_allowed = (
+            allow_synthetic_test and row.provenance == SYNTHETIC_TEST_PROVENANCE
+        ) or (
+            allow_controlled_demo and row.provenance == CONTROLLED_DEMO_PROVENANCE
+        )
+        if row.provenance != RUNTIME_PROVENANCE and not explicitly_allowed:
             raise ValueError("only approved real feature rows may enter final evaluation")
         if row.source_attempt_sequence is None:
             raise ValueError("legacy_no_sequence attempts cannot enter U7 evaluation")

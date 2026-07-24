@@ -1,0 +1,159 @@
+catalogVersion: controlled-demo-scenario-catalog-v1
+featureSchemaVersion: quiz-attempt-features-v2
+predictionTarget: next_attempt_support_needed
+labelVersion: next-attempt-support-needed-v1
+masteryCriterion: 0.60
+trainingDataProvenance: expert_authored_controlled_demo
+scenarioAuthorApprovalReference: supervisor-review-cdm-catalog-v1
+scenarioFamilies:
+  - scenarioFamilyId: steady-recovery-v1
+    fictionalProfileId: fictional-profile-a
+    yearLevel: 4
+    topicId: fractions
+    subtopicId: equivalent-fractions
+    skillIds: [recognise-equivalent-fractions]
+    contentVersion: year4-fractions-v1
+    adaptivePolicyVersion: adaptive-policy-v1
+    attempts:
+      - attemptId: steady-recovery-a1
+        sourceAttemptSequence: 1
+        bankId: fractions-easy-a
+        difficultyLevel: Easy
+        correct_rate: 0.8
+        mean_response_time_ms: 44000
+        questionIds: [sr-a1-q1, sr-a1-q2, sr-a1-q3, sr-a1-q4, sr-a1-q5]
+      - attemptId: steady-recovery-a2
+        sourceAttemptSequence: 2
+        bankId: fractions-medium-a
+        difficultyLevel: Medium
+        correct_rate: 0.4
+        mean_response_time_ms: 69000
+        questionIds: [sr-a2-q1, sr-a2-q2, sr-a2-q3, sr-a2-q4, sr-a2-q5]
+      - attemptId: steady-recovery-a3
+        sourceAttemptSequence: 3
+        bankId: fractions-easy-b
+        difficultyLevel: Easy
+        correct_rate: 0.8
+        mean_response_time_ms: 39000
+        questionIds: [sr-a3-q1, sr-a3-q2, sr-a3-q3, sr-a3-q4, sr-a3-q5]
+      - attemptId: steady-recovery-a4
+        sourceAttemptSequence: 4
+        bankId: fractions-medium-b
+        difficultyLevel: Medium
+        correct_rate: 0.4
+        mean_response_time_ms: 72000
+        questionIds: [sr-a4-q1, sr-a4-q2, sr-a4-q3, sr-a4-q4, sr-a4-q5]
+
+  - scenarioFamilyId: scaffolded-progress-v1
+    fictionalProfileId: fictional-profile-b
+    yearLevel: 4
+    topicId: fractions
+    subtopicId: equivalent-fractions
+    skillIds: [recognise-equivalent-fractions]
+    contentVersion: year4-fractions-v1
+    adaptivePolicyVersion: adaptive-policy-v1
+    attempts:
+      - attemptId: scaffolded-progress-b1
+        sourceAttemptSequence: 1
+        bankId: fractions-easy-c
+        difficultyLevel: Easy
+        correct_rate: 0.4
+        mean_response_time_ms: 76000
+        questionIds: [sp-b1-q1, sp-b1-q2, sp-b1-q3, sp-b1-q4, sp-b1-q5]
+      - attemptId: scaffolded-progress-b2
+        sourceAttemptSequence: 2
+        bankId: fractions-easy-d
+        difficultyLevel: Easy
+        correct_rate: 0.8
+        mean_response_time_ms: 41000
+        questionIds: [sp-b2-q1, sp-b2-q2, sp-b2-q3, sp-b2-q4, sp-b2-q5]
+      - attemptId: scaffolded-progress-b3
+        sourceAttemptSequence: 3
+        bankId: fractions-medium-c
+        difficultyLevel: Medium
+        correct_rate: 0.4
+        mean_response_time_ms: 65000
+        questionIds: [sp-b3-q1, sp-b3-q2, sp-b3-q3, sp-b3-q4, sp-b3-q5]
+      - attemptId: scaffolded-progress-b4
+        sourceAttemptSequence: 4
+        bankId: fractions-easy-e
+        difficultyLevel: Easy
+        correct_rate: 0.8
+        mean_response_time_ms: 36000
+        questionIds: [sp-b4-q1, sp-b4-q2, sp-b4-q3, sp-b4-q4, sp-b4-q5]
+
+  - scenarioFamilyId: threshold-variation-v1
+    fictionalProfileId: fictional-profile-c
+    yearLevel: 4
+    topicId: fractions
+    subtopicId: equivalent-fractions
+    skillIds: [recognise-equivalent-fractions]
+    contentVersion: year4-fractions-v1
+    adaptivePolicyVersion: adaptive-policy-v1
+    attempts:
+      - attemptId: threshold-variation-c1
+        sourceAttemptSequence: 1
+        bankId: fractions-medium-d
+        difficultyLevel: Medium
+        correct_rate: 1.0
+        mean_response_time_ms: 30000
+        questionIds: [tv-c1-q1, tv-c1-q2, tv-c1-q3, tv-c1-q4, tv-c1-q5]
+      - attemptId: threshold-variation-c2
+        sourceAttemptSequence: 2
+        bankId: fractions-hard-a
+        difficultyLevel: Hard
+        correct_rate: 0.4
+        mean_response_time_ms: 82000
+        questionIds: [tv-c2-q1, tv-c2-q2, tv-c2-q3, tv-c2-q4, tv-c2-q5]
+      - attemptId: threshold-variation-c3
+        sourceAttemptSequence: 3
+        bankId: fractions-easy-f
+        difficultyLevel: Easy
+        correct_rate: 0.6
+        mean_response_time_ms: 50000
+        questionIds: [tv-c3-q1, tv-c3-q2, tv-c3-q3, tv-c3-q4, tv-c3-q5]
+      - attemptId: threshold-variation-c4
+        sourceAttemptSequence: 4
+        bankId: fractions-medium-e
+        difficultyLevel: Medium
+        correct_rate: 0.2
+        mean_response_time_ms: 91000
+        questionIds: [tv-c4-q1, tv-c4-q2, tv-c4-q3, tv-c4-q4, tv-c4-q5]
+
+  - scenarioFamilyId: challenge-transfer-v1
+    fictionalProfileId: fictional-profile-d
+    yearLevel: 4
+    topicId: fractions
+    subtopicId: equivalent-fractions
+    skillIds: [recognise-equivalent-fractions]
+    contentVersion: year4-fractions-v1
+    adaptivePolicyVersion: adaptive-policy-v1
+    attempts:
+      - attemptId: challenge-transfer-d1
+        sourceAttemptSequence: 1
+        bankId: fractions-easy-g
+        difficultyLevel: Easy
+        correct_rate: 0.2
+        mean_response_time_ms: 88000
+        questionIds: [ct-d1-q1, ct-d1-q2, ct-d1-q3, ct-d1-q4, ct-d1-q5]
+      - attemptId: challenge-transfer-d2
+        sourceAttemptSequence: 2
+        bankId: fractions-easy-h
+        difficultyLevel: Easy
+        correct_rate: 0.8
+        mean_response_time_ms: 42000
+        questionIds: [ct-d2-q1, ct-d2-q2, ct-d2-q3, ct-d2-q4, ct-d2-q5]
+      - attemptId: challenge-transfer-d3
+        sourceAttemptSequence: 3
+        bankId: fractions-hard-b
+        difficultyLevel: Hard
+        correct_rate: 0.4
+        mean_response_time_ms: 79000
+        questionIds: [ct-d3-q1, ct-d3-q2, ct-d3-q3, ct-d3-q4, ct-d3-q5]
+      - attemptId: challenge-transfer-d4
+        sourceAttemptSequence: 4
+        bankId: fractions-medium-f
+        difficultyLevel: Medium
+        correct_rate: 1.0
+        mean_response_time_ms: 28000
+        questionIds: [ct-d4-q1, ct-d4-q2, ct-d4-q3, ct-d4-q4, ct-d4-q5]

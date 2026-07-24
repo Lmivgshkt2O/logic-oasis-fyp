@@ -1,0 +1,14 @@
+configVersion: controlled-demo-model-config-v1
+deploymentScope: controlled_demo
+trainingDataProvenance: expert_authored_controlled_demo
+evidenceLevel: controlled_demonstration
+claimLevel: controlled_demonstration_only
+catalogVersion: controlled-demo-scenario-catalog-v1
+datasetVersion: controlled-demo-dataset-v1
+featureSchemaVersion: quiz-attempt-features-v2
+predictionTarget: next_attempt_support_needed
+labelVersion: next-attempt-support-needed-v1
+masteryCriterion: 0.60
+randomSeed: 42
+groupingKey: scenarioFamilyId
+automaticPromotion: false

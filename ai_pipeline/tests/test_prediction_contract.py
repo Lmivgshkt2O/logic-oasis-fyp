@@ -123,6 +123,21 @@ class PredictionContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "only approved real"):
             build_supervised_examples((replace(feature_attempt(1, 0, 0.5), provenance="emulator_verified"),))
 
+    def test_controlled_demo_provenance_requires_its_dedicated_flag(self):
+        rows = tuple(
+            replace(row, provenance="expert_authored_controlled_demo")
+            for row in fixture_attempts(1)
+        )
+        with self.assertRaisesRegex(ValueError, "only approved real"):
+            build_supervised_examples(rows)
+        with self.assertRaisesRegex(ValueError, "only approved real"):
+            build_supervised_examples(rows, allow_synthetic_test=True)
+
+        examples = build_supervised_examples(rows, allow_controlled_demo=True)
+
+        self.assertEqual(len(examples), 2)
+        self.assertEqual(assess_data_sufficiency(examples).claim_level, "controlled_demonstration_only")
+
     def test_typed_bkt_ablation_requires_current_lineage_and_identical_rows(self):
         rows = fixture_attempts()
         base = synthetic_examples(rows)
