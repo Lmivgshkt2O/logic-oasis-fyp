@@ -41,6 +41,7 @@ void main() {
             displayCode: 'analysis_complete',
             masteryProbability: .6,
             evidenceLevel: 'preliminary',
+            modelEvidenceState: 'controlled_demonstration',
             observationCount: 1,
           ),
         ],
@@ -68,6 +69,11 @@ void main() {
 
       expect(find.text('Safe learning updates for Aiman.'), findsOneWidget);
       expect(find.text('Practice focus ready'), findsOneWidget);
+      expect(
+        find.textContaining('controlled demonstration model'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('not real-world validated'), findsOneWidget);
       expect(
         find.textContaining('2 questions, 1 answers, and 3 helpful marks.'),
         findsOneWidget,
@@ -128,8 +134,9 @@ void main() {
         home: ParentDashboardPage(
           state: AppState(persistQuizResults: false),
           linkedChildrenGateway: const _LinkedChildrenGateway([childA, childB]),
-          dashboardLoader: (child) =>
-              child.studentId == childA.studentId ? firstLoad.future : Future.value(belaSnapshot),
+          dashboardLoader: (child) => child.studentId == childA.studentId
+              ? firstLoad.future
+              : Future.value(belaSnapshot),
         ),
       ),
     );
@@ -150,6 +157,9 @@ void main() {
     await tester.pump();
 
     expect(find.text('Safe learning updates for Bela.'), findsOneWidget);
-    expect(find.text('Safe learner updates are temporarily unavailable.'), findsNothing);
+    expect(
+      find.text('Safe learner updates are temporarily unavailable.'),
+      findsNothing,
+    );
   });
 }

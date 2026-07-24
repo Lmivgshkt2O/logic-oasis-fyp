@@ -7,6 +7,9 @@ import 'package:logic_oasis/shared/models/adaptive_assignment.dart';
 /// metadata, job errors, or model-registry values. A supportive reason is
 /// supplied only by the compatible, server-written adaptive assignment.
 class AiDiagnosis {
+  static const controlledDemonstrationEvidence = 'controlled_demonstration';
+  static const realEvaluatedEvidence = 'real_evaluated';
+
   const AiDiagnosis({
     required this.attemptId,
     required this.studentId,
@@ -18,6 +21,7 @@ class AiDiagnosis {
     this.masteryProbability,
     this.weakTopicPriorityScore,
     this.evidenceLevel,
+    this.modelEvidenceState,
     this.observationCount,
     this.rankingVersion,
     this.assignment,
@@ -35,6 +39,7 @@ class AiDiagnosis {
   final double? masteryProbability;
   final double? weakTopicPriorityScore;
   final String? evidenceLevel;
+  final String? modelEvidenceState;
   final int? observationCount;
   final String? rankingVersion;
   final AdaptiveAssignment? assignment;
@@ -51,7 +56,9 @@ class AiDiagnosis {
     if (mastery >= 0.5) return 'Building';
     return 'Needs practice';
   }
-  String get modelName => isCompleted ? 'Approved server analysis' : 'BKT guidance';
+
+  String get modelName =>
+      isCompleted ? 'Approved server analysis' : 'BKT guidance';
   int get attemptsCount => observationCount ?? 0;
   DateTime get createdAt => updatedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
   List<String> get explanationReasons =>
@@ -65,12 +72,17 @@ class AiDiagnosis {
     return createdAt.isAfter(other.createdAt);
   }
 
-  bool get isProcessing => analysisState == 'queued' || analysisState == 'processing';
+  bool get isProcessing =>
+      analysisState == 'queued' || analysisState == 'processing';
   bool get isCompleted => analysisState == 'completed';
   bool get isFallback => analysisState == 'fallback';
   bool get isFailed => analysisState == 'failed';
+  bool get usesControlledDemonstrationModel =>
+      modelEvidenceState == controlledDemonstrationEvidence;
   bool get hasCompatibleRanking =>
-      rankingVersion != null && rankingVersion!.isNotEmpty && masteryProbability != null;
+      rankingVersion != null &&
+      rankingVersion!.isNotEmpty &&
+      masteryProbability != null;
 
   /// Only server-projected child-friendly text may be shown as an explanation.
   String? get supportingReason => assignment?.reasonText;
@@ -78,7 +90,8 @@ class AiDiagnosis {
   String get childFacingStatus => switch (analysisState) {
     'completed' => 'Your next practice is ready.',
     'fallback' => 'Your next practice is ready using your quiz progress.',
-    'failed' => 'Your quiz score is saved. Practice advice will be available later.',
+    'failed' =>
+      'Your quiz score is saved. Practice advice will be available later.',
     _ => 'Your quiz score is saved. Preparing your next practice…',
   };
 
@@ -111,6 +124,9 @@ class AiDiagnosis {
       masteryProbability: _probability(mastery?['masteryProbability']),
       weakTopicPriorityScore: _probability(mastery?['weakTopicPriorityScore']),
       evidenceLevel: _string(mastery?['evidenceLevel']),
+      modelEvidenceState: analysisState == 'completed'
+          ? _modelEvidenceState(status['modelEvidenceState'])
+          : null,
       observationCount: _int(mastery?['observationCount']),
       rankingVersion: _string(mastery?['rankingVersion']),
       assignment: assignment,
@@ -134,4 +150,9 @@ class AiDiagnosis {
 
   static String? _string(Object? value) =>
       value is String && value.isNotEmpty ? value : null;
+
+  static String? _modelEvidenceState(Object? value) => switch (value) {
+    controlledDemonstrationEvidence || realEvaluatedEvidence => value as String,
+    _ => null,
+  };
 }

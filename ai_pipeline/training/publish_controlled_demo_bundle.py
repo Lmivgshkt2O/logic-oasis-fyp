@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from hashlib import sha256
 import json
-from math import exp, isfinite
+from math import isfinite
 from pathlib import Path
 import re
 import shutil
@@ -14,6 +14,11 @@ from typing import Mapping
 
 from logic_oasis_ai.features import BASE_FEATURE_NAMES
 from logic_oasis_ai.model_registry import ModelArtifact
+from logic_oasis_ai.native_xgboost import (
+    NativeXGBoostContractError,
+    SHAP_RECONSTRUCTION_TOLERANCE,
+    predict_and_explain_native_xgboost,
+)
 
 from .evaluate_models import EVALUATION_STATUS_EVALUATED, RANDOM_SEED
 from .train_controlled_demo_xgboost import ControlledDemoEvaluation
@@ -22,7 +27,6 @@ from .train_xgboost import XGBOOST_PARAMETERS
 
 BUNDLE_SCHEMA_VERSION = "controlled-demo-xgboost-bundle-v1"
 DEFAULT_MODEL_VERSION = "controlled-demo-xgboost-v1"
-SHAP_RECONSTRUCTION_TOLERANCE = 1e-5
 MODEL_VERSION_PATTERN = re.compile(r"[a-z0-9](?:[a-z0-9._-]{0,62}[a-z0-9])?")
 HASH_FIELDS = frozenset({
     "artifactSha256", "trainingDatasetSha256", "scenarioCatalogueSha256",
@@ -235,38 +239,37 @@ def _representative_shap_integrity(
     artifact_bytes: bytes,
 ) -> tuple[Mapping[str, object], ...]:
     import numpy as np
-    import shap
-
     model = _load_native_xgboost(artifact_bytes)
     rows = evaluation.dataset.prediction_dataset.examples
     matrix = np.asarray([[float(row.features[name]) for name in BASE_FEATURE_NAMES] for row in rows])
-    probabilities = model.predict_proba(matrix)
-    classes = list(getattr(model, "classes_", ()))
-    if 1 not in classes:
-        raise ValueError("controlled-demo XGBoost artifact does not contain the support-needed target")
-    positive_index = classes.index(1)
-    scored = [(round(float(probability[positive_index]), 8), row) for probability, row in zip(probabilities, rows)]
+    try:
+        scored_explanations = predict_and_explain_native_xgboost(
+            model, matrix, feature_names=BASE_FEATURE_NAMES,
+        )
+    except NativeXGBoostContractError as error:
+        _raise_publication_shap_error(error)
+    scored = [
+        (round(support_risk, 8), row)
+        for support_risk, row in zip(scored_explanations.support_risks, rows)
+    ]
     scored.sort(key=lambda item: (item[0], item[1].attempt_id))
     selected = (("low", scored[0]), ("medium", scored[len(scored) // 2]), ("high", scored[-1]))
     selected_matrix = np.asarray([[float(row.features[name]) for name in BASE_FEATURE_NAMES] for _, (_, row) in selected])
-    explained = shap.TreeExplainer(model)(selected_matrix)
-    values = explained.values
-    if getattr(values, "ndim", 0) == 3:
-        values = values[:, :, -1]
-    if getattr(values, "ndim", 0) != 2 or values.shape != selected_matrix.shape:
-        raise ValueError("Tree SHAP output does not match the controlled-demo feature contract")
-    base_values = np.asarray(explained.base_values).reshape(-1)
-    if len(base_values) not in {1, len(selected)}:
-        raise ValueError("Tree SHAP expected values do not match the representative cases")
+    try:
+        selected_explanations = predict_and_explain_native_xgboost(
+            model, selected_matrix, feature_names=BASE_FEATURE_NAMES,
+        )
+    except NativeXGBoostContractError as error:
+        _raise_publication_shap_error(error)
     evidence: list[Mapping[str, object]] = []
-    for index, (tier, (support_risk, row)) in enumerate(selected):
-        raw_values = values[index]
+    for index, (tier, (_, row)) in enumerate(selected):
+        support_risk = selected_explanations.support_risks[index]
+        raw_values = selected_explanations.shap_values[index]
         shap_values = {name: round(float(value), 8) for name, value in zip(BASE_FEATURE_NAMES, raw_values)}
         if not any(abs(value) > 0 for value in shap_values.values()):
             raise ValueError("Tree SHAP output does not match the controlled-demo feature contract")
-        expected_value = float(base_values[0] if len(base_values) == 1 else base_values[index])
-        raw_margin = expected_value + sum(float(value) for value in raw_values)
-        reconstructed = 1.0 / (1.0 + exp(-raw_margin))
+        expected_value = selected_explanations.expected_values[index]
+        reconstructed = selected_explanations.reconstructed_risks[index]
         absolute_error = abs(reconstructed - support_risk)
         if absolute_error > SHAP_RECONSTRUCTION_TOLERANCE:
             raise ValueError("Tree SHAP values do not reconstruct the matching XGBoost output")
@@ -280,6 +283,16 @@ def _representative_shap_integrity(
             "shapValues": shap_values,
         })
     return tuple(evidence)
+
+
+def _raise_publication_shap_error(error: NativeXGBoostContractError) -> None:
+    if error.code == "model_target_incompatible":
+        raise ValueError("controlled-demo XGBoost artifact does not contain the support-needed target") from error
+    if error.code == "shap_reconstruction_mismatch":
+        raise ValueError("Tree SHAP values do not reconstruct the matching XGBoost output") from error
+    if error.code == "shap_output_invalid":
+        raise ValueError("Tree SHAP output does not match the controlled-demo feature contract") from error
+    raise ValueError(f"controlled-demo native XGBoost validation failed: {error.code}") from error
 
 
 def _load_native_xgboost(artifact_bytes: bytes):

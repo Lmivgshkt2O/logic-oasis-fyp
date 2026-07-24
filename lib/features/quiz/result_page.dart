@@ -267,6 +267,11 @@ class AiAnalysisStatusCard extends StatelessWidget {
               ? 'Bukti awal — teruskan latihan ringkas.'
               : 'Preliminary evidence — keep practising in short steps.')
         : null;
+    final modelEvidence = diagnosis.usesControlledDemonstrationModel
+        ? (isBahasaMelayu
+              ? 'Cadangan AI sokongan ini menggunakan model demonstrasi terkawal; ia belum disahkan untuk penggunaan dunia sebenar.'
+              : 'This supportive AI recommendation uses a controlled demonstration model; it is not real-world validated.')
+        : null;
     return SectionCard(
       title: title,
       icon: isReady ? Icons.route_outlined : Icons.hourglass_top_outlined,
@@ -286,6 +291,10 @@ class AiAnalysisStatusCard extends StatelessWidget {
           if (evidence != null) ...[
             const SizedBox(height: 8),
             Text(evidence, style: Theme.of(context).textTheme.bodySmall),
+          ],
+          if (modelEvidence != null) ...[
+            const SizedBox(height: 8),
+            Text(modelEvidence, style: Theme.of(context).textTheme.bodySmall),
           ],
         ],
       ),

@@ -289,6 +289,8 @@ class _ParentDashboardContent extends StatelessWidget {
                   createdAt: aiDiagnosis.createdAt,
                   shapReasons: aiDiagnosis.explanationReasons,
                   evidenceLevel: aiDiagnosis.evidenceLevel,
+                  usesControlledDemonstrationModel:
+                      aiDiagnosis.usesControlledDemonstrationModel,
                   isBahasaMelayu: state.isBahasaMelayu,
                 ),
               ],
@@ -607,6 +609,7 @@ class _AiDiagnosisDetails extends StatelessWidget {
     required this.createdAt,
     required this.shapReasons,
     required this.evidenceLevel,
+    required this.usesControlledDemonstrationModel,
     required this.isBahasaMelayu,
   });
 
@@ -616,6 +619,7 @@ class _AiDiagnosisDetails extends StatelessWidget {
   final DateTime createdAt;
   final List<String> shapReasons;
   final String? evidenceLevel;
+  final bool usesControlledDemonstrationModel;
   final bool isBahasaMelayu;
 
   @override
@@ -658,6 +662,15 @@ class _AiDiagnosisDetails extends StatelessWidget {
               isBahasaMelayu
                   ? 'Tahap bukti: $evidenceLevel.'
                   : 'Evidence level: $evidenceLevel.',
+              style: theme.textTheme.bodySmall,
+            ),
+          ],
+          if (usesControlledDemonstrationModel) ...[
+            const SizedBox(height: 6),
+            Text(
+              isBahasaMelayu
+                  ? 'Cadangan AI sokongan ini berdasarkan model demonstrasi terkawal dan belum disahkan untuk penggunaan dunia sebenar.'
+                  : 'This supportive AI recommendation is based on a controlled demonstration model and is not real-world validated.',
               style: theme.textTheme.bodySmall,
             ),
           ],
