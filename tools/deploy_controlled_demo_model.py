@@ -92,6 +92,12 @@ def _runtime_manifest_bindings(manifest: Mapping[str, object]) -> dict[str, obje
     }
 
 
+def build_deployment_manifest_bytes(manifest: Mapping[str, object]) -> bytes:
+    """Return the canonical runtime-bound manifest bytes used for upload and hashing."""
+    deployment_manifest = {**manifest, **_runtime_manifest_bindings(manifest)}
+    return (json.dumps(deployment_manifest, indent=2, sort_keys=True) + "\n").encode("utf-8")
+
+
 def deploy_controlled_demo_model(
     *,
     database: Any,
@@ -113,8 +119,7 @@ def deploy_controlled_demo_model(
     artifact_object = artifact_uri.removeprefix(f"gs://{bucket_name}/")
     manifest_object = manifest_uri.removeprefix(f"gs://{bucket_name}/")
     artifact_bytes = artifact_source.read_bytes()
-    deployment_manifest = {**manifest, **_runtime_manifest_bindings(manifest)}
-    manifest_bytes = (json.dumps(deployment_manifest, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    manifest_bytes = build_deployment_manifest_bytes(manifest)
     for object_name, expected in (
         (artifact_object, artifact_bytes),
         (manifest_object, manifest_bytes),

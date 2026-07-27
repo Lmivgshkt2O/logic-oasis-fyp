@@ -138,7 +138,12 @@ The authoritative feature schema is `ai_pipeline/configs/feature_schema.yaml` an
 
 The executable FYP1 schema identifier is `quiz-attempt-features-v2`. It replaces the five-feature development-only `quiz-attempt-features-v1`; it is the physical release identifier for the reduced feature contract referred to elsewhere in this document as `feature_schema_v1`.
 
-The initial declared features are `correct_rate`, `mean_response_time_ms`, and the separately evaluated `bkt_mastery_probability` feature. `mean_hint_count` is deferred to a future schema version after a real, privacy-safe hint interaction exists.
+The base XGBoost feature contract contains exactly `correct_rate` and
+`mean_response_time_ms`. BKT remains separately versioned mastery/ranking
+evidence; the named offline BKT ablation may evaluate a typed
+`bkt_mastery_probability`, but that value is not part of the controlled-demo
+XGBoost runtime vector. `mean_hint_count` is deferred to a future schema version
+after a real, privacy-safe hint interaction exists.
 
 Preparation must reject a record when response lineage is incomplete, finalization or validation status is wrong, provenance is not approved, timestamp parsing fails, content/schema versions conflict, or a feature would use future evidence.
 
@@ -178,7 +183,7 @@ Only an evaluated XGBoost artifact whose manifest matches the active prediction 
 
 U8 loads XGBoost only when every registry binding matches the bundled release. Missing approval, an inactive record, an unsupported target, or any hash/version mismatch fails closed to the declared BKT/rule fallback. Signed approval/revocation documents, signing keys, and key rotation are deferred production hardening rather than FYP1 acceptance requirements. This preserves an auditable supervisor-approved release without introducing a cryptographic governance subsystem that the prototype cannot fully exercise or explain.
 
-At deployment, `tools/build_function_bundle.py` packages the authoritative `ai_pipeline/logic_oasis_ai/` source, promoted model manifest, feature schema, active ranking-policy configuration, and active adaptive-policy configuration into the Firebase Functions deployment boundary. The Functions runtime manifest records package, feature-schema, model-artifact, ranking-policy, and adaptive-policy versions and file hashes. Before writing a weak-topic projection or assignment, runtime verifies all five are compatible. A missing or mismatched ranking/adaptive policy must produce the declared `fallback` or `failed` state and must not silently use hardcoded weights or thresholds; it may preserve safe BKT/rule guidance only when its separately declared compatible policy remains available.
+At deployment, `tools/build_function_bundle.py` packages the authoritative `ai_pipeline/logic_oasis_ai/` source, feature schema, ranking-policy configuration, adaptive-policy configuration, and their bundle manifest into the Firebase Functions boundary. The selected model artifact and runtime-bound deployment manifest remain immutable objects in the approved model bucket; the privileged registry record binds their hashes to the Functions package, schema, and policy hashes. Before writing a weak-topic projection or assignment, runtime verifies all five are compatible. A missing or mismatched ranking/adaptive policy must produce the declared `fallback` or `failed` state and must not silently use hardcoded weights or thresholds; it may preserve safe BKT/rule guidance only when its separately declared compatible policy remains available.
 
 The U8 automatic runtime will record `aiJobs/{attemptId}` states, idempotently materialize `masterySnapshots`, `subtopicMastery`, `aiModelRuns`, and `adaptiveAssignments`, and write separate safe status/projection documents for Flutter. `aiJobs`, `aiModelRuns`, model registry records, SHAP arrays, feature vectors, hashes, and error traces are never client-readable because Firestore Rules cannot redact selected fields from a readable document.
 
@@ -244,7 +249,7 @@ This section is the tracked protocol for changing, training, evaluating, and
 deploying the quiz-learning pipeline. It supplements the canonical FYP1 plan;
 it does not itself approve a target, model, or deployment.
 
-### Status at 2026-07-17
+### Status at 2026-07-27
 
 | Area | Status | Evidence |
 | --- | --- | --- |
@@ -252,8 +257,8 @@ it does not itself approve a target, model, or deployment.
 | U6 trusted source/export/candidate lifecycle | Core mechanics implemented; reconciliation planned | RD2, RD3, RD6, and RD8 must be implemented before an approved real-data release. Fixture/source-contract verification does not support performance claims. |
 | U7 target/comparison harness | Core mechanics implemented; reconciliation planned | RD1 and RD3-RD6 must be implemented and verified before an approved real-data grouped evaluation, promotion, or supervisor-facing performance claim. |
 | Real dataset and final performance claim | Pending consent/approval and collection | Release manifest and report; only this gate supports a final performance claim. |
-| Runtime promotion | Planned/blocked until evaluation gates and named approval pass | `ModelRegistry.promote()` evidence plus approval record. |
-| U8 jobs, SHAP review, retries, dashboard statuses | Planned for U8 | Automatic emulator/cloud-compatible demonstration and runtime evidence remain pending. |
+| Runtime promotion | Controlled-demo promotion and one-active transaction implemented; genuine activation remains blocked until the separate named model approval and deployment record exist | Controlled bundle/registry tests plus `docs/evidence/2026-07-24-controlled-demo-xgboost-release.md`. |
+| U8 jobs, SHAP review, retries, dashboard statuses | Automatic runtime and bounded controlled-demo presentation implemented and locally verified | Native UBJ/Tree SHAP, fallback, lineage, and safe projection tests pass; cloud/live controlled activation remains pending release approval. |
 
 ### Implementation-Readiness Decisions (2026-07-17)
 
@@ -517,12 +522,14 @@ BKT/rule fallback and report that no supervised candidate passed promotion.
 
 Before parent-facing SHAP text is enabled, review samples from the exact
 promoted bundle for feature names, values, directions, source attempt, and
-model/schema versions. Text must be supportive and evidence-aware. This SHAP
-sanity review is pending U8. Rollback deactivates the version, keeps its audit,
-uses the last compatible approved model or BKT/rule fallback, and never loads
-the legacy `.pkl` on bundle/registry/schema mismatch.
+model/schema versions. Text must be supportive and evidence-aware. The
+controlled-demo bundle records low-, medium-, and high-risk reconstruction
+samples and presents only a bounded demonstration-evidence label; every later
+`real_evaluated` bundle requires its own review. Rollback keeps the immutable
+audit, uses a compatible separately approved record or BKT/rule fallback, and
+never loads the legacy `.pkl` on bundle/registry/schema mismatch.
 
-### 6. Deployment Test Protocol (U8 Pending)
+### 6. Deployment Test Protocol (U8 Implemented; Live CDM Activation Pending)
 
 ```text
 finalizeQuizSession commits trusted finalized quizAttempts/{attemptId}
@@ -551,7 +558,38 @@ Status meanings: `queued` or
 `processing` = analysis in progress; `completed` = verified derived insight;
 `fallback` = guarded BKT/rule guidance; `failed` = no AI claim and safe retry/
 support message. Exact collection shapes, retry limit, and sanitized error
-vocabulary must be recorded here during U8 before deployment.
+vocabulary are enforced by the runtime contracts and the Firestore schema.
+
+#### 6.1 Controlled-Demonstration Release, Disable, and Replacement
+
+The deployable Functions package is generated only from the authoritative
+`ai_pipeline/logic_oasis_ai` package plus the three versioned runtime
+configurations. Parity verification compares file sets and bytes, rejects stale
+vendored files, and recalculates the package, feature-schema, ranking-policy,
+and adaptive-policy hashes without rewriting the checked-in bundle. The model
+binary is not embedded in Functions: the byte-verified deployment manifest in
+the approved model bucket binds the selected native UBJ artifact to those
+runtime hashes.
+
+A controlled record can run only when the deployment explicitly sets
+`AI_MODEL_EVIDENCE_MODE=controlled_demo` and the approved `AI_MODEL_BUCKET`,
+and when the one active registry document contains the complete controlled
+provenance, approval, catalogue/configuration/dataset/report, artifact,
+package/schema/policy, target, and label bindings. The default
+`real_evaluated_only` mode rejects that record. Disabling controlled mode is
+therefore the immediate safe rollback: the application continues through the
+existing BKT/rule fallback without changing the immutable registry audit or
+loading a legacy model.
+
+Replacement is always an explicit privileged one-active-record registry
+transaction and immutable artifact upload. A future `real_evaluated` model
+requires separately governed pseudonymized data, student-grouped evaluation, a
+real-data report, and a new model-specific approval; controlled-demo approval
+cannot be reused. Existing safe projections retain their original evidence
+state and may be regenerated only from a newer trusted finalized attempt or an
+explicitly approved deterministic replay. The detailed candidate status,
+hashes, deployment sequence, rollback boundary, and replacement checklist are
+recorded in `docs/evidence/2026-07-24-controlled-demo-xgboost-release.md`.
 
 ### 7. Model-Specific Assessment Protocols
 
@@ -780,7 +818,7 @@ Cloud Tasks dispatch, Cloud Scheduler recovery, distributed leases/fencing, a tr
 | Leakage and label comparability | U7 | No feature or label uses later attempt data; labels use compatible student/year/topic/subtopic/skill/content pairs; same-bank/cross-bank strata and policy versions are reported; rows without a later eligible attempt are censored. |
 | Fair comparison | U7 | Decision Tree, XGBoost, and MLP share the reduced `quiz-attempt-features-v2` target, student-grouped split, metrics, seed, and limitation statement; same-bank/cross-bank, repeated-question, telemetry, and grouped-stopping evidence are reported. |
 | BKT sequential assessment | U4, U6-U8 | One-step-ahead chronological replay sorts each state by `(sourceAttemptSequence, sequenceIndex)`, scores BKT-derived predicted correctness rather than raw mastery, and retains typed evidence ending at the current response. |
-| Promotion and deployment parity | U7-U8 | Runtime loads only an evaluated active XGBoost artifact whose package, `quiz-attempt-features-v2`, model-artifact, ranking-policy, adaptive-policy, target, and label bindings match the server-only supervisor-approved registry; otherwise it uses fallback. |
+| Promotion and deployment parity | U7-U8, CDM | Runtime loads only an evaluated active XGBoost artifact whose package, `quiz-attempt-features-v2`, model-artifact, ranking-policy, adaptive-policy, target, and label bindings match the server-only supervisor-approved registry. Controlled-demo activation additionally binds its dataset, catalogue, configuration, report, evidence scope, deployment mode, and approved bucket; source/vendor parity is byte-checked. Otherwise the runtime uses fallback. |
 | Risk and explanation integrity | U7-U9 | Risk threshold/calibration evidence is versioned, and SHAP values reconstruct the matching promoted-model output before safe text is displayed. |
 | Ranking projection integrity | U8-U9 | A versioned policy keeps weakness severity separate from evidence reliability; delayed older attempts cannot overwrite a newer `subtopicMastery` source, and incompatible ranking versions are not cross-ordered. |
 | Runtime idempotency and reconciliation | U8 | Platform event delivery or the Emulator retry adapter invokes the same handler up to three runtime attempts. Deterministic IDs and one terminal transaction prevent duplicate outputs; partial failures either retry automatically or end in declared fallback/failed state. |
@@ -825,6 +863,12 @@ Expected commands as each unit becomes active are `py -3.11 -m unittest discover
   model-artifact, ranking-policy, and adaptive-policy hashes before a
   weak-topic projection or assignment is written; a missing/mismatched policy
   never falls back to hardcoded weights or thresholds.
+- The controlled-demonstration release evidence records the selected native
+  UBJ and manifest hashes, source/vendor parity, deployment mode/bucket, bounded
+  SHAP reconstruction samples, approval boundary, safe disable route, and the
+  separately governed `real_evaluated` replacement checklist. Repository
+  evidence never substitutes for a genuine model-specific approval or live
+  registry/deployment record.
 - U7 reports student/attempt counts, PR-AUC where appropriate, grouped-result
   stability where feasible, same-bank/cross-bank and repeated-question
   evidence, telemetry readiness, fallback/failure rate, and an explicit

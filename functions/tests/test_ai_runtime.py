@@ -219,6 +219,25 @@ class AiRuntimeTests(unittest.TestCase):
             ai_runtime._registry_mismatch(registry, unknown_mode),
         )
 
+    def test_disabled_controlled_demo_falls_back_without_artifact_access(self) -> None:
+        self.gateway.registry = self.controlled_registry()
+        with patch.object(
+            ai_runtime,
+            "_approved_artifact_path",
+            side_effect=AssertionError("disabled controlled-demo must not access its artifact"),
+        ):
+            self.assertEqual(
+                "fallback",
+                process_finalized_attempt("attempt-1", gateway=self.gateway, bundle=self.bundle),
+            )
+        finalized = self.gateway.finalized[0]
+        self.assertEqual("fallback", finalized["raw"]["status"])
+        self.assertEqual("model_evidence_incompatible", finalized["raw"]["statusCode"])
+        self.assertNotIn("modelEvidenceState", finalized["raw"])
+        self.assertNotIn("modelEvidenceState", finalized["assignment"])
+        self.assertNotIn("modelEvidenceState", self.gateway.statuses["attempt-1"])
+        self.assertEqual("runtime_callable", finalized["assignment"]["dataSource"])
+
     def test_controlled_demo_registry_rejects_wrong_scope_hash_bucket_or_inactive_record(self) -> None:
         controlled_bundle = RuntimeBundle.from_runtime_root(
             ROOT / "ai_pipeline", evidence_mode="controlled_demo", model_bucket="logic-oasis-models"

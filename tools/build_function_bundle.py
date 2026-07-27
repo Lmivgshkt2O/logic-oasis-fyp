@@ -12,7 +12,13 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "ai_pipeline"
 VENDOR = ROOT / "functions" / "vendor"
 PACKAGE = SOURCE / "logic_oasis_ai"
-CONFIGS = ("feature_schema.yaml", "adaptive_policy_v1.yaml", "weak_topic_ranking_v1.yaml")
+BUNDLE_VERSION = "u8-ai-runtime-v1"
+CONFIG_HASH_FILES = {
+    "featureSchemaSha256": "feature_schema.yaml",
+    "adaptivePolicySha256": "adaptive_policy_v1.yaml",
+    "weakTopicRankingPolicySha256": "weak_topic_ranking_v1.yaml",
+}
+CONFIGS = tuple(CONFIG_HASH_FILES.values())
 
 
 def file_sha256(path: Path) -> str:
@@ -32,16 +38,19 @@ def build_bundle() -> dict[str, object]:
     target_configs = VENDOR / "configs"
     if target_package.exists():
         shutil.rmtree(target_package)
+    if target_configs.exists():
+        shutil.rmtree(target_configs)
     shutil.copytree(PACKAGE, target_package, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     target_configs.mkdir(parents=True, exist_ok=True)
     for filename in CONFIGS:
         shutil.copy2(SOURCE / "configs" / filename, target_configs / filename)
     manifest = {
-        "bundleVersion": "u8-ai-runtime-v1",
+        "bundleVersion": BUNDLE_VERSION,
         "packageSha256": tree_sha256(PACKAGE),
-        "featureSchemaSha256": file_sha256(SOURCE / "configs" / "feature_schema.yaml"),
-        "adaptivePolicySha256": file_sha256(SOURCE / "configs" / "adaptive_policy_v1.yaml"),
-        "weakTopicRankingPolicySha256": file_sha256(SOURCE / "configs" / "weak_topic_ranking_v1.yaml"),
+        **{
+            manifest_key: file_sha256(SOURCE / "configs" / filename)
+            for manifest_key, filename in CONFIG_HASH_FILES.items()
+        },
     }
     (VENDOR / "bundle_manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return manifest

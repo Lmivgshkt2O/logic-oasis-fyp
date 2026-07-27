@@ -86,6 +86,26 @@ def run_invoker_command() -> list[str]:
     ]
 
 
+def deployment_commands(
+    *,
+    model_bucket: str,
+    evidence_mode: str,
+    runtime_only: bool = False,
+    grant_run_invoker: bool = False,
+    deploy_runtime: bool = False,
+) -> list[list[str]]:
+    """Build an idempotent deployment sequence for bootstrap or runtime-only changes."""
+    requested = [] if runtime_only else commands(model_bucket=model_bucket)
+    if grant_run_invoker:
+        requested.append(run_invoker_command())
+    if deploy_runtime or runtime_only:
+        requested.append(runtime_deploy_command(
+            model_bucket=model_bucket,
+            evidence_mode=evidence_mode,
+        ))
+    return requested
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--model-bucket", required=True, help="gs:// bucket containing approved model artifacts")
@@ -94,15 +114,17 @@ def main() -> None:
                         help="also bind Eventarc delivery after the U8 Cloud Run service exists")
     parser.add_argument("--deploy-runtime", action="store_true",
                         help="also deploy the runtime with explicit evidence-mode configuration")
+    parser.add_argument("--runtime-only", action="store_true",
+                        help="skip identity bootstrap and deploy only the runtime configuration")
     parser.add_argument("--evidence-mode", choices=EVIDENCE_MODES, default="real_evaluated_only")
     args = parser.parse_args()
-    requested = commands(model_bucket=args.model_bucket)
-    if args.grant_run_invoker:
-        requested.append(run_invoker_command())
-    if args.deploy_runtime:
-        requested.append(runtime_deploy_command(
-            model_bucket=args.model_bucket, evidence_mode=args.evidence_mode
-        ))
+    requested = deployment_commands(
+        model_bucket=args.model_bucket,
+        evidence_mode=args.evidence_mode,
+        runtime_only=args.runtime_only,
+        grant_run_invoker=args.grant_run_invoker,
+        deploy_runtime=args.deploy_runtime,
+    )
     for command in requested:
         print(" ".join(command))
         if args.apply:

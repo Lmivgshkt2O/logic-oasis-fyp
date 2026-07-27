@@ -189,15 +189,23 @@ class ControlledDemoRegistryContractTests(unittest.TestCase):
         self.assertEqual(document["deploymentScope"], "controlled_demo")
         self.assertEqual(document["scenarioCatalogueSha256"], "d" * 64)
 
-    def test_privileged_transaction_deactivates_previous_record_and_creates_one_active(self):
-        database = Database({"previous": {"artifactId": "previous", "isActive": True}})
+    def test_privileged_transaction_explicitly_replaces_real_evaluated_record(self):
+        database = Database({
+            "xgboost-real-v1": {
+                "artifactId": "xgboost-real-v1",
+                "evidenceLevel": "real_evaluated",
+                "deploymentScope": "real_evaluated",
+                "isActive": True,
+            },
+        })
         document = controlled_registry_document()
 
         with patch("firebase_admin.firestore.transactional", lambda function: lambda transaction: function(transaction)):
             result = promote_controlled_demo_model(database, document, now=NOW)
 
         self.assertEqual(result["artifactId"], document["artifactId"])
-        self.assertFalse(database.registry["previous"]["isActive"])
+        self.assertFalse(database.registry["xgboost-real-v1"]["isActive"])
+        self.assertEqual(database.registry["xgboost-real-v1"]["evidenceLevel"], "real_evaluated")
         active = [item for item in database.registry.values() if item.get("isActive") is True]
         self.assertEqual(active, [document])
 

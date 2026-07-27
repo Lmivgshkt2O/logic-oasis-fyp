@@ -17,6 +17,7 @@ from deploy_u8_runtime_iam import (
     SERVICE_ACCOUNT,
     _gcloud_executable,
     commands,
+    deployment_commands,
     runtime_deploy_command,
     run_invoker_command,
 )
@@ -69,6 +70,18 @@ class RuntimeIdentityContractTests(unittest.TestCase):
                 model_bucket="gs://logic-oasis-models/subdirectory",
                 evidence_mode="controlled_demo",
             )
+
+    def test_runtime_only_mode_skips_non_idempotent_identity_bootstrap(self) -> None:
+        requested = deployment_commands(
+            model_bucket="gs://logic-oasis-models",
+            evidence_mode="real_evaluated_only",
+            runtime_only=True,
+        )
+        self.assertEqual(1, len(requested))
+        command = " ".join(requested[0])
+        self.assertIn("gcloud functions deploy", command)
+        self.assertIn("AI_MODEL_EVIDENCE_MODE=real_evaluated_only", command)
+        self.assertNotIn("service-accounts create", command)
 
     def test_function_parameters_default_fail_closed(self) -> None:
         import main
