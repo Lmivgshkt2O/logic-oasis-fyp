@@ -27,11 +27,11 @@ from logic_oasis_ai.explain import explain_prediction
 from logic_oasis_ai.features import BASE_FEATURE_NAMES, FEATURE_SCHEMA_VERSION, build_attempt_features
 from logic_oasis_ai.inference import InferenceContractError, predict_support_risk
 from logic_oasis_ai.model_registry import (
-    CONTROLLED_DEMO_APPROVAL_SCOPE,
+    CONTROLLED_DEMO_RELEASE_SCOPE,
     CONTROLLED_DEMO_DEPLOYMENT_SCOPE,
     CONTROLLED_DEMO_EVIDENCE_LEVEL,
     CONTROLLED_DEMO_PROVENANCE,
-    CONTROLLED_DEMO_RATIONALE_MARKER,
+    CONTROLLED_DEMO_RELEASE_RATIONALE_MARKER,
     REAL_EVALUATED_DEPLOYMENT_SCOPE,
     SHA256_PATTERN,
     controlled_demo_object_paths,
@@ -52,7 +52,7 @@ AI_RUNTIME_SERVICE_ACCOUNT = "logic-oasis-ai-runtime@logic-oasis-fyp.iam.gservic
 TERMINAL_STATES = frozenset({"completed", "fallback", "failed"})
 MAX_RUNTIME_ATTEMPTS = 3
 FALLBACK_CODES = frozenset({
-    "model_registry_missing", "model_registry_inactive", "approval_missing",
+    "model_registry_missing", "model_registry_inactive", "release_missing",
     "bundle_mismatch", "artifact_hash_mismatch", "model_load_failed",
     "shap_load_failed", "feature_schema_incompatible", "model_target_incompatible",
     "policy_unavailable", "artifact_unavailable", "artifact_hash_invalid", "model_prediction_invalid", "shap_output_invalid",
@@ -214,7 +214,7 @@ def _supervised_or_fallback(attempt: Mapping[str, Any], dataset: Any, registry: 
         row = rows[-1]
     row_feature_values = row.to_model_features()
     try:
-        with _approved_artifact_path(bundle, registry) as artifact_path:
+        with _released_artifact_path(bundle, registry) as artifact_path:
             if registry.get("deploymentScope") == CONTROLLED_DEMO_DEPLOYMENT_SCOPE:
                 support_risk, shap_values, shap_expected_value = _controlled_demo_prediction_and_explanation(
                     artifact_path,
@@ -247,7 +247,7 @@ def _supervised_or_fallback(attempt: Mapping[str, Any], dataset: Any, registry: 
         "labelVersion": registry["labelVersion"], "supportRisk": support_risk,
         "featureValues": feature_values, "shapValues": shap_values,
         "shapExpectedValue": shap_expected_value, "sourceAttemptSequence": attempt["sourceAttemptSequence"],
-        "approvalId": registry["approvalId"], "dataSource": "runtime_callable",
+        "releaseId": registry["releaseId"], "dataSource": "runtime_callable",
         **({"modelEvidenceState": model_evidence_state} if model_evidence_state else {}),
     }
 
@@ -290,10 +290,10 @@ def _registry_mismatch(registry: Mapping[str, Any], bundle: RuntimeBundle) -> st
     if registry.get("isActive") is not True or registry.get("lifecycleStatus") != "promoted":
         return "model_registry_inactive"
     if not all(registry.get(key) for key in (
-        "approvalId", "approvedBy", "approvedAt", "approvalRationale", "evaluationReportSha256",
+        "releaseId", "releasedBy", "releasedAt", "releaseRationale", "evaluationReportSha256",
         "artifactManifestSha256", "promotedAt",
     )):
-        return "approval_missing"
+        return "release_missing"
     expected = {
         "packageSha256": bundle.package_sha256, "featureSchemaVersion": FEATURE_SCHEMA_VERSION,
         "featureSchemaSha256": bundle.feature_schema_sha256,
@@ -325,7 +325,7 @@ def _controlled_demo_evidence_mismatch(
     expected = {
         "trainingDataProvenance": CONTROLLED_DEMO_PROVENANCE,
         "evidenceLevel": CONTROLLED_DEMO_EVIDENCE_LEVEL,
-        "approvalScope": CONTROLLED_DEMO_APPROVAL_SCOPE,
+        "releaseScope": CONTROLLED_DEMO_RELEASE_SCOPE,
         "deploymentScope": CONTROLLED_DEMO_DEPLOYMENT_SCOPE,
     }
     if any(registry.get(field) != value for field, value in expected.items()):
@@ -340,8 +340,8 @@ def _controlled_demo_evidence_mismatch(
         return "model_evidence_incompatible"
     if not isinstance(registry.get("trainingDatasetVersion"), str) or not registry["trainingDatasetVersion"]:
         return "model_evidence_incompatible"
-    rationale = registry.get("approvalRationale")
-    if not isinstance(rationale, str) or CONTROLLED_DEMO_RATIONALE_MARKER not in rationale.lower():
+    rationale = registry.get("releaseRationale")
+    if not isinstance(rationale, str) or CONTROLLED_DEMO_RELEASE_RATIONALE_MARKER not in rationale.lower():
         return "model_evidence_incompatible"
     try:
         paths = controlled_demo_object_paths(
@@ -360,7 +360,7 @@ def _real_evidence_mismatch(registry: Mapping[str, Any], bundle: RuntimeBundle) 
     expected_real = {
         "trainingDataProvenance": "approved_pseudonymized_real",
         "evidenceLevel": "real_evaluated",
-        "approvalScope": "real_evaluated",
+        "releaseScope": "real_evaluated",
         "deploymentScope": REAL_EVALUATED_DEPLOYMENT_SCOPE,
     }
     evidence_values = tuple(registry.get(field) for field in expected_real)
@@ -375,7 +375,7 @@ def _real_evidence_mismatch(registry: Mapping[str, Any], bundle: RuntimeBundle) 
 
 
 @contextmanager
-def _approved_artifact_path(bundle: RuntimeBundle, registry: Mapping[str, Any]):
+def _released_artifact_path(bundle: RuntimeBundle, registry: Mapping[str, Any]):
     """Download approved GCS bytes to a short-lived verified local path.
 
     The registry may use ``gs://bucket/object`` only; relative paths remain an

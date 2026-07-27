@@ -15,7 +15,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 sys.path.insert(0, str(ROOT / "functions"))
 
 from deploy_controlled_demo_model import (
-    SupervisorApproval,
+    DeveloperRelease,
     controlled_demo_object_paths,
     deploy_controlled_demo_model,
     validate_model_bucket,
@@ -54,13 +54,13 @@ def controlled_registry_document(artifact_id: str = "xgboost-controlled-demo-xgb
         "promotionGateStatus": "passed",
         "lifecycleStatus": "promoted",
         "isActive": True,
-        "approvalId": "approval-cdm-v1",
-        "approvedBy": "supervisor@example.edu",
-        "approvedAt": NOW,
-        "approvalRationale": "Approved for FYP1 demonstration only; not real-world validated.",
+        "releaseId": "CDM-2026-001",
+        "releasedBy": "zyonn",
+        "releasedAt": NOW,
+        "releaseRationale": "Developer-released FYP1 controlled demonstration; not real-world validated.",
         "trainingDataProvenance": "expert_authored_controlled_demo",
         "evidenceLevel": "controlled_demonstration",
-        "approvalScope": "fyp1_controlled_demo",
+        "releaseScope": "fyp1_controlled_demo",
         "deploymentScope": "controlled_demo",
         "scenarioCatalogueSha256": "3" * 64,
         "controlledDemoConfigSha256": "4" * 64,
@@ -169,7 +169,7 @@ class Bucket:
 
 
 class ControlledDemoRegistryContractTests(unittest.TestCase):
-    def test_model_artifact_serializes_complete_controlled_approval_metadata(self):
+    def test_model_artifact_serializes_complete_controlled_release_metadata(self):
         artifact = ModelArtifact(
             artifact_id="xgboost-controlled-demo-v1", model_type="xgboost",
             model_version="controlled-demo-xgboost-v1",
@@ -177,10 +177,10 @@ class ControlledDemoRegistryContractTests(unittest.TestCase):
             training_dataset_version="controlled-demo-dataset-v1", artifact_sha256="a" * 64,
             evaluation_status="evaluated", evaluation_report_sha256="b" * 64,
             artifact_manifest_sha256="c" * 64, promotion_gate_status="passed",
-            approval_id="approval-cdm-v1", approved_by="supervisor@example.edu", approved_at=NOW,
-            approval_rationale="Approved only for demonstration; not real-world validated.",
+            release_id="CDM-2026-001", released_by="zyonn", released_at=NOW,
+            release_rationale="Developer-released demonstration; not real-world validated.",
             training_data_provenance="expert_authored_controlled_demo",
-            evidence_level="controlled_demonstration", approval_scope="fyp1_controlled_demo",
+            evidence_level="controlled_demonstration", release_scope="fyp1_controlled_demo",
             deployment_scope="controlled_demo", scenario_catalogue_sha256="d" * 64,
             controlled_demo_config_sha256="e" * 64,
         )
@@ -232,10 +232,10 @@ class ControlledDemoRegistryContractTests(unittest.TestCase):
 
     def test_incomplete_scope_hash_or_rationale_cannot_be_promoted(self):
         mutations = (
-            ("approvalScope", "another_scope"),
+            ("releaseScope", "another_scope"),
             ("scenarioCatalogueSha256", ""),
             ("controlledDemoConfigSha256", "not-a-hash"),
-            ("approvalRationale", "Approved for a demo."),
+            ("releaseRationale", "Developer-released for a demo."),
         )
         for field, value in mutations:
             with self.subTest(field=field):
@@ -244,17 +244,17 @@ class ControlledDemoRegistryContractTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     promote_controlled_demo_model(Database(), document, now=NOW)
 
-    def test_promotion_rejects_approval_later_than_the_trusted_promotion_time(self):
+    def test_promotion_rejects_release_later_than_the_trusted_promotion_time(self):
         document = controlled_registry_document()
-        document["approvedAt"] = NOW + timedelta(seconds=1)
+        document["releasedAt"] = NOW + timedelta(seconds=1)
 
         with self.assertRaisesRegex(ValueError, "later than promotion"):
             promote_controlled_demo_model(Database(), document, now=NOW)
 
-        document["approvedAt"] = NOW
+        document["releasedAt"] = NOW
         with patch("firebase_admin.firestore.transactional", lambda function: lambda transaction: function(transaction)):
             promoted = promote_controlled_demo_model(Database(), document, now=NOW)
-        self.assertEqual(promoted["approvedAt"], promoted["promotedAt"])
+        self.assertEqual(promoted["releasedAt"], promoted["promotedAt"])
 
     def test_bucket_and_controlled_demo_object_paths_are_exact(self):
         self.assertEqual(validate_model_bucket("gs://logic-oasis-models"), "logic-oasis-models")
@@ -281,15 +281,16 @@ class ControlledDemoRegistryContractTests(unittest.TestCase):
             published = publish_controlled_demo_bundle(train_controlled_demo_xgboost(), output)
             database = Database()
             bucket = Bucket()
-            approval = SupervisorApproval(
-                "approval-cdm-v1", "supervisor@example.edu", NOW,
-                "Approved for FYP1 demonstration only; not real-world validated.",
+            release = DeveloperRelease(
+                "CDM-2026-001", "zyonn", NOW,
+                "Developer-released FYP1 controlled demonstration; not real-world validated.",
+                "fyp1_controlled_demo",
             )
             with patch("firebase_admin.firestore.transactional", lambda function: lambda transaction: function(transaction)):
                 result = deploy_controlled_demo_model(
                     database=database, bucket=bucket, model_bucket="gs://logic-oasis-models",
                     artifact_path=published.artifact_path, manifest_path=published.manifest_path,
-                    approval=approval, promoted_at=NOW,
+                    release=release, promoted_at=NOW,
                 )
 
         self.assertEqual(result["deploymentScope"], "controlled_demo")
@@ -313,7 +314,7 @@ class ControlledDemoRegistryContractTests(unittest.TestCase):
             ROOT / "ai_pipeline", evidence_mode="controlled_demo", model_bucket="logic-oasis-models"
         )
         with patch("firebase_admin.storage.bucket", return_value=bucket):
-            with ai_runtime._approved_artifact_path(runtime_bundle, result) as downloaded:
+            with ai_runtime._released_artifact_path(runtime_bundle, result) as downloaded:
                 self.assertEqual(sha256(downloaded.read_bytes()).hexdigest(), result["artifactSha256"])
         self.assertEqual([item for item in database.registry.values() if item["isActive"]], [result])
 
@@ -323,20 +324,21 @@ class ControlledDemoRegistryContractTests(unittest.TestCase):
         with TemporaryDirectory() as output:
             published = publish_controlled_demo_bundle(train_controlled_demo_xgboost(), output)
             bucket = Bucket()
-            approval = SupervisorApproval(
-                "approval-cdm-v1", "supervisor@example.edu", NOW,
-                "Approved for FYP1 demonstration only; not real-world validated.",
+            release = DeveloperRelease(
+                "CDM-2026-001", "zyonn", NOW,
+                "Developer-released FYP1 controlled demonstration; not real-world validated.",
+                "fyp1_controlled_demo",
             )
             with patch("firebase_admin.firestore.transactional", lambda function: lambda transaction: function(transaction)):
                 first = deploy_controlled_demo_model(
                     database=Database(), bucket=bucket, model_bucket="gs://logic-oasis-models",
                     artifact_path=published.artifact_path, manifest_path=published.manifest_path,
-                    approval=approval, promoted_at=NOW,
+                    release=release, promoted_at=NOW,
                 )
                 second = deploy_controlled_demo_model(
                     database=Database(), bucket=bucket, model_bucket="gs://logic-oasis-models",
                     artifact_path=published.artifact_path, manifest_path=published.manifest_path,
-                    approval=approval, promoted_at=NOW,
+                    release=release, promoted_at=NOW,
                 )
 
         self.assertEqual(first["artifactSha256"], second["artifactSha256"])
@@ -348,15 +350,16 @@ class ControlledDemoRegistryContractTests(unittest.TestCase):
         with TemporaryDirectory() as output:
             published = publish_controlled_demo_bundle(train_controlled_demo_xgboost(), output)
             database = Database()
-            approval = SupervisorApproval(
-                "approval-cdm-v1", "supervisor@example.edu", NOW,
-                "Approved for FYP1 demonstration only; not real-world validated.",
+            release = DeveloperRelease(
+                "CDM-2026-001", "zyonn", NOW,
+                "Developer-released FYP1 controlled demonstration; not real-world validated.",
+                "fyp1_controlled_demo",
             )
             with self.assertRaisesRegex(ValueError, "byte verification"):
                 deploy_controlled_demo_model(
                     database=database, bucket=Bucket(corrupt_download=True),
                     model_bucket="gs://logic-oasis-models", artifact_path=published.artifact_path,
-                    manifest_path=published.manifest_path, approval=approval, promoted_at=NOW,
+                    manifest_path=published.manifest_path, release=release, promoted_at=NOW,
                 )
 
         self.assertEqual(database.registry, {})

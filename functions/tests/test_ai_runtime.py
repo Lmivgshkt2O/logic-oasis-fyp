@@ -107,9 +107,9 @@ class AiRuntimeTests(unittest.TestCase):
         return {
             "isActive": True, "lifecycleStatus": "promoted", "modelType": "xgboost",
             "evaluationStatus": "evaluated", "promotionGateStatus": "passed",
-            "approvalId": "approval-cdm-v1", "approvedBy": "supervisor@example.edu", "approvedAt": NOW,
+            "releaseId": "CDM-2026-001", "releasedBy": "zyonn", "releasedAt": NOW,
             "promotedAt": NOW,
-            "approvalRationale": "Approved for FYP1 demonstration only; not real-world validated.",
+            "releaseRationale": "Developer-released FYP1 controlled demonstration; not real-world validated.",
             "evaluationReportSha256": "1" * 64, "artifactManifestSha256": "2" * 64,
             "artifactPath": "gs://logic-oasis-models/controlled-demo/controlled-demo-xgboost-v1/model.ubj",
             "artifactManifestPath": "gs://logic-oasis-models/controlled-demo/controlled-demo-xgboost-v1/manifest.json",
@@ -123,7 +123,7 @@ class AiRuntimeTests(unittest.TestCase):
             "labelVersion": "next-attempt-support-needed-v1",
             "trainingDataProvenance": "expert_authored_controlled_demo",
             "evidenceLevel": "controlled_demonstration",
-            "approvalScope": "fyp1_controlled_demo",
+            "releaseScope": "fyp1_controlled_demo",
             "deploymentScope": "controlled_demo",
             "trainingDatasetVersion": "controlled-demo-dataset-v1",
             "trainingDatasetSha256": "6" * 64,
@@ -194,9 +194,9 @@ class AiRuntimeTests(unittest.TestCase):
         self.assertNotIn("shapValues", self.gateway.statuses["attempt-1"])
         self.assertNotIn("featureValues", self.gateway.statuses["attempt-1"])
 
-    def test_registry_requires_complete_approval_metadata(self) -> None:
+    def test_registry_requires_complete_release_metadata(self) -> None:
         registry = {"isActive": True, "lifecycleStatus": "promoted"}
-        self.assertEqual("approval_missing", ai_runtime._registry_mismatch(registry, self.bundle))
+        self.assertEqual("release_missing", ai_runtime._registry_mismatch(registry, self.bundle))
 
     def test_controlled_demo_registry_activates_only_in_controlled_demo_mode(self) -> None:
         registry = self.controlled_registry()
@@ -223,7 +223,7 @@ class AiRuntimeTests(unittest.TestCase):
         self.gateway.registry = self.controlled_registry()
         with patch.object(
             ai_runtime,
-            "_approved_artifact_path",
+            "_released_artifact_path",
             side_effect=AssertionError("disabled controlled-demo must not access its artifact"),
         ):
             self.assertEqual(
@@ -243,12 +243,12 @@ class AiRuntimeTests(unittest.TestCase):
             ROOT / "ai_pipeline", evidence_mode="controlled_demo", model_bucket="logic-oasis-models"
         )
         cases = (
-            ("approvalScope", "real_evaluated", "model_evidence_incompatible"),
+            ("releaseScope", "real_evaluated", "model_evidence_incompatible"),
             ("scenarioCatalogueSha256", "", "model_evidence_incompatible"),
             ("controlledDemoConfigSha256", "wrong", "model_evidence_incompatible"),
             ("trainingDatasetSha256", "wrong", "model_evidence_incompatible"),
             ("trainingDatasetVersion", "", "model_evidence_incompatible"),
-            ("approvalRationale", "Approved for a demo.", "model_evidence_incompatible"),
+            ("releaseRationale", "Developer-released for a demo.", "model_evidence_incompatible"),
             ("artifactPath", "gs://another-bucket/controlled-demo/controlled-demo-xgboost-v1/model.ubj", "artifact_unavailable"),
             ("packageSha256", "wrong", "bundle_mismatch"),
             ("featureSchemaSha256", "wrong", "bundle_mismatch"),
@@ -280,7 +280,7 @@ class AiRuntimeTests(unittest.TestCase):
         registry.update({
             "trainingDataProvenance": "approved_pseudonymized_real",
             "evidenceLevel": "real_evaluated",
-            "approvalScope": "real_evaluated",
+            "releaseScope": "real_evaluated",
             "deploymentScope": "real_evaluated",
             "artifactPath": "gs://logic-oasis-models/approved/model.joblib",
         })
@@ -295,7 +295,7 @@ class AiRuntimeTests(unittest.TestCase):
                 self.assertEqual("artifact_unavailable", ai_runtime._registry_mismatch(registry, bundle))
 
         legacy_registry = dict(registry)
-        for field in ("trainingDataProvenance", "evidenceLevel", "approvalScope", "deploymentScope"):
+        for field in ("trainingDataProvenance", "evidenceLevel", "releaseScope", "deploymentScope"):
             legacy_registry.pop(field)
         self.assertIsNone(ai_runtime._registry_mismatch(legacy_registry, self.bundle))
 
@@ -327,7 +327,7 @@ class AiRuntimeTests(unittest.TestCase):
                 return Blob(name)
 
         with patch.object(storage, "bucket", return_value=Bucket()):
-            with ai_runtime._approved_artifact_path(controlled_bundle, registry) as model_path:
+            with ai_runtime._released_artifact_path(controlled_bundle, registry) as model_path:
                 self.assertEqual(model_path.read_bytes(), artifact)
                 self.assertEqual(model_path.suffix, ".ubj")
 
@@ -355,7 +355,7 @@ class AiRuntimeTests(unittest.TestCase):
             def blob(self, name): return Blob(name)
 
         with patch.object(storage, "bucket", return_value=Bucket()), self.assertRaises(RuntimeFailure) as raised:
-            with ai_runtime._approved_artifact_path(controlled_bundle, registry):
+            with ai_runtime._released_artifact_path(controlled_bundle, registry):
                 pass
         self.assertEqual("artifact_hash_mismatch", raised.exception.code)
 
@@ -481,14 +481,14 @@ class AiRuntimeTests(unittest.TestCase):
             artifact = model_path.read_bytes()
             artifact_sha = sha256(artifact).hexdigest()
             registry = {"isActive": True, "lifecycleStatus": "promoted", "modelType": "xgboost", "evaluationStatus": "evaluated", "promotionGateStatus": "passed",
-                "approvalId": "approval-1", "approvedBy": "supervisor", "approvedAt": NOW, "approvalRationale": "accepted", "evaluationReportSha256": "report",
+                "releaseId": "release-1", "releasedBy": "developer", "releasedAt": NOW, "releaseRationale": "accepted", "evaluationReportSha256": "report",
                 "promotedAt": NOW,
                 "artifactPath": "gs://logic-oasis-models/approved/model.joblib", "artifactSha256": artifact_sha, "modelVersion": "xgb-v1",
                 "featureSchemaVersion": "quiz-attempt-features-v2", "featureSchemaSha256": self.bundle.feature_schema_sha256,
                 "packageSha256": self.bundle.package_sha256, "weakTopicRankingPolicySha256": self.bundle.ranking_policy_sha256,
                 "adaptivePolicySha256": self.bundle.adaptive_policy_sha256, "predictionTarget": "next_attempt_support_needed", "labelVersion": "next-attempt-support-needed-v1",
                 "trainingDataProvenance": "approved_pseudonymized_real", "evidenceLevel": "real_evaluated",
-                "approvalScope": "real_evaluated", "deploymentScope": "real_evaluated"}
+                "releaseScope": "real_evaluated", "deploymentScope": "real_evaluated"}
             manifest = {**{key: registry[key] for key in ("artifactSha256", "modelVersion", "featureSchemaVersion", "featureSchemaSha256", "packageSha256", "weakTopicRankingPolicySha256", "adaptivePolicySha256", "predictionTarget", "labelVersion")}}
             manifest_bytes = json.dumps(manifest, sort_keys=True).encode()
             registry["artifactManifestSha256"] = sha256(manifest_bytes).hexdigest()

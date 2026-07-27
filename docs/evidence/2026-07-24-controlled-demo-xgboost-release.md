@@ -1,9 +1,21 @@
 ---
 artifact_contract: logic-oasis-controlled-demo-release-evidence/v1
-release_status: release_candidate
-live_activation_status: pending
-mechanism_approval_reference: supervisor-review-cdm-catalog-v1
-model_activation_approval_status: pending
+release_status: developer_released
+live_activation_status: verified
+object_publication_status: verified
+registry_activation_status: active
+runtime_activation_status: deployed_verified
+live_quiz_verification_status: passed_and_cleaned_up
+catalogue_declaration_reference: developer-declaration-cdm-catalog-v1
+release_declaration:
+  releaseId: CDM-2026-001
+  releasedBy: zyonn
+  releasedAt: 2026-07-27T00:00:00+08:00
+  releaseRationale: "Developer-released FYP1 controlled-demonstration XGBoost model trained on fictional trajectories; not real-world validated."
+  releaseScope: fyp1_controlled_demo
+  trainingDataProvenance: expert_authored_controlled_demo
+  evidenceLevel: controlled_demonstration
+  deploymentScope: controlled_demo
 claim_level: controlled_demonstration_only
 contains_scenario_content: false
 runtime:
@@ -14,13 +26,13 @@ runtime:
 bindings:
   bundleVersion: u8-ai-runtime-v1
   modelVersion: controlled-demo-xgboost-v1
-  packageSha256: 6499f8d4679d47ce87a2c2b8a25892acd316acc3a38887f4104dc22bd27c5425
+  packageSha256: 62b614e0b8019cf81ac52d7d6f7d1b8782c6b54e533c6f6e6a81acc2149fb444
   artifactSha256: 9a32079d95a37dc1d3eeecc52f5e7723e12ac1ee3dd8f6eb9dc609a3fa11f39a
-  publicationManifestSha256: c7f29d46afbfab7509550e8a301b56bc89a713fd3e4685519ede6e0ed4c1a98e
-  deploymentManifestSha256: 5e672f56933dd0a2575ebf97639594c7be21c7ac73cd082df7e8dd82154a46bb
+  publicationManifestSha256: 4b68b7dcbb6c43a8b391b51fc6eaee9c01e26249ded6fb955b8754b3f76d9f2d
+  deploymentManifestSha256: 26796bd788df25b0c9cff015a49a5de2295457b6a4180e80beccbd3ade7cff02
   trainingDatasetVersion: controlled-demo-dataset-v1
-  trainingDatasetSha256: 4f41f2cb3438ca4632235354980f51f8f36b88ede8846b89ac2d6714dbd02ec2
-  scenarioCatalogueSha256: 0e984d84afd6ffcb8feef8340f73d6bcb74270bfe160bbdb27090627627237a8
+  trainingDatasetSha256: 0c307297355fcf9315594d8386c8b5fa297771f176bf11e7b2223aa318107aef
+  scenarioCatalogueSha256: 2ef2a006e0fad0474204e94a7449b35d79618090b28de7086dec23976df7306f
   controlledDemoConfigSha256: d18cc9017e121885741c7fbdbb4aff0ffb9310202e6f4d5dc82c27185032f668
   evaluationReportSha256: 7c269eb0212b6a9196ee61de6f4a1169dbe4119aaef4250727959c2f8668c614
   featureSchemaVersion: quiz-attempt-features-v2
@@ -54,26 +66,106 @@ shap_samples:
     supportRisk: 0.89040530
     reconstructedRisk: 0.89040529
     absoluteError: 0.0000000092
+deployment_observation:
+  temporaryPublisher:
+    member: zyonn1509@gmail.com
+    roles: [roles/storage.objectCreator, roles/storage.objectViewer]
+    scope: gs://logic-oasis-models
+    bindingsRemoved: true
+    effectiveDenialCheck: passed
+  bucketControls:
+    location: ASIA-SOUTHEAST1
+    uniformBucketLevelAccess: true
+    publicAccessPrevention: enforced
+  bucketIamPolicies:
+    before:
+      etag: CAI=
+      objectViewer: [serviceAccount:logic-oasis-ai-runtime@logic-oasis-fyp.iam.gserviceaccount.com]
+    temporaryPublisher:
+      etag: CAQ=
+      objectCreator: [user:zyonn1509@gmail.com]
+      objectViewer: [serviceAccount:logic-oasis-ai-runtime@logic-oasis-fyp.iam.gserviceaccount.com, user:zyonn1509@gmail.com]
+    final:
+      etag: CAY=
+      objectViewer: [serviceAccount:logic-oasis-ai-runtime@logic-oasis-fyp.iam.gserviceaccount.com]
+  artifactObject:
+    generation: 1785157604327827
+    size: 31211
+    sha256: 9a32079d95a37dc1d3eeecc52f5e7723e12ac1ee3dd8f6eb9dc609a3fa11f39a
+  manifestObject:
+    generation: 1785157604827655
+    size: 3440
+    sha256: 26796bd788df25b0c9cff015a49a5de2295457b6a4180e80beccbd3ade7cff02
+  activeRegistryCount: 1
+  deploymentResult: successful_update
+  deployedRevision: processfinalizedquizattempt-00012-nax
+  deployedFunctionState: ACTIVE
+  deployedServiceAccount: logic-oasis-ai-runtime@logic-oasis-fyp.iam.gserviceaccount.com
+  deployedAiEnvironment:
+    AI_MODEL_EVIDENCE_MODE: controlled_demo
+    AI_MODEL_BUCKET: logic-oasis-models
+  postDeploymentVerification: passed
+  disposableQuiz:
+    attemptId: cdm-live-attempt-20260728-002
+    jobStatus: completed
+    jobAttemptCount: 1
+    statusCode: model_completed
+    releaseId: CDM-2026-001
+    modelVersion: controlled-demo-xgboost-v1
+    modelEvidenceState: controlled_demonstration
+    shapFeatureCount: 2
+    masteryProjectionPresent: true
+    snapshotProjectionPresent: true
+    assignmentProjectionPresent: true
+    unsafeProjectionFields: []
+    cleanupVerified: true
+  temporaryIamAudit:
+    serviceAccount: logic-oasis-iam-audit@logic-oasis-fyp.iam.gserviceaccount.com
+    customPermission: storage.buckets.getIamPolicy
+    conditionTitle: temporary_cdm_bucket_iam_audit
+    result: impersonation_denied
+    bindingsRemoved: true
+    serviceAccountDeleted: true
+    customRoleDeleted: true
+  storageIamDiagnosis:
+    checkedAt: 2026-07-28
+    activeAccount: zyonn1509@gmail.com
+    activeProject: logic-oasis-fyp
+    projectParent: null
+    projectOwnerBinding: unconditional
+    ownerIncludesGetIamPolicy: false
+    ownerIncludesSetIamPolicy: false
+    projectDenyPolicies: []
+    projectPabBindings: []
+    organizationPabBindings: []
+    cause: missing_allow_binding
+    recovery: temporary_bucket_resource_conditioned_storage_admin
+    troubleshooterErrorId: CiQwMTlmYTRiMS1mNTNmLTdlOWUtOGE3NC1hMDFhM2Y3Zjc2OWQSJXByb2plY3RzL18vYnVja2V0cy9sb2dpYy1vYXNpcy1tb2RlbHM=
+    blockingPolicy: none
+    blockingResourceLevel: none
+    requiredAdministratorAction: temporary_conditioned_allow_on_target_bucket_only
+    temporaryAdminConditionTitle: temporary_cdm_bucket_iam_recovery
+    temporaryAdminBindingRemoved: true
+    postCleanupStoragePermissions: []
 ---
 
 # Controlled-demonstration XGBoost release evidence — 2026-07-24
 
 ## Release status and claim boundary
 
-This is a reproducible **controlled-demonstration release candidate**. It proves
+This is a reproducible **developer-released controlled-demonstration candidate**. It proves
 the training, native XGBoost UBJ inference, Tree SHAP, registry, adaptive
-assignment, and safe projection mechanisms using supervisor-reviewed fictional
+assignment, and safe projection mechanisms using developer-authored fictional
 trajectories. It does not establish real-student accuracy, calibration, learning
 improvement, or superiority over Decision Tree or MLP.
 
-The catalogue mechanism approval reference is
-`supervisor-review-cdm-catalog-v1`. The separate model-specific activation
-approval is pending and is deliberately not fabricated in this repository. An
-operator must supply the immutable `approvalId`, `approvedBy`, `approvedAt`, and
-a rationale containing `not real-world validated` when running
-`tools/deploy_controlled_demo_model.py`. Until that privileged transaction and
-its resulting registry snapshot are reviewed, this document is candidate
-evidence and must not be described as proof of a live activation.
+The catalogue declaration reference is
+`developer-declaration-cdm-catalog-v1`. The immutable model release declaration
+is `CDM-2026-001`, released by `zyonn` at `2026-07-27T00:00:00+08:00` for
+`fyp1_controlled_demo`. It was created only after the CDM-2 catalogue,
+evaluation, artifact, and SHAP evidence passed. The controlled-demo runtime was
+then activated and verified with one disposable live quiz; this remains
+mechanics evidence only, not evidence about real learners or model quality.
 
 No scenario rows, fictional profile identifiers, question identifiers, or
 learner records are reproduced here.
@@ -124,10 +216,10 @@ Release order:
    identity tests. Do not hand-edit `functions/vendor`.
 2. Reproduce the candidate bundle and verify the hashes above against its UBJ
    artifact, publication manifest, configuration, and mechanics report.
-3. Obtain the separate model-specific supervisor approval. Its rationale must
-   state that the bundle is not real-world validated.
-4. Run `tools/deploy_controlled_demo_model.py` with the approved bucket and
-   approval fields. It uploads byte-verified immutable objects and performs the
+3. Confirm the immutable developer release declaration above, including the
+   rationale that the bundle is not real-world validated.
+4. Run `tools/deploy_controlled_demo_model.py` with the declared bucket and
+   developer-release fields. It uploads byte-verified immutable objects and performs the
    one-active-record registry switch in one privileged transaction.
 5. After the one-time identity bootstrap, deploy the Functions runtime using
    `tools/deploy_u8_runtime_iam.py --model-bucket gs://logic-oasis-models
@@ -151,8 +243,8 @@ weights. Keep the immutable artifact and registry audit record for review.
 Replacing or reactivating a model is an explicit privileged registry change,
 never an artifact overwrite. The transaction must deactivate the current
 record and activate exactly one complete, compatible approved record. If a
-compatible previously approved model is not available, remain in fail-closed
-fallback while a new immutable candidate is evaluated and approved.
+compatible previously released model is not available, remain in fail-closed
+fallback while a new immutable candidate is evaluated and released.
 
 ## Real-data replacement checklist
 
@@ -168,8 +260,9 @@ retune or relabel this controlled-demo artifact in place.
    student-grouped split containing the required classes.
 4. Produce a real-data report covering data sufficiency, calibration,
    false-negative trade-offs, operational slices, fallback rate, and limits.
-5. Obtain a new model-specific approval with `evidenceLevel: real_evaluated`
-   and a real-data deployment scope. Controlled-demo approval cannot be reused.
+5. Create a separately governed release declaration with
+   `evidenceLevel: real_evaluated` and a real-data deployment scope. The
+   controlled-demo declaration cannot be reused.
 6. Upload a new immutable artifact/manifest and perform one privileged
    one-active-record registry transaction. Never overwrite the demo objects.
 7. Deploy the runtime in `real_evaluated_only` mode and verify the selected
@@ -181,18 +274,140 @@ retune or relabel this controlled-demo artifact in place.
 No Flutter architecture change is required: the bounded safe projection field
 already distinguishes `controlled_demonstration` from `real_evaluated`.
 
+## Cloud activation observation — 2026-07-27
+
+The `logic-oasis-models` bucket was created in `asia-southeast1` with uniform
+bucket-level access and enforced public-access prevention. A temporary
+conditional grant gave `zyonn1509@gmail.com` only
+`roles/storage.objectCreator` and `roles/storage.objectViewer` for this bucket.
+No project-wide Storage role was granted.
+
+Both unique versioned objects were absent before publication. They were uploaded
+with `ifGenerationMatch=0`, downloaded again, compared byte-for-byte, and
+independently SHA-256 verified before the registry transaction. The generations,
+sizes, and hashes are recorded in front matter. Firestore then contained exactly
+one active registry record, `xgboost-controlled-demo-xgboost-v1`, with release
+`CDM-2026-001` and all declared package, schema, artifact, policy, dataset,
+catalogue, configuration, report, evidence, and deployment bindings.
+
+The first deployment attempts exposed three independent preparation failures:
+the isolated worktree lacked `functions/venv`, Cloud Runtime Config was
+temporarily unavailable, and two non-secret parent-invitation values were
+missing from the ignored deployment `.env`. The virtual environment and values
+were restored, Firebase analytics was disabled only for each deployment
+session, and the exact single-function dry run passed before deployment. No
+parent-invitation secret value was added to source control or printed in this
+evidence.
+
+The first successful target deployment produced revision
+`processfinalizedquizattempt-00011-hin`. Its first disposable quiz exposed a
+runtime compatibility fault before job claim: the installed Firebase Functions
+SDK represents `StringParam.value` as a string property, while the handler
+called it as a method. Eventarc delivery was working and the logs consistently
+reported `TypeError: 'str' object is not callable` at the evidence-mode lookup.
+The attempt timed out with no `aiJobs` record and every uniquely named input and
+output document was deleted and re-read as absent.
+
+Parameter resolution was made compatible with both property- and method-based
+SDK shapes and covered by regression tests. The unchanged exact target passed a
+new dry run and was redeployed as active revision
+`processfinalizedquizattempt-00012-nax`. The readback confirmed the dedicated
+`logic-oasis-ai-runtime` service account,
+`AI_MODEL_EVIDENCE_MODE=controlled_demo`, `AI_MODEL_BUCKET=logic-oasis-models`,
+the Firestore-created event type, and retry enabled. Project IAM readback showed
+no temporary Storage Admin condition and no project Storage role for the
+publisher.
+
+The fresh disposable attempt `cdm-live-attempt-20260728-002` completed on its
+first claim with `model_completed`, release `CDM-2026-001`, model version
+`controlled-demo-xgboost-v1`, and evidence state
+`controlled_demonstration`. Native inference returned a bounded support-risk
+value and Tree SHAP returned two feature contributions. Mastery, snapshot, and
+assignment projections were present; the client-facing projections contained
+no raw feature values, SHAP values, artifact paths, or artifact/package hashes.
+All exact disposable input and output documents were deleted and independently
+re-read as absent. This verifies deployment mechanics only and makes no claim
+about real-student accuracy, calibration, learning improvement, or superiority.
+
+A temporary audit service account and custom role had been attempted during an
+earlier diagnosis, but impersonation failed and both were deleted with their
+bindings. They were not recreated during the successful recovery.
+
+## Storage IAM denial diagnosis — 2026-07-28
+
+The active Cloud SDK account and project were confirmed as
+`zyonn1509@gmail.com` and `logic-oasis-fyp`. Policy Troubleshooter requests for
+the exact bucket resource reproduced `storage.buckets.getIamPolicy` denial and
+issued error IDs, but could not expose the bucket policy to this caller.
+
+The effective allow-policy diagnosis is nevertheless conclusive. Project
+`559775119210` has no organization or folder parent, its `roles/owner` binding
+for this user is unconditional, and the current predefined Owner role contains
+neither `storage.buckets.getIamPolicy` nor `storage.buckets.setIamPolicy`.
+Project Deny policies and project PAB bindings are empty. The visible
+`zyonn1509-org` has no principal-set PAB binding for this account; because this
+project is not its descendant, organization Deny policy inheritance cannot
+govern the bucket resource. The cause is therefore a missing effective allow
+binding after the bucket policy was narrowed, not a Deny policy, PAB, conditional
+Owner binding, unavailable bucket, or mis-owned project.
+
+The denied post-cleanup `getIamPolicy` request is traceable by Troubleshooter
+error ID
+`CiQwMTlmYTRiMS1mNTNmLTdlOWUtOGE3NC1hMDFhM2Y3Zjc2OWQSJXByb2plY3RzL18vYnVja2V0cy9sb2dpYy1vYXNpcy1tb2RlbHM=`.
+There is no blocking policy or blocking ancestor resource level; the required
+administrator action was a minimal temporary allow on the target bucket.
+
+The authorized recovery used a temporary project IAM binding of
+`roles/storage.admin` with title `temporary_cdm_bucket_iam_recovery`, whose
+condition required both
+`resource.type == "storage.googleapis.com/Bucket"` and
+`resource.name == "projects/_/buckets/logic-oasis-models"`. It must be removed
+immediately after the bucket-level policy is restored and verified. The binding
+made both `storage.buckets.getIamPolicy` and
+`storage.buckets.setIamPolicy` effective without granting unconditioned project
+Storage administration.
+
+The preserved bucket policy had etag `CAI=` and only the dedicated runtime
+service account in `roles/storage.objectViewer`. Temporary bucket-level
+`roles/storage.objectCreator` and `roles/storage.objectViewer` grants for
+`zyonn1509@gmail.com` produced etag `CAQ=`. The two existing immutable objects
+were not overwritten: their generations, byte lengths, and SHA-256 values were
+downloaded and verified against the generated manifest before the single active
+developer-release registry record was accepted. The controlled-demo gate
+accepted it and `real_evaluated_only` returned
+`model_evidence_incompatible`.
+
+Both publisher roles were removed. The authoritative final bucket policy,
+captured after that removal and before removal of the project condition, had
+etag `CAY=` and exactly one binding:
+`roles/storage.objectViewer` for
+`logic-oasis-ai-runtime@logic-oasis-fyp.iam.gserviceaccount.com`. No bucket
+mutation followed this capture. The project condition was then removed; after
+IAM propagation, the publisher's effective bucket IAM and object create/read
+permission set was empty. A later direct bucket-policy read was therefore
+expected to be denied. A redundant Cloud Asset inventory route was not enabled
+solely for this audit because the API was disabled; the preserved final policy,
+project-policy cleanup readback, and successful live model object read provide
+the final evidence chain.
+
 ## Automated verification record
 
-Verified locally on 2026-07-27:
+Verified locally on 2026-07-28:
 
-- AI pipeline unit suite: 77 tests passed.
-- Functions modules: 60 tests passed when isolated to avoid the known duplicate
+- AI pipeline unit suite: 78 tests and 6 subtests passed under the recorded
+  Python 3.11 controlled-demo toolchain.
+- Functions modules: 62 tests passed across 10 isolated modules to avoid the known duplicate
   Firebase parameter registration caused by importing both entry-point names
   in one Python process.
 - Tooling suite: 26 tests passed, including deterministic candidate/evidence
   binding, source/vendor parity, stale-file cleanup, registry, and deployment
   configuration checks.
-- Focused controlled-demo Flutter projection/disclosure suite: 11 tests passed.
+- Focused controlled-demo Flutter projection/disclosure suite: 11 tests passed
+  across `ai_diagnosis_test.dart`, `ai_result_page_status_test.dart`, and
+  `parent_dashboard_linked_child_test.dart`. Earlier sandboxed invocations
+  stalled before Flutter startup because the SDK is installed outside the
+  workspace; the same exact suite passed after narrowly scoped SDK access was
+  granted.
 - Python compilation and staged-diff checks passed.
 
 The unrelated full Flutter baseline still contains two independently

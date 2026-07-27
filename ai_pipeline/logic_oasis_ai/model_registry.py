@@ -21,10 +21,10 @@ CANDIDATE = "candidate"
 PROMOTED = "promoted"
 CONTROLLED_DEMO_PROVENANCE = "expert_authored_controlled_demo"
 CONTROLLED_DEMO_EVIDENCE_LEVEL = "controlled_demonstration"
-CONTROLLED_DEMO_APPROVAL_SCOPE = "fyp1_controlled_demo"
+CONTROLLED_DEMO_RELEASE_SCOPE = "fyp1_controlled_demo"
 CONTROLLED_DEMO_DEPLOYMENT_SCOPE = "controlled_demo"
 REAL_EVALUATED_DEPLOYMENT_SCOPE = "real_evaluated"
-CONTROLLED_DEMO_RATIONALE_MARKER = "not real-world validated"
+CONTROLLED_DEMO_RELEASE_RATIONALE_MARKER = "not real-world validated"
 SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
 MODEL_VERSION_PATTERN = re.compile(r"[a-z0-9](?:[a-z0-9._-]{0,62}[a-z0-9])?")
 BUCKET_PATTERN = re.compile(r"[a-z0-9][a-z0-9._-]{1,221}[a-z0-9]")
@@ -46,14 +46,14 @@ class ModelArtifact:
     artifact_manifest_sha256: str | None = None
     promotion_gate_status: str = "not_passed"
     lifecycle_status: str = CANDIDATE
-    approval_id: str | None = None
-    approved_by: str | None = None
-    approved_at: datetime | None = None
-    approval_rationale: str | None = None
+    release_id: str | None = None
+    released_by: str | None = None
+    released_at: datetime | None = None
+    release_rationale: str | None = None
     promoted_at: datetime | None = None
     training_data_provenance: str | None = None
     evidence_level: str | None = None
-    approval_scope: str | None = None
+    release_scope: str | None = None
     deployment_scope: str | None = None
     scenario_catalogue_sha256: str | None = None
     controlled_demo_config_sha256: str | None = None
@@ -81,11 +81,11 @@ class ModelArtifact:
             raise ValueError("promoted artifacts require promoted_at")
         if self.lifecycle_status == CANDIDATE and self.promoted_at is not None:
             raise ValueError("candidate artifacts cannot have promoted_at")
-        approval_values = (self.approval_id, self.approved_by, self.approved_at, self.approval_rationale)
-        if any(value is not None for value in approval_values) and not all(value is not None for value in approval_values):
-            raise ValueError("approval metadata must be complete when supplied")
-        if self.approved_at is not None and self.approved_at.tzinfo is None:
-            raise ValueError("approved_at must include a timezone")
+        release_values = (self.release_id, self.released_by, self.released_at, self.release_rationale)
+        if any(value is not None for value in release_values) and not all(value is not None for value in release_values):
+            raise ValueError("release metadata must be complete when supplied")
+        if self.released_at is not None and self.released_at.tzinfo is None:
+            raise ValueError("released_at must include a timezone")
         if self.deployment_scope == CONTROLLED_DEMO_DEPLOYMENT_SCOPE:
             validate_controlled_demo_artifact(self)
 
@@ -105,14 +105,14 @@ class ModelArtifact:
             "artifactManifestSha256": self.artifact_manifest_sha256,
             "promotionGateStatus": self.promotion_gate_status,
             "lifecycleStatus": self.lifecycle_status,
-            "approvalId": self.approval_id,
-            "approvedBy": self.approved_by,
-            "approvedAt": self.approved_at,
-            "approvalRationale": self.approval_rationale,
+            "releaseId": self.release_id,
+            "releasedBy": self.released_by,
+            "releasedAt": self.released_at,
+            "releaseRationale": self.release_rationale,
             "promotedAt": self.promoted_at,
             "trainingDataProvenance": self.training_data_provenance,
             "evidenceLevel": self.evidence_level,
-            "approvalScope": self.approval_scope,
+            "releaseScope": self.release_scope,
             "deploymentScope": self.deployment_scope,
             "scenarioCatalogueSha256": self.scenario_catalogue_sha256,
             "controlledDemoConfigSha256": self.controlled_demo_config_sha256,
@@ -158,8 +158,8 @@ class ModelRegistry:
             raise ValueError("artifact does not match the active prediction contract")
         if not artifact.artifact_manifest_sha256:
             raise ValueError("an artifact without a manifest cannot become active")
-        if not all((artifact.approval_id, artifact.approved_by, artifact.approved_at, artifact.approval_rationale)):
-            raise ValueError("supervisor approval metadata is required before activation")
+        if not all((artifact.release_id, artifact.released_by, artifact.released_at, artifact.release_rationale)):
+            raise ValueError("developer release metadata is required before activation")
         timestamp = promoted_at or datetime.now(timezone.utc)
         if timestamp.tzinfo is None:
             raise ValueError("promoted_at must include a timezone")
@@ -181,25 +181,25 @@ class ModelRegistry:
 
 
 def validate_controlled_demo_artifact(artifact: ModelArtifact) -> None:
-    """Require the complete model-specific approval boundary for demo evidence."""
+    """Require the complete developer-release boundary for demo evidence."""
     expected = {
         "training_data_provenance": CONTROLLED_DEMO_PROVENANCE,
         "evidence_level": CONTROLLED_DEMO_EVIDENCE_LEVEL,
-        "approval_scope": CONTROLLED_DEMO_APPROVAL_SCOPE,
+        "release_scope": CONTROLLED_DEMO_RELEASE_SCOPE,
         "deployment_scope": CONTROLLED_DEMO_DEPLOYMENT_SCOPE,
     }
     if any(getattr(artifact, field) != value for field, value in expected.items()):
-        raise ValueError("controlled-demo artifact metadata does not match its approved scope")
+        raise ValueError("controlled-demo artifact metadata does not match its release scope")
     if any(
         not isinstance(value, str) or not SHA256_PATTERN.fullmatch(value)
         for value in (artifact.scenario_catalogue_sha256, artifact.controlled_demo_config_sha256)
     ):
         raise ValueError("controlled-demo catalogue and configuration hashes are required")
     if (
-        not isinstance(artifact.approval_rationale, str)
-        or CONTROLLED_DEMO_RATIONALE_MARKER not in artifact.approval_rationale.lower()
+        not isinstance(artifact.release_rationale, str)
+        or CONTROLLED_DEMO_RELEASE_RATIONALE_MARKER not in artifact.release_rationale.lower()
     ):
-        raise ValueError("controlled-demo approval must state that it is not real-world validated")
+        raise ValueError("controlled-demo release must state that it is not real-world validated")
 
 
 def validate_model_bucket_uri(value: str) -> str:

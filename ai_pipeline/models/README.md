@@ -5,8 +5,11 @@ Only a versioned, evaluated **XGBoost** bundle that declares the U7
 The bundle must contain its target/label version, mastery criterion,
 `quiz-attempt-features-v2`, exactly `correct_rate` and
 `mean_response_time_ms` (or the separately evaluated typed BKT ablation),
-dataset version, evaluation-report hash, and manifest hash. It remains a
-candidate until the project owner and supervisor approve the evaluated bundle.
+dataset version, evaluation-report hash, and manifest hash. A real-evaluated
+candidate remains inactive until its separately governed release requirements
+are satisfied. The FYP1 controlled-demo route instead uses the immutable
+developer release declaration described below and no model-specific supervisor
+approval metadata.
 
 `../xgboost_logic_oasis_model.pkl` is a legacy developer artifact using the
 old `Weak`/`Moderate`/`Strong` mastery-label path. It is not an active U7/U8
@@ -25,7 +28,7 @@ catalogue, dataset, feature-schema, configuration, evaluation-report, artifact,
 and manifest hashes and verifies Tree SHAP reconstruction from that same
 serialized artifact. The controlled-demo loader does not accept pickle/joblib
 payloads. Generated binaries stay outside version control and may
-be activated only later through the CDM-3 supervisor-approved
+be activated only later through the CDM-3 developer-release
 `controlled_demo` registry path.
 
 The metrics in `../reports/controlled_demo_model_report.md` demonstrate only

@@ -118,19 +118,19 @@ startQuizSession
 | `subtopicMastery/{studentId}_y{yearLevel}_{topicId}_{subtopicId}` | Current prototype -> Derived target | Student/year/topic/subtopic pair | `studentId`, `yearLevel`, `topicId`, `subtopicId`, BKT posterior, `observationCount`, `evidenceLevel`, `lastSourceAttemptId`, `updatedAt` | Derived dashboard summary only; client writes denied. |
 | `adaptiveAssignments/{assignmentId}` | Target FYP1 | Deterministic student/subtopic assignment ID | `studentId`, `subtopicId`, `bankId`, `difficultyLevel`, `reasonCode`, `reasonText`, `policyVersion`, `sourceAttemptId`, `sourceAttemptSequence`, `status`, optional bounded `modelEvidenceState`, `createdAt` | Adaptive-policy backend writes. Student and linked parent may read the safe projection; clients cannot choose or edit the bank assignment. `modelEvidenceState` is present only for a compatible completed model-backed assignment. |
 | `aiJobs/{attemptId}` | Target FYP1 | Attempt ID | `attemptId`, `studentId`, `status`, `attemptCount`, sanitized `errorCode`, timestamps, `sourceAttemptSequence` | Trigger/worker only. All client reads and writes are denied; visible state is copied to `studentAiStatuses`. |
-| `aiModelRuns/{runId}` | Derived target | Deterministic attempt run ID | `studentId`, `attemptId`, `modelVersion`, `featureSchemaVersion`, prediction, raw feature values, Tree SHAP values/expected value, approval and source lineage, `status`, `createdAt` | AI runtime only. All client reads and writes are denied; no raw feature, SHAP, hash, path, or approval data enters a client projection. |
+| `aiModelRuns/{runId}` | Derived target | Deterministic attempt run ID | `studentId`, `attemptId`, `modelVersion`, `featureSchemaVersion`, prediction, raw feature values, Tree SHAP values/expected value, `releaseId`, evidence and source lineage, `status`, `createdAt` | AI runtime only. All client reads and writes are denied; no raw feature, SHAP, hash, path, or release data enters a client projection. |
 | `studentAiStatuses/{attemptId}` | Safe derived projection | Attempt ID | `attemptId`, `studentId`, `analysisState`, `displayCode`, `sourceAttemptSequence`, optional bounded `modelEvidenceState`, `updatedAt` | AI runtime writes. Owning student and active linked parent may read; clients cannot write. The controlled value is exactly `controlled_demonstration` and only accompanies `completed`. |
-| `modelRegistry/{artifactId}` | Target FYP1 | Immutable artifact ID | Model/version/type, artifact and manifest paths/hashes, package/schema/ranking/adaptive-policy hashes, target/label/mastery contract, dataset/report/catalogue/config hashes, provenance/evidence/approval/deployment scopes, lifecycle/promotion state, complete supervisor approval, `isActive`, and timestamps | Privileged promotion/deployment only; all client reads and writes are denied. One transaction deactivates the current record and creates exactly one active immutable record. |
+| `modelRegistry/{artifactId}` | Target FYP1 | Immutable artifact ID | Model/version/type, artifact and manifest paths/hashes, package/schema/ranking/adaptive-policy hashes, target/label/mastery contract, dataset/report/catalogue/config hashes, provenance/evidence/release/deployment scopes, lifecycle/promotion state, complete `releaseId`/`releasedBy`/`releasedAt`/`releaseRationale` developer declaration, `isActive`, and timestamps | Privileged promotion/deployment only; all client reads and writes are denied. One transaction deactivates the current record and creates exactly one active immutable record. A controlled-demo record uses `releaseScope: fyp1_controlled_demo` and `deploymentScope: controlled_demo`. |
 
 **AI evidence invariant:** `aiModelRuns` must identify its finalized `attemptId`,
-model version, feature schema, approval, and data-source lineage. A
+model version, feature schema, release identity, and data-source lineage. A
 controlled-demo run uses `trainingDataProvenance:
 expert_authored_controlled_demo` in its protected registry evidence and exposes
 only `modelEvidenceState: controlled_demonstration` through completed safe
 status/assignment projections. Seed/demo rows remain excluded from real-data
 performance claims. A later `real_evaluated` registry record requires separate
-data governance, evaluation, and approval; existing controlled projections are
-never relabelled in place.
+data governance, evaluation, and a separately governed release declaration;
+existing controlled projections are never relabelled in place.
 
 ## 7. Q&A and Naive Bayes Data
 
@@ -175,7 +175,7 @@ The approved Stage 3 reservation does not change FYP1 database implementation. T
 | Safe curriculum (`topics`, `subtopics`, `questions`, `questionBanks`) | Authenticated read | Denied | Controlled seed/deployment | Questions never include answer keys. |
 | Answer keys, sessions, responses | Denied | Denied | Callable Functions only | Emulator denies direct access even to the owning student. |
 | Final attempts and safe mastery/status/assignment projections | Owner/authorized parent safe view | Denied | Backend only | Student cannot forge correctness, score, evidence state, mastery, or next bank. |
-| Raw AI jobs/runs and model registry | Denied | Denied | Runtime or privileged promotion only | Raw features, SHAP values, errors, hashes, paths, approvals, and registry state never cross the client boundary. |
+| Raw AI jobs/runs and model registry | Denied | Denied | Runtime or privileged promotion only | Raw features, SHAP values, errors, hashes, paths, release metadata, and registry state never cross the client boundary. |
 | User profile and preferences | Owner only | Restricted safe fields only | Server validates identity/role fields | Foreign UID access denied; role/link escalation denied. |
 | Parent links | Linked parties may read | Denied | Approved server/admin flow | No self-linking or cross-student access. |
 | Q&A source text | Role/visibility-based read | Author restricted fields or validated callable | Backend/moderation derived fields | Acceptance, AI quality, rewards, and moderation are not client-controlled. |

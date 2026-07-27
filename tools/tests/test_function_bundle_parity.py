@@ -107,10 +107,23 @@ class FunctionBundleParityTests(unittest.TestCase):
         metadata = yaml.safe_load(evidence.split("---", 2)[1])
         manifest = json.loads((VENDOR / "bundle_manifest.json").read_text(encoding="utf-8"))
         self.assertEqual(metadata["artifact_contract"], "logic-oasis-controlled-demo-release-evidence/v1")
-        self.assertEqual(metadata["release_status"], "release_candidate")
-        self.assertEqual(metadata["live_activation_status"], "pending")
-        self.assertEqual(metadata["mechanism_approval_reference"], "supervisor-review-cdm-catalog-v1")
-        self.assertEqual(metadata["model_activation_approval_status"], "pending")
+        self.assertEqual(metadata["release_status"], "developer_released")
+        self.assertEqual(metadata["live_activation_status"], "verified")
+        self.assertEqual(metadata["live_quiz_verification_status"], "passed_and_cleaned_up")
+        self.assertTrue(metadata["deployment_observation"]["disposableQuiz"]["cleanupVerified"])
+        self.assertEqual(
+            metadata["catalogue_declaration_reference"],
+            "developer-declaration-cdm-catalog-v1",
+        )
+        release = metadata["release_declaration"]
+        self.assertEqual(release["releaseId"], "CDM-2026-001")
+        self.assertEqual(release["releasedBy"], "zyonn")
+        self.assertEqual(release["releasedAt"].isoformat(), "2026-07-27T00:00:00+08:00")
+        self.assertEqual(release["releaseScope"], "fyp1_controlled_demo")
+        self.assertEqual(release["trainingDataProvenance"], "expert_authored_controlled_demo")
+        self.assertEqual(release["evidenceLevel"], "controlled_demonstration")
+        self.assertEqual(release["deploymentScope"], "controlled_demo")
+        self.assertIn("not real-world validated", release["releaseRationale"])
         self.assertFalse(metadata["contains_scenario_content"])
         self.assertIsInstance(metadata["bindings"], dict)
         for key, value in manifest.items():

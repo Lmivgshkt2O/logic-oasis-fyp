@@ -17,6 +17,20 @@ class QuizTriggerContractTests(unittest.TestCase):
         self.assertTrue(endpoint.eventTrigger["retry"])
         self.assertEqual(AI_RUNTIME_SERVICE_ACCOUNT, endpoint.serviceAccountEmail)
 
+    def test_runtime_string_parameters_resolve_with_installed_sdk(self) -> None:
+        self.assertEqual(
+            main.AI_MODEL_EVIDENCE_MODE.value,
+            main._resolved_string_param(main.AI_MODEL_EVIDENCE_MODE),
+        )
+        self.assertEqual(
+            main.AI_MODEL_BUCKET.value,
+            main._resolved_string_param(main.AI_MODEL_BUCKET),
+        )
+
+    def test_runtime_string_parameters_accept_legacy_callable_value(self) -> None:
+        legacy_parameter = type("LegacyParameter", (), {"value": lambda self: "controlled_demo"})()
+        self.assertEqual("controlled_demo", main._resolved_string_param(legacy_parameter))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -206,7 +206,7 @@ def write_controlled_demo_report(
         "## Mechanics comparison",
         "",
         "All models used the same grouped rows and exactly `correct_rate` plus `mean_response_time_ms`.",
-        "These metrics describe fit to fictional supervisor-reviewed scenarios only; they are not real-world performance or superiority evidence.",
+        "These metrics describe fit to fictional developer-authored scenarios only; they are not real-world performance or superiority evidence.",
         "",
         "| Model | Accuracy | F1 | ROC-AUC | PR-AUC | Log loss | Brier |",
         "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",

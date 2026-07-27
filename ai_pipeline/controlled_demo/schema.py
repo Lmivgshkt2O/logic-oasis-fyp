@@ -1,4 +1,4 @@
-"""Strict schema for supervisor-reviewed fictional learning trajectories."""
+"""Strict schema for developer-authored fictional learning trajectories."""
 
 from __future__ import annotations
 
@@ -62,7 +62,7 @@ class ScenarioCatalogue:
     label_version: str
     mastery_criterion: float
     training_data_provenance: str
-    scenario_author_approval_reference: str
+    scenario_author_declaration_reference: str
     scenario_families: tuple[ScenarioFamily, ...]
 
 
@@ -80,7 +80,7 @@ def parse_catalogue(source: str | bytes) -> ScenarioCatalogue:
         {
             "catalogVersion", "featureSchemaVersion", "predictionTarget",
             "labelVersion", "masteryCriterion", "trainingDataProvenance",
-            "scenarioAuthorApprovalReference", "scenarioFamilies",
+            "scenarioAuthorDeclarationReference", "scenarioFamilies",
         },
         "catalogue",
     )
@@ -94,7 +94,7 @@ def parse_catalogue(source: str | bytes) -> ScenarioCatalogue:
         label_version=_required_string(document, "labelVersion"),
         mastery_criterion=_finite_number(document, "masteryCriterion"),
         training_data_provenance=_required_string(document, "trainingDataProvenance"),
-        scenario_author_approval_reference=_required_string(document, "scenarioAuthorApprovalReference"),
+        scenario_author_declaration_reference=_required_string(document, "scenarioAuthorDeclarationReference"),
         scenario_families=tuple(_parse_family(value) for value in families_raw),
     )
     _validate_catalogue(catalogue)

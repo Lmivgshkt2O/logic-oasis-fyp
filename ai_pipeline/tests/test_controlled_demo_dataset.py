@@ -28,6 +28,10 @@ class ControlledDemoDatasetTests(unittest.TestCase):
         build = build_controlled_demo_dataset()
 
         self.assertEqual(build.manifest["trainingDataProvenance"], "expert_authored_controlled_demo")
+        self.assertEqual(
+            build.manifest["scenarioAuthorDeclarationReference"],
+            "developer-declaration-cdm-catalog-v1",
+        )
         self.assertEqual(build.manifest["claimLevel"], "controlled_demonstration_only")
         self.assertEqual(build.manifest["sourceAttemptCount"], 16)
         self.assertEqual(build.manifest["trainingRowCount"], 12)
@@ -41,6 +45,14 @@ class ControlledDemoDatasetTests(unittest.TestCase):
         self.assertTrue(first.target)  # Derived from a2=0.4, not a1=0.8.
         second = next(row for row in build.prediction_dataset.examples if row.attempt_id == "steady-recovery-a2")
         self.assertFalse(second.target)  # Derived from a3=0.8.
+
+    def test_obsolete_catalogue_approval_field_is_rejected(self):
+        modified = copy.deepcopy(self.source_document)
+        declaration = modified.pop("scenarioAuthorDeclarationReference")
+        modified["scenarioAuthorApprovalReference"] = declaration
+        with TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(ValueError, "exactly"):
+                build_controlled_demo_dataset(self._write_catalogue(directory, modified))
 
     def test_generation_and_written_documents_are_deterministic(self):
         first = build_controlled_demo_dataset()

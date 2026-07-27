@@ -1,4 +1,4 @@
-"""Upload and activate a supervisor-approved CDM-2 bundle in one model bucket."""
+"""Upload and activate a developer-released CDM-2 bundle in one model bucket."""
 
 from __future__ import annotations
 
@@ -30,18 +30,19 @@ from training.publish_controlled_demo_bundle import load_controlled_demo_bundle
 
 
 @dataclass(frozen=True)
-class SupervisorApproval:
-    approval_id: str
-    approved_by: str
-    approved_at: datetime
+class DeveloperRelease:
+    release_id: str
+    released_by: str
+    released_at: datetime
     rationale: str
+    scope: str
 
 
 def build_controlled_demo_registry_document(
     manifest: Mapping[str, object],
     *,
     model_bucket: str,
-    approval: SupervisorApproval,
+    release: DeveloperRelease,
     manifest_sha256: str,
 ) -> dict[str, object]:
     artifact_path, manifest_path = controlled_demo_object_paths(model_bucket, str(manifest.get("modelVersion", "")))
@@ -69,13 +70,13 @@ def build_controlled_demo_registry_document(
         "promotionGateStatus": "passed",
         "lifecycleStatus": "promoted",
         "isActive": True,
-        "approvalId": approval.approval_id,
-        "approvedBy": approval.approved_by,
-        "approvedAt": approval.approved_at,
-        "approvalRationale": approval.rationale,
+        "releaseId": release.release_id,
+        "releasedBy": release.released_by,
+        "releasedAt": release.released_at,
+        "releaseRationale": release.rationale,
         "trainingDataProvenance": manifest["trainingDataProvenance"],
         "evidenceLevel": manifest["evidenceLevel"],
-        "approvalScope": "fyp1_controlled_demo",
+        "releaseScope": release.scope,
         "deploymentScope": manifest["deploymentScope"],
         "scenarioCatalogueSha256": manifest["scenarioCatalogueSha256"],
         "controlledDemoConfigSha256": manifest["controlledDemoConfigSha256"],
@@ -105,13 +106,13 @@ def deploy_controlled_demo_model(
     model_bucket: str,
     artifact_path: str | Path,
     manifest_path: str | Path,
-    approval: SupervisorApproval,
+    release: DeveloperRelease,
     promoted_at: datetime | None = None,
 ) -> Mapping[str, object]:
     """Verify, upload, re-verify, then atomically switch the registry record."""
     bucket_name = validate_model_bucket(model_bucket)
     if getattr(bucket, "name", bucket_name) != bucket_name:
-        raise ValueError("storage bucket does not match the approved model bucket")
+        raise ValueError("storage bucket does not match the declared model bucket")
     artifact_source = Path(artifact_path)
     manifest_source = Path(manifest_path)
     _, manifest = load_controlled_demo_bundle(artifact_source, manifest_source)
@@ -139,7 +140,7 @@ def deploy_controlled_demo_model(
     document = build_controlled_demo_registry_document(
         manifest,
         model_bucket=model_bucket,
-        approval=approval,
+        release=release,
         manifest_sha256=sha256(manifest_bytes).hexdigest(),
     )
     return promote_controlled_demo_model(database, document, now=timestamp)
@@ -147,21 +148,22 @@ def deploy_controlled_demo_model(
 
 def _timestamp(value: str) -> datetime:
     try:
-        return parse_timestamp(value, "approved-at")
+        return parse_timestamp(value, "released-at")
     except ValueError as error:
         raise argparse.ArgumentTypeError(str(error)) from error
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Deploy one approved controlled-demo XGBoost bundle")
+    parser = argparse.ArgumentParser(description="Deploy one developer-released controlled-demo XGBoost bundle")
     parser.add_argument("--project", required=True)
     parser.add_argument("--model-bucket", required=True)
     parser.add_argument("--artifact", type=Path, required=True)
     parser.add_argument("--manifest", type=Path, required=True)
-    parser.add_argument("--approval-id", required=True)
-    parser.add_argument("--approved-by", required=True)
-    parser.add_argument("--approved-at", type=_timestamp, required=True)
-    parser.add_argument("--approval-rationale", required=True)
+    parser.add_argument("--release-id", required=True)
+    parser.add_argument("--released-by", required=True)
+    parser.add_argument("--released-at", type=_timestamp, required=True)
+    parser.add_argument("--release-rationale", required=True)
+    parser.add_argument("--release-scope", required=True)
     args = parser.parse_args()
     bucket_name = validate_model_bucket(args.model_bucket)
     app = firebase_admin.initialize_app(options={"projectId": args.project, "storageBucket": bucket_name})
@@ -171,7 +173,13 @@ def main() -> None:
         model_bucket=args.model_bucket,
         artifact_path=args.artifact,
         manifest_path=args.manifest,
-        approval=SupervisorApproval(args.approval_id, args.approved_by, args.approved_at, args.approval_rationale),
+        release=DeveloperRelease(
+            args.release_id,
+            args.released_by,
+            args.released_at,
+            args.release_rationale,
+            args.release_scope,
+        ),
     )
     print(f"Activated controlled-demo artifact: {result['artifactId']}")
 

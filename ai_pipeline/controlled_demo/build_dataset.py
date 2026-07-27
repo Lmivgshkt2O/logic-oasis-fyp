@@ -55,7 +55,7 @@ def build_controlled_demo_dataset(
         "labelVersion": catalogue.label_version,
         "masteryCriterion": catalogue.mastery_criterion,
         "trainingDataProvenance": catalogue.training_data_provenance,
-        "scenarioAuthorApprovalReference": catalogue.scenario_author_approval_reference,
+        "scenarioAuthorDeclarationReference": catalogue.scenario_author_declaration_reference,
         "scenarioFamilyGroups": groups,
         "scenarioFamilyCount": len(catalogue.scenario_families),
         "sourceAttemptCount": len(attempts),

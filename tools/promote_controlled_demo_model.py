@@ -15,11 +15,11 @@ if str(AI_ROOT) not in sys.path:
     sys.path.insert(0, str(AI_ROOT))
 
 from logic_oasis_ai.model_registry import (
-    CONTROLLED_DEMO_APPROVAL_SCOPE,
+    CONTROLLED_DEMO_RELEASE_SCOPE,
     CONTROLLED_DEMO_DEPLOYMENT_SCOPE,
     CONTROLLED_DEMO_EVIDENCE_LEVEL,
     CONTROLLED_DEMO_PROVENANCE,
-    CONTROLLED_DEMO_RATIONALE_MARKER,
+    CONTROLLED_DEMO_RELEASE_RATIONALE_MARKER,
     SHA256_PATTERN,
     controlled_demo_object_paths,
 )
@@ -36,14 +36,14 @@ CONTROLLED_VALUES = MappingProxyType({
     "lifecycleStatus": "promoted",
     "trainingDataProvenance": CONTROLLED_DEMO_PROVENANCE,
     "evidenceLevel": CONTROLLED_DEMO_EVIDENCE_LEVEL,
-    "approvalScope": CONTROLLED_DEMO_APPROVAL_SCOPE,
+    "releaseScope": CONTROLLED_DEMO_RELEASE_SCOPE,
     "deploymentScope": CONTROLLED_DEMO_DEPLOYMENT_SCOPE,
     "trainingDatasetVersion": "controlled-demo-dataset-v1",
     "isActive": True,
 })
 REQUIRED_TEXT_FIELDS = frozenset({
     "artifactId", "modelVersion", "artifactPath", "artifactManifestPath",
-    "trainingDatasetVersion", "approvalId", "approvedBy", "approvalRationale",
+    "trainingDatasetVersion", "releaseId", "releasedBy", "releaseRationale",
 })
 HASH_FIELDS = frozenset({
     "artifactSha256", "artifactManifestSha256", "featureSchemaSha256",
@@ -61,8 +61,8 @@ def validate_controlled_demo_registry_document(document: Mapping[str, object]) -
         for field in HASH_FIELDS
     ):
         raise ValueError("controlled-demo registry hash bindings must be lowercase SHA-256 values")
-    if CONTROLLED_DEMO_RATIONALE_MARKER not in document["approvalRationale"].lower():
-        raise ValueError("approval rationale must state that the model is not real-world validated")
+    if CONTROLLED_DEMO_RELEASE_RATIONALE_MARKER not in document["releaseRationale"].lower():
+        raise ValueError("release rationale must state that the model is not real-world validated")
     version = str(document["modelVersion"])
     artifact_path = str(document["artifactPath"])
     manifest_path = str(document["artifactManifestPath"])
@@ -75,7 +75,7 @@ def validate_controlled_demo_registry_document(document: Mapping[str, object]) -
         expected_artifact, expected_manifest, f"xgboost-{version}"
     ):
         raise ValueError("controlled-demo artifact paths and immutable ID are invalid")
-    for field in ("approvedAt", "promotedAt"):
+    for field in ("releasedAt", "promotedAt"):
         timestamp = document.get(field)
         if not isinstance(timestamp, datetime) or timestamp.tzinfo is None:
             raise ValueError(f"{field} must be a timezone-aware timestamp")
@@ -94,8 +94,8 @@ def promote_controlled_demo_model(
         raise ValueError("promotion timestamp must include a timezone")
     document["promotedAt"] = timestamp
     validate_controlled_demo_registry_document(document)
-    if document["approvedAt"] > timestamp:
-        raise ValueError("approval timestamp cannot be later than promotion")
+    if document["releasedAt"] > timestamp:
+        raise ValueError("release timestamp cannot be later than promotion")
     collection = database.collection("modelRegistry")
     artifact_ref = collection.document(str(document["artifactId"]))
 

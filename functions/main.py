@@ -102,6 +102,15 @@ PARENT_INVITATION_SMTP_USERNAME = params.StringParam(
 )
 PARENT_INVITATION_SMTP_FROM = params.StringParam("PARENT_INVITATION_SMTP_FROM")
 
+
+def _resolved_string_param(parameter: Any) -> str:
+    """Resolve Firebase StringParam across property- and method-based SDKs."""
+    value = parameter.value
+    resolved = value() if callable(value) else value
+    if not isinstance(resolved, str):
+        raise TypeError("Firebase string parameter did not resolve to a string")
+    return resolved
+
 try:
     firebase_admin.get_app()
 except ValueError:
@@ -1183,8 +1192,8 @@ def processFinalizedQuizAttempt(event: firestore_fn.Event[Any]) -> None:
         gateway=FirestoreRuntimeGateway(firestore_db()),
         bundle=_runtime_bundle(
             runtime_root,
-            AI_MODEL_EVIDENCE_MODE.value(),
-            AI_MODEL_BUCKET.value(),
+            _resolved_string_param(AI_MODEL_EVIDENCE_MODE),
+            _resolved_string_param(AI_MODEL_BUCKET),
         ),
         provenance="emulator_verified" if os.environ.get("FUNCTIONS_EMULATOR") == "true" else "real",
     )

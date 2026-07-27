@@ -4,7 +4,7 @@ predictionTarget: next_attempt_support_needed
 labelVersion: next-attempt-support-needed-v1
 masteryCriterion: 0.60
 trainingDataProvenance: expert_authored_controlled_demo
-scenarioAuthorApprovalReference: supervisor-review-cdm-catalog-v1
+scenarioAuthorDeclarationReference: developer-declaration-cdm-catalog-v1
 scenarioFamilies:
   - scenarioFamilyId: steady-recovery-v1
     fictionalProfileId: fictional-profile-a

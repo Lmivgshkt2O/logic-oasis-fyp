@@ -186,8 +186,8 @@ class SourceParityTests(unittest.TestCase):
             feature_schema_version="quiz-attempt-features-v2", training_dataset_version="2026-07-16-r1",
             artifact_sha256="abc123", evaluation_status="evaluated", evaluation_report_sha256="report123",
             artifact_manifest_sha256="manifest123", promotion_gate_status="passed",
-            approval_id="approval-1", approved_by="supervisor@example.edu", approved_at=NOW,
-            approval_rationale="evaluation reviewed",
+            release_id="release-1", released_by="developer", released_at=NOW,
+            release_rationale="evaluation reviewed",
         )
         registry.register_candidate(candidate)
         with self.assertRaisesRegex(ValueError, "no promoted runtime model"):

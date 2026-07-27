@@ -106,7 +106,7 @@ It is “use repeated, validated learning evidence to decide whether the student
 
 The frozen supervised target is `next_attempt_support_needed`.
 
-For a current attempt, the label is derived only from the next chronological attempt in the same student/subtopic sequence using the supervisor-approved `masteryCriterion`.
+For a current attempt, the label is derived only from the next chronological attempt in the same student/subtopic sequence using the versioned `masteryCriterion`. The controlled-demo value is frozen by its developer release; a future real-data release must govern its criterion separately.
 
 The educational success criteria are useful support, conservative progression, clear explanations, and no unsupported high-confidence diagnosis.
 
@@ -179,13 +179,13 @@ Training, evaluation, promotion, and runtime inference are separate operations.
 
 Offline training may generate candidate artifacts but cannot make them active automatically.
 
-Only an evaluated XGBoost artifact whose manifest matches the active prediction contract and passes the promotion gates can become the promoted runtime model. For FYP1, one server-only `modelRegistry` version records `isActive`, `approvedBy`, `approvedAt`, the evaluation-report hash, training-dataset version, target, label version, and exact package, feature-schema, artifact, ranking-policy, and adaptive-policy hashes. Clients cannot read or write this registry.
+Only an evaluated XGBoost artifact whose manifest matches the active prediction contract and passes the promotion gates can become the promoted runtime model. For FYP1, one server-only `modelRegistry` version records `isActive`, `releaseId`, `releasedBy`, `releasedAt`, `releaseRationale`, `releaseScope`, the evaluation-report hash, training-dataset version, target, label version, and exact package, feature-schema, artifact, ranking-policy, and adaptive-policy hashes. Clients cannot read or write this registry.
 
-U8 loads XGBoost only when every registry binding matches the bundled release. Missing approval, an inactive record, an unsupported target, or any hash/version mismatch fails closed to the declared BKT/rule fallback. Signed approval/revocation documents, signing keys, and key rotation are deferred production hardening rather than FYP1 acceptance requirements. This preserves an auditable supervisor-approved release without introducing a cryptographic governance subsystem that the prototype cannot fully exercise or explain.
+U8 loads XGBoost only when every registry binding matches the bundled release. Missing release metadata, an inactive record, an unsupported target, or any hash/version mismatch fails closed to the declared BKT/rule fallback. Signed release/revocation documents, signing keys, and key rotation are deferred production hardening rather than FYP1 acceptance requirements. The controlled-demo record remains auditable through its immutable developer release declaration without introducing a cryptographic governance subsystem that the prototype cannot fully exercise or explain.
 
-At deployment, `tools/build_function_bundle.py` packages the authoritative `ai_pipeline/logic_oasis_ai/` source, feature schema, ranking-policy configuration, adaptive-policy configuration, and their bundle manifest into the Firebase Functions boundary. The selected model artifact and runtime-bound deployment manifest remain immutable objects in the approved model bucket; the privileged registry record binds their hashes to the Functions package, schema, and policy hashes. Before writing a weak-topic projection or assignment, runtime verifies all five are compatible. A missing or mismatched ranking/adaptive policy must produce the declared `fallback` or `failed` state and must not silently use hardcoded weights or thresholds; it may preserve safe BKT/rule guidance only when its separately declared compatible policy remains available.
+At deployment, `tools/build_function_bundle.py` packages the authoritative `ai_pipeline/logic_oasis_ai/` source, feature schema, ranking-policy configuration, adaptive-policy configuration, and their bundle manifest into the Firebase Functions boundary. The selected model artifact and runtime-bound deployment manifest remain immutable objects in the declared model bucket; the privileged registry record binds their hashes to the Functions package, schema, and policy hashes. Before writing a weak-topic projection or assignment, runtime verifies all five are compatible. A missing or mismatched ranking/adaptive policy must produce the declared `fallback` or `failed` state and must not silently use hardcoded weights or thresholds; it may preserve safe BKT/rule guidance only when its separately declared compatible policy remains available.
 
-The U8 automatic runtime will record `aiJobs/{attemptId}` states, idempotently materialize `masterySnapshots`, `subtopicMastery`, `aiModelRuns`, and `adaptiveAssignments`, and write separate safe status/projection documents for Flutter. `aiJobs`, `aiModelRuns`, model registry records, SHAP arrays, feature vectors, hashes, and error traces are never client-readable because Firestore Rules cannot redact selected fields from a readable document.
+The U8 automatic runtime records `aiJobs/{attemptId}` states, idempotently materializes `masterySnapshots`, `subtopicMastery`, `aiModelRuns`, and `adaptiveAssignments`, and writes separate safe status/projection documents for Flutter. `aiJobs`, `aiModelRuns`, model registry records, SHAP arrays, feature vectors, hashes, and error traces are never client-readable because Firestore Rules cannot redact selected fields from a readable document.
 
 `subtopicMastery/{studentId}_y{yearLevel}_{topicId}_{subtopicId}` is the one
 authoritative current weak-topic projection. It stores
@@ -249,7 +249,7 @@ This section is the tracked protocol for changing, training, evaluating, and
 deploying the quiz-learning pipeline. It supplements the canonical FYP1 plan;
 it does not itself approve a target, model, or deployment.
 
-### Status at 2026-07-27
+### Status at 2026-07-28
 
 | Area | Status | Evidence |
 | --- | --- | --- |
@@ -257,12 +257,12 @@ it does not itself approve a target, model, or deployment.
 | U6 trusted source/export/candidate lifecycle | Core mechanics implemented; reconciliation planned | RD2, RD3, RD6, and RD8 must be implemented before an approved real-data release. Fixture/source-contract verification does not support performance claims. |
 | U7 target/comparison harness | Core mechanics implemented; reconciliation planned | RD1 and RD3-RD6 must be implemented and verified before an approved real-data grouped evaluation, promotion, or supervisor-facing performance claim. |
 | Real dataset and final performance claim | Pending consent/approval and collection | Release manifest and report; only this gate supports a final performance claim. |
-| Runtime promotion | Controlled-demo promotion and one-active transaction implemented; genuine activation remains blocked until the separate named model approval and deployment record exist | Controlled bundle/registry tests plus `docs/evidence/2026-07-24-controlled-demo-xgboost-release.md`. |
-| U8 jobs, SHAP review, retries, dashboard statuses | Automatic runtime and bounded controlled-demo presentation implemented and locally verified | Native UBJ/Tree SHAP, fallback, lineage, and safe projection tests pass; cloud/live controlled activation remains pending release approval. |
+| Runtime promotion | Developer-released controlled-demo record is active through the one-active transaction; immutable object, registry, evidence-mode, and cleanup checks passed | Release `CDM-2026-001` and `docs/evidence/2026-07-24-controlled-demo-xgboost-release.md`. |
+| U8 jobs, SHAP review, retries, dashboard statuses | Automatic runtime and bounded controlled-demo presentation are deployed and live verified | Revision `processfinalizedquizattempt-00012-nax` completed one disposable quiz through native UBJ/Tree SHAP and safe projections; all disposable documents were removed and re-read as absent. |
 
 ### Implementation-Readiness Decisions (2026-07-17)
 
-The following decisions reconcile the detailed target protocol with the U3-U7 code already present in the repository. They are approved for implementation planning by the project owner. Supervisor approval of the final mastery criterion, real-data use, and promotion remains a release gate; it does not block the engineering work described below.
+The following decisions reconcile the detailed target protocol with the U3-U7 code already present in the repository. They are approved for implementation planning by the project owner. Future real-data use and performance claims retain their separately governed data/release gates; they do not block the developer-released controlled demonstration described here.
 
 | ID | Approved decision | Execution owner and proof |
 | --- | --- | --- |
@@ -272,9 +272,9 @@ The following decisions reconcile the detailed target protocol with the U3-U7 co
 | RD4 | Represent BKT ablation input as typed, auditable evidence rather than an unproven attempt-to-float map. It records `sourceAttemptSequence`, `(studentId, subtopicId, skillId)` scope, source attempt/response IDs, BKT version, `pKnownAfterAttempt`, and separately calculated next-response probability. | U4 defines the evidence contract and replay tests; U7 accepts only evidence whose lineage ends at the current attempt. |
 | RD5 | Disable MLP early stopping for the FYP1 comparison. It may be enabled only in a later version with a viable group-disjoint inner validation partition and tests proving no student overlap. | U7 sets a fixed regularized MLP configuration and reports early stopping as disabled. |
 | RD6 | Keep fixture/model-mechanics output separate from the real-data evaluation release report. Only the latter carries PR-AUC where appropriate, BKT ablation, dataset/release metadata, transition and repeat rates, telemetry status, stability, fallback rate, and a promotion decision. | U6 produces the release manifest; U7 produces the release report and blocks promotion when any required evidence is absent. |
-| RD7 | Move adaptive-assignment and weak-topic ranking parameters into immutable YAML configuration. U8 verifies their versions and hashes with the package, feature schema, model artifact, and protected model-approval record before writing derived records. | U5 owns policy loading and fallback semantics; U8 owns bundle parity, authorization, and runtime rejection tests. |
+| RD7 | Move adaptive-assignment and weak-topic ranking parameters into immutable YAML configuration. U8 verifies their versions and hashes with the package, feature schema, model artifact, and protected model-release record before writing derived records. | U5 owns policy loading and fallback semantics; U8 owns bundle parity, authorization, and runtime rejection tests. |
 | RD8 | Extend the approved real-data manifest with consent/ethics reference, steward, protected storage location, collection window, retention/deletion rule, and file hashes. It remains protected project evidence, not repository data. | U6 owns manifest construction and validation before an approved export. |
-| RD9 | U8 remains planned until emulator or cloud evidence proves the automatic job path. All target runtime wording uses `will` or `must`; only U3-U7 mechanics verified in code use `implemented`. | U8 completion requires the automatic attempt-to-job-to-safe-insight demonstration. |
+| RD9 | U8 is implemented and cloud verified because the automatic finalized-attempt job path completed the disposable controlled-demo quiz through safe insight and assignment projections. | Release evidence records the deployed revision, one-claim completion, bounded projections, and exact-record cleanup. |
 | RD10 | The canonical FYP1 plan remains the authority for scope, priority, and dependencies. This companion supplies implementation detail and must map every added control to an existing canonical unit rather than creating a parallel workstream. | The traceability table below is maintained whenever this companion adds a requirement. |
 
 ### Canonical Traceability
@@ -305,7 +305,7 @@ The following decisions reconcile the detailed target protocol with the U3-U7 co
 
 ### Readiness Decision
 
-This companion is implementation-ready because every reconciliation item now has an executable decision, named canonical owner, file boundary, dependency order, and verification outcome. This readiness means an implementer can begin the work; it does not mean the listed changes, real-data evaluation, promotion, or U8 runtime already exist.
+This companion remains the implementation protocol because every reconciliation item has an executable decision, named canonical owner, file boundary, dependency order, and verification outcome. U8 and the developer-released controlled-demo path are implemented and live verified; the separate real-data evaluation and `real_evaluated` release remain future governed work.
 
 Each implementation unit must still reach one of these evidence states before it is described as complete:
 
@@ -506,14 +506,15 @@ same-bank versus cross-bank results, repeated-question rate,
 difficulty-transition appropriateness, fallback/failure rate, and limits.
 Where feasible, report distributions or confidence intervals from repeated
 student-grouped evaluation rather than one isolated split. There is no
-automatic numeric promotion threshold. A named project owner and supervisor
-must review evidence, trade-offs, safety/explanation review, and rollback plan.
-Record approver/date, report/artifact hashes, dataset version,
-target/criterion/schema versions, and promotion/rejection rationale.
+automatic numeric promotion threshold. A future `real_evaluated` release must
+follow its separately governed review of evidence, trade-offs,
+safety/explanation results, and rollback plan. Record the applicable release
+identity/date, report/artifact hashes, dataset version, target/criterion/schema
+versions, and promotion/rejection rationale.
 
 `ModelRegistry` blocks activation unless an artifact is evaluated XGBoost, has
 a passing promotion-gate flag, and matches the frozen target, label version,
-mastery criterion, and feature schema. U8 must persist approval/audit fields;
+mastery criterion, and feature schema. U8 must persist release/audit fields;
 U7 fixtures do not create a real promoted model. Do not promote XGBoost when
 held-out grouped evaluation is unavailable, calibration or false-negative
 behaviour is unacceptable, results are unstable, or it is materially worse than
@@ -529,7 +530,7 @@ samples and presents only a bounded demonstration-evidence label; every later
 audit, uses a compatible separately approved record or BKT/rule fallback, and
 never loads the legacy `.pkl` on bundle/registry/schema mismatch.
 
-### 6. Deployment Test Protocol (U8 Implemented; Live CDM Activation Pending)
+### 6. Deployment Test Protocol (U8 and Live CDM Activation Verified)
 
 ```text
 finalizeQuizSession commits trusted finalized quizAttempts/{attemptId}
@@ -568,13 +569,13 @@ configurations. Parity verification compares file sets and bytes, rejects stale
 vendored files, and recalculates the package, feature-schema, ranking-policy,
 and adaptive-policy hashes without rewriting the checked-in bundle. The model
 binary is not embedded in Functions: the byte-verified deployment manifest in
-the approved model bucket binds the selected native UBJ artifact to those
+the declared model bucket binds the selected native UBJ artifact to those
 runtime hashes.
 
 A controlled record can run only when the deployment explicitly sets
-`AI_MODEL_EVIDENCE_MODE=controlled_demo` and the approved `AI_MODEL_BUCKET`,
+`AI_MODEL_EVIDENCE_MODE=controlled_demo` and the declared `AI_MODEL_BUCKET`,
 and when the one active registry document contains the complete controlled
-provenance, approval, catalogue/configuration/dataset/report, artifact,
+provenance, developer release, catalogue/configuration/dataset/report, artifact,
 package/schema/policy, target, and label bindings. The default
 `real_evaluated_only` mode rejects that record. Disabling controlled mode is
 therefore the immediate safe rollback: the application continues through the
@@ -584,8 +585,9 @@ loading a legacy model.
 Replacement is always an explicit privileged one-active-record registry
 transaction and immutable artifact upload. A future `real_evaluated` model
 requires separately governed pseudonymized data, student-grouped evaluation, a
-real-data report, and a new model-specific approval; controlled-demo approval
-cannot be reused. Existing safe projections retain their original evidence
+real-data report, and a separate release declaration; the controlled-demo
+developer declaration cannot be reused. Existing safe projections retain their
+original evidence
 state and may be regenerated only from a newer trusted finalized attempt or an
 explicitly approved deterministic replay. The detailed candidate status,
 hashes, deployment sequence, rollback boundary, and replacement checklist are
@@ -764,9 +766,9 @@ of these tasks must never be presented as evidence for another.
 - **Goal:** Replace manual post-quiz AI execution with one idempotent automatic backend path.
 - **Requirements:** R4, R10, R11, R12.
 - **Files:** `firebase.json`, `functions/main.py`, `functions/ai_runtime.py`, `functions/requirements.txt`, `functions/vendor/README.md`, `functions/vendor/logic_oasis_ai/`, `tools/build_function_bundle.py`, `tools/deploy_u8_runtime_iam.py`, `tools/tests/test_function_bundle_parity.py`, `tools/tests/test_u8_runtime_identity_contract.py`, `ai_pipeline/logic_oasis_ai/inference.py`, `ai_pipeline/logic_oasis_ai/explain.py`, `ai_pipeline/logic_oasis_ai/sinks/firestore_sink.py`, `ai_pipeline/logic_oasis_ai/model_registry.py`, `ai_pipeline/configs/weak_topic_ranking_v1.yaml`, `ai_pipeline/configs/adaptive_policy_v1.yaml`, `ai_pipeline/tests/test_weak_topic_ranking.py`, `functions/tests/test_ai_runtime.py`, `functions/tests/test_quiz_trigger.py`, and `firestore.rules`.
-- **Approach:** Build the Functions vendor bundle from the authoritative package and expose one finalized-attempt Firestore trigger through `functions/main.py`. The same entry point runs in Firebase Emulator and cloud deployment. It creates or reuses deterministic `aiJobs/{attemptId}`, validates the trusted source, replays BKT by `(sourceAttemptSequence, sequenceIndex)`, and then attempts XGBoost/SHAP only when the active server-only registry matches the bundled package, `quiz-attempt-features-v2`, artifact, weak-topic ranking policy, adaptive policy, prediction target, and label version. The registry also records supervisor approval and evaluation-report evidence. Missing approval, inactive status, any incompatible binding, or model-load failure produces the versioned BKT/rule fallback. Job states are `queued|processing|completed|fallback|failed`; terminal jobs never restart. Event delivery may repeat or overlap, so raw and safe output IDs are deterministic and one final transaction accepts the first compatible terminal result. A projection write commits only when `sourceAttemptSequence` is newer than the current projection. Cloud deployment uses platform event retry and Emulator uses a controlled automatic retry adapter around the same handler. `attemptCount` is bounded at three; exhaustion writes fallback when compatible BKT/rule guidance exists, otherwise failed. Flutter reads only `studentAiStatuses`, `adaptiveAssignments`, and `subtopicMastery`; raw jobs, runs, SHAP arrays, features, registry, hashes, paths, and errors are server-only.
+- **Approach:** Build the Functions vendor bundle from the authoritative package and expose one finalized-attempt Firestore trigger through `functions/main.py`. The same entry point runs in Firebase Emulator and cloud deployment. It creates or reuses deterministic `aiJobs/{attemptId}`, validates the trusted source, replays BKT by `(sourceAttemptSequence, sequenceIndex)`, and then attempts XGBoost/SHAP only when the active server-only registry matches the bundled package, `quiz-attempt-features-v2`, artifact, weak-topic ranking policy, adaptive policy, prediction target, and label version. The registry also records immutable release metadata and evaluation-report evidence. Missing release metadata, inactive status, any incompatible binding, or model-load failure produces the versioned BKT/rule fallback. Job states are `queued|processing|completed|fallback|failed`; terminal jobs never restart. Event delivery may repeat or overlap, so raw and safe output IDs are deterministic and one final transaction accepts the first compatible terminal result. A projection write commits only when `sourceAttemptSequence` is newer than the currently stored projection source. Cloud deployment uses platform event retry and Emulator uses a controlled automatic retry adapter around the same handler. `attemptCount` is bounded at three; exhaustion writes fallback when compatible BKT/rule guidance exists, otherwise failed. Flutter reads only `studentAiStatuses`, `adaptiveAssignments`, and `subtopicMastery`; raw jobs, runs, SHAP arrays, features, registry, hashes, paths, and errors are server-only.
 - **Mandatory deployment spike:** During the first U8 day, deploy or emulate a minimal handler that imports the bundled package, XGBoost, and SHAP and performs one representative inference. Record dependency/deployment success, bundle size, cold-start duration, memory use, and inference duration. If the chosen cloud runtime cannot load the bundle reliably, retain the same automatic Emulator entry point as the FYP1 evidence path and disclose the cloud limitation.
-- **Test scenarios:** A valid attempt creates one safe `processing` status and reaches exactly one matching `completed` status; duplicate delivery creates no duplicate mastery, model-run, status, or assignment documents; transient claims one and two commit retry state then rethrow, while the third claim writes terminal fallback/failed state and returns success; invalid source fails; missing approval, inactive registry, incompatible package/schema/artifact/ranking/adaptive-policy/target/label binding, or model-load failure falls back without legacy-model loading or hardcoded production thresholds; a compatible model produces matching XGBoost/SHAP lineage; delayed attempt A cannot overwrite newer attempt B; terminal jobs do not restart; deployment configuration binds the named U8 service account and rejects the default compute/app-engine account; Rules deny all raw runtime/model data while owner/linked-parent reads access only safe projections.
+- **Test scenarios:** A valid attempt creates one safe `processing` status and reaches exactly one matching `completed` status; duplicate delivery creates no duplicate mastery, model-run, status, or assignment documents; transient claims one and two commit retry state then rethrow, while the third claim writes terminal fallback/failed state and returns success; invalid source fails; missing release metadata, inactive registry, incompatible package/schema/artifact/ranking/adaptive-policy/target/label binding, or model-load failure falls back without legacy-model loading or hardcoded production thresholds; a compatible model produces matching XGBoost/SHAP lineage; delayed attempt A cannot overwrite newer attempt B; terminal jobs do not restart; deployment configuration binds the named U8 service account and rejects the default compute/app-engine account; Rules deny all raw runtime/model data while owner/linked-parent reads access only safe projections.
 - **Verification:** Bundle-parity tests cover the package, feature schema, model artifact, weak-topic ranking policy, and adaptive policy. Firebase Emulator or cloud deployment automatically executes the same packaged `functions/main.py` entry point from a finalized attempt. The deployment-spike report records whether cloud execution was demonstrated and its measured resource/latency results. Firestore Rules tests prove projection-only client access.
 
 #### U8 Completion Contract
@@ -780,7 +782,7 @@ of these tasks must never be presented as evidence for another.
 | Boundary | FYP1 requirement |
 |---|---|
 | Runtime identity | Deploy the U8 trigger with Python `service_account="logic-oasis-ai-runtime@logic-oasis-fyp.iam.gserviceaccount.com"`; grant only project `roles/datastore.user`, model-bucket `roles/storage.objectViewer`, and project `roles/logging.logWriter`. Contract tests reject the default Compute Engine/App Engine identity and broad `Owner`/`Editor` roles. Emulator execution uses the same server code. |
-| Model approval | The server-only `modelRegistry` stores active status, supervisor approval, evaluation-report hash, target/label version, and package/schema/artifact/ranking/adaptive-policy hashes. Clients cannot read or write it. |
+| Model release | The server-only `modelRegistry` stores active status, immutable developer release metadata for the controlled demo, evaluation-report hash, target/label version, and package/schema/artifact/ranking/adaptive-policy hashes. Clients cannot read or write it. |
 | Duplicate and retry safety | Use `attemptId` and deterministic output IDs. One final transaction accepts a compatible terminal result and rejects stale projection updates. Maximum runtime attempts: three. |
 | Client access | Students and linked parents read only safe status, assignment, and mastery/ranking projections; raw jobs, runs, SHAP arrays, features, registry, hashes, paths, and errors are server-only. |
 | Failure behaviour | Preserve the trusted attempt, use compatible BKT/rule guidance when possible, record only a sanitized reason code, and display an honest fallback or failed state. |
@@ -818,7 +820,7 @@ Cloud Tasks dispatch, Cloud Scheduler recovery, distributed leases/fencing, a tr
 | Leakage and label comparability | U7 | No feature or label uses later attempt data; labels use compatible student/year/topic/subtopic/skill/content pairs; same-bank/cross-bank strata and policy versions are reported; rows without a later eligible attempt are censored. |
 | Fair comparison | U7 | Decision Tree, XGBoost, and MLP share the reduced `quiz-attempt-features-v2` target, student-grouped split, metrics, seed, and limitation statement; same-bank/cross-bank, repeated-question, telemetry, and grouped-stopping evidence are reported. |
 | BKT sequential assessment | U4, U6-U8 | One-step-ahead chronological replay sorts each state by `(sourceAttemptSequence, sequenceIndex)`, scores BKT-derived predicted correctness rather than raw mastery, and retains typed evidence ending at the current response. |
-| Promotion and deployment parity | U7-U8, CDM | Runtime loads only an evaluated active XGBoost artifact whose package, `quiz-attempt-features-v2`, model-artifact, ranking-policy, adaptive-policy, target, and label bindings match the server-only supervisor-approved registry. Controlled-demo activation additionally binds its dataset, catalogue, configuration, report, evidence scope, deployment mode, and approved bucket; source/vendor parity is byte-checked. Otherwise the runtime uses fallback. |
+| Promotion and deployment parity | U7-U8, CDM | Runtime loads only an evaluated active XGBoost artifact whose package, `quiz-attempt-features-v2`, model-artifact, ranking-policy, adaptive-policy, target, and label bindings match the server-only released registry. Controlled-demo activation additionally binds its developer declaration, dataset, catalogue, configuration, report, evidence scope, deployment mode, and declared bucket; source/vendor parity is byte-checked. Otherwise the runtime uses fallback. |
 | Risk and explanation integrity | U7-U9 | Risk threshold/calibration evidence is versioned, and SHAP values reconstruct the matching promoted-model output before safe text is displayed. |
 | Ranking projection integrity | U8-U9 | A versioned policy keeps weakness severity separate from evidence reliability; delayed older attempts cannot overwrite a newer `subtopicMastery` source, and incompatible ranking versions are not cross-ordered. |
 | Runtime idempotency and reconciliation | U8 | Platform event delivery or the Emulator retry adapter invokes the same handler up to three runtime attempts. Deterministic IDs and one terminal transaction prevent duplicate outputs; partial failures either retry automatically or end in declared fallback/failed state. |
@@ -865,10 +867,10 @@ Expected commands as each unit becomes active are `py -3.11 -m unittest discover
   never falls back to hardcoded weights or thresholds.
 - The controlled-demonstration release evidence records the selected native
   UBJ and manifest hashes, source/vendor parity, deployment mode/bucket, bounded
-  SHAP reconstruction samples, approval boundary, safe disable route, and the
+  SHAP reconstruction samples, developer-release boundary, safe disable route, and the
   separately governed `real_evaluated` replacement checklist. Repository
-  evidence never substitutes for a genuine model-specific approval or live
-  registry/deployment record.
+  evidence never substitutes for a separately governed real-data release or
+  live registry/deployment record.
 - U7 reports student/attempt counts, PR-AUC where appropriate, grouped-result
   stability where feasible, same-bank/cross-bank and repeated-question
   evidence, telemetry readiness, fallback/failure rate, and an explicit
