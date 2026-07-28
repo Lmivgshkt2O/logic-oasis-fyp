@@ -96,10 +96,19 @@ class PredictionContractTests(unittest.TestCase):
         example = SupervisedExample(
             attempt_id="a", student_key="student", subtopic_id="subtopic", observed_at=NOW,
             features={"correct_rate": 0.6, "mean_response_time_ms": 1000.0, "hint_count": 0.0},
-            target=False, contract=PredictionContract(), provenance="synthetic_test",
+            target=False, contract=PredictionContract(), provenance="synthetic_test", evaluation_group_key="student",
         )
         with self.assertRaisesRegex(ValueError, "future or undeclared"):
             feature_names((example,))
+
+    def test_evaluation_group_defaults_to_student_for_existing_callers(self):
+        example = SupervisedExample(
+            attempt_id="a", student_key="student", subtopic_id="subtopic", observed_at=NOW,
+            features={"correct_rate": 0.6, "mean_response_time_ms": 1000.0},
+            target=False, contract=PredictionContract(), provenance="synthetic_test",
+        )
+
+        self.assertEqual(example.evaluation_group_key, "student")
 
     def test_grouped_split_never_shares_student_and_uses_declared_seed(self):
         examples = synthetic_examples()
@@ -122,6 +131,21 @@ class PredictionContractTests(unittest.TestCase):
             evaluate_fair_comparison(synthetic_examples(), random_seed=7, allow_synthetic_test=True)
         with self.assertRaisesRegex(ValueError, "only approved real"):
             build_supervised_examples((replace(feature_attempt(1, 0, 0.5), provenance="emulator_verified"),))
+
+    def test_controlled_demo_provenance_requires_its_dedicated_flag(self):
+        rows = tuple(
+            replace(row, provenance="expert_authored_controlled_demo")
+            for row in fixture_attempts(1)
+        )
+        with self.assertRaisesRegex(ValueError, "only approved real"):
+            build_supervised_examples(rows)
+        with self.assertRaisesRegex(ValueError, "only approved real"):
+            build_supervised_examples(rows, allow_synthetic_test=True)
+
+        examples = build_supervised_examples(rows, allow_controlled_demo=True)
+
+        self.assertEqual(len(examples), 2)
+        self.assertEqual(assess_data_sufficiency(examples).claim_level, "controlled_demonstration_only")
 
     def test_typed_bkt_ablation_requires_current_lineage_and_identical_rows(self):
         rows = fixture_attempts()

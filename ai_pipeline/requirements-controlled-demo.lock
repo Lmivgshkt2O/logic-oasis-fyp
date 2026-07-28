@@ -1,0 +1,9 @@
+# Exact toolchain used to reproduce the controlled-demo-xgboost-v1 release candidate.
+# Python 3.11.9 on Windows-10-10.0.26200-SP0.
+joblib==1.5.3
+numpy==2.4.6
+pandas==3.0.3
+PyYAML==6.0.3
+scikit-learn==1.9.0
+shap==0.51.0
+xgboost==3.2.0

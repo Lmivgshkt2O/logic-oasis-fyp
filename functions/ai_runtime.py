@@ -8,6 +8,7 @@ paths, hashes, feature vectors, raw SHAP values, or exception text.
 
 from __future__ import annotations
 
+from collections import OrderedDict
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from hashlib import sha256
@@ -15,6 +16,7 @@ import json
 from pathlib import Path
 from contextlib import contextmanager
 from tempfile import TemporaryDirectory
+from threading import RLock
 from typing import Any, Mapping, Protocol
 
 import yaml
@@ -26,6 +28,20 @@ from logic_oasis_ai.bkt import build_bkt_materialization
 from logic_oasis_ai.explain import explain_prediction
 from logic_oasis_ai.features import BASE_FEATURE_NAMES, FEATURE_SCHEMA_VERSION, build_attempt_features
 from logic_oasis_ai.inference import InferenceContractError, predict_support_risk
+from logic_oasis_ai.model_registry import (
+    CONTROLLED_DEMO_RELEASE_SCOPE,
+    CONTROLLED_DEMO_DEPLOYMENT_SCOPE,
+    CONTROLLED_DEMO_EVIDENCE_LEVEL,
+    CONTROLLED_DEMO_PROVENANCE,
+    CONTROLLED_DEMO_RELEASE_RATIONALE_MARKER,
+    REAL_EVALUATED_DEPLOYMENT_SCOPE,
+    SHA256_PATTERN,
+    controlled_demo_object_paths,
+)
+from logic_oasis_ai.native_xgboost import (
+    NativeXGBoostContractError,
+    predict_and_explain_native_xgboost,
+)
 from logic_oasis_ai.sinks.firestore_sink import (
     adaptive_assignment_id, is_newer_projection, mastery_snapshot_id,
     safe_status_document, subtopic_mastery_id,
@@ -38,12 +54,17 @@ AI_RUNTIME_SERVICE_ACCOUNT = "logic-oasis-ai-runtime@logic-oasis-fyp.iam.gservic
 TERMINAL_STATES = frozenset({"completed", "fallback", "failed"})
 MAX_RUNTIME_ATTEMPTS = 3
 FALLBACK_CODES = frozenset({
-    "model_registry_missing", "model_registry_inactive", "approval_missing",
+    "model_registry_missing", "model_registry_inactive", "release_missing",
     "bundle_mismatch", "artifact_hash_mismatch", "model_load_failed",
     "shap_load_failed", "feature_schema_incompatible", "model_target_incompatible",
     "policy_unavailable", "artifact_unavailable", "artifact_hash_invalid", "model_prediction_invalid", "shap_output_invalid",
+    "model_evidence_incompatible",
 })
 SAFE_ERROR_CODES = FALLBACK_CODES | frozenset({"trusted_source_invalid", "runtime_exhausted"})
+CONTROLLED_DEMO_MODE = "controlled_demo"
+REAL_EVALUATED_ONLY_MODE = "real_evaluated_only"
+ALLOWED_EVIDENCE_MODES = frozenset({CONTROLLED_DEMO_MODE, REAL_EVALUATED_ONLY_MODE})
+CONTROLLED_DEMO_NATIVE_CACHE_SIZE = 2
 
 
 class RuntimeFailure(RuntimeError):
@@ -68,9 +89,17 @@ class RuntimeBundle:
     ranking_policy_sha256: str
     adaptive_policy_path: Path
     artifact_root: Path
+    evidence_mode: str
+    model_bucket: str
 
     @classmethod
-    def from_runtime_root(cls, root: str | Path) -> "RuntimeBundle":
+    def from_runtime_root(
+        cls,
+        root: str | Path,
+        *,
+        evidence_mode: str = REAL_EVALUATED_ONLY_MODE,
+        model_bucket: str = "",
+    ) -> "RuntimeBundle":
         root_path = Path(root).resolve()
         package = root_path / "logic_oasis_ai"
         feature_schema = root_path / "configs" / "feature_schema.yaml"
@@ -85,7 +114,24 @@ class RuntimeBundle:
             ranking_policy_sha256=_file_sha256(ranking),
             adaptive_policy_path=adaptive,
             artifact_root=(root_path / "models").resolve(),
+            evidence_mode=evidence_mode,
+            model_bucket=model_bucket.removeprefix("gs://").rstrip("/"),
         )
+
+
+class _ControlledDemoNativeRuntime:
+    """One immutable native model/explainer pair safe for warm-instance reuse."""
+
+    def __init__(self, model: Any, explainer: Any) -> None:
+        self.model = model
+        self.explainer = explainer
+        self.lock = RLock()
+
+
+_CONTROLLED_DEMO_NATIVE_CACHE: OrderedDict[
+    tuple[str, str], _ControlledDemoNativeRuntime
+] = OrderedDict()
+_CONTROLLED_DEMO_NATIVE_CACHE_LOCK = RLock()
 
 
 class RuntimeGateway(Protocol):
@@ -124,8 +170,20 @@ def process_finalized_attempt(attempt_id: str, *, gateway: RuntimeGateway, bundl
         support_risk, model_run = _supervised_or_fallback(attempt, dataset, gateway.active_registry(), bundle)
         state = "completed" if model_run["status"] == "completed" else "fallback"
         primary = current[0]
-        assignment = _assignment(attempt, primary.mastery_probability, primary.evidence_count,
-                                 support_risk, gateway.banks(attempt), bundle)
+        model_evidence_state = model_run.get("modelEvidenceState")
+        assignment = _assignment(
+            attempt,
+            primary.mastery_probability,
+            primary.evidence_count,
+            support_risk,
+            gateway.banks(attempt),
+            bundle,
+            model_evidence_state=(
+                model_evidence_state
+                if model_evidence_state == CONTROLLED_DEMO_EVIDENCE_LEVEL
+                else None
+            ),
+        )
         mastery = _subtopic_mastery(attempt, primary, support_risk, bundle)
         return gateway.finalize(attempt, state=state, code=model_run["statusCode"], raw_run=model_run,
                                 snapshots=snapshots, assignment=assignment, mastery=mastery)
@@ -172,33 +230,146 @@ def _supervised_or_fallback(attempt: Mapping[str, Any], dataset: Any, registry: 
         row = next(item for item in rows if item.source_attempt_sequence == attempt["sourceAttemptSequence"])
     except StopIteration:
         row = rows[-1]
+    row_feature_values = row.to_model_features()
     try:
-        with _approved_artifact_path(bundle, registry) as artifact_path:
-            prediction = predict_support_risk(artifact_path, expected_sha256=registry["artifactSha256"],
-                                              feature_names=BASE_FEATURE_NAMES, feature_values=row.to_model_features())
-            explanation = explain_prediction(str(artifact_path), expected_sha256=registry["artifactSha256"],
-                                             feature_names=BASE_FEATURE_NAMES, feature_values=prediction.feature_values)
+        with _released_artifact_path(bundle, registry) as artifact_path:
+            if registry.get("deploymentScope") == CONTROLLED_DEMO_DEPLOYMENT_SCOPE:
+                support_risk, shap_values, shap_expected_value = _controlled_demo_prediction_and_explanation(
+                    artifact_path,
+                    feature_values=row_feature_values,
+                    artifact_sha256=str(registry["artifactSha256"]),
+                    manifest_sha256=str(registry["artifactManifestSha256"]),
+                )
+                feature_values = {
+                    name: float(row_feature_values[name])
+                    for name in BASE_FEATURE_NAMES
+                }
+            else:
+                prediction = predict_support_risk(artifact_path, expected_sha256=registry["artifactSha256"],
+                                                   feature_names=BASE_FEATURE_NAMES, feature_values=row_feature_values)
+                explanation = explain_prediction(str(artifact_path), expected_sha256=registry["artifactSha256"],
+                                                 feature_names=BASE_FEATURE_NAMES, feature_values=prediction.feature_values)
+                support_risk = prediction.support_risk
+                shap_values = dict(explanation.values)
+                shap_expected_value = explanation.expected_value
+                feature_values = dict(prediction.feature_values)
     except (InferenceContractError, RuntimeFailure) as error:
         return None, _fallback_run(attempt, str(error))
-    return prediction.support_risk, {
+    model_evidence_state = (
+        CONTROLLED_DEMO_EVIDENCE_LEVEL
+        if registry.get("deploymentScope") == CONTROLLED_DEMO_DEPLOYMENT_SCOPE
+        else None
+    )
+    return support_risk, {
         "attemptId": attempt["attemptId"], "studentId": attempt["studentId"], "status": "completed",
         "statusCode": "model_completed", "modelVersion": registry["modelVersion"],
         "featureSchemaVersion": FEATURE_SCHEMA_VERSION, "predictionTarget": registry["predictionTarget"],
-        "labelVersion": registry["labelVersion"], "supportRisk": prediction.support_risk,
-        "featureValues": dict(prediction.feature_values), "shapValues": dict(explanation.values),
-        "shapExpectedValue": explanation.expected_value, "sourceAttemptSequence": attempt["sourceAttemptSequence"],
-        "approvalId": registry["approvalId"], "dataSource": "runtime_callable",
+        "labelVersion": registry["labelVersion"], "supportRisk": support_risk,
+        "featureValues": feature_values, "shapValues": shap_values,
+        "shapExpectedValue": shap_expected_value, "sourceAttemptSequence": attempt["sourceAttemptSequence"],
+        "releaseId": registry["releaseId"], "dataSource": "runtime_callable",
+        **({"modelEvidenceState": model_evidence_state} if model_evidence_state else {}),
     }
+
+
+def _controlled_demo_prediction_and_explanation(
+    artifact_path: Path,
+    *,
+    feature_values: Mapping[str, float],
+    artifact_sha256: str,
+    manifest_sha256: str,
+) -> tuple[float, Mapping[str, float], float]:
+    """Load one verified native UBJ model and derive its prediction and Tree SHAP."""
+    try:
+        import numpy as np
+
+        matrix = np.asarray([[float(feature_values[name]) for name in BASE_FEATURE_NAMES]])
+    except Exception as error:
+        raise InferenceContractError("model_load_failed") from error
+    runtime = _controlled_demo_native_runtime(
+        artifact_path,
+        artifact_sha256=artifact_sha256,
+        manifest_sha256=manifest_sha256,
+    )
+    try:
+        # XGBoost/TreeExplainer do not declare concurrent-call safety. Serialize
+        # use of one cached pair while allowing different immutable pairs to run.
+        with runtime.lock:
+            explanation = predict_and_explain_native_xgboost(
+                runtime.model,
+                matrix,
+                feature_names=BASE_FEATURE_NAMES,
+                explainer_factory=lambda _model: runtime.explainer,
+            )
+    except NativeXGBoostContractError as error:
+        if error.code in {"model_target_incompatible", "model_prediction_invalid"}:
+            raise InferenceContractError(error.code) from error
+        if error.code == "shap_load_failed":
+            raise InferenceContractError("shap_load_failed") from error
+        raise InferenceContractError("shap_output_invalid") from error
+    except Exception as error:
+        raise InferenceContractError("shap_load_failed") from error
+    return (
+        round(explanation.support_risks[0], 8),
+        {name: round(value, 8) for name, value in zip(BASE_FEATURE_NAMES, explanation.shap_values[0])},
+        explanation.expected_values[0],
+    )
+
+
+def _controlled_demo_native_runtime(
+    artifact_path: Path,
+    *,
+    artifact_sha256: str,
+    manifest_sha256: str,
+) -> _ControlledDemoNativeRuntime:
+    """Reuse only a pair whose artifact and manifest were verified this call."""
+    key = (artifact_sha256, manifest_sha256)
+    with _CONTROLLED_DEMO_NATIVE_CACHE_LOCK:
+        cached = _CONTROLLED_DEMO_NATIVE_CACHE.get(key)
+        if cached is not None:
+            _CONTROLLED_DEMO_NATIVE_CACHE.move_to_end(key)
+            return cached
+        loaded = _load_controlled_demo_native_runtime(artifact_path)
+        _CONTROLLED_DEMO_NATIVE_CACHE[key] = loaded
+        _CONTROLLED_DEMO_NATIVE_CACHE.move_to_end(key)
+        while len(_CONTROLLED_DEMO_NATIVE_CACHE) > CONTROLLED_DEMO_NATIVE_CACHE_SIZE:
+            _CONTROLLED_DEMO_NATIVE_CACHE.popitem(last=False)
+        return loaded
+
+
+def _load_controlled_demo_native_runtime(
+    artifact_path: Path,
+) -> _ControlledDemoNativeRuntime:
+    try:
+        from xgboost import XGBClassifier
+
+        model = XGBClassifier()
+        model.load_model(str(artifact_path))
+    except Exception as error:
+        raise InferenceContractError("model_load_failed") from error
+    try:
+        import shap
+
+        explainer = shap.TreeExplainer(model)
+    except Exception as error:
+        raise InferenceContractError("shap_load_failed") from error
+    return _ControlledDemoNativeRuntime(model, explainer)
+
+
+def _clear_controlled_demo_native_cache() -> None:
+    """Reset warm-instance state for deterministic isolated tests."""
+    with _CONTROLLED_DEMO_NATIVE_CACHE_LOCK:
+        _CONTROLLED_DEMO_NATIVE_CACHE.clear()
 
 
 def _registry_mismatch(registry: Mapping[str, Any], bundle: RuntimeBundle) -> str | None:
     if registry.get("isActive") is not True or registry.get("lifecycleStatus") != "promoted":
         return "model_registry_inactive"
     if not all(registry.get(key) for key in (
-        "approvalId", "approvedBy", "approvedAt", "approvalRationale", "evaluationReportSha256",
-        "artifactManifestSha256",
+        "releaseId", "releasedBy", "releasedAt", "releaseRationale", "evaluationReportSha256",
+        "artifactManifestSha256", "promotedAt",
     )):
-        return "approval_missing"
+        return "release_missing"
     expected = {
         "packageSha256": bundle.package_sha256, "featureSchemaVersion": FEATURE_SCHEMA_VERSION,
         "featureSchemaSha256": bundle.feature_schema_sha256,
@@ -213,28 +384,102 @@ def _registry_mismatch(registry: Mapping[str, Any], bundle: RuntimeBundle) -> st
         return "model_target_incompatible"
     if not registry.get("artifactSha256") or not registry.get("artifactPath"):
         return "artifact_unavailable"
+    return _evidence_mismatch(registry, bundle)
+
+
+def _evidence_mismatch(registry: Mapping[str, Any], bundle: RuntimeBundle) -> str | None:
+    if bundle.evidence_mode not in ALLOWED_EVIDENCE_MODES:
+        return "model_evidence_incompatible"
+    if bundle.evidence_mode == CONTROLLED_DEMO_MODE:
+        return _controlled_demo_evidence_mismatch(registry, bundle)
+    return _real_evidence_mismatch(registry, bundle)
+
+
+def _controlled_demo_evidence_mismatch(
+    registry: Mapping[str, Any], bundle: RuntimeBundle
+) -> str | None:
+    expected = {
+        "trainingDataProvenance": CONTROLLED_DEMO_PROVENANCE,
+        "evidenceLevel": CONTROLLED_DEMO_EVIDENCE_LEVEL,
+        "releaseScope": CONTROLLED_DEMO_RELEASE_SCOPE,
+        "deploymentScope": CONTROLLED_DEMO_DEPLOYMENT_SCOPE,
+    }
+    if any(registry.get(field) != value for field, value in expected.items()):
+        return "model_evidence_incompatible"
+    if any(
+        not isinstance(registry.get(field), str)
+        or not SHA256_PATTERN.fullmatch(str(registry[field]))
+        for field in (
+            "trainingDatasetSha256", "scenarioCatalogueSha256", "controlledDemoConfigSha256",
+        )
+    ):
+        return "model_evidence_incompatible"
+    if not isinstance(registry.get("trainingDatasetVersion"), str) or not registry["trainingDatasetVersion"]:
+        return "model_evidence_incompatible"
+    rationale = registry.get("releaseRationale")
+    if not isinstance(rationale, str) or CONTROLLED_DEMO_RELEASE_RATIONALE_MARKER not in rationale.lower():
+        return "model_evidence_incompatible"
+    try:
+        paths = controlled_demo_object_paths(
+            f"gs://{bundle.model_bucket}", registry.get("modelVersion")
+        )
+    except ValueError:
+        return "artifact_unavailable"
+    if (registry.get("artifactPath"), registry.get("artifactManifestPath")) != paths:
+        return "artifact_unavailable"
+    return None
+
+
+def _real_evidence_mismatch(registry: Mapping[str, Any], bundle: RuntimeBundle) -> str | None:
+    if registry.get("deploymentScope") == CONTROLLED_DEMO_DEPLOYMENT_SCOPE:
+        return "model_evidence_incompatible"
+    expected_real = {
+        "trainingDataProvenance": "approved_pseudonymized_real",
+        "evidenceLevel": "real_evaluated",
+        "releaseScope": "real_evaluated",
+        "deploymentScope": REAL_EVALUATED_DEPLOYMENT_SCOPE,
+    }
+    evidence_values = tuple(registry.get(field) for field in expected_real)
+    if any(value is not None for value in evidence_values) and any(
+        registry.get(field) != value for field, value in expected_real.items()
+    ):
+        return "model_evidence_incompatible"
+    artifact_path = str(registry.get("artifactPath", ""))
+    if not bundle.model_bucket or not artifact_path.startswith(f"gs://{bundle.model_bucket}/"):
+        return "artifact_unavailable"
     return None
 
 
 @contextmanager
-def _approved_artifact_path(bundle: RuntimeBundle, registry: Mapping[str, Any]):
+def _released_artifact_path(bundle: RuntimeBundle, registry: Mapping[str, Any]):
     """Download approved GCS bytes to a short-lived verified local path.
 
     The registry may use ``gs://bucket/object`` only; relative paths remain an
     emulator-only bundle fixture.  Both model and manifest bytes are checked
-    before the caller can pass the model to joblib.
+    before native UBJ loading or the legacy real-evaluated joblib path.
     """
     artifact_path = str(registry["artifactPath"])
     with TemporaryDirectory(prefix="logic-oasis-model-") as temporary:
         root = Path(temporary)
-        candidate, manifest = root / "model.joblib", root / "model.manifest.json"
+        artifact_name = "model.ubj" if registry.get("deploymentScope") == CONTROLLED_DEMO_DEPLOYMENT_SCOPE else "model.joblib"
+        candidate, manifest = root / artifact_name, root / "model.manifest.json"
         if artifact_path.startswith("gs://"):
             try:
                 from firebase_admin import storage
                 bucket_name, object_name = artifact_path[5:].split("/", 1)
+                manifest_path = registry.get("artifactManifestPath")
+                if manifest_path:
+                    manifest_prefix = f"gs://{bucket_name}/"
+                    if not isinstance(manifest_path, str) or not manifest_path.startswith(manifest_prefix):
+                        raise ValueError("manifest must use the approved artifact bucket")
+                    manifest_object = manifest_path.removeprefix(manifest_prefix)
+                    if not manifest_object:
+                        raise ValueError("manifest object path is missing")
+                else:
+                    manifest_object = object_name + ".manifest.json"
                 bucket = storage.bucket(bucket_name)
                 candidate.write_bytes(bucket.blob(object_name).download_as_bytes())
-                manifest.write_bytes(bucket.blob(object_name + ".manifest.json").download_as_bytes())
+                manifest.write_bytes(bucket.blob(manifest_object).download_as_bytes())
             except Exception as error:
                 raise RuntimeFailure("artifact_unavailable", fallback_available=True) from error
         else:
@@ -252,18 +497,49 @@ def _approved_artifact_path(bundle: RuntimeBundle, registry: Mapping[str, Any]):
             declared = json.loads(manifest.read_text(encoding="utf-8"))
         except (OSError, ValueError) as error:
             raise RuntimeFailure("artifact_hash_mismatch", fallback_available=True) from error
-        bindings = {"artifactSha256": registry["artifactSha256"], "modelVersion": registry["modelVersion"],
-                    "featureSchemaVersion": FEATURE_SCHEMA_VERSION, "featureSchemaSha256": bundle.feature_schema_sha256,
-                    "packageSha256": bundle.package_sha256, "weakTopicRankingPolicySha256": bundle.ranking_policy_sha256,
-                    "adaptivePolicySha256": bundle.adaptive_policy_sha256, "predictionTarget": registry["predictionTarget"],
-                    "labelVersion": registry["labelVersion"]}
+        if not isinstance(declared, Mapping):
+            raise RuntimeFailure("artifact_hash_mismatch", fallback_available=True)
+        if registry.get("deploymentScope") == CONTROLLED_DEMO_DEPLOYMENT_SCOPE:
+            bindings = {
+                "bundleSchemaVersion": "controlled-demo-xgboost-bundle-v1",
+                "modelType": "xgboost",
+                "modelVersion": registry["modelVersion"],
+                "artifactFile": "model.ubj",
+                "artifactSha256": registry["artifactSha256"],
+                "targetName": registry["predictionTarget"],
+                "labelVersion": registry["labelVersion"],
+                "featureSchemaVersion": FEATURE_SCHEMA_VERSION,
+                "featureNames": list(BASE_FEATURE_NAMES),
+                "trainingDatasetVersion": registry["trainingDatasetVersion"],
+                "trainingDatasetSha256": registry["trainingDatasetSha256"],
+                "trainingDataProvenance": CONTROLLED_DEMO_PROVENANCE,
+                "scenarioCatalogueSha256": registry["scenarioCatalogueSha256"],
+                "featureSchemaSha256": bundle.feature_schema_sha256,
+                "controlledDemoConfigSha256": registry["controlledDemoConfigSha256"],
+                "evaluationReportSha256": registry["evaluationReportSha256"],
+                "evaluationStatus": "evaluated",
+                "evidenceLevel": CONTROLLED_DEMO_EVIDENCE_LEVEL,
+                "claimLevel": "controlled_demonstration_only",
+                "deploymentScope": CONTROLLED_DEMO_DEPLOYMENT_SCOPE,
+                "packageSha256": bundle.package_sha256,
+                "weakTopicRankingPolicySha256": bundle.ranking_policy_sha256,
+                "adaptivePolicySha256": bundle.adaptive_policy_sha256,
+                "predictionTarget": registry["predictionTarget"],
+            }
+        else:
+            bindings = {"artifactSha256": registry["artifactSha256"], "modelVersion": registry["modelVersion"],
+                        "featureSchemaVersion": FEATURE_SCHEMA_VERSION, "featureSchemaSha256": bundle.feature_schema_sha256,
+                        "packageSha256": bundle.package_sha256, "weakTopicRankingPolicySha256": bundle.ranking_policy_sha256,
+                        "adaptivePolicySha256": bundle.adaptive_policy_sha256, "predictionTarget": registry["predictionTarget"],
+                        "labelVersion": registry["labelVersion"]}
         if any(declared.get(key) != value for key, value in bindings.items()):
             raise RuntimeFailure("artifact_hash_mismatch", fallback_available=True)
         yield candidate
 
 
 def _assignment(attempt: Mapping[str, Any], mastery: float, evidence: int, support_risk: float | None,
-                banks: list[Mapping[str, Any]], bundle: RuntimeBundle) -> Mapping[str, Any] | None:
+                banks: list[Mapping[str, Any]], bundle: RuntimeBundle, *,
+                model_evidence_state: str | None = None) -> Mapping[str, Any] | None:
     try:
         policy = load_adaptive_policy_config(bundle.adaptive_policy_path)
         eligible = [EligibleBank(bank_id=str(bank["bankId"]), difficulty=Difficulty(str(bank["difficultyLevel"])),
@@ -281,7 +557,8 @@ def _assignment(attempt: Mapping[str, Any], mastery: float, evidence: int, suppo
             # `startQuizSession` consumes only assignments whose lineage can
             # be traced to this trusted callable-finalized attempt. Seed/demo
             # rows and manually shaped records are never a normal runtime path.
-            "dataSource": "runtime_callable"}
+            "dataSource": "runtime_callable",
+            **({"modelEvidenceState": model_evidence_state} if model_evidence_state else {})}
 
 
 def _subtopic_mastery(attempt: Mapping[str, Any], snapshot: Any, risk: float | None, bundle: RuntimeBundle) -> dict[str, Any]:
@@ -535,13 +812,18 @@ class FirestoreRuntimeGateway:
                     str(attempt["studentId"]), str(attempt["subtopicId"])))
                 existing = ref.get(transaction=transaction)
                 if is_newer_projection(sequence, _snapshot_dict(existing)):
-                    projection_writes.append((ref, {**assignment, "updatedAt": now}))
+                    assignment_projection = {**assignment, "updatedAt": now}
+                    if "modelEvidenceState" not in assignment_projection:
+                        assignment_projection["modelEvidenceState"] = firestore.DELETE_FIELD
+                    projection_writes.append((ref, assignment_projection))
             # Firestore transactions require every read to occur before the first write.
             transaction.set(run_ref, {**raw_run, "createdAt": now}, merge=True)
             for ref, document in projection_writes:
                 transaction.set(ref, document, merge=True)
             display = {"completed": "analysis_completed", "fallback": "analysis_fallback", "failed": "analysis_failed"}[state]
             status = safe_status_document(attempt=attempt, analysis_state=state, display_code=display)
+            if raw_run.get("modelEvidenceState") == CONTROLLED_DEMO_EVIDENCE_LEVEL:
+                status["modelEvidenceState"] = CONTROLLED_DEMO_EVIDENCE_LEVEL
             status["updatedAt"] = now
             transaction.set(status_ref, status, merge=True)
             transaction.set(job_ref, {"status": state, "errorCode": code if state != "completed" else None,

@@ -29,7 +29,7 @@ void main() {
         displayName: 'Aiman',
         yearLevel: 4,
       );
-      final snapshot = ParentDashboardSnapshot(
+      const snapshot = ParentDashboardSnapshot(
         attempts: const [],
         masteryRecordCount: 1,
         aiDiagnoses: const [
@@ -41,6 +41,7 @@ void main() {
             displayCode: 'analysis_complete',
             masteryProbability: .6,
             evidenceLevel: 'preliminary',
+            modelEvidenceState: 'controlled_demonstration',
             observationCount: 1,
           ),
         ],
@@ -69,10 +70,68 @@ void main() {
       expect(find.text('Safe learning updates for Aiman.'), findsOneWidget);
       expect(find.text('Practice focus ready'), findsOneWidget);
       expect(
+        find.textContaining('controlled demonstration model'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('not real-world validated'), findsOneWidget);
+      expect(
+        find.text('Fallback advice uses server-confirmed quiz progress.'),
+        findsNothing,
+      );
+      expect(
         find.textContaining('2 questions, 1 answers, and 3 helpful marks.'),
         findsOneWidget,
       );
       expect(find.textContaining('No quiz activity yet'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'parent dashboard shows fallback advice only for fallback state',
+    (tester) async {
+      const child = LinkedChildContext(
+        studentId: 'student_fallback',
+        displayName: 'Bela',
+        yearLevel: 5,
+      );
+      const snapshot = ParentDashboardSnapshot(
+        attempts: const [],
+        masteryRecordCount: 1,
+        aiDiagnoses: const [
+          AiDiagnosis(
+            attemptId: 'attempt_fallback',
+            studentId: 'student_fallback',
+            sourceAttemptSequence: 1,
+            analysisState: 'fallback',
+            displayCode: 'analysis_fallback',
+            masteryProbability: .6,
+            evidenceLevel: 'preliminary',
+            observationCount: 1,
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: ParentDashboardPage(
+            state: AppState(persistQuizResults: false),
+            linkedChildrenGateway: const _LinkedChildrenGateway([child]),
+            dashboardLoader: (_) async => snapshot,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Fallback advice uses server-confirmed quiz progress.'),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('controlled demonstration model'),
+        findsNothing,
+      );
     },
   );
 
@@ -115,7 +174,7 @@ void main() {
       yearLevel: 5,
     );
     final firstLoad = Completer<ParentDashboardSnapshot>();
-    final belaSnapshot = ParentDashboardSnapshot(
+    const belaSnapshot = ParentDashboardSnapshot(
       attempts: const [],
       masteryRecordCount: 2,
       aiDiagnoses: const [],
@@ -128,8 +187,9 @@ void main() {
         home: ParentDashboardPage(
           state: AppState(persistQuizResults: false),
           linkedChildrenGateway: const _LinkedChildrenGateway([childA, childB]),
-          dashboardLoader: (child) =>
-              child.studentId == childA.studentId ? firstLoad.future : Future.value(belaSnapshot),
+          dashboardLoader: (child) => child.studentId == childA.studentId
+              ? firstLoad.future
+              : Future.value(belaSnapshot),
         ),
       ),
     );
@@ -150,6 +210,9 @@ void main() {
     await tester.pump();
 
     expect(find.text('Safe learning updates for Bela.'), findsOneWidget);
-    expect(find.text('Safe learner updates are temporarily unavailable.'), findsNothing);
+    expect(
+      find.text('Safe learner updates are temporarily unavailable.'),
+      findsNothing,
+    );
   });
 }

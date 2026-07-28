@@ -44,6 +44,45 @@ void main() {
     expect(diagnosis.supportingReason, 'Try one short guided practice next.');
     expect(diagnosis.childFacingStatus, contains('quiz progress'));
     expect(diagnosis.hasCompatibleRanking, isTrue);
+    expect(diagnosis.usesControlledDemonstrationModel, isFalse);
+  });
+
+  test('ignores an unknown model evidence state', () {
+    final diagnosis = AiDiagnosis.fromSafeProjection('attempt_001', {
+      'studentId': 'student_aiman_y4',
+      'sourceAttemptSequence': 1,
+      'analysisState': 'completed',
+      'displayCode': 'analysis_completed',
+      'modelEvidenceState': 'unreviewed_experiment',
+    })!;
+
+    expect(diagnosis.modelEvidenceState, isNull);
+    expect(diagnosis.usesControlledDemonstrationModel, isFalse);
+  });
+
+  test('accepts controlled model evidence on a completed analysis', () {
+    final diagnosis = AiDiagnosis.fromSafeProjection('attempt_001', {
+      'studentId': 'student_aiman_y4',
+      'sourceAttemptSequence': 1,
+      'analysisState': 'completed',
+      'displayCode': 'analysis_completed',
+      'modelEvidenceState': 'controlled_demonstration',
+    })!;
+
+    expect(diagnosis.modelEvidenceState, 'controlled_demonstration');
+    expect(diagnosis.usesControlledDemonstrationModel, isTrue);
+  });
+
+  test('ignores model evidence on a non-model fallback result', () {
+    final diagnosis = AiDiagnosis.fromSafeProjection('attempt_001', {
+      'studentId': 'student_aiman_y4',
+      'sourceAttemptSequence': 1,
+      'analysisState': 'fallback',
+      'displayCode': 'analysis_fallback',
+      'modelEvidenceState': 'controlled_demonstration',
+    })!;
+
+    expect(diagnosis.modelEvidenceState, isNull);
   });
 
   test('rejects malformed safe status instead of inventing advice', () {
@@ -58,21 +97,24 @@ void main() {
     );
   });
 
-  test('newer source sequence wins even when a delayed status arrives later', () {
-    final earlier = AiDiagnosis.fromSafeProjection('attempt_001', {
-      'studentId': 'student_aiman_y4',
-      'sourceAttemptSequence': 1,
-      'analysisState': 'completed',
-      'displayCode': 'analysis_completed',
-    })!;
-    final later = AiDiagnosis.fromSafeProjection('attempt_002', {
-      'studentId': 'student_aiman_y4',
-      'sourceAttemptSequence': 2,
-      'analysisState': 'completed',
-      'displayCode': 'analysis_completed',
-    })!;
+  test(
+    'newer source sequence wins even when a delayed status arrives later',
+    () {
+      final earlier = AiDiagnosis.fromSafeProjection('attempt_001', {
+        'studentId': 'student_aiman_y4',
+        'sourceAttemptSequence': 1,
+        'analysisState': 'completed',
+        'displayCode': 'analysis_completed',
+      })!;
+      final later = AiDiagnosis.fromSafeProjection('attempt_002', {
+        'studentId': 'student_aiman_y4',
+        'sourceAttemptSequence': 2,
+        'analysisState': 'completed',
+        'displayCode': 'analysis_completed',
+      })!;
 
-    expect(later.isNewerThan(earlier), isTrue);
-    expect(earlier.isNewerThan(later), isFalse);
-  });
+      expect(later.isNewerThan(earlier), isTrue);
+      expect(earlier.isNewerThan(later), isFalse);
+    },
+  );
 }

@@ -86,6 +86,10 @@ PARENT_INVITATION_CONTINUE_URL = params.StringParam(
     "PARENT_INVITATION_CONTINUE_URL",
     default="https://logic-oasis-fyp.web.app/parent-invitation",
 )
+AI_MODEL_EVIDENCE_MODE = params.StringParam(
+    "AI_MODEL_EVIDENCE_MODE", default="real_evaluated_only"
+)
+AI_MODEL_BUCKET = params.StringParam("AI_MODEL_BUCKET", default="")
 PARENT_INVITATION_ANDROID_PACKAGE = params.StringParam(
     "PARENT_INVITATION_ANDROID_PACKAGE", default="com.example.logic_oasis"
 )
@@ -97,6 +101,15 @@ PARENT_INVITATION_SMTP_USERNAME = params.StringParam(
     "PARENT_INVITATION_SMTP_USERNAME"
 )
 PARENT_INVITATION_SMTP_FROM = params.StringParam("PARENT_INVITATION_SMTP_FROM")
+
+
+def _resolved_string_param(parameter: Any) -> str:
+    """Resolve Firebase StringParam across property- and method-based SDKs."""
+    value = parameter.value
+    resolved = value() if callable(value) else value
+    if not isinstance(resolved, str):
+        raise TypeError("Firebase string parameter did not resolve to a string")
+    return resolved
 
 try:
     firebase_admin.get_app()
@@ -120,10 +133,12 @@ def firestore_db() -> Any:
     return _db
 
 
-@lru_cache(maxsize=2)
-def _runtime_bundle(runtime_root: Path) -> RuntimeBundle:
+@lru_cache(maxsize=4)
+def _runtime_bundle(runtime_root: Path, evidence_mode: str, model_bucket: str) -> RuntimeBundle:
     """Hash one immutable deployed bundle once per warm Functions instance."""
-    return RuntimeBundle.from_runtime_root(runtime_root)
+    return RuntimeBundle.from_runtime_root(
+        runtime_root, evidence_mode=evidence_mode, model_bucket=model_bucket
+    )
 
 
 def _auth_uid(request: https_fn.CallableRequest) -> str:
@@ -1175,7 +1190,11 @@ def processFinalizedQuizAttempt(event: firestore_fn.Event[Any]) -> None:
     process_finalized_attempt(
         snapshot.id,
         gateway=FirestoreRuntimeGateway(firestore_db()),
-        bundle=_runtime_bundle(runtime_root),
+        bundle=_runtime_bundle(
+            runtime_root,
+            _resolved_string_param(AI_MODEL_EVIDENCE_MODE),
+            _resolved_string_param(AI_MODEL_BUCKET),
+        ),
         provenance="emulator_verified" if os.environ.get("FUNCTIONS_EMULATOR") == "true" else "real",
     )
 

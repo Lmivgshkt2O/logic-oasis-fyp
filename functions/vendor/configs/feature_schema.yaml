@@ -10,6 +10,11 @@ finalEvaluationProvenance:
   - real
 developmentOnlyProvenance:
   - emulator_verified
+controlledDemoProvenance:
+  - expert_authored_controlled_demo
+controlledDemoGate:
+  validationFlag: allow_controlled_demo
+  permittedClaimLevel: controlled_demonstration_only
 rejectedProvenance:
   - seed_demo
   - synthetic_test
