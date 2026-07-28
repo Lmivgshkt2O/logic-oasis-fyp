@@ -8,6 +8,40 @@ import 'package:logic_oasis/shared/models/quiz_question.dart';
 import 'package:logic_oasis/shared/models/quiz_session.dart';
 import 'package:logic_oasis/shared/services/quiz_session_service.dart';
 
+const _quizSession = QuizSession(
+  id: 'session-1',
+  attemptId: 'attempt-1',
+  assignmentId: 'assignment-1',
+  assignmentSource: 'adaptive',
+  bankId: 'bank-1',
+  topicId: 'whole_numbers',
+  subtopicId: 'read_write_numbers',
+  yearLevel: 4,
+  difficultyLevel: 'Easy',
+  contentVersion: 'test',
+  questionIds: <String>['question-1'],
+  questions: <QuizQuestion>[
+    QuizQuestion(
+      id: 'question-1',
+      bankId: 'bank-1',
+      topicId: 'whole_numbers',
+      subtopicId: 'read_write_numbers',
+      skillId: 'read_write_numbers',
+      yearLevel: 4,
+      difficultyLevel: 'Easy',
+      estimatedDifficulty: .2,
+      contentVersion: 'test',
+      language: 'en',
+      createdAt: '2026-07-20',
+      question: 'Which numeral shows twenty thousand four?',
+      questionBm: 'Nombor manakah menunjukkan dua puluh ribu empat?',
+      options: <String>['2 004', '20 004'],
+      optionsBm: <String>['2 004', '20 004'],
+      sourceReference: 'Test',
+    ),
+  ],
+);
+
 class _FinalizingQuizSessionService implements QuizSessionGateway {
   @override
   Future<QuizSession> startSession({
@@ -59,39 +93,7 @@ void main() {
           title: 'Whole Numbers',
           isBahasaMelayu: false,
           sessionService: _FinalizingQuizSessionService(),
-          session: const QuizSession(
-            id: 'session-1',
-            attemptId: 'attempt-1',
-            assignmentId: 'assignment-1',
-            assignmentSource: 'adaptive',
-            bankId: 'bank-1',
-            topicId: 'whole_numbers',
-            subtopicId: 'read_write_numbers',
-            yearLevel: 4,
-            difficultyLevel: 'Easy',
-            contentVersion: 'test',
-            questionIds: <String>['question-1'],
-            questions: <QuizQuestion>[
-              QuizQuestion(
-                id: 'question-1',
-                bankId: 'bank-1',
-                topicId: 'whole_numbers',
-                subtopicId: 'read_write_numbers',
-                skillId: 'read_write_numbers',
-                yearLevel: 4,
-                difficultyLevel: 'Easy',
-                estimatedDifficulty: .2,
-                contentVersion: 'test',
-                language: 'en',
-                createdAt: '2026-07-20',
-                question: 'Which numeral shows twenty thousand four?',
-                questionBm: 'Nombor manakah menunjukkan dua puluh ribu empat?',
-                options: <String>['2 004', '20 004'],
-                optionsBm: <String>['2 004', '20 004'],
-                sourceReference: 'Test',
-              ),
-            ],
-          ),
+          session: _quizSession,
         ),
       ),
     );
@@ -104,5 +106,53 @@ void main() {
     expect(find.text('100%'), findsOneWidget);
     expect(find.text('Back to Forge'), findsOneWidget);
     expect(find.text('Quiz complete!'), findsNothing);
+  });
+
+  testWidgets('back to forge returns from the result to the subtopic page', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Column(
+              children: [
+                const Text('Subtopic page'),
+                FilledButton(
+                  onPressed: () => Navigator.of(context).push<void>(
+                    MaterialPageRoute(
+                      builder: (_) => QuizPage(
+                        title: 'Whole Numbers',
+                        isBahasaMelayu: false,
+                        sessionService: _FinalizingQuizSessionService(),
+                        session: _quizSession,
+                      ),
+                    ),
+                  ),
+                  child: const Text('Start quiz'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Start quiz'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('20 004'));
+    await tester.pump();
+    await tester.tap(find.text('Finish Quiz'));
+    await tester.pumpAndSettle();
+
+    final backToForge = find.text('Back to Forge');
+    await tester.ensureVisible(backToForge);
+    await tester.tap(backToForge);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Subtopic page'), findsOneWidget);
+    expect(find.text('Quiz Result'), findsNothing);
   });
 }

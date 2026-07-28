@@ -136,14 +136,14 @@ class _QuizPageState extends State<QuizPage> {
       if (!mounted) return;
       await Navigator.of(context).pushReplacement<void, void>(
         MaterialPageRoute(
-          builder: (_) => ResultPage(
+          builder: (resultContext) => ResultPage(
             correctCount: completion.correctCount,
             totalQuestions:
                 completion.totalQuestions ?? widget.session.questions.length,
             topicArea: widget.title,
             isBahasaMelayu: widget.isBahasaMelayu,
             attemptId: completion.attemptId,
-            onBackToForge: () => Navigator.of(context).pop(),
+            onBackToForge: () => Navigator.of(resultContext).pop(),
           ),
         ),
       );
