@@ -283,14 +283,7 @@ class _ParentDashboardContent extends StatelessWidget {
                 Text(aiDiagnosis.childFacingStatus),
                 const SizedBox(height: 12),
                 _AiDiagnosisDetails(
-                  masteryProbability: aiDiagnosis.bktMasteryProbability,
-                  finalLabel: aiDiagnosis.finalMasteryLabel,
-                  attemptsCount: aiDiagnosis.attemptsCount,
-                  createdAt: aiDiagnosis.createdAt,
-                  shapReasons: aiDiagnosis.explanationReasons,
-                  evidenceLevel: aiDiagnosis.evidenceLevel,
-                  usesControlledDemonstrationModel:
-                      aiDiagnosis.usesControlledDemonstrationModel,
+                  diagnosis: aiDiagnosis,
                   isBahasaMelayu: state.isBahasaMelayu,
                 ),
               ],
@@ -603,29 +596,17 @@ class _ParentActionStep extends StatelessWidget {
 
 class _AiDiagnosisDetails extends StatelessWidget {
   const _AiDiagnosisDetails({
-    required this.masteryProbability,
-    required this.finalLabel,
-    required this.attemptsCount,
-    required this.createdAt,
-    required this.shapReasons,
-    required this.evidenceLevel,
-    required this.usesControlledDemonstrationModel,
+    required this.diagnosis,
     required this.isBahasaMelayu,
   });
 
-  final double masteryProbability;
-  final String finalLabel;
-  final int attemptsCount;
-  final DateTime createdAt;
-  final List<String> shapReasons;
-  final String? evidenceLevel;
-  final bool usesControlledDemonstrationModel;
+  final AiDiagnosis diagnosis;
   final bool isBahasaMelayu;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final masteryText = (masteryProbability * 100).round();
+    final masteryText = (diagnosis.bktMasteryProbability * 100).round();
 
     return SoftCard(
       padding: const EdgeInsets.all(12),
@@ -642,8 +623,8 @@ class _AiDiagnosisDetails extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             isBahasaMelayu
-                ? 'Status pelayan: ${attemptsCount.clamp(0, 999)} pemerhatian pembelajaran.'
-                : 'Server status: ${attemptsCount.clamp(0, 999)} learning observations.',
+                ? 'Status pelayan: ${diagnosis.attemptsCount.clamp(0, 999)} pemerhatian pembelajaran.'
+                : 'Server status: ${diagnosis.attemptsCount.clamp(0, 999)} learning observations.',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: LogicOasisTheme.ink,
               fontWeight: FontWeight.w700,
@@ -652,20 +633,20 @@ class _AiDiagnosisDetails extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             isBahasaMelayu
-                ? 'Tahap pembelajaran: $finalLabel. Penguasaan semasa: $masteryText%.'
-                : 'Learning status: $finalLabel. Current mastery: $masteryText%.',
+                ? 'Tahap pembelajaran: ${diagnosis.finalMasteryLabel}. Penguasaan semasa: $masteryText%.'
+                : 'Learning status: ${diagnosis.finalMasteryLabel}. Current mastery: $masteryText%.',
             style: theme.textTheme.bodyMedium,
           ),
-          if (evidenceLevel != null) ...[
+          if (diagnosis.evidenceLevel != null) ...[
             const SizedBox(height: 6),
             Text(
               isBahasaMelayu
-                  ? 'Tahap bukti: $evidenceLevel.'
-                  : 'Evidence level: $evidenceLevel.',
+                  ? 'Tahap bukti: ${diagnosis.evidenceLevel}.'
+                  : 'Evidence level: ${diagnosis.evidenceLevel}.',
               style: theme.textTheme.bodySmall,
             ),
           ],
-          if (usesControlledDemonstrationModel) ...[
+          if (diagnosis.usesControlledDemonstrationModel) ...[
             const SizedBox(height: 6),
             Text(
               isBahasaMelayu
@@ -674,37 +655,39 @@ class _AiDiagnosisDetails extends StatelessWidget {
               style: theme.textTheme.bodySmall,
             ),
           ],
-          if (createdAt.millisecondsSinceEpoch > 0) ...[
+          if (diagnosis.createdAt.millisecondsSinceEpoch > 0) ...[
             const SizedBox(height: 6),
             Text(
               isBahasaMelayu
-                  ? 'Dikemas kini: ${formatAiUpdatedAt(createdAt)}'
-                  : 'Updated: ${formatAiUpdatedAt(createdAt)}',
+                  ? 'Dikemas kini: ${formatAiUpdatedAt(diagnosis.createdAt)}'
+                  : 'Updated: ${formatAiUpdatedAt(diagnosis.createdAt)}',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: LogicOasisTheme.ink,
                 fontWeight: FontWeight.w700,
               ),
             ),
           ],
-          if (shapReasons.isNotEmpty) ...[
+          if (diagnosis.explanationReasons.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(
               isBahasaMelayu
-                  ? 'Sebab sokongan: ${shapReasons.take(3).join(', ')}'
-                  : 'Supportive reason: ${shapReasons.take(3).join(', ')}',
+                  ? 'Sebab sokongan: ${diagnosis.explanationReasons.take(3).join(', ')}'
+                  : 'Supportive reason: ${diagnosis.explanationReasons.take(3).join(', ')}',
               style: theme.textTheme.bodyMedium,
             ),
           ],
-          const SizedBox(height: 8),
-          Text(
-            isBahasaMelayu
-                ? 'Nasihat sandaran menggunakan kemajuan kuiz yang disahkan oleh pelayan.'
-                : 'Fallback advice uses server-confirmed quiz progress.',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: LogicOasisTheme.deepLeaf,
-              fontWeight: FontWeight.w700,
+          if (diagnosis.isFallback) ...[
+            const SizedBox(height: 8),
+            Text(
+              isBahasaMelayu
+                  ? 'Nasihat sandaran menggunakan kemajuan kuiz yang disahkan oleh pelayan.'
+                  : 'Fallback advice uses server-confirmed quiz progress.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: LogicOasisTheme.deepLeaf,
+                fontWeight: FontWeight.w700,
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );

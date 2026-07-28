@@ -4,7 +4,9 @@ from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 import json
 from pathlib import Path
+import shutil
 import sys
+from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
@@ -19,6 +21,7 @@ from deploy_controlled_demo_model import (
     controlled_demo_object_paths,
     deploy_controlled_demo_model,
     validate_model_bucket,
+    verify_function_bundle_parity,
 )
 import ai_runtime
 from logic_oasis_ai.model_registry import ModelArtifact
@@ -275,8 +278,6 @@ class ControlledDemoRegistryContractTests(unittest.TestCase):
                 validate_model_bucket(invalid)
 
     def test_deploy_verifies_both_uploaded_objects_before_registry_promotion(self):
-        from tempfile import TemporaryDirectory
-
         with TemporaryDirectory() as output:
             published = publish_controlled_demo_bundle(train_controlled_demo_xgboost(), output)
             database = Database()
@@ -318,9 +319,106 @@ class ControlledDemoRegistryContractTests(unittest.TestCase):
                 self.assertEqual(sha256(downloaded.read_bytes()).hexdigest(), result["artifactSha256"])
         self.assertEqual([item for item in database.registry.values() if item["isActive"]], [result])
 
-    def test_deploy_accepts_byte_identical_immutable_objects_on_retry(self):
-        from tempfile import TemporaryDirectory
+    def test_deploy_preflight_rejects_source_vendor_or_manifest_drift(self):
+        verify_function_bundle_parity()
+        for drift in ("vendor_source", "manifest_value", "manifest_json"):
+            with self.subTest(drift=drift), TemporaryDirectory() as temporary:
+                vendor = Path(temporary) / "vendor"
+                shutil.copytree(ROOT / "functions" / "vendor", vendor)
+                if drift == "vendor_source":
+                    native_runtime = vendor / "logic_oasis_ai" / "native_xgboost.py"
+                    native_runtime.write_bytes(native_runtime.read_bytes() + b"\n# stale vendor drift\n")
+                elif drift == "manifest_value":
+                    manifest_path = vendor / "bundle_manifest.json"
+                    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                    manifest["packageSha256"] = "0" * 64
+                    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+                else:
+                    (vendor / "bundle_manifest.json").write_text("{", encoding="utf-8")
+                with patch("deploy_controlled_demo_model.VENDOR", vendor):
+                    with self.assertRaisesRegex(ValueError, "parity preflight"):
+                        verify_function_bundle_parity()
 
+    def test_failed_bundle_preflight_never_uploads_or_activates(self):
+        database = Database()
+        bucket = Bucket()
+        release = DeveloperRelease(
+            "CDM-2026-001", "zyonn", NOW,
+            "Developer-released FYP1 controlled demonstration; not real-world validated.",
+            "fyp1_controlled_demo",
+        )
+        with patch(
+            "deploy_controlled_demo_model.verify_function_bundle_parity",
+            side_effect=ValueError("function bundle parity preflight failed"),
+        ):
+            with self.assertRaisesRegex(ValueError, "parity preflight"):
+                deploy_controlled_demo_model(
+                    database=database, bucket=bucket, model_bucket="gs://logic-oasis-models",
+                    artifact_path="must-not-be-read.ubj", manifest_path="must-not-be-read.json",
+                    release=release, promoted_at=NOW,
+                )
+
+        self.assertEqual(bucket.objects, {})
+        self.assertEqual(database.registry, {})
+
+    def test_deploy_rejects_candidate_from_a_stale_feature_schema(self):
+        database = Database()
+        bucket = Bucket()
+        release = DeveloperRelease(
+            "CDM-2026-001", "zyonn", NOW,
+            "Developer-released FYP1 controlled demonstration; not real-world validated.",
+            "fyp1_controlled_demo",
+        )
+        with TemporaryDirectory() as output:
+            published = publish_controlled_demo_bundle(train_controlled_demo_xgboost(), output)
+            stale_manifest = json.loads(published.manifest_path.read_text(encoding="utf-8"))
+            stale_manifest["featureSchemaSha256"] = "0" * 64
+            stale_path = Path(output) / "stale-feature-schema.manifest.json"
+            stale_path.write_text(json.dumps(stale_manifest), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "parity preflight"):
+                deploy_controlled_demo_model(
+                    database=database, bucket=bucket,
+                    model_bucket="gs://logic-oasis-models",
+                    artifact_path=published.artifact_path,
+                    manifest_path=stale_path,
+                    release=release,
+                    promoted_at=NOW,
+                )
+
+        self.assertEqual(bucket.objects, {})
+        self.assertEqual(database.registry, {})
+
+    def test_deploy_reuses_the_verified_runtime_hash_snapshot(self):
+        verified_hashes = verify_function_bundle_parity()
+        release = DeveloperRelease(
+            "CDM-2026-001", "zyonn", NOW,
+            "Developer-released FYP1 controlled demonstration; not real-world validated.",
+            "fyp1_controlled_demo",
+        )
+        with TemporaryDirectory() as output:
+            published = publish_controlled_demo_bundle(train_controlled_demo_xgboost(), output)
+            with patch(
+                "deploy_controlled_demo_model.verify_function_bundle_parity",
+                return_value=verified_hashes,
+            ), patch(
+                "deploy_controlled_demo_model._source_runtime_hash_bindings",
+                side_effect=AssertionError("runtime hashes were recomputed after parity verification"),
+            ), patch(
+                "firebase_admin.firestore.transactional",
+                lambda function: lambda transaction: function(transaction),
+            ):
+                result = deploy_controlled_demo_model(
+                    database=Database(), bucket=Bucket(),
+                    model_bucket="gs://logic-oasis-models",
+                    artifact_path=published.artifact_path,
+                    manifest_path=published.manifest_path,
+                    release=release,
+                    promoted_at=NOW,
+                )
+
+        self.assertEqual(verified_hashes["packageSha256"], result["packageSha256"])
+
+    def test_deploy_accepts_byte_identical_immutable_objects_on_retry(self):
         with TemporaryDirectory() as output:
             published = publish_controlled_demo_bundle(train_controlled_demo_xgboost(), output)
             bucket = Bucket()
@@ -345,8 +443,6 @@ class ControlledDemoRegistryContractTests(unittest.TestCase):
         self.assertEqual(len(bucket.objects), 2)
 
     def test_failed_upload_verification_never_creates_an_active_registry_record(self):
-        from tempfile import TemporaryDirectory
-
         with TemporaryDirectory() as output:
             published = publish_controlled_demo_bundle(train_controlled_demo_xgboost(), output)
             database = Database()

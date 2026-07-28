@@ -7,13 +7,12 @@ from hashlib import sha256
 import json
 from math import isfinite
 from pathlib import Path
-import re
 import shutil
 import tempfile
 from typing import Mapping
 
 from logic_oasis_ai.features import BASE_FEATURE_NAMES
-from logic_oasis_ai.model_registry import ModelArtifact
+from logic_oasis_ai.model_registry import ModelArtifact, SHA256_PATTERN, validate_model_version
 from logic_oasis_ai.native_xgboost import (
     NativeXGBoostContractError,
     SHAP_RECONSTRUCTION_TOLERANCE,
@@ -27,7 +26,6 @@ from .train_xgboost import XGBOOST_PARAMETERS
 
 BUNDLE_SCHEMA_VERSION = "controlled-demo-xgboost-bundle-v1"
 DEFAULT_MODEL_VERSION = "controlled-demo-xgboost-v1"
-MODEL_VERSION_PATTERN = re.compile(r"[a-z0-9](?:[a-z0-9._-]{0,62}[a-z0-9])?")
 HASH_FIELDS = frozenset({
     "artifactSha256", "trainingDatasetSha256", "scenarioCatalogueSha256",
     "featureSchemaSha256", "controlledDemoConfigSha256", "evaluationReportSha256",
@@ -60,7 +58,7 @@ def publish_controlled_demo_bundle(
     model_version: str = DEFAULT_MODEL_VERSION,
     report_path: str | Path | None = None,
 ) -> PublishedControlledDemoBundle:
-    _validate_model_version(model_version)
+    validate_model_version(model_version)
     report = evaluation.report
     if report.evaluation_status != EVALUATION_STATUS_EVALUATED or report.data_sufficiency.claim_level != "controlled_demonstration_only":
         raise ValueError("a complete controlled-demo evaluation is required before bundle publication")
@@ -303,11 +301,6 @@ def _load_native_xgboost(artifact_bytes: bytes):
     return model
 
 
-def _validate_model_version(model_version: object) -> None:
-    if not isinstance(model_version, str) or not MODEL_VERSION_PATTERN.fullmatch(model_version) or ".." in model_version:
-        raise ValueError("model_version must be a safe lowercase version token")
-
-
 def _validate_manifest(manifest: object, *, artifact_name: str) -> None:
     if not isinstance(manifest, dict) or set(manifest) != MANIFEST_FIELDS:
         raise ValueError("artifact manifest does not match the complete controlled-demo schema")
@@ -331,8 +324,12 @@ def _validate_manifest(manifest: object, *, artifact_name: str) -> None:
     }
     if any(manifest.get(key) != value for key, value in expected.items()):
         raise ValueError("artifact manifest does not match the controlled-demo prediction contract")
-    _validate_model_version(manifest.get("modelVersion"))
-    if any(not isinstance(manifest.get(field), str) or not re.fullmatch(r"[0-9a-f]{64}", manifest[field]) for field in HASH_FIELDS):
+    validate_model_version(manifest.get("modelVersion"))
+    if any(
+        not isinstance(manifest.get(field), str)
+        or not SHA256_PATTERN.fullmatch(manifest[field])
+        for field in HASH_FIELDS
+    ):
         raise ValueError("artifact manifest contains an invalid SHA-256 binding")
     train_groups = manifest.get("trainEvaluationGroupKeys")
     test_groups = manifest.get("testEvaluationGroupKeys")

@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import sys
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -96,6 +97,7 @@ def trusted_responses() -> list[dict]:
 
 class AiRuntimeTests(unittest.TestCase):
     def setUp(self) -> None:
+        ai_runtime._clear_controlled_demo_native_cache()
         self.gateway = MemoryGateway(trusted_attempt(), trusted_responses())
         self.bundle = RuntimeBundle.from_runtime_root(
             ROOT / "ai_pipeline",
@@ -422,6 +424,79 @@ class AiRuntimeTests(unittest.TestCase):
         self.assertIn("shapValues", finalized["raw"])
         self.assertNotIn("shapValues", self.gateway.statuses["attempt-1"])
         self.assertNotIn("featureValues", self.gateway.statuses["attempt-1"])
+
+    def test_controlled_native_cache_reuses_verified_pair_and_invalidates_on_manifest_hash(self) -> None:
+        from firebase_admin import storage
+
+        controlled_bundle = RuntimeBundle.from_runtime_root(
+            ROOT / "ai_pipeline", evidence_mode="controlled_demo", model_bucket="logic-oasis-models"
+        )
+        registry = self.controlled_registry()
+        artifact = b"verified-native-ubj"
+        registry["artifactSha256"] = sha256(artifact).hexdigest()
+        manifest = self.controlled_manifest(registry)
+        registry["artifactManifestSha256"] = sha256(manifest).hexdigest()
+        objects = {
+            "controlled-demo/controlled-demo-xgboost-v1/model.ubj": artifact,
+            "controlled-demo/controlled-demo-xgboost-v1/manifest.json": manifest,
+        }
+        downloads: list[str] = []
+
+        class Blob:
+            def __init__(self, name):
+                self.name = name
+
+            def download_as_bytes(self):
+                downloads.append(self.name)
+                return objects[self.name]
+
+        class Bucket:
+            def blob(self, name):
+                return Blob(name)
+
+        first_runtime = ai_runtime._ControlledDemoNativeRuntime(object(), object())
+        changed_runtime = ai_runtime._ControlledDemoNativeRuntime(object(), object())
+        explanation = SimpleNamespace(
+            support_risks=(0.4,),
+            shap_values=((-0.1, 0.2),),
+            expected_values=(0.0,),
+        )
+        dataset = ai_runtime.load_firestore_dataset(
+            *self.gateway.history(self.gateway.attempt_doc),
+            provenance="emulator_verified",
+            allow_emulator_records=True,
+        )
+
+        with patch.object(storage, "bucket", return_value=Bucket()), patch.object(
+            ai_runtime,
+            "_load_controlled_demo_native_runtime",
+            side_effect=(first_runtime, changed_runtime),
+        ) as load_runtime, patch.object(
+            ai_runtime,
+            "predict_and_explain_native_xgboost",
+            return_value=explanation,
+        ):
+            for _ in range(2):
+                risk, run = ai_runtime._supervised_or_fallback(
+                    self.gateway.attempt_doc, dataset, registry, controlled_bundle
+                )
+                self.assertEqual(0.4, risk)
+                self.assertEqual("completed", run["status"])
+
+            self.assertEqual(1, load_runtime.call_count)
+            self.assertEqual(4, len(downloads))
+
+            changed_manifest = manifest + b"\n"
+            objects["controlled-demo/controlled-demo-xgboost-v1/manifest.json"] = changed_manifest
+            registry["artifactManifestSha256"] = sha256(changed_manifest).hexdigest()
+            risk, run = ai_runtime._supervised_or_fallback(
+                self.gateway.attempt_doc, dataset, registry, controlled_bundle
+            )
+
+        self.assertEqual(0.4, risk)
+        self.assertEqual("completed", run["status"])
+        self.assertEqual(2, load_runtime.call_count)
+        self.assertEqual(6, len(downloads))
 
     def test_invalid_controlled_ubj_falls_back_without_joblib_loading(self) -> None:
         from firebase_admin import storage

@@ -64,8 +64,9 @@ def runtime_deploy_command(*, model_bucket: str, evidence_mode: str) -> list[str
         "--source", str(FUNCTIONS_ROOT),
         "--runtime", "python311", "--entry-point", "processFinalizedQuizAttempt",
         "--trigger-location", FUNCTION_REGION,
-        "--trigger-event-filters", "type=google.cloud.firestore.document.v1.written,database=(default)",
+        "--trigger-event-filters", "type=google.cloud.firestore.document.v1.created,database=(default)",
         "--trigger-event-filters-path-pattern", "document=quizAttempts/{attemptId}",
+        "--retry",
         "--service-account", SERVICE_ACCOUNT,
         "--set-env-vars", f"AI_MODEL_EVIDENCE_MODE={evidence_mode},AI_MODEL_BUCKET={bucket_name}",
     ]
@@ -96,13 +97,13 @@ def deployment_commands(
 ) -> list[list[str]]:
     """Build an idempotent deployment sequence for bootstrap or runtime-only changes."""
     requested = [] if runtime_only else commands(model_bucket=model_bucket)
-    if grant_run_invoker:
-        requested.append(run_invoker_command())
     if deploy_runtime or runtime_only:
         requested.append(runtime_deploy_command(
             model_bucket=model_bucket,
             evidence_mode=evidence_mode,
         ))
+    if grant_run_invoker:
+        requested.append(run_invoker_command())
     return requested
 
 

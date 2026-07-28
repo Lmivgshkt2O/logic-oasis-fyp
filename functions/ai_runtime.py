@@ -8,6 +8,7 @@ paths, hashes, feature vectors, raw SHAP values, or exception text.
 
 from __future__ import annotations
 
+from collections import OrderedDict
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from hashlib import sha256
@@ -15,6 +16,7 @@ import json
 from pathlib import Path
 from contextlib import contextmanager
 from tempfile import TemporaryDirectory
+from threading import RLock
 from typing import Any, Mapping, Protocol
 
 import yaml
@@ -62,6 +64,7 @@ SAFE_ERROR_CODES = FALLBACK_CODES | frozenset({"trusted_source_invalid", "runtim
 CONTROLLED_DEMO_MODE = "controlled_demo"
 REAL_EVALUATED_ONLY_MODE = "real_evaluated_only"
 ALLOWED_EVIDENCE_MODES = frozenset({CONTROLLED_DEMO_MODE, REAL_EVALUATED_ONLY_MODE})
+CONTROLLED_DEMO_NATIVE_CACHE_SIZE = 2
 
 
 class RuntimeFailure(RuntimeError):
@@ -114,6 +117,21 @@ class RuntimeBundle:
             evidence_mode=evidence_mode,
             model_bucket=model_bucket.removeprefix("gs://").rstrip("/"),
         )
+
+
+class _ControlledDemoNativeRuntime:
+    """One immutable native model/explainer pair safe for warm-instance reuse."""
+
+    def __init__(self, model: Any, explainer: Any) -> None:
+        self.model = model
+        self.explainer = explainer
+        self.lock = RLock()
+
+
+_CONTROLLED_DEMO_NATIVE_CACHE: OrderedDict[
+    tuple[str, str], _ControlledDemoNativeRuntime
+] = OrderedDict()
+_CONTROLLED_DEMO_NATIVE_CACHE_LOCK = RLock()
 
 
 class RuntimeGateway(Protocol):
@@ -219,6 +237,8 @@ def _supervised_or_fallback(attempt: Mapping[str, Any], dataset: Any, registry: 
                 support_risk, shap_values, shap_expected_value = _controlled_demo_prediction_and_explanation(
                     artifact_path,
                     feature_values=row_feature_values,
+                    artifact_sha256=str(registry["artifactSha256"]),
+                    manifest_sha256=str(registry["artifactManifestSha256"]),
                 )
                 feature_values = {
                     name: float(row_feature_values[name])
@@ -256,21 +276,31 @@ def _controlled_demo_prediction_and_explanation(
     artifact_path: Path,
     *,
     feature_values: Mapping[str, float],
+    artifact_sha256: str,
+    manifest_sha256: str,
 ) -> tuple[float, Mapping[str, float], float]:
     """Load one verified native UBJ model and derive its prediction and Tree SHAP."""
     try:
         import numpy as np
-        from xgboost import XGBClassifier
 
-        model = XGBClassifier()
-        model.load_model(str(artifact_path))
         matrix = np.asarray([[float(feature_values[name]) for name in BASE_FEATURE_NAMES]])
     except Exception as error:
         raise InferenceContractError("model_load_failed") from error
+    runtime = _controlled_demo_native_runtime(
+        artifact_path,
+        artifact_sha256=artifact_sha256,
+        manifest_sha256=manifest_sha256,
+    )
     try:
-        explanation = predict_and_explain_native_xgboost(
-            model, matrix, feature_names=BASE_FEATURE_NAMES,
-        )
+        # XGBoost/TreeExplainer do not declare concurrent-call safety. Serialize
+        # use of one cached pair while allowing different immutable pairs to run.
+        with runtime.lock:
+            explanation = predict_and_explain_native_xgboost(
+                runtime.model,
+                matrix,
+                feature_names=BASE_FEATURE_NAMES,
+                explainer_factory=lambda _model: runtime.explainer,
+            )
     except NativeXGBoostContractError as error:
         if error.code in {"model_target_incompatible", "model_prediction_invalid"}:
             raise InferenceContractError(error.code) from error
@@ -284,6 +314,52 @@ def _controlled_demo_prediction_and_explanation(
         {name: round(value, 8) for name, value in zip(BASE_FEATURE_NAMES, explanation.shap_values[0])},
         explanation.expected_values[0],
     )
+
+
+def _controlled_demo_native_runtime(
+    artifact_path: Path,
+    *,
+    artifact_sha256: str,
+    manifest_sha256: str,
+) -> _ControlledDemoNativeRuntime:
+    """Reuse only a pair whose artifact and manifest were verified this call."""
+    key = (artifact_sha256, manifest_sha256)
+    with _CONTROLLED_DEMO_NATIVE_CACHE_LOCK:
+        cached = _CONTROLLED_DEMO_NATIVE_CACHE.get(key)
+        if cached is not None:
+            _CONTROLLED_DEMO_NATIVE_CACHE.move_to_end(key)
+            return cached
+        loaded = _load_controlled_demo_native_runtime(artifact_path)
+        _CONTROLLED_DEMO_NATIVE_CACHE[key] = loaded
+        _CONTROLLED_DEMO_NATIVE_CACHE.move_to_end(key)
+        while len(_CONTROLLED_DEMO_NATIVE_CACHE) > CONTROLLED_DEMO_NATIVE_CACHE_SIZE:
+            _CONTROLLED_DEMO_NATIVE_CACHE.popitem(last=False)
+        return loaded
+
+
+def _load_controlled_demo_native_runtime(
+    artifact_path: Path,
+) -> _ControlledDemoNativeRuntime:
+    try:
+        from xgboost import XGBClassifier
+
+        model = XGBClassifier()
+        model.load_model(str(artifact_path))
+    except Exception as error:
+        raise InferenceContractError("model_load_failed") from error
+    try:
+        import shap
+
+        explainer = shap.TreeExplainer(model)
+    except Exception as error:
+        raise InferenceContractError("shap_load_failed") from error
+    return _ControlledDemoNativeRuntime(model, explainer)
+
+
+def _clear_controlled_demo_native_cache() -> None:
+    """Reset warm-instance state for deterministic isolated tests."""
+    with _CONTROLLED_DEMO_NATIVE_CACHE_LOCK:
+        _CONTROLLED_DEMO_NATIVE_CACHE.clear()
 
 
 def _registry_mismatch(registry: Mapping[str, Any], bundle: RuntimeBundle) -> str | None:
@@ -380,7 +456,7 @@ def _released_artifact_path(bundle: RuntimeBundle, registry: Mapping[str, Any]):
 
     The registry may use ``gs://bucket/object`` only; relative paths remain an
     emulator-only bundle fixture.  Both model and manifest bytes are checked
-    before the caller can pass the model to joblib.
+    before native UBJ loading or the legacy real-evaluated joblib path.
     """
     artifact_path = str(registry["artifactPath"])
     with TemporaryDirectory(prefix="logic-oasis-model-") as temporary:

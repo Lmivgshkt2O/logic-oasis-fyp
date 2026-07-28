@@ -9,6 +9,7 @@ from hashlib import sha256
 import json
 from pathlib import Path
 import sys
+from types import MappingProxyType
 from typing import Any, Mapping
 
 import firebase_admin
@@ -19,7 +20,15 @@ AI_ROOT = ROOT / "ai_pipeline"
 if str(AI_ROOT) not in sys.path:
     sys.path.insert(0, str(AI_ROOT))
 
-from build_function_bundle import file_sha256, tree_sha256
+from build_function_bundle import (
+    BUNDLE_VERSION,
+    CONFIGS,
+    PACKAGE,
+    SOURCE,
+    VENDOR,
+    file_sha256,
+    tree_sha256,
+)
 from logic_oasis_ai.model_registry import (
     controlled_demo_object_paths,
     validate_model_bucket_uri as validate_model_bucket,
@@ -44,9 +53,13 @@ def build_controlled_demo_registry_document(
     model_bucket: str,
     release: DeveloperRelease,
     manifest_sha256: str,
+    runtime_hash_bindings: Mapping[str, str] | None = None,
 ) -> dict[str, object]:
     artifact_path, manifest_path = controlled_demo_object_paths(model_bucket, str(manifest.get("modelVersion", "")))
-    runtime_bindings = _runtime_manifest_bindings(manifest)
+    runtime_bindings = _runtime_manifest_bindings(
+        manifest,
+        runtime_hash_bindings=runtime_hash_bindings,
+    )
     document = {
         "artifactId": f"xgboost-{manifest['modelVersion']}",
         "modelType": manifest["modelType"],
@@ -84,19 +97,78 @@ def build_controlled_demo_registry_document(
     return document
 
 
-def _runtime_manifest_bindings(manifest: Mapping[str, object]) -> dict[str, object]:
+def _source_runtime_hash_bindings() -> dict[str, str]:
     return {
         "packageSha256": tree_sha256(AI_ROOT / "logic_oasis_ai"),
         "weakTopicRankingPolicySha256": file_sha256(AI_ROOT / "configs" / "weak_topic_ranking_v1.yaml"),
         "adaptivePolicySha256": file_sha256(AI_ROOT / "configs" / "adaptive_policy_v1.yaml"),
+        "featureSchemaSha256": file_sha256(AI_ROOT / "configs" / "feature_schema.yaml"),
+    }
+
+
+def _runtime_manifest_bindings(
+    manifest: Mapping[str, object],
+    *,
+    runtime_hash_bindings: Mapping[str, str] | None = None,
+) -> dict[str, object]:
+    hashes = runtime_hash_bindings or _source_runtime_hash_bindings()
+    return {
+        "packageSha256": hashes["packageSha256"],
+        "weakTopicRankingPolicySha256": hashes["weakTopicRankingPolicySha256"],
+        "adaptivePolicySha256": hashes["adaptivePolicySha256"],
         "predictionTarget": manifest["targetName"],
     }
 
 
-def build_deployment_manifest_bytes(manifest: Mapping[str, object]) -> bytes:
+def build_deployment_manifest_bytes(
+    manifest: Mapping[str, object],
+    *,
+    runtime_hash_bindings: Mapping[str, str] | None = None,
+) -> bytes:
     """Return the canonical runtime-bound manifest bytes used for upload and hashing."""
-    deployment_manifest = {**manifest, **_runtime_manifest_bindings(manifest)}
+    deployment_manifest = {
+        **manifest,
+        **_runtime_manifest_bindings(
+            manifest,
+            runtime_hash_bindings=runtime_hash_bindings,
+        ),
+    }
     return (json.dumps(deployment_manifest, indent=2, sort_keys=True) + "\n").encode("utf-8")
+
+
+def verify_function_bundle_parity() -> Mapping[str, str]:
+    """Fail closed when the committed Functions bundle is stale or divergent."""
+    vendor_package = VENDOR / "logic_oasis_ai"
+    vendor_configs = VENDOR / "configs"
+    manifest_path = VENDOR / "bundle_manifest.json"
+    if not PACKAGE.is_dir() or not vendor_package.is_dir() or not vendor_configs.is_dir():
+        raise ValueError("function bundle parity preflight failed")
+    source_hashes = _source_runtime_hash_bindings()
+    source_package_sha256 = source_hashes["packageSha256"]
+    if source_package_sha256 != tree_sha256(vendor_package):
+        raise ValueError("function bundle parity preflight failed")
+    vendored_config_files = {
+        path.relative_to(vendor_configs).as_posix()
+        for path in vendor_configs.rglob("*")
+        if path.is_file()
+    }
+    if vendored_config_files != set(CONFIGS) or any(
+        (SOURCE / "configs" / filename).read_bytes()
+        != (vendor_configs / filename).read_bytes()
+        for filename in CONFIGS
+    ):
+        raise ValueError("function bundle parity preflight failed")
+    expected_manifest = {
+        "bundleVersion": BUNDLE_VERSION,
+        **source_hashes,
+    }
+    try:
+        stored_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError("function bundle parity preflight failed") from error
+    if stored_manifest != expected_manifest:
+        raise ValueError("function bundle parity preflight failed")
+    return MappingProxyType(source_hashes)
 
 
 def deploy_controlled_demo_model(
@@ -113,14 +185,20 @@ def deploy_controlled_demo_model(
     bucket_name = validate_model_bucket(model_bucket)
     if getattr(bucket, "name", bucket_name) != bucket_name:
         raise ValueError("storage bucket does not match the declared model bucket")
+    runtime_hash_bindings = verify_function_bundle_parity()
     artifact_source = Path(artifact_path)
     manifest_source = Path(manifest_path)
     _, manifest = load_controlled_demo_bundle(artifact_source, manifest_source)
+    if manifest["featureSchemaSha256"] != runtime_hash_bindings["featureSchemaSha256"]:
+        raise ValueError("function bundle parity preflight failed")
     artifact_uri, manifest_uri = controlled_demo_object_paths(model_bucket, str(manifest["modelVersion"]))
     artifact_object = artifact_uri.removeprefix(f"gs://{bucket_name}/")
     manifest_object = manifest_uri.removeprefix(f"gs://{bucket_name}/")
     artifact_bytes = artifact_source.read_bytes()
-    manifest_bytes = build_deployment_manifest_bytes(manifest)
+    manifest_bytes = build_deployment_manifest_bytes(
+        manifest,
+        runtime_hash_bindings=runtime_hash_bindings,
+    )
     for object_name, expected in (
         (artifact_object, artifact_bytes),
         (manifest_object, manifest_bytes),
@@ -142,6 +220,7 @@ def deploy_controlled_demo_model(
         model_bucket=model_bucket,
         release=release,
         manifest_sha256=sha256(manifest_bytes).hexdigest(),
+        runtime_hash_bindings=runtime_hash_bindings,
     )
     return promote_controlled_demo_model(database, document, now=timestamp)
 
