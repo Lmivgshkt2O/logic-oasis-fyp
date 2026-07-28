@@ -286,8 +286,8 @@ Do not hardcode `80% = move up` as the main decision. Score remains one feature,
 
 ### 5.1 Server-Authoritative Quiz and AI Runtime
 
-1. `QuizPage` calls `startQuizSession` with the assigned bank and content version.
-2. The backend authenticates the student, verifies the active `adaptiveAssignment` or creates the documented cold-start assignment, preallocates `attemptId`, creates `quizSessions/{sessionId}` with status `active`, and returns a five-question form containing prompts/options but no answer keys.
+1. `QuizPage` calls `startQuizSession` with only `topicId`, `subtopicId`, and `yearLevel`; it supplies no bank or content-selection authority.
+2. The backend authenticates the student, consumes a current compatible server-created `adaptiveAssignment` or selects the active Easy-bank fallback, preallocates `attemptId`, creates `quizSessions/{sessionId}` with status `active`, and returns a deterministic five-question form containing prompts/options but no answer keys.
 3. For each question, Flutter calls `submitQuizResponse` with `sessionId`, `questionId`, `selectedIndex`, sequence index, client-observed response time, the legacy `hintCount`, and an idempotency token. FYP1 has no hint interaction, so `hintCount` remains `0` and is not a model feature.
 4. The backend verifies session ownership, expected question/order, content version, and first-submission state; reads the matching server-only `questionAnswerKeys` document; writes one immutable `questionResponses/{responseId}` record with trusted correctness, `responseTimeQuality: client_reported_unverified`, and `hintTelemetryStatus: not_supported`; and returns correctness plus the authoritative explanation.
 5. Flutter displays the returned feedback. If the call fails, the response remains `pending_validation`, is retried idempotently, and no local answer key is used to reveal correctness.
@@ -813,6 +813,8 @@ The following are intentionally deferred from FYP1: Cloud Tasks dispatch, Cloud 
 **Verification:** A disposable student sends an invitation, a separate controlled parent account accepts it from the email link, sets/uses Firebase credentials, reads only the linked child's safe dashboard, signs out to the original student Settings page, and all negative-access checks are recorded.
 
 **Current implementation record:** Implemented on the parent-invitation branch through the callable, Flutter, Hosting/App Link, and IAM deployment contracts.
+
+**Documentation boundary:** `docs/architecture/logic-oasis-firestore-database-schema.md` remains an older parent-access snapshot and must be reconciled separately before it is cited as current evidence for the self-service invitation, isolated-session, or link-audit contract.
 
 ### U10. Complete Q&A Forum and Naive Bayes Pipeline
 
