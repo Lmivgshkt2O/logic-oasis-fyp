@@ -1,11 +1,21 @@
 const fs = require("node:fs");
 const path = require("node:path");
+const assert = require("node:assert/strict");
 const {
   assertFails,
   assertSucceeds,
   initializeTestEnvironment,
 } = require("@firebase/rules-unit-testing");
-const { collection, doc, getDoc, getDocs, setDoc } = require("firebase/firestore");
+const {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  onSnapshot,
+  query,
+  setDoc,
+  where,
+} = require("firebase/firestore");
 
 async function main() {
   const testEnv = await initializeTestEnvironment({
@@ -49,6 +59,10 @@ async function main() {
       await setDoc(doc(adminDb, "studentAiStatuses", "attempt_safe"), {
         attemptId: "attempt_safe", studentId: "student_aiman_y4",
         analysisState: "completed", displayCode: "analysis_completed",
+      });
+      await setDoc(doc(adminDb, "quizAttempts", "attempt_status_pending"), {
+        attemptId: "attempt_status_pending", studentId: "student_aiman_y4",
+        validationStatus: "finalized",
       });
       await setDoc(doc(adminDb, "adaptiveAssignments", "student_aiman_y4_read_write_numbers"), {
         studentId: "student_aiman_y4", subtopicId: "read_write_numbers", bankId: "bank_2",
@@ -116,6 +130,56 @@ async function main() {
       ),
     );
     await assertSucceeds(getDoc(doc(studentDb, "studentAiStatuses", "attempt_safe")));
+    await assertSucceeds(getDoc(doc(studentDb, "studentAiStatuses", "attempt_status_pending")));
+    await assertSucceeds(getDoc(doc(linkedParentDb, "studentAiStatuses", "attempt_status_pending")));
+    await assertFails(getDoc(doc(otherParentDb, "studentAiStatuses", "attempt_status_pending")));
+    await assertFails(getDoc(doc(studentDb, "studentAiStatuses", "attempt_unknown")));
+    await assertSucceeds(getDocs(query(
+      collection(linkedParentDb, "studentAiStatuses"),
+      where("studentId", "==", "student_aiman_y4"),
+    )));
+
+    const pendingStatusRef = doc(
+      studentDb,
+      "studentAiStatuses",
+      "attempt_status_pending",
+    );
+    let resolveMissingStatus;
+    let resolveCreatedStatus;
+    let rejectMissingStatus;
+    let rejectCreatedStatus;
+    const missingStatus = new Promise((resolve, reject) => {
+      resolveMissingStatus = resolve;
+      rejectMissingStatus = reject;
+    });
+    const createdStatus = new Promise((resolve, reject) => {
+      resolveCreatedStatus = resolve;
+      rejectCreatedStatus = reject;
+    });
+    const unsubscribeStatus = onSnapshot(
+      pendingStatusRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          resolveCreatedStatus(snapshot);
+        } else {
+          resolveMissingStatus(snapshot);
+        }
+      },
+      (error) => {
+        rejectMissingStatus(error);
+        rejectCreatedStatus(error);
+      },
+    );
+    assert.equal((await missingStatus).exists(), false);
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), "studentAiStatuses", "attempt_status_pending"), {
+        attemptId: "attempt_status_pending", studentId: "student_aiman_y4",
+        analysisState: "processing", displayCode: "analysis_in_progress",
+      });
+    });
+    const createdStatusSnapshot = await createdStatus;
+    unsubscribeStatus();
+    assert.equal(createdStatusSnapshot.data().analysisState, "processing");
     await assertSucceeds(getDoc(doc(studentDb, "adaptiveAssignments", "student_aiman_y4_read_write_numbers")));
     await assertSucceeds(getDoc(doc(linkedParentDb, "studentAiStatuses", "attempt_safe")));
     await assertSucceeds(getDoc(doc(linkedParentDb, "adaptiveAssignments", "student_aiman_y4_read_write_numbers")));

@@ -6,6 +6,83 @@ import 'package:logic_oasis/shared/models/ai_diagnosis.dart';
 import 'package:logic_oasis/shared/models/quiz_reward.dart';
 
 void main() {
+  testWidgets('result surfaces an analysis stream error and retries safely', (
+    tester,
+  ) async {
+    var watchCount = 0;
+    Stream<AiDiagnosis?> watchAttempt(String _) {
+      watchCount += 1;
+      if (watchCount == 1) {
+        return Stream<AiDiagnosis?>.error(StateError('hidden diagnostic'));
+      }
+      return Stream<AiDiagnosis?>.value(
+        const AiDiagnosis(
+          attemptId: 'attempt_retry',
+          studentId: 'student_a',
+          sourceAttemptSequence: 1,
+          analysisState: 'completed',
+          displayCode: 'analysis_completed',
+        ),
+      );
+    }
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: ResultPage(
+          correctCount: 3,
+          totalQuestions: 5,
+          topicArea: 'Fraction Bridge',
+          isBahasaMelayu: false,
+          attemptId: 'attempt_retry',
+          aiDiagnosisStreamFactory: watchAttempt,
+          onBackToForge: () {},
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.textContaining('temporarily unavailable'), findsOneWidget);
+    expect(find.text('Retry analysis'), findsOneWidget);
+    expect(find.textContaining('hidden diagnostic'), findsNothing);
+
+    final retryAnalysis = find.text('Retry analysis');
+    await tester.ensureVisible(retryAnalysis);
+    await tester.tap(retryAnalysis);
+    await tester.pumpAndSettle();
+
+    expect(watchCount, 2);
+    expect(find.text('Next practice step'), findsOneWidget);
+    expect(find.text('Your next practice is ready.'), findsOneWidget);
+  });
+
+  testWidgets('result localizes the safe analysis error state in Malay', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: ResultPage(
+          correctCount: 3,
+          totalQuestions: 5,
+          topicArea: 'Jambatan Pecahan',
+          isBahasaMelayu: true,
+          attemptId: 'attempt_retry_bm',
+          aiDiagnosisStreamFactory: (_) =>
+              Stream<AiDiagnosis?>.error(StateError('hidden diagnostic')),
+          onBackToForge: () {},
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Status analisis tidak tersedia'), findsOneWidget);
+    expect(find.text('Cuba semula analisis'), findsOneWidget);
+    expect(find.textContaining('hidden diagnostic'), findsNothing);
+  });
+
   testWidgets('result keeps the score immediate while analysis is processing', (
     tester,
   ) async {
