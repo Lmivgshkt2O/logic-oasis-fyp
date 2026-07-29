@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/l10n/app_localizations.dart';
@@ -7,6 +9,10 @@ import 'package:logic_oasis/shared/services/ai_status_service.dart';
 import 'package:logic_oasis/shared/widgets/logic_oasis_figma_components.dart';
 import 'package:logic_oasis/shared/widgets/recommendation_box.dart';
 import 'package:logic_oasis/shared/widgets/section_card.dart';
+
+typedef AiDiagnosisStreamFactory = Stream<AiDiagnosis?> Function(
+  String attemptId,
+);
 
 class ResultPage extends StatelessWidget {
   const ResultPage({
@@ -20,6 +26,7 @@ class ResultPage extends StatelessWidget {
     this.backActionLabel,
     this.aiDiagnosis,
     this.attemptId,
+    this.aiDiagnosisStreamFactory,
   });
 
   final int correctCount;
@@ -31,6 +38,7 @@ class ResultPage extends StatelessWidget {
   final String? backActionLabel;
   final AiDiagnosis? aiDiagnosis;
   final String? attemptId;
+  final AiDiagnosisStreamFactory? aiDiagnosisStreamFactory;
 
   @override
   Widget build(BuildContext context) {
@@ -129,6 +137,7 @@ class ResultPage extends StatelessWidget {
             _AttemptAnalysisStatus(
               attemptId: attemptId!,
               isBahasaMelayu: isBahasaMelayu,
+              streamFactory: aiDiagnosisStreamFactory,
             ),
           ],
           const SizedBox(height: 22),
@@ -195,22 +204,43 @@ class _AttemptAnalysisStatus extends StatefulWidget {
   const _AttemptAnalysisStatus({
     required this.attemptId,
     required this.isBahasaMelayu,
+    this.streamFactory,
   });
 
   final String attemptId;
   final bool isBahasaMelayu;
+  final AiDiagnosisStreamFactory? streamFactory;
 
   @override
   State<_AttemptAnalysisStatus> createState() => _AttemptAnalysisStatusState();
 }
 
 class _AttemptAnalysisStatusState extends State<_AttemptAnalysisStatus> {
-  late final Stream<AiDiagnosis?> _diagnosisStream;
+  late Stream<AiDiagnosis?> _diagnosisStream;
 
   @override
   void initState() {
     super.initState();
-    _diagnosisStream = AiStatusService().watchAttempt(widget.attemptId);
+    _diagnosisStream = _watchAttempt();
+  }
+
+  @override
+  void didUpdateWidget(covariant _AttemptAnalysisStatus oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.attemptId != widget.attemptId ||
+        oldWidget.streamFactory != widget.streamFactory) {
+      _diagnosisStream = _watchAttempt();
+    }
+  }
+
+  Stream<AiDiagnosis?> _watchAttempt() {
+    return (widget.streamFactory ?? AiStatusService().watchAttempt)(
+      widget.attemptId,
+    );
+  }
+
+  void _retry() {
+    setState(() => _diagnosisStream = _watchAttempt());
   }
 
   @override
@@ -218,6 +248,12 @@ class _AttemptAnalysisStatusState extends State<_AttemptAnalysisStatus> {
     return StreamBuilder<AiDiagnosis?>(
       stream: _diagnosisStream,
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return _AnalysisUnavailable(
+            isBahasaMelayu: widget.isBahasaMelayu,
+            onRetry: _retry,
+          );
+        }
         final diagnosis = snapshot.data;
         if (diagnosis == null) {
           return RecommendationBox(
@@ -231,6 +267,44 @@ class _AttemptAnalysisStatusState extends State<_AttemptAnalysisStatus> {
           isBahasaMelayu: widget.isBahasaMelayu,
         );
       },
+    );
+  }
+}
+
+class _AnalysisUnavailable extends StatelessWidget {
+  const _AnalysisUnavailable({
+    required this.isBahasaMelayu,
+    required this.onRetry,
+  });
+
+  final bool isBahasaMelayu;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return SectionCard(
+      title: isBahasaMelayu
+          ? 'Status analisis tidak tersedia'
+          : 'Analysis status unavailable',
+      icon: Icons.sync_problem_outlined,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            isBahasaMelayu
+                ? 'Markah anda selamat, tetapi status analisis tidak tersedia buat sementara waktu.'
+                : 'Your score is safe, but the analysis status is temporarily unavailable.',
+          ),
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh_outlined),
+            label: Text(
+              isBahasaMelayu ? 'Cuba semula analisis' : 'Retry analysis',
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

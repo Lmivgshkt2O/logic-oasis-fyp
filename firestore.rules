@@ -50,6 +50,13 @@ service cloud.firestore {
       return signedIn() && (request.auth.uid == studentId || isActiveLinkedParent(studentId));
     }
 
+    function ownsStatusSourceAttempt(attemptId) {
+      return exists(/databases/$(database)/documents/quizAttempts/$(attemptId)) &&
+        ownsOrActiveLinkedParent(
+          get(/databases/$(database)/documents/quizAttempts/$(attemptId)).data.studentId
+        );
+    }
+
     match /topics/{topicId} {
       allow read: if signedIn();
       allow write: if false;
@@ -129,7 +136,13 @@ service cloud.firestore {
     }
 
     match /studentAiStatuses/{attemptId} {
-      allow read: if ownsOrActiveLinkedParent(resource.data.studentId);
+      // A result page can subscribe after quiz finalization but before the AI
+      // trigger creates this projection. Authorize that missing-document read
+      // through the immutable, server-owned source attempt; once the projection
+      // exists, retain the normal bounded-projection ownership check.
+      allow read: if resource == null
+        ? ownsStatusSourceAttempt(attemptId)
+        : ownsOrActiveLinkedParent(resource.data.studentId);
       allow write: if false;
     }
 
