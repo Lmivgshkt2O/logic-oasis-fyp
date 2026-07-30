@@ -171,6 +171,9 @@ class _QuizPageState extends State<QuizPage> {
     final feedback = _validatedResponse;
     final selectedIndex =
         feedback?.selectedIndex ?? _pendingResponse?.selectedIndex;
+    final positiveMessage = feedback?.localizedPositiveConfirmation(
+      widget.isBahasaMelayu,
+    );
 
     return Scaffold(
       appBar: AppBar(title: Text(widget.title)),
@@ -198,7 +201,7 @@ class _QuizPageState extends State<QuizPage> {
               selected: selectedIndex == i,
               correct: feedback?.isCorrect == true && selectedIndex == i,
               wrong: feedback?.isCorrect == false && selectedIndex == i,
-              onTap: () => chooseAnswer(i),
+              onTap: _hasSelection ? null : () => chooseAnswer(i),
             ),
             const SizedBox(height: 10),
           ],
@@ -224,16 +227,22 @@ class _QuizPageState extends State<QuizPage> {
             ),
           ] else if (feedback != null) ...[
             const SizedBox(height: 10),
-            RecommendationBox(
-              text:
-                  feedback
-                      .localizedExplanation(widget.isBahasaMelayu)
-                      .isNotEmpty
-                  ? feedback.localizedExplanation(widget.isBahasaMelayu)
-                  : widget.isBahasaMelayu
-                  ? 'Pilihan anda telah disemak dengan selamat.'
-                  : 'Your choice has been securely checked.',
-            ),
+            if (feedback.isCorrect == false) ...[
+              Semantics(
+                container: true,
+                label: widget.isBahasaMelayu
+                    ? 'Langkah panduan untuk soalan ini'
+                    : 'Guidance steps for this question',
+                child: _GuidanceSteps(
+                  steps: feedback.localizedGuidedSteps(widget.isBahasaMelayu),
+                ),
+              ),
+            ] else
+              RecommendationBox(
+                text: positiveMessage?.isNotEmpty == true
+                    ? positiveMessage!
+                    : l10n.secureAnswerChecked,
+              ),
             const SizedBox(height: 16),
             FilledButton.icon(
               onPressed: goNext,
@@ -253,6 +262,33 @@ class _QuizPageState extends State<QuizPage> {
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+class _GuidanceSteps extends StatelessWidget {
+  const _GuidanceSteps({required this.steps});
+
+  final List<String> steps;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
+    return SoftCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(l10n.guidedStepsTitle, style: theme.textTheme.titleMedium),
+          const SizedBox(height: 8),
+          for (var index = 0; index < steps.length; index++)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text('${index + 1}. ${steps[index]}'),
+            ),
         ],
       ),
     );

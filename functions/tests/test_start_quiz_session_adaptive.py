@@ -147,6 +147,8 @@ def answer_keys_for(bank_data: dict) -> dict[str, dict]:
             "isActive": True,
             "explanation": "Server-validated explanation.",
             "explanationBm": "Penerangan pelayan yang disahkan.",
+            "guidedSteps": ["Read the place values.", "Check each option."],
+            "guidedStepsBm": ["Baca nilai tempat.", "Semak setiap pilihan."],
         }
         for question_id in bank_data["questionIds"]
     }
@@ -249,6 +251,9 @@ class AdaptiveQuizStartTests(unittest.TestCase):
         self.assertEqual(f"{STUDENT_ID}_{SUBTOPIC_ID}", first["assignmentId"])
         self.assertEqual("runtime_adaptive", first["assignmentSource"])
         self.assertNotEqual(first["questionIds"], second["questionIds"])
+        self.assertNotIn("guidedSteps", first["questions"][0])
+        self.assertNotIn("guidedStepsBm", first["questions"][0])
+        self.assertNotIn("answerIndex", first["questions"][0])
         self.assertEqual(
             set(self.moderate["questionIds"]),
             set(first["questionIds"]) | set(second["questionIds"]),

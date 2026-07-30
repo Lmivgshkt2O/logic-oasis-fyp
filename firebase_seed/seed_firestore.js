@@ -117,6 +117,8 @@ function clientSafeLegacyQuestion(documentData) {
     answerIndex,
     explanation,
     explanationBm,
+    guidedSteps,
+    guidedStepsBm,
     ...clientFields
   } = documentData;
   return {
@@ -124,6 +126,74 @@ function clientSafeLegacyQuestion(documentData) {
     isActive: false,
     contentStatus: "legacy_migration_fixture",
   };
+}
+
+function validateSecureQuestionSeed(secure) {
+  const banks = Object.values(secure.questionBanks);
+  if (banks.length !== 7) {
+    throw new Error('Expected the three read/write banks and four follow-on Easy banks.');
+  }
+  for (const bank of banks) {
+    if (bank.questionIds.length < 8 || bank.questionIds.length > 10) {
+      throw new Error(`Invalid question count for ${bank.bankId}.`);
+    }
+  }
+
+  const activeQuestions = Object.values(secure.questions).filter(
+    (question) => question.isActive === true,
+  );
+  for (const question of Object.values(secure.questions)) {
+    if ('answerIndex' in question || 'explanation' in question || 'explanationBm' in question || 'guidedSteps' in question || 'guidedStepsBm' in question) {
+      throw new Error('Client-readable questions must not contain answer keys.');
+    }
+  }
+  if (Object.keys(secure.questionAnswerKeys).length !== activeQuestions.length) {
+    throw new Error('Every active question must have exactly one answer key.');
+  }
+
+  for (const question of activeQuestions) {
+    const key = secure.questionAnswerKeys[question.questionId];
+    if (
+      !key ||
+      key.questionId !== question.questionId ||
+      !Number.isInteger(key.answerIndex) ||
+      key.answerIndex < 0 ||
+      key.answerIndex >= question.options.length ||
+      typeof key.explanation !== 'string' ||
+      key.explanation.trim() === '' ||
+      typeof key.explanationBm !== 'string' ||
+      key.explanationBm.trim() === '' ||
+      key.contentVersion !== question.contentVersion ||
+      key.isActive !== question.isActive
+    ) {
+      throw new Error(`Server-only answer key is incomplete for ${question.questionId}.`);
+    }
+    const steps = key.guidedSteps;
+    const stepsBm = key.guidedStepsBm;
+    if (
+      !Array.isArray(steps) || !Array.isArray(stepsBm) ||
+      steps.length < 2 || steps.length > 5 || steps.length !== stepsBm.length ||
+      [...steps, ...stepsBm].some((step) => typeof step !== 'string' || step.trim() === '')
+    ) {
+      throw new Error(`Guidance steps are incomplete for ${question.questionId}.`);
+    }
+    const correctOptions = [
+      question.options[key.answerIndex],
+      question.optionsBm[key.answerIndex],
+    ].filter((option) => typeof option === 'string' && option.trim().length >= 2)
+      .map((option) => option.trim().toLowerCase());
+    const answerPhrases = /the answer is|correct answer|answer:|choose option|jawapan ialah|jawapan yang betul|jawapan:|pilih pilihan/i;
+    if ([...steps, ...stepsBm].some((step) => {
+      const normalized = step.trim().toLowerCase().replace(/[^\w]+/g, ' ').trim();
+      return answerPhrases.test(step) || correctOptions.some((option) =>
+        normalized === option || normalized.includes(`${option} is correct`) ||
+        normalized.includes(`${option} ialah jawapan`) || normalized.includes(`${option} adalah jawapan`) ||
+        (normalized.includes(option) && /choose|select|pick|pilih/.test(normalized))
+      );
+    })) {
+      throw new Error(`Guidance steps reveal an answer for ${question.questionId}.`);
+    }
+  }
 }
 
 function buildSecureQuestionSeed(seedData) {
@@ -156,7 +226,7 @@ function buildSecureQuestionSeed(seedData) {
     };
     return result;
   }, {});
-  return {
+  const secure = {
     ...seedData,
     subtopics: {
       ...seedData.subtopics,
@@ -166,6 +236,8 @@ function buildSecureQuestionSeed(seedData) {
     questionBanks,
     questionAnswerKeys: answerKeys,
   };
+  validateSecureQuestionSeed(secure);
+  return secure;
 }
 
 async function main() {
@@ -208,4 +280,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { buildSecureQuestionSeed };
+module.exports = { buildSecureQuestionSeed, validateSecureQuestionSeed };

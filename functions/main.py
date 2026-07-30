@@ -57,11 +57,14 @@ from quiz_session import (
     CLIENT_REPORTED_UNVERIFIED,
     HINT_TELEMETRY_NOT_SUPPORTED,
     MAX_RESPONSE_TIME_MS,
+    POSITIVE_CONFIRMATION,
+    POSITIVE_CONFIRMATION_BM,
     QuizSessionError,
     client_completion,
     client_response,
     client_session,
     response_document_id,
+    validated_guided_steps,
 )
 
 
@@ -305,12 +308,9 @@ def _bank_questions(
             or not isinstance(answer_index, int)
             or answer_index < 0
             or answer_index >= len(options)
-            or not isinstance(key.get("explanation"), str)
-            or not key.get("explanation")
-            or not isinstance(key.get("explanationBm"), str)
-            or not key.get("explanationBm")
         ):
             raise QuizSessionError("failed-precondition", "The active question bank has invalid answer content.")
+        validated_guided_steps(key, options, options_bm)
     return questions
 
 
@@ -805,6 +805,7 @@ def submit_quiz_response(data: dict[str, Any], student_id: str) -> dict[str, Any
             or answer_index >= len(options)
         ):
             raise QuizSessionError("failed-precondition", "The quiz answer key is invalid.")
+        is_correct = selected_index == answer_index
         response = {
             "responseId": response_ref.id,
             "sessionId": session_id,
@@ -820,9 +821,7 @@ def submit_quiz_response(data: dict[str, Any], student_id: str) -> dict[str, Any
             # zero exposure value from a client request.
             "priorExposureCount": question.get("priorExposureCount"),
             "selectedIndex": selected_index,
-            "serverIsCorrect": selected_index == answer_index,
-            "explanation": answer_key.get("explanation", ""),
-            "explanationBm": answer_key.get("explanationBm", ""),
+            "serverIsCorrect": is_correct,
             "validationStatus": "validated",
             "responseTimeMs": response_time_ms,
             # This is client-observed timing, never trusted correctness data.
@@ -834,6 +833,16 @@ def submit_quiz_response(data: dict[str, Any], student_id: str) -> dict[str, Any
             "idempotencyKey": idempotency_key,
             "createdAt": firestore.SERVER_TIMESTAMP,
         }
+        if is_correct:
+            response.update({
+                "positiveConfirmation": POSITIVE_CONFIRMATION,
+                "positiveConfirmationBm": POSITIVE_CONFIRMATION_BM,
+            })
+        else:
+            guided_steps, guided_steps_bm = validated_guided_steps(
+                answer_key, options, question.get("optionsBm")
+            )
+            response.update({"guidedSteps": guided_steps, "guidedStepsBm": guided_steps_bm})
         transaction.create(response_ref, response)
         transaction.update(session_ref, {"validatedResponseCount": firestore.Increment(1)})
         return response
