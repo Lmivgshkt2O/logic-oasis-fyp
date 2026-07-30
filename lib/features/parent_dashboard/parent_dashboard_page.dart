@@ -195,7 +195,7 @@ class _ParentDashboardContent extends StatelessWidget {
         if (children.length > 1) ...[
           const SizedBox(height: 14),
           DropdownButtonFormField<LinkedChildContext>(
-            value: selectedChild,
+            initialValue: selectedChild,
             decoration: const InputDecoration(labelText: 'Linked learner'),
             items: children
                 .map(
