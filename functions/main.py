@@ -29,6 +29,12 @@ if str(_PACKAGE_ROOT) not in sys.path:
     sys.path.insert(0, str(_PACKAGE_ROOT))
 
 from ai_runtime import AI_RUNTIME_SERVICE_ACCOUNT, FirestoreRuntimeGateway, RuntimeBundle, process_finalized_attempt
+from forum_runtime import (
+    FORUM_RUNTIME_SERVICE_ACCOUNT,
+    ForumRuntimeError,
+    ForumRuntimeGateway,
+    load_forum_classifier,
+)
 from logic_oasis_ai.sinks.firestore_sink import adaptive_assignment_id, subtopic_mastery_id
 from parent_link_admin import (
     PARENT_LINK_ADMIN_SERVICE_ACCOUNT,
@@ -1058,6 +1064,39 @@ def _call(handler: Callable[[dict[str, Any], str], dict[str, Any]], request: htt
         raise https_fn.HttpsError(_ERROR_CODES.get(error.code, https_fn.FunctionsErrorCode.INTERNAL), str(error))
 
 
+def _forum_call(
+    handler: Callable[[str], dict[str, Any]], request: https_fn.CallableRequest,
+) -> dict[str, Any]:
+    try:
+        return handler(_student_auth_uid(request))
+    except ForumRuntimeError as error:
+        raise https_fn.HttpsError(
+            _ERROR_CODES.get(error.code, https_fn.FunctionsErrorCode.INTERNAL), str(error)
+        )
+
+
+@https_fn.on_call(region=FUNCTION_REGION, service_account=FORUM_RUNTIME_SERVICE_ACCOUNT)
+def markForumAnswerHelpful(request: https_fn.CallableRequest) -> dict[str, Any]:
+    data = _data(request)
+    answer_id = _string(data, "answerId")
+    return _forum_call(
+        lambda student_id: ForumRuntimeGateway(firestore_db()).mark_helpful(
+            answer_id=answer_id, actor_id=student_id, now=datetime.now(timezone.utc),
+        ), request,
+    )
+
+
+@https_fn.on_call(region=FUNCTION_REGION, service_account=FORUM_RUNTIME_SERVICE_ACCOUNT)
+def acceptForumAnswer(request: https_fn.CallableRequest) -> dict[str, Any]:
+    data = _data(request)
+    answer_id = _string(data, "answerId")
+    return _forum_call(
+        lambda student_id: ForumRuntimeGateway(firestore_db()).accept_answer(
+            answer_id=answer_id, actor_id=student_id, now=datetime.now(timezone.utc),
+        ), request,
+    )
+
+
 @https_fn.on_call(region=FUNCTION_REGION)
 def startQuizSession(request: https_fn.CallableRequest) -> dict[str, Any]:
     return _call(start_quiz_session, request)
@@ -1254,3 +1293,34 @@ def processFinalizedQuizAttempt(event: firestore_fn.Event[Any]) -> None:
 # flag explicitly so deployed Eventarc delivery retries the same handler; the
 # runtime still caps its own server claims at three.
 getattr(processFinalizedQuizAttempt, "__firebase_endpoint__").eventTrigger["retry"] = True
+
+
+@firestore_fn.on_document_created(
+    document="forumQuestions/{questionId}",
+    region=FUNCTION_REGION,
+    service_account=FORUM_RUNTIME_SERVICE_ACCOUNT,
+)
+def processForumQuestion(event: firestore_fn.Event[Any]) -> None:
+    snapshot = event.data
+    if snapshot is None or not snapshot.exists:
+        return
+    ForumRuntimeGateway(firestore_db()).record_question(snapshot.id, snapshot.to_dict())
+
+
+@firestore_fn.on_document_created(
+    document="forumAnswers/{answerId}",
+    region=FUNCTION_REGION,
+    service_account=FORUM_RUNTIME_SERVICE_ACCOUNT,
+)
+def processForumAnswer(event: firestore_fn.Event[Any]) -> None:
+    snapshot = event.data
+    if snapshot is None or not snapshot.exists:
+        return
+    gateway = ForumRuntimeGateway(firestore_db())
+    data = snapshot.to_dict()
+    gateway.record_answer(snapshot.id, data)
+    gateway.process_answer(snapshot.id, data, load_forum_classifier())
+
+
+getattr(processForumQuestion, "__firebase_endpoint__").eventTrigger["retry"] = True
+getattr(processForumAnswer, "__firebase_endpoint__").eventTrigger["retry"] = True

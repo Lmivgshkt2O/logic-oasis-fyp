@@ -35,6 +35,12 @@ service cloud.firestore {
         resource.data.studentId == request.auth.uid;
     }
 
+    function isStudent() {
+      return signedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'student';
+    }
+
     // U8 exposes only bounded derived projections.  Link creation/revocation
     // is owned by the U9 callable administration flow; this predicate merely
     // enforces a server-created active relationship when it exists.
@@ -157,6 +163,84 @@ service cloud.firestore {
     match /forumParticipationSummaries/{studentId} {
       allow read: if ownsOrActiveLinkedParent(studentId);
       allow write: if false;
+    }
+
+    // U10's peer forum is a student-only surface.  Parents read only the
+    // count-only summary above, never posts, identities, moderation, AI jobs,
+    // or AI runs.  Server triggers/callables stamp derived state using Admin.
+    match /forumQuestions/{questionId} {
+      allow read: if isStudent();
+      allow create: if isStudent() &&
+        request.resource.data.keys().hasOnly([
+          'authorId', 'title', 'text', 'createdAt', 'updatedAt'
+        ]) && request.resource.data.authorId == request.auth.uid &&
+        request.resource.data.title is string && request.resource.data.title.size() >= 8 &&
+        request.resource.data.title.size() <= 140 &&
+        request.resource.data.text is string && request.resource.data.text.size() >= 20 &&
+        request.resource.data.text.size() <= 3000 &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.updatedAt == request.time;
+      allow update: if isStudent() && resource.data.authorId == request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'title', 'text', 'updatedAt'
+        ]) && request.resource.data.title is string &&
+        request.resource.data.text is string && request.resource.data.updatedAt == request.time;
+      allow delete: if false;
+    }
+
+    match /forumAnswers/{answerId} {
+      allow read: if isStudent();
+      allow create: if isStudent() &&
+        request.resource.data.keys().hasOnly([
+          'questionId', 'authorId', 'text', 'createdAt', 'updatedAt'
+        ]) && request.resource.data.authorId == request.auth.uid &&
+        request.resource.data.questionId is string &&
+        exists(/databases/$(database)/documents/forumQuestions/$(request.resource.data.questionId)) &&
+        request.resource.data.text is string && request.resource.data.text.size() >= 8 &&
+        request.resource.data.text.size() <= 4000 &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.updatedAt == request.time;
+      // A learner may revise only their text. AI feedback and acceptance are
+      // server-owned fields and cannot be forged from Flutter.
+      allow update: if isStudent() && resource.data.authorId == request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'text', 'updatedAt'
+        ]) && request.resource.data.text is string &&
+        request.resource.data.updatedAt == request.time;
+      allow delete: if false;
+    }
+
+    match /forumReports/{reportId} {
+      allow create: if isStudent() && request.resource.data.keys().hasOnly([
+        'reporterId', 'targetType', 'targetId', 'reason', 'createdAt'
+      ]) && request.resource.data.reporterId == request.auth.uid &&
+        request.resource.data.createdAt == request.time;
+      allow read, update, delete: if false;
+    }
+
+    match /forumBlocks/{blockId} {
+      allow create: if isStudent() && request.resource.data.keys().hasOnly([
+        'studentId', 'blockedStudentId', 'createdAt'
+      ]) && request.resource.data.studentId == request.auth.uid &&
+        request.resource.data.createdAt == request.time;
+      allow read, delete: if isStudent() && resource.data.studentId == request.auth.uid;
+      allow update: if false;
+    }
+
+    match /forumHelpfulMarks/{markId} {
+      allow read, write: if false;
+    }
+
+    match /forumParticipationEvents/{eventId} {
+      allow read, write: if false;
+    }
+
+    match /forumAiJobs/{answerId} {
+      allow read, write: if false;
+    }
+
+    match /forumAiRuns/{answerId} {
+      allow read, write: if false;
     }
 
     match /oasisProgress/{progressId} {

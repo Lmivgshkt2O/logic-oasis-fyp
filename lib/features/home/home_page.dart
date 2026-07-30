@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:logic_oasis/app/logic_oasis_design.dart';
+import 'package:logic_oasis/features/collaboration/qa_forum/qa_forum_page.dart';
 import 'package:logic_oasis/l10n/app_localizations.dart';
 import 'package:logic_oasis/shared/models/recommended_mission.dart';
 import 'package:logic_oasis/shared/state/app_state.dart';
@@ -107,6 +108,14 @@ class HomePage extends StatelessWidget {
           mission: state.recommendedMission,
           isBahasaMelayu: state.isBahasaMelayu,
           onTap: () => _handleRecommendedMissionTap(context),
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => QaForumPage(state: state),
+          )),
+          icon: const Icon(Icons.forum_outlined),
+          label: const Text('Ask and help in the Q&A Forum'),
         ),
       ],
     );

@@ -10,6 +10,7 @@ class ForumParticipationSummary {
     required this.answersSubmittedCount,
     required this.acceptedAnswersCount,
     required this.helpfulReceivedCount,
+    this.weekStart,
     this.lastParticipationAt,
     this.updatedAt,
   });
@@ -19,6 +20,7 @@ class ForumParticipationSummary {
   final int answersSubmittedCount;
   final int acceptedAnswersCount;
   final int helpfulReceivedCount;
+  final DateTime? weekStart;
   final DateTime? lastParticipationAt;
   final DateTime? updatedAt;
 
@@ -46,6 +48,7 @@ class ForumParticipationSummary {
       answersSubmittedCount: count('answersSubmittedCount'),
       acceptedAnswersCount: count('acceptedAnswersCount'),
       helpfulReceivedCount: count('helpfulReceivedCount'),
+      weekStart: timestamp('weekStart'),
       lastParticipationAt: timestamp('lastParticipationAt'),
       updatedAt: timestamp('updatedAt'),
     );
