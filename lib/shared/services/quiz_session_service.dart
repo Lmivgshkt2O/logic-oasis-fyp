@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:logic_oasis/shared/models/question_response.dart';
 import 'package:logic_oasis/shared/models/quiz_completion.dart';
@@ -41,12 +43,18 @@ class QuizSessionService implements QuizSessionGateway {
           functions ?? FirebaseFunctions.instanceFor(region: 'asia-southeast1');
 
   final FirebaseFunctions _functions;
+  static final Random _startRequestRandom = Random.secure();
 
   Future<QuizSession> startSession({
     required String topicId,
     required String subtopicId,
     required int yearLevel,
   }) async {
+    // One button press represents one learner-initiated attempt. Firebase may
+    // retry this callable with the same payload, while a later visit to the
+    // subtopic receives a new intent and can safely start over.
+    final startRequestId =
+        'start_${DateTime.now().microsecondsSinceEpoch}_${_startRequestRandom.nextInt(1 << 32)}';
     try {
       final result = await _functions
           .httpsCallable('startQuizSession')
@@ -56,6 +64,7 @@ class QuizSessionService implements QuizSessionGateway {
             // Send this as digits to avoid Android numeric-bridge decoding
             // differences; the callable normalizes only whole-number text.
             'yearLevel': yearLevel.toString(),
+            'startRequestId': startRequestId,
           });
       return QuizSession.fromCallableData(result.data);
     } on FirebaseFunctionsException catch (error) {

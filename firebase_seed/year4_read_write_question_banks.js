@@ -4,6 +4,27 @@ const skillId = 'y4_whole_numbers_read_write';
 const contentVersion = '2026.07.15';
 const createdAt = '2026-07-15T00:00:00Z';
 const sourceReference = 'KSSR Year 4 Whole Numbers 1.1.1';
+function guidedStepsFor(questionText, questionTextBm) {
+  const asksForWords = /word|sentence|read|wording|writes/i.test(questionText);
+  return {
+    guidedSteps: [
+      `First identify what this question asks you to check: ${questionText}`,
+      asksForWords
+        ? 'Decide whether the question asks you to read a numeral or check written words.'
+        : 'Decide whether the question asks you to build, compare, or check a numeral.',
+      'Track each place value from the largest group to the ones place, including zero places.',
+      'Compare every option with that place-value pattern before you continue.',
+    ],
+    guidedStepsBm: [
+      `Mula-mula kenal pasti perkara yang diminta oleh soalan ini: ${questionTextBm}`,
+      /perkataan|ayat|membaca|menulis/i.test(questionTextBm)
+        ? 'Tentukan sama ada soalan meminta anda membaca angka atau menyemak perkataan.'
+        : 'Tentukan sama ada soalan meminta anda membina, membanding atau menyemak angka.',
+      'Jejak setiap nilai tempat dari kumpulan terbesar hingga tempat sa, termasuk tempat sifar.',
+      'Bandingkan setiap pilihan dengan pola nilai tempat itu sebelum meneruskan.',
+    ],
+  };
+}
 
 const bankIdFor = (difficulty) =>
   `y4_whole_read_write_${difficulty.toLowerCase()}_v1`;
@@ -21,7 +42,8 @@ function question(suffix, difficulty, estimatedDifficulty, questionText, questio
       sourceReference, isActive: true,
     },
     answerKey: {
-      questionId, answerIndex, explanation, explanationBm, contentVersion, createdAt,
+      questionId, answerIndex, explanation, explanationBm,
+      ...guidedStepsFor(questionText, questionTextBm), contentVersion, createdAt,
       isActive: true, sourceReference,
     },
   };

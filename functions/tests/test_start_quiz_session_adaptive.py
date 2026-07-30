@@ -56,6 +56,9 @@ class Transaction:
     def set(self, reference: Document, data: dict):
         reference._parent.documents[reference.id] = dict(data)
 
+    def update(self, reference: Document, data: dict):
+        reference._parent.documents[reference.id].update(data)
+
 
 class Query:
     def __init__(self, collection: "Collection", conditions: list[tuple[str, object]] | None = None) -> None:
@@ -147,6 +150,8 @@ def answer_keys_for(bank_data: dict) -> dict[str, dict]:
             "isActive": True,
             "explanation": "Server-validated explanation.",
             "explanationBm": "Penerangan pelayan yang disahkan.",
+            "guidedSteps": ["Read the place values.", "Check each option."],
+            "guidedStepsBm": ["Baca nilai tempat.", "Semak setiap pilihan."],
         }
         for question_id in bank_data["questionIds"]
     }
@@ -212,17 +217,20 @@ class AdaptiveQuizStartTests(unittest.TestCase):
             },
         })
 
-    def _start(self) -> dict:
+    def _start(self, *, start_request_id: str | None = None) -> dict:
+        data = {
+            "topicId": TOPIC_ID,
+            "subtopicId": SUBTOPIC_ID,
+            "yearLevel": YEAR_LEVEL,
+            # A client-supplied bank must never override the server assignment.
+            "bankId": self.easy["bankId"],
+        }
+        if start_request_id is not None:
+            data["startRequestId"] = start_request_id
         with patch.object(main, "firestore_db", return_value=self.database), patch.object(
             main.firestore, "transactional", side_effect=lambda callback: callback
         ):
-            return main.start_quiz_session({
-                "topicId": TOPIC_ID,
-                "subtopicId": SUBTOPIC_ID,
-                "yearLevel": YEAR_LEVEL,
-                # A client-supplied bank must never override the server assignment.
-                "bankId": self.easy["bankId"],
-            }, STUDENT_ID)
+            return main.start_quiz_session(data, STUDENT_ID)
 
     def test_uses_only_a_compatible_runtime_assignment_and_rotates_question_forms(self) -> None:
         first = self._start()
@@ -249,6 +257,9 @@ class AdaptiveQuizStartTests(unittest.TestCase):
         self.assertEqual(f"{STUDENT_ID}_{SUBTOPIC_ID}", first["assignmentId"])
         self.assertEqual("runtime_adaptive", first["assignmentSource"])
         self.assertNotEqual(first["questionIds"], second["questionIds"])
+        self.assertNotIn("guidedSteps", first["questions"][0])
+        self.assertNotIn("guidedStepsBm", first["questions"][0])
+        self.assertNotIn("answerIndex", first["questions"][0])
         self.assertEqual(
             set(self.moderate["questionIds"]),
             set(first["questionIds"]) | set(second["questionIds"]),
@@ -349,12 +360,42 @@ class AdaptiveQuizStartTests(unittest.TestCase):
         self.assertIn("questions", session)
 
     def test_retry_reuses_the_one_active_session_and_form(self) -> None:
-        first = self._start()
-        second = self._start()
+        first = self._start(start_request_id="start-1")
+        second = self._start(start_request_id="start-1")
 
         self.assertEqual(first["sessionId"], second["sessionId"])
         self.assertEqual(first["questionIds"], second["questionIds"])
         self.assertEqual(1, len(self.database.collections["quizSessions"]))
+
+    def test_new_start_request_replaces_an_unfinished_session(self) -> None:
+        first = self._start(start_request_id="start-1")
+        second = self._start(start_request_id="start-2")
+
+        self.assertNotEqual(first["sessionId"], second["sessionId"])
+        self.assertEqual(
+            "abandoned",
+            self.database.collections["quizSessions"][first["sessionId"]]["status"],
+        )
+        self.assertEqual(
+            second["sessionId"],
+            next(iter(self.database.collections["activeQuizSessionStarts"].values()))[
+                "sessionId"
+            ],
+        )
+
+    def test_legacy_restart_replaces_a_partially_answered_session(self) -> None:
+        first = self._start()
+        self.database.collections["quizSessions"][first["sessionId"]][
+            "validatedResponseCount"
+        ] = 1
+
+        second = self._start()
+
+        self.assertNotEqual(first["sessionId"], second["sessionId"])
+        self.assertEqual(
+            "abandoned",
+            self.database.collections["quizSessions"][first["sessionId"]]["status"],
+        )
 
 
 if __name__ == "__main__":

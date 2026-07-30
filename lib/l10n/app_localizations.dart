@@ -594,6 +594,18 @@ abstract class AppLocalizations {
   /// **'Next Question'**
   String get nextQuestion;
 
+  /// No description provided for @guidedStepsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Let\'s review the steps'**
+  String get guidedStepsTitle;
+
+  /// No description provided for @secureAnswerChecked.
+  ///
+  /// In en, this message translates to:
+  /// **'Your choice has been securely checked.'**
+  String get secureAnswerChecked;
+
   /// No description provided for @parentDashboardSummary.
   ///
   /// In en, this message translates to:

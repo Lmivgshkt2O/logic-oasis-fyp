@@ -1,6 +1,79 @@
 const topicId = 'whole_numbers_y4';
 const contentVersion = '2026.07.20';
 const createdAt = '2026-07-20T00:00:00Z';
+const guidanceBySubtopic = {
+  place_digit_value: {
+    guidedSteps: [
+      'Find the digit named in the question.',
+      'Count its position from the right, one place at a time.',
+      'Use that position to check the value or expanded form in every option.',
+    ],
+    guidedStepsBm: [
+      'Cari digit yang disebut dalam soalan.',
+      'Kira kedudukannya dari kanan, satu nilai tempat pada satu masa.',
+      'Gunakan kedudukan itu untuk menyemak nilai atau bentuk cerakin bagi setiap pilihan.',
+    ],
+  },
+  compare_order_numbers: {
+    guidedSteps: [
+      'Line up the numbers by place value.',
+      'Compare from the leftmost place and stop at the first place that differs.',
+      'Use that comparison to test the requested sign, order, or range.',
+    ],
+    guidedStepsBm: [
+      'Susun nombor mengikut nilai tempat.',
+      'Banding dari tempat paling kiri dan berhenti pada tempat pertama yang berbeza.',
+      'Gunakan perbandingan itu untuk menyemak tanda, tertib atau julat yang diminta.',
+    ],
+  },
+  odd_even_numbers: {
+    guidedSteps: [
+      'Look only at the ones digit of each number.',
+      'Classify that digit as even or odd.',
+      'Check which option matches the rule asked in the question.',
+    ],
+    guidedStepsBm: [
+      'Lihat digit sa bagi setiap nombor sahaja.',
+      'Kelaskan digit itu sebagai genap atau ganjil.',
+      'Semak pilihan yang sepadan dengan peraturan dalam soalan.',
+    ],
+  },
+  number_patterns: {
+    guidedSteps: [
+      'Compare two neighbouring terms in the pattern.',
+      'Find the same amount added or subtracted each time.',
+      'Apply that rule once more and compare it with the options.',
+    ],
+    guidedStepsBm: [
+      'Bandingkan dua nombor yang bersebelahan dalam pola.',
+      'Cari jumlah yang sama ditambah atau ditolak setiap kali.',
+      'Gunakan peraturan itu sekali lagi dan bandingkan dengan pilihan.',
+    ],
+  },
+};
+
+function guidedStepsFor(definition, questionText, questionTextBm) {
+  const guidance = guidanceBySubtopic[definition.subtopicId];
+  const isSequenceQuestion = /next|missing|sequence|pattern|seterusnya|hilang|jujukan|pola/i.test(
+    `${questionText} ${questionTextBm}`,
+  );
+  return {
+    guidedSteps: [
+      `First identify what this question asks you to check: ${questionText}`,
+      isSequenceQuestion
+        ? 'First identify the change between the values already shown.'
+        : 'First identify the numbers or digits the question asks you to examine.',
+      ...guidance.guidedSteps,
+    ],
+    guidedStepsBm: [
+      `Mula-mula kenal pasti perkara yang diminta oleh soalan ini: ${questionTextBm}`,
+      isSequenceQuestion
+        ? 'Mula-mula kenal pasti perubahan antara nilai yang sudah ditunjukkan.'
+        : 'Mula-mula kenal pasti nombor atau digit yang diminta untuk diperiksa.',
+      ...guidance.guidedStepsBm,
+    ],
+  };
+}
 
 const definitions = [
   {
@@ -78,6 +151,7 @@ function makeBank(definition) {
       },
       answerKey: {
         questionId, answerIndex, explanation, explanationBm, contentVersion, createdAt,
+        ...guidedStepsFor(definition, questionText, questionTextBm),
         isActive: true, sourceReference: definition.sourceReference,
       },
     };

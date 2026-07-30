@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
+import re
 from typing import Any
 from uuid import uuid4
 
@@ -32,6 +33,8 @@ class QuizSessionPolicy:
 MAX_RESPONSE_TIME_MS = 900_000
 CLIENT_REPORTED_UNVERIFIED = "client_reported_unverified"
 HINT_TELEMETRY_NOT_SUPPORTED = "not_supported"
+POSITIVE_CONFIRMATION = "Correct. Your answer was securely checked."
+POSITIVE_CONFIRMATION_BM = "Betul. Jawapan anda telah disemak dengan selamat."
 
 
 def utc_now() -> datetime:
@@ -88,9 +91,11 @@ def client_response(response: dict[str, Any]) -> dict[str, Any]:
         key: response[key]
         for key in (
             "responseId", "sessionId", "attemptId", "questionId", "selectedIndex",
-            "serverIsCorrect", "explanation", "explanationBm", "validationStatus",
+            "serverIsCorrect", "positiveConfirmation", "positiveConfirmationBm",
+            "guidedSteps", "guidedStepsBm", "validationStatus",
             "sequenceIndex",
         )
+        if key in response
     }
 
 
@@ -145,6 +150,11 @@ class InMemoryQuizSessionService:
             raise QuizSessionError("failed-precondition", "No complete active question bank is available.")
 
         selected = candidates[: self._policy.question_count]
+        for question in selected:
+            answer_key = self._answer_keys.get(question["questionId"])
+            if answer_key is None:
+                raise QuizSessionError("failed-precondition", "The answer key is unavailable.")
+            validated_guided_steps(answer_key, question.get("options"), question.get("optionsBm"))
         skill_ids = {question.get("skillId") for question in selected}
         if None in skill_ids or len(skill_ids) != 1:
             raise QuizSessionError(
@@ -238,6 +248,7 @@ class InMemoryQuizSessionService:
         if answer_index < 0 or answer_index >= len(options):
             raise QuizSessionError("failed-precondition", "The quiz answer key is invalid.")
 
+        is_correct = selected_index == answer_index
         response = {
             "responseId": response_id,
             "sessionId": session_id,
@@ -250,9 +261,7 @@ class InMemoryQuizSessionService:
             "contentVersion": session["contentVersion"],
             "priorExposureCount": question.get("priorExposureCount"),
             "selectedIndex": selected_index,
-            "serverIsCorrect": selected_index == answer_index,
-            "explanation": answer_key.get("explanation", ""),
-            "explanationBm": answer_key.get("explanationBm", ""),
+            "serverIsCorrect": is_correct,
             "validationStatus": "validated",
             "responseTimeMs": response_time_ms,
             "responseTimeQuality": CLIENT_REPORTED_UNVERIFIED,
@@ -264,6 +273,14 @@ class InMemoryQuizSessionService:
             "idempotencyKey": idempotency_key,
             "createdAt": now,
         }
+        if is_correct:
+            response.update({
+                "positiveConfirmation": POSITIVE_CONFIRMATION,
+                "positiveConfirmationBm": POSITIVE_CONFIRMATION_BM,
+            })
+        else:
+            guided_steps, guided_steps_bm = validated_guided_steps(answer_key, options, question.get("optionsBm"))
+            response.update({"guidedSteps": guided_steps, "guidedStepsBm": guided_steps_bm})
         self.responses[response_id] = response
         session["validatedResponseCount"] += 1
         return self._client_response(response)
@@ -375,3 +392,56 @@ def _answer_index(answer_key: dict[str, Any]) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
         raise QuizSessionError("failed-precondition", "The answer key is invalid.")
     return value
+
+
+def validated_guided_steps(
+    answer_key: dict[str, Any],
+    options: Any,
+    options_bm: Any,
+) -> tuple[list[str], list[str]]:
+    """Validate authored guidance without exposing a final answer.
+
+    Guidance is deliberately held beside the server-only answer key.  It is
+    checked before use and projected only after an incorrect answer has been
+    securely sealed.
+    """
+    steps = answer_key.get("guidedSteps")
+    steps_bm = answer_key.get("guidedStepsBm")
+    if (
+        not isinstance(steps, list)
+        or not isinstance(steps_bm, list)
+        or not 2 <= len(steps) <= 5
+        or len(steps) != len(steps_bm)
+        or any(not isinstance(step, str) or not step.strip() for step in [*steps, *steps_bm])
+    ):
+        raise QuizSessionError("failed-precondition", "The quiz guidance is invalid.")
+
+    correct_index = _answer_index(answer_key)
+    if not isinstance(options, list) or not isinstance(options_bm, list):
+        raise QuizSessionError("failed-precondition", "The quiz guidance is invalid.")
+    correct_options = tuple(
+        option.strip().casefold()
+        for option in (options[correct_index], options_bm[correct_index])
+        if isinstance(option, str) and len(option.strip()) >= 2
+    )
+    revealing_phrases = (
+        "the answer is", "correct answer", "answer:", "choose option",
+        "jawapan ialah", "jawapan yang betul", "jawapan:", "pilih pilihan",
+    )
+    for step in [*steps, *steps_bm]:
+        normalized = re.sub(r"[^\w]+", " ", step.casefold()).strip()
+        if any(phrase in normalized for phrase in revealing_phrases):
+            raise QuizSessionError("failed-precondition", "The quiz guidance reveals an answer.")
+        if any(
+            normalized.strip() == option
+            or f"{option} is correct" in normalized
+            or f"{option} ialah jawapan" in normalized
+            or f"{option} adalah jawapan" in normalized
+            or (
+                option in normalized
+                and any(directive in normalized for directive in ("choose", "select", "pick", "pilih"))
+            )
+            for option in correct_options
+        ):
+            raise QuizSessionError("failed-precondition", "The quiz guidance reveals an answer.")
+    return list(steps), list(steps_bm)

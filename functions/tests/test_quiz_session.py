@@ -26,6 +26,8 @@ def service() -> InMemoryQuizSessionService:
             "correctOptionIndex": index % 4,
             "explanation": "Server feedback",
             "explanationBm": "Maklum balas pelayan",
+            "guidedSteps": ["Read the place values.", "Check each option."],
+            "guidedStepsBm": ["Baca nilai tempat.", "Semak setiap pilihan."],
         }
         for index, item in enumerate(questions)
     }
@@ -59,7 +61,33 @@ class QuizSessionTests(unittest.TestCase):
         response = self.submit()
         self.assertTrue(response["serverIsCorrect"])
         self.assertEqual("validated", response["validationStatus"])
+        self.assertEqual("Correct. Your answer was securely checked.", response["positiveConfirmation"])
+        self.assertNotIn("guidedSteps", response)
         self.assertEqual(1, len(self.service.responses))
+
+    def test_wrong_answer_returns_only_ordered_guidance_after_validation(self) -> None:
+        response = self.submit(selected_index=1)
+        self.assertFalse(response["serverIsCorrect"])
+        self.assertEqual(["Read the place values.", "Check each option."], response["guidedSteps"])
+        self.assertEqual(["Baca nilai tempat.", "Semak setiap pilihan."], response["guidedStepsBm"])
+        self.assertNotIn("explanation", response)
+        self.assertNotIn("positiveConfirmation", response)
+
+    def test_invalid_or_answer_revealing_guidance_blocks_session_start(self) -> None:
+        self.service._answer_keys["q0"]["guidedSteps"] = []
+        with self.assertRaisesRegex(QuizSessionError, "guidance is invalid"):
+            self.service.start_session(
+                student_id="student-b", topic_id="y4_whole_numbers",
+                subtopic_id="read_write_numbers", year_level=4, now=NOW,
+            )
+
+        self.service._answer_keys["q0"]["guidedSteps"] = ["The answer is a.", "Check it."]
+        self.service._answer_keys["q0"]["guidedStepsBm"] = ["Jawapan ialah a.", "Semak."]
+        with self.assertRaisesRegex(QuizSessionError, "guidance reveals"):
+            self.service.start_session(
+                student_id="student-b", topic_id="y4_whole_numbers",
+                subtopic_id="read_write_numbers", year_level=4, now=NOW,
+            )
 
     def test_rejects_out_of_range_answer_key(self) -> None:
         self.service._answer_keys["q0"]["correctOptionIndex"] = 4

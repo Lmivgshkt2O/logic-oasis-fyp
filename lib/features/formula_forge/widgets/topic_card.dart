@@ -25,7 +25,6 @@ class TopicCard extends StatelessWidget {
     final subtitle = locked && lockedReason != null
         ? lockedReason!
         : _restorationSubtitle(topic);
-    final learningArea = topic.localizedArea(isBahasaMelayu);
     final masteryLabel = !locked && topic.mastery == 'Locked'
         ? 'New'
         : topic.mastery;

@@ -82,6 +82,8 @@
   "questionProgress": "Soalan {current} daripada {total}",
   "finishQuiz": "Selesai Kuiz",
   "nextQuestion": "Soalan Seterusnya",
+  "guidedStepsTitle": "Mari semak langkahnya",
+  "secureAnswerChecked": "Pilihan anda telah disemak dengan selamat.",
   "parentDashboardSummary": "Ringkasan tenang tentang kemajuan pembelajaran {name}.",
   "overallRestoration": "Pemulihan keseluruhan",
   "oasisRestoredSummary": "{percent}% oasis telah dipulihkan.",

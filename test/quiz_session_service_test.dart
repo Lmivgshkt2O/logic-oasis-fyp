@@ -85,8 +85,8 @@ void main() {
         'questionId': 'question_1',
         'selectedIndex': 2,
         'serverIsCorrect': false,
-        'explanation': 'The server checked this answer.',
-        'explanationBm': 'Pelayan menyemak jawapan ini.',
+        'guidedSteps': ['Read the place values.', 'Check every option.'],
+        'guidedStepsBm': ['Baca nilai tempat.', 'Semak setiap pilihan.'],
         'validationStatus': 'validated',
         'sequenceIndex': 0,
       }, idempotencyKey: 'session_1:question_1:0');
@@ -101,8 +101,32 @@ void main() {
 
       expect(response.isValidated, isTrue);
       expect(response.isCorrect, isFalse);
+      expect(response.localizedGuidedSteps(false), hasLength(2));
+      expect(response.localizedPositiveConfirmation(false), isEmpty);
       expect(completion.score, 60);
       expect(completion.attemptId, 'attempt_1');
     },
   );
+
+  test('validated feedback rejects incomplete or mixed secure payloads', () {
+    final invalid = <Object?, Object?>{
+      'responseId': 'response_1',
+      'sessionId': 'session_1',
+      'questionId': 'question_1',
+      'selectedIndex': 2,
+      'serverIsCorrect': false,
+      'guidedSteps': const <String>['Only one step'],
+      'guidedStepsBm': const <String>['Satu langkah sahaja'],
+      'validationStatus': 'validated',
+      'sequenceIndex': 0,
+    };
+
+    expect(
+      () => QuestionResponse.fromCallableData(
+        invalid,
+        idempotencyKey: 'session_1:question_1:0',
+      ),
+      throwsFormatException,
+    );
+  });
 }

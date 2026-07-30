@@ -16,7 +16,7 @@ class AnswerTile extends StatelessWidget {
   final bool selected;
   final bool correct;
   final bool wrong;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {

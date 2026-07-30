@@ -82,6 +82,8 @@
   "questionProgress": "Question {current} of {total}",
   "finishQuiz": "Finish Quiz",
   "nextQuestion": "Next Question",
+  "guidedStepsTitle": "Let's review the steps",
+  "secureAnswerChecked": "Your choice has been securely checked.",
   "parentDashboardSummary": "A calm summary of {name}'s learning progress.",
   "overallRestoration": "Overall restoration",
   "oasisRestoredSummary": "{percent}% of the oasis is restored.",

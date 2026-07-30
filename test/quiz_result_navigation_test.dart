@@ -65,7 +65,7 @@ class _FinalizingQuizSessionService implements QuizSessionGateway {
       sequenceIndex: pendingResponse.sequenceIndex,
       idempotencyKey: pendingResponse.idempotencyKey,
       isCorrect: true,
-      explanation: 'Confirmed by the server.',
+      positiveConfirmation: 'Confirmed by the server.',
       validationStatus: 'validated',
     );
   }

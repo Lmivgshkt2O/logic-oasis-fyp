@@ -295,6 +295,13 @@ class AppLocalizationsMs extends AppLocalizations {
   String get nextQuestion => 'Soalan Seterusnya';
 
   @override
+  String get guidedStepsTitle => 'Mari semak langkahnya';
+
+  @override
+  String get secureAnswerChecked =>
+      'Pilihan anda telah disemak dengan selamat.';
+
+  @override
   String parentDashboardSummary(Object name) {
     return 'Ringkasan tenang tentang kemajuan pembelajaran $name.';
   }

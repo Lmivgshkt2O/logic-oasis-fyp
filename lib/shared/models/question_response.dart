@@ -1,6 +1,6 @@
 /// A response whose correctness was returned by the callable backend.
 ///
-/// A pending value deliberately has no correctness or explanation. This keeps
+/// A pending value deliberately has no correctness or guidance. This keeps
 /// the quiz UI from inferring an answer while a network retry is outstanding.
 class QuestionResponse {
   const QuestionResponse({
@@ -11,8 +11,10 @@ class QuestionResponse {
     required this.idempotencyKey,
     this.responseId,
     this.isCorrect,
-    this.explanation,
-    this.explanationBm,
+    this.positiveConfirmation,
+    this.positiveConfirmationBm,
+    this.guidedSteps = const <String>[],
+    this.guidedStepsBm = const <String>[],
     this.validationStatus = 'pending',
   });
 
@@ -23,18 +25,23 @@ class QuestionResponse {
   final String idempotencyKey;
   final String? responseId;
   final bool? isCorrect;
-  final String? explanation;
-  final String? explanationBm;
+  final String? positiveConfirmation;
+  final String? positiveConfirmationBm;
+  final List<String> guidedSteps;
+  final List<String> guidedStepsBm;
   final String validationStatus;
 
   bool get isValidated => validationStatus == 'validated' && isCorrect != null;
   bool get isPending => !isValidated;
 
-  String localizedExplanation(bool isBahasaMelayu) {
+  String localizedPositiveConfirmation(bool isBahasaMelayu) {
     return isBahasaMelayu
-        ? explanationBm ?? explanation ?? ''
-        : explanation ?? '';
+        ? positiveConfirmationBm ?? positiveConfirmation ?? ''
+        : positiveConfirmation ?? '';
   }
+
+  List<String> localizedGuidedSteps(bool isBahasaMelayu) =>
+      isBahasaMelayu && guidedStepsBm.isNotEmpty ? guidedStepsBm : guidedSteps;
 
   Map<String, Object> toSubmissionData({
     required int responseTimeMs,
@@ -60,6 +67,26 @@ class QuestionResponse {
     Map<Object?, Object?> data, {
     required String idempotencyKey,
   }) {
+    final isCorrect = data['serverIsCorrect'] as bool?;
+    final positiveConfirmation = _string(data['positiveConfirmation']);
+    final positiveConfirmationBm = _string(data['positiveConfirmationBm']);
+    final guidedSteps = _stringList(data['guidedSteps']);
+    final guidedStepsBm = _stringList(data['guidedStepsBm']);
+    final validationStatus = _string(data['validationStatus']) ?? 'pending';
+    if (validationStatus == 'validated' && isCorrect != null) {
+      final hasGuidance =
+          guidedSteps.length >= 2 &&
+          guidedSteps.length <= 5 &&
+          guidedSteps.length == guidedStepsBm.length;
+      final hasConfirmation =
+          (positiveConfirmation?.isNotEmpty ?? false) &&
+          (positiveConfirmationBm?.isNotEmpty ?? false);
+      if (isCorrect
+          ? !hasConfirmation || guidedSteps.isNotEmpty
+          : !hasGuidance || hasConfirmation) {
+        throw const FormatException('Invalid secure quiz feedback payload.');
+      }
+    }
     return QuestionResponse(
       responseId: _string(data['responseId']),
       sessionId: _requiredString(data['sessionId'], 'sessionId'),
@@ -67,10 +94,12 @@ class QuestionResponse {
       selectedIndex: _requiredInt(data['selectedIndex'], 'selectedIndex'),
       sequenceIndex: _requiredInt(data['sequenceIndex'], 'sequenceIndex'),
       idempotencyKey: idempotencyKey,
-      isCorrect: data['serverIsCorrect'] as bool?,
-      explanation: _string(data['explanation']),
-      explanationBm: _string(data['explanationBm']),
-      validationStatus: _string(data['validationStatus']) ?? 'pending',
+      isCorrect: isCorrect,
+      positiveConfirmation: positiveConfirmation,
+      positiveConfirmationBm: positiveConfirmationBm,
+      guidedSteps: guidedSteps,
+      guidedStepsBm: guidedStepsBm,
+      validationStatus: validationStatus,
     );
   }
 
@@ -86,4 +115,13 @@ class QuestionResponse {
   }
 
   static String? _string(Object? value) => value is String ? value : null;
+
+  static List<String> _stringList(Object? value) {
+    if (value == null) return const <String>[];
+    if (value is! List ||
+        value.any((item) => item is! String || item.isEmpty)) {
+      throw const FormatException('Invalid callable guidance field.');
+    }
+    return value.cast<String>();
+  }
 }

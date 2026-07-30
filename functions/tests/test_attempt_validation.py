@@ -96,6 +96,8 @@ class AttemptValidationTests(unittest.TestCase):
                 "correctOptionIndex": index % 4,
                 "explanation": "Server feedback",
                 "explanationBm": "Maklum balas pelayan",
+                "guidedSteps": ["Read the place values.", "Check each option."],
+                "guidedStepsBm": ["Baca nilai tempat.", "Semak setiap pilihan."],
             }
 
         self._submit_all()

@@ -36,15 +36,19 @@ class AdaptiveAssignment {
       _requiredString(data, 'difficultyLevel'),
     );
     if (difficulty == null) {
-      throw FormatException('Unknown assignment difficulty.');
+      throw const FormatException('Unknown assignment difficulty.');
     }
     final evidenceCount = _requiredInt(data, 'evidenceCount');
     if (evidenceCount < 0) {
-      throw FormatException('Adaptive assignment evidence count is invalid.');
+      throw const FormatException(
+        'Adaptive assignment evidence count is invalid.',
+      );
     }
     final usedBktFallback = data['usedBktFallback'];
     if (usedBktFallback is! bool) {
-      throw FormatException('Adaptive assignment fallback state is missing.');
+      throw const FormatException(
+        'Adaptive assignment fallback state is missing.',
+      );
     }
     return AdaptiveAssignment(
       id: id,
