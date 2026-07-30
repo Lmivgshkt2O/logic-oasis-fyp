@@ -173,6 +173,15 @@ def _string(data: dict[str, Any], key: str) -> str:
     return value
 
 
+def _optional_string(data: dict[str, Any], key: str) -> str | None:
+    value = data.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value.strip():
+        raise QuizSessionError("invalid-argument", f"{key} must be a non-empty string.")
+    return value
+
+
 def _int(data: dict[str, Any], key: str) -> int:
     value = data.get(key)
     if isinstance(value, bool):
@@ -586,6 +595,21 @@ def _active_session_from_reservation(
     return session
 
 
+def _is_same_start_request(
+    reservation: dict[str, Any],
+    session: dict[str, Any],
+    start_request_id: str | None,
+) -> bool:
+    """Keep retries idempotent while allowing a new learner-initiated attempt.
+
+    Older clients cannot restore sealed feedback after returning to a quiz, so
+    they may only reuse a session that has no validated responses yet.
+    """
+    if start_request_id is None:
+        return session.get("validatedResponseCount") == 0
+    return reservation.get("startRequestId") == start_request_id
+
+
 def _reserve_or_reuse_active_session(
     *,
     session: dict[str, Any],
@@ -593,6 +617,7 @@ def _reserve_or_reuse_active_session(
     topic_id: str,
     subtopic_id: str,
     year_level: int,
+    start_request_id: str | None,
     now: datetime,
     database: Any,
 ) -> tuple[dict[str, Any], bool]:
@@ -612,6 +637,7 @@ def _reserve_or_reuse_active_session(
         "topicId": topic_id,
         "subtopicId": subtopic_id,
         "yearLevel": year_level,
+        "startRequestId": start_request_id,
         "expiresAt": session["expiresAt"],
         "updatedAt": firestore.SERVER_TIMESTAMP,
     }
@@ -631,7 +657,16 @@ def _reserve_or_reuse_active_session(
                 transaction=transaction,
             )
             if existing is not None:
-                return existing, False
+                if _is_same_start_request(
+                    reservation=dict(current_snapshot.to_dict() or {}),
+                    session=existing,
+                    start_request_id=start_request_id,
+                ):
+                    return existing, False
+                transaction.update(
+                    database.collection("quizSessions").document(existing["sessionId"]),
+                    {"status": "abandoned", "abandonedAt": now},
+                )
         transaction.create(session_ref, session)
         transaction.set(reservation_ref, reservation)
         return session, True
@@ -643,6 +678,7 @@ def start_quiz_session(data: dict[str, Any], student_id: str) -> dict[str, Any]:
     topic_id = _string(data, "topicId")
     subtopic_id = _string(data, "subtopicId")
     year_level = _int(data, "yearLevel")
+    start_request_id = _optional_string(data, "startRequestId")
     database = firestore_db()
     now = datetime.now(timezone.utc)
     reservation_ref = database.collection("activeQuizSessionStarts").document(
@@ -664,7 +700,11 @@ def start_quiz_session(data: dict[str, Any], student_id: str) -> dict[str, Any]:
             now=now,
             database=database,
         )
-        if existing is not None:
+        if existing is not None and _is_same_start_request(
+            reservation=dict(existing_reservation.to_dict() or {}),
+            session=existing,
+            start_request_id=start_request_id,
+        ):
             return client_session(existing, _session_questions(existing, database))
     bank, questions, assignment = _start_bank_selection(
         student_id=student_id,
@@ -707,6 +747,7 @@ def start_quiz_session(data: dict[str, Any], student_id: str) -> dict[str, Any]:
         topic_id=topic_id,
         subtopic_id=subtopic_id,
         year_level=year_level,
+        start_request_id=start_request_id,
         now=now,
         database=database,
     )
