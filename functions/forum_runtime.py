@@ -3,6 +3,9 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from datetime import datetime, timedelta
+from hashlib import sha256
+import json
+import os
 from pathlib import Path
 from typing import Any, Mapping
 from zoneinfo import ZoneInfo
@@ -14,6 +17,7 @@ from logic_oasis_ai.forum_ai.classifier import (
 
 FORUM_RUNTIME_SERVICE_ACCOUNT = "logic-oasis-forum-runtime@logic-oasis-fyp.iam.gserviceaccount.com"
 FORUM_MODEL_PATH = Path(__file__).resolve().parent / "forum_model.joblib"
+FORUM_MODEL_MANIFEST_PATH = Path(__file__).resolve().parent / "forum_model_manifest.json"
 KUALA_LUMPUR = ZoneInfo("Asia/Kuala_Lumpur")
 COUNTER_FIELDS = ("questionsPostedCount", "answersSubmittedCount", "acceptedAnswersCount", "helpfulReceivedCount")
 
@@ -46,6 +50,18 @@ def feedback_for(label: str) -> str:
     return "Your answer is saved. You can add a little more about how you reached it if you wish."
 
 
+def _transaction_snapshot(transaction: Any, reference: Any) -> Any:
+    """Normalise Admin SDK transaction reads across supported Python releases.
+
+    Recent google-cloud-firestore versions return an iterator even for a single
+    document reference; older versions and focused fakes return a snapshot.
+    """
+    value = transaction.get(reference)
+    if hasattr(value, "exists"):
+        return value
+    return next(iter(value), None)
+
+
 class ForumRuntimeGateway:
     """Firestore adapter; raw jobs/runs are never a client read surface."""
     def __init__(self, database: Any) -> None:
@@ -60,9 +76,9 @@ class ForumRuntimeGateway:
 
         @firestore.transactional
         def record(transaction: Any) -> None:
-            if transaction.get(event_ref).exists:
+            if (_transaction_snapshot(transaction, event_ref) or _MissingSnapshot()).exists:
                 return
-            summary = transaction.get(summary_ref)
+            summary = _transaction_snapshot(transaction, summary_ref) or _MissingSnapshot()
             current = summary.to_dict() if summary.exists else {}
             current_week = current.get("weekStart")
             if current_week is not None:
@@ -95,44 +111,46 @@ class ForumRuntimeGateway:
         mark_ref = self.database.collection("forumHelpfulMarks").document(f"{answer_id}_{actor_id}")
         @firestore.transactional
         def mark(transaction: Any) -> dict[str, Any]:
-            answer = transaction.get(answer_ref)
+            answer = _transaction_snapshot(transaction, answer_ref) or _MissingSnapshot()
             if not answer.exists:
                 raise ForumRuntimeError("not-found", "Answer not found.")
             answer_data = answer.to_dict()
             author_id = _required(answer_data, "authorId")
             if author_id == actor_id:
                 raise ForumRuntimeError("failed-precondition", "You cannot mark your own answer helpful.")
-            if transaction.get(mark_ref).exists:
-                return {"alreadyMarked": True}
+            if (_transaction_snapshot(transaction, mark_ref) or _MissingSnapshot()).exists:
+                return {"alreadyMarked": True, "answerAuthorId": author_id}
             transaction.set(mark_ref, {"answerId": answer_id, "studentId": actor_id, "createdAt": now})
             return {"alreadyMarked": False, "answerAuthorId": author_id}
         result = mark(self.database.transaction())
-        if not result["alreadyMarked"]:
-            self._record_participation(event_id=f"helpful:{answer_id}:{actor_id}", student_id=result["answerAuthorId"], field="helpfulReceivedCount", occurred_at=now)
+        # The deterministic event is independently idempotent. Replaying it
+        # repairs a counter if a prior callable died after writing the mark.
+        self._record_participation(event_id=f"helpful:{answer_id}:{actor_id}", student_id=result["answerAuthorId"], field="helpfulReceivedCount", occurred_at=now)
         return result
 
     def accept_answer(self, *, answer_id: str, actor_id: str, now: datetime) -> dict[str, Any]:
         answer_ref = self.database.collection("forumAnswers").document(answer_id)
         @firestore.transactional
         def accept(transaction: Any) -> dict[str, Any]:
-            answer = transaction.get(answer_ref)
+            answer = _transaction_snapshot(transaction, answer_ref) or _MissingSnapshot()
             if not answer.exists:
                 raise ForumRuntimeError("not-found", "Answer not found.")
             data = answer.to_dict()
             question_id, author_id = _required(data, "questionId"), _required(data, "authorId")
             question_ref = self.database.collection("forumQuestions").document(question_id)
-            question = transaction.get(question_ref)
+            question = _transaction_snapshot(transaction, question_ref) or _MissingSnapshot()
             if not question.exists or _required(question.to_dict(), "authorId") != actor_id:
                 raise ForumRuntimeError("permission-denied", "Only the question author may accept an answer.")
             if author_id == actor_id:
                 raise ForumRuntimeError("failed-precondition", "You cannot accept your own answer.")
             if data.get("acceptedAt") is not None:
-                return {"alreadyAccepted": True}
+                return {"alreadyAccepted": True, "answerAuthorId": author_id}
             transaction.update(answer_ref, {"acceptedAt": now, "acceptedBy": actor_id})
             return {"alreadyAccepted": False, "answerAuthorId": author_id}
         result = accept(self.database.transaction())
-        if not result["alreadyAccepted"]:
-            self._record_participation(event_id=f"accept:{answer_id}", student_id=result["answerAuthorId"], field="acceptedAnswersCount", occurred_at=now)
+        # As above, a retry after a partial failure restores the safe count
+        # without ever creating a second acceptance event.
+        self._record_participation(event_id=f"accept:{answer_id}", student_id=result["answerAuthorId"], field="acceptedAnswersCount", occurred_at=now)
         return result
 
     def process_answer(self, answer_id: str, data: Mapping[str, Any], classifier: ForumTextClassifier | None) -> str:
@@ -169,13 +187,30 @@ class ForumRuntimeGateway:
             job_ref.set({"answerId": answer_id, "state": state, "updatedAt": firestore.SERVER_TIMESTAMP}, merge=True)
             return state
         except Exception as error:
+            recovered_run = run_ref.get()
+            if recovered_run.exists and isinstance((recovered_run.to_dict() or {}).get("state"), str):
+                state = recovered_run.to_dict()["state"]
+                job_ref.set({"answerId": answer_id, "state": state, "updatedAt": firestore.SERVER_TIMESTAMP}, merge=True)
+                return state
             job_ref.set({"answerId": answer_id, "state": "failed", "errorCode": type(error).__name__, "updatedAt": firestore.SERVER_TIMESTAMP}, merge=True)
-            return "failed"
+            # Eventarc can retry a transient model/Firestore failure. The job
+            # remains server-only and retry processing is idempotent.
+            raise
 
 
-def load_forum_classifier(path: Path = FORUM_MODEL_PATH) -> ForumTextClassifier | None:
+def load_forum_classifier(
+    path: Path = FORUM_MODEL_PATH, manifest_path: Path = FORUM_MODEL_MANIFEST_PATH,
+) -> ForumTextClassifier | None:
     try:
-        return ForumTextClassifier.load(path) if path.is_file() else None
+        if not path.is_file() or not manifest_path.is_file():
+            return None
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if not isinstance(manifest, dict) or manifest.get("artifactSha256") != sha256(path.read_bytes()).hexdigest():
+            return None
+        if manifest.get("evidenceState") == "emulator_fixture_only" and os.environ.get("FUNCTIONS_EMULATOR") != "true":
+            return None
+        classifier = ForumTextClassifier.load(path)
+        return classifier if manifest.get("modelVersion") == classifier.model_version else None
     except Exception:
         return None
 
@@ -185,3 +220,10 @@ def _required(data: Mapping[str, Any], key: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ForumRuntimeError("failed-precondition", f"Forum {key} is missing.")
     return value.strip()
+
+
+class _MissingSnapshot:
+    exists = False
+
+    def to_dict(self) -> dict[str, Any]:
+        return {}

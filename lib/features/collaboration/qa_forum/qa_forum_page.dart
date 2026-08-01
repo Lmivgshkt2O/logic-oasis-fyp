@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:logic_oasis/shared/models/forum_answer.dart';
 import 'package:logic_oasis/shared/models/forum_question.dart';
 import 'package:logic_oasis/shared/repositories/collaboration_repository.dart';
@@ -6,9 +7,15 @@ import 'package:logic_oasis/shared/services/forum_ai_status_service.dart';
 import 'package:logic_oasis/shared/state/app_state.dart';
 
 class QaForumPage extends StatefulWidget {
-  const QaForumPage({super.key, required this.state, this.repository});
+  const QaForumPage({
+    super.key,
+    required this.state,
+    this.repository,
+    this.questionsStream,
+  });
   final AppState state;
   final CollaborationRepository? repository;
+  final Stream<List<ForumQuestion>>? questionsStream;
 
   @override
   State<QaForumPage> createState() => _QaForumPageState();
@@ -27,12 +34,18 @@ class _QaForumPageState extends State<QaForumPage> {
       label: const Text('Ask a question'),
     ),
     body: StreamBuilder<List<ForumQuestion>>(
-      stream: _repository.watchQuestions(),
+      stream: widget.questionsStream ?? _repository.watchQuestions(),
       builder: (context, snapshot) {
-        if (snapshot.hasError)
-          return const _Message(
-            'The forum could not be loaded. Please check your connection and try again.',
+        if (snapshot.hasError) {
+          final error = snapshot.error;
+          final denied =
+              error is FirebaseException && error.code == 'permission-denied';
+          return _Message(
+            denied
+                ? 'Forum access is unavailable for this account. Sign in with a student profile, then try again.'
+                : 'The forum could not be loaded. Please check your connection and try again.',
           );
+        }
         if (!snapshot.hasData)
           return const Center(child: CircularProgressIndicator());
         final questions = snapshot.data!;

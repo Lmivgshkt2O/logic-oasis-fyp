@@ -4,4 +4,8 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Firebase Emulator uses local HTTP. This debug-only override permits
+         10.0.2.2 traffic on an Android emulator without enabling cleartext in
+         release builds. -->
+    <application android:usesCleartextTraffic="true"/>
 </manifest>

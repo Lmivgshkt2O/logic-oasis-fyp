@@ -1,0 +1,19 @@
+{
+  "artifactSha256": "50d840fbd38740db48d045fc5fefe99427e655eab16af69ce3369c84095a5132",
+  "authorGroupedSplit": "not_evaluable_small_fixture_dataset",
+  "calibrationState": "not_calibrated",
+  "claimBoundary": "This artifact validates integration only; it is not evidence of performance with learners.",
+  "classBalance": {
+    "needs_reasoning": 3,
+    "sufficient_reasoning": 3
+  },
+  "datasetSha256": "c948c565309202cb52e02d6e771bd17b0228926af4898de446237adca6bb7f80",
+  "evidenceState": "emulator_fixture_only",
+  "modelVersion": "forum-explanation-nb-v1",
+  "precisionRecallF1": "not_claimed_small_fixture_dataset",
+  "provenance": [
+    "synthetic_test"
+  ],
+  "rowCount": 6,
+  "rubricVersion": "forum-explanation-rubric-v1"
+}

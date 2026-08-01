@@ -14,6 +14,7 @@ const {
   onSnapshot,
   query,
   setDoc,
+  serverTimestamp,
   where,
 } = require("firebase/firestore");
 
@@ -31,6 +32,10 @@ async function main() {
   try {
     await testEnv.withSecurityRulesDisabled(async (context) => {
       const adminDb = context.firestore();
+
+      await setDoc(doc(adminDb, "users", "student_aiman_y4"), { role: "student" });
+      await setDoc(doc(adminDb, "users", "student_other"), { role: "student" });
+      await setDoc(doc(adminDb, "users", "parent_active"), { role: "parent" });
 
       await setDoc(doc(adminDb, "questions", "safe_q1"), {
         questionId: "safe_q1",
@@ -74,6 +79,13 @@ async function main() {
         studentId: "student_aiman_y4", questionsPostedCount: 1, answersSubmittedCount: 2,
         acceptedAnswersCount: 0, helpfulReceivedCount: 1,
       });
+      await setDoc(doc(adminDb, "forumQuestions", "forum_q1"), {
+        authorId: "student_aiman_y4", title: "How do I check my addition?",
+        text: "I added the tens first. How can I check the result?", createdAt: new Date(), updatedAt: new Date(),
+      });
+      await setDoc(doc(adminDb, "forumAnswers", "forum_a1"), {
+        questionId: "forum_q1", authorId: "student_other", text: "Use subtraction to check the total.", createdAt: new Date(), updatedAt: new Date(),
+      });
       await setDoc(doc(adminDb, "parentLinks", "parent_active_student_aiman_y4"), {
         parentId: "parent_active", studentId: "student_aiman_y4", status: "active",
       });
@@ -96,6 +108,7 @@ async function main() {
     const revokedParentDb = testEnv.authenticatedContext("parent_revoked").firestore();
     const otherParentDb = testEnv.authenticatedContext("parent_other").firestore();
     const anonymousDb = testEnv.unauthenticatedContext().firestore();
+    const otherStudentDb = testEnv.authenticatedContext("student_other").firestore();
 
     await assertSucceeds(getDoc(doc(studentDb, "questions", "safe_q1")));
     await assertFails(getDoc(doc(anonymousDb, "questions", "safe_q1")));
@@ -195,6 +208,18 @@ async function main() {
     await assertFails(getDoc(doc(studentDb, "aiJobs", "attempt_safe")));
     await assertFails(getDoc(doc(studentDb, "aiModelRuns", "attempt_safe")));
     await assertFails(getDoc(doc(studentDb, "modelRegistry", "xgboost_v1")));
+    await assertSucceeds(getDoc(doc(studentDb, "forumQuestions", "forum_q1")));
+    await assertSucceeds(getDoc(doc(otherStudentDb, "forumAnswers", "forum_a1")));
+    await assertFails(getDoc(doc(linkedParentDb, "forumQuestions", "forum_q1")));
+    await assertFails(getDoc(doc(studentDb, "forumAiJobs", "forum_a1")));
+    await assertSucceeds(setDoc(doc(studentDb, "forumQuestions", "forum_q2"), {
+      authorId: "student_aiman_y4", title: "How can I check this answer?",
+      text: "I tried grouping the numbers and need help checking it.",
+      createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+    }));
+    await assertFails(setDoc(doc(otherStudentDb, "forumQuestions", "forum_q1"), {
+      authorId: "student_other", title: "Changed question title", text: "This should not replace another learner question.", updatedAt: new Date(),
+    }, { merge: true }));
 
     console.log("PASS: student can read safe questions/projections but cannot access answer keys, U3-R state, or U8 raw AI data.");
   } finally {

@@ -32,6 +32,9 @@ class AppState extends ChangeNotifier {
   static const int recommendedMissionRequiredCompletions = 2;
   static const int recommendedMissionRewardCrystals = 20;
   static const String _lastTabKey = 'logic_oasis_last_tab';
+  static const String _navigationSchemaKey =
+      'logic_oasis_navigation_schema_version';
+  static const int _navigationSchemaVersion = 2;
   static const String _languageKey = 'logic_oasis_language';
   static const String _missionRemindersKey = 'logic_oasis_mission_reminders';
   static const String _eyeComfortKey = 'logic_oasis_eye_comfort';
@@ -351,7 +354,11 @@ class AppState extends ChangeNotifier {
 
   Future<void> loadSavedAppPreferences() async {
     final preferences = await SharedPreferences.getInstance();
-    selectedTab = (preferences.getInt(_lastTabKey) ?? selectedTab).clamp(0, 2);
+    final savedTab = preferences.getInt(_lastTabKey);
+    final navigationSchema = preferences.getInt(_navigationSchemaKey) ?? 1;
+    selectedTab = _restoredTab(savedTab, navigationSchema);
+    await preferences.setInt(_lastTabKey, selectedTab);
+    await preferences.setInt(_navigationSchemaKey, _navigationSchemaVersion);
     language = preferences.getString(_languageKey) ?? language;
     missionReminders =
         preferences.getBool(_missionRemindersKey) ?? missionReminders;
@@ -388,7 +395,8 @@ class AppState extends ChangeNotifier {
 
   Future<void> saveAppSession() async {
     final preferences = await SharedPreferences.getInstance();
-    await preferences.setInt(_lastTabKey, selectedTab.clamp(0, 2));
+    await preferences.setInt(_lastTabKey, selectedTab.clamp(0, 3));
+    await preferences.setInt(_navigationSchemaKey, _navigationSchemaVersion);
     await preferences.setString(_languageKey, language);
     await preferences.setBool(_missionRemindersKey, missionReminders);
     await preferences.setBool(_eyeComfortKey, eyeComfortMode);
@@ -469,6 +477,20 @@ class AppState extends ChangeNotifier {
   }
 
   RecommendedMission get recommendedMission {
+    // A newly authenticated emulator user can render Home while the async
+    // topic refresh is still replacing the year list. Keep Home safe until
+    // either the local fallback or Firestore topics are available.
+    if (topics.isEmpty) {
+      return const RecommendedMission(
+        topicId: '',
+        topicTitle: 'Loading practice',
+        topicTitleBm: 'Memuatkan latihan',
+        requiredCompletions: 1,
+        completedCompletions: 0,
+        rewardCrystals: 0,
+        rewardClaimed: true,
+      );
+    }
     final recommendedTopicId = _currentRecommendedMissionTopicId();
     final topic = topics.firstWhere(
       (topic) => topic.id == recommendedTopicId,
@@ -565,13 +587,21 @@ class AppState extends ChangeNotifier {
   void changeTab(int index) {
     if (index < 0) {
       selectedTab = 0;
-    } else if (index > 2) {
-      selectedTab = 2;
+    } else if (index > 3) {
+      selectedTab = 3;
     } else {
       selectedTab = index;
     }
     notifyListeners();
     unawaited(saveAppSession());
+  }
+
+  int _restoredTab(int? savedTab, int navigationSchema) {
+    if (savedTab == null) return selectedTab.clamp(0, 3);
+    if (navigationSchema < _navigationSchemaVersion && savedTab == 2) {
+      return 3;
+    }
+    return savedTab.clamp(0, 3);
   }
 
   void updateStudentProfile({required String name, required int year}) {
