@@ -1069,7 +1069,7 @@ def _forum_call(
 ) -> dict[str, Any]:
     try:
         return handler(_student_auth_uid(request))
-    except ForumRuntimeError as error:
+    except (ForumRuntimeError, QuizSessionError) as error:
         raise https_fn.HttpsError(
             _ERROR_CODES.get(error.code, https_fn.FunctionsErrorCode.INTERNAL), str(error)
         )
@@ -1077,23 +1077,37 @@ def _forum_call(
 
 @https_fn.on_call(region=FUNCTION_REGION, service_account=FORUM_RUNTIME_SERVICE_ACCOUNT)
 def markForumAnswerHelpful(request: https_fn.CallableRequest) -> dict[str, Any]:
-    data = _data(request)
-    answer_id = _string(data, "answerId")
     return _forum_call(
         lambda student_id: ForumRuntimeGateway(firestore_db()).mark_helpful(
-            answer_id=answer_id, actor_id=student_id, now=datetime.now(timezone.utc),
+            answer_id=_string(_data(request), "answerId"),
+            actor_id=student_id,
+            now=datetime.now(timezone.utc),
         ), request,
     )
 
 
 @https_fn.on_call(region=FUNCTION_REGION, service_account=FORUM_RUNTIME_SERVICE_ACCOUNT)
 def acceptForumAnswer(request: https_fn.CallableRequest) -> dict[str, Any]:
-    data = _data(request)
-    answer_id = _string(data, "answerId")
     return _forum_call(
         lambda student_id: ForumRuntimeGateway(firestore_db()).accept_answer(
-            answer_id=answer_id, actor_id=student_id, now=datetime.now(timezone.utc),
+            answer_id=_string(_data(request), "answerId"),
+            actor_id=student_id,
+            now=datetime.now(timezone.utc),
         ), request,
+    )
+
+
+@https_fn.on_call(region=FUNCTION_REGION, service_account=FORUM_RUNTIME_SERVICE_ACCOUNT)
+def reportForumContent(request: https_fn.CallableRequest) -> dict[str, Any]:
+    return _forum_call(
+        lambda student_id: ForumRuntimeGateway(firestore_db()).report_content(
+            target_type=_string(_data(request), "targetType"),
+            target_id=_string(_data(request), "targetId"),
+            reason=_string(_data(request), "reason"),
+            actor_id=student_id,
+            now=datetime.now(timezone.utc),
+        ),
+        request,
     )
 
 

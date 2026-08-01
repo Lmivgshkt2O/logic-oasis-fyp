@@ -184,7 +184,9 @@ service cloud.firestore {
         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'title', 'text', 'updatedAt'
         ]) && request.resource.data.title is string &&
-        request.resource.data.text is string && request.resource.data.updatedAt == request.time;
+        request.resource.data.title.size() >= 8 && request.resource.data.title.size() <= 140 &&
+        request.resource.data.text is string && request.resource.data.text.size() >= 20 &&
+        request.resource.data.text.size() <= 3000 && request.resource.data.updatedAt == request.time;
       allow delete: if false;
     }
 
@@ -192,36 +194,48 @@ service cloud.firestore {
       allow read: if isStudent();
       allow create: if isStudent() &&
         request.resource.data.keys().hasOnly([
-          'questionId', 'authorId', 'text', 'createdAt', 'updatedAt'
+          'questionId', 'authorId', 'text', 'createdAt', 'updatedAt', 'revision'
         ]) && request.resource.data.authorId == request.auth.uid &&
         request.resource.data.questionId is string &&
         exists(/databases/$(database)/documents/forumQuestions/$(request.resource.data.questionId)) &&
         request.resource.data.text is string && request.resource.data.text.size() >= 8 &&
         request.resource.data.text.size() <= 4000 &&
+        request.resource.data.get('revision', 1) == 1 &&
         request.resource.data.createdAt == request.time &&
         request.resource.data.updatedAt == request.time;
       // A learner may revise only their text. AI feedback and acceptance are
       // server-owned fields and cannot be forged from Flutter.
       allow update: if isStudent() && resource.data.authorId == request.auth.uid &&
+        resource.data.get('acceptedAt', null) == null &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'text', 'updatedAt'
+          'text', 'updatedAt', 'revision', 'aiFeedback'
         ]) && request.resource.data.text is string &&
+        request.resource.data.text.size() >= 8 && request.resource.data.text.size() <= 4000 &&
+        request.resource.data.revision == resource.data.get('revision', 1) + 1 &&
+        request.resource.data.aiFeedback.keys().hasOnly([
+          'state', 'label', 'message', 'revision'
+        ]) && request.resource.data.aiFeedback.state == 'pending' &&
+        request.resource.data.aiFeedback.label == 'uncertain' &&
+        request.resource.data.aiFeedback.message == 'Your revised answer is being reviewed.' &&
+        request.resource.data.aiFeedback.revision == request.resource.data.revision &&
         request.resource.data.updatedAt == request.time;
       allow delete: if false;
     }
 
     match /forumReports/{reportId} {
-      allow create: if isStudent() && request.resource.data.keys().hasOnly([
-        'reporterId', 'targetType', 'targetId', 'reason', 'createdAt'
-      ]) && request.resource.data.reporterId == request.auth.uid &&
-        request.resource.data.createdAt == request.time;
-      allow read, update, delete: if false;
+      // Reports and review state are server-owned. The callable derives the
+      // reporter from verified auth and converges duplicates on this ID.
+      allow read, write: if false;
     }
 
     match /forumBlocks/{blockId} {
       allow create: if isStudent() && request.resource.data.keys().hasOnly([
         'studentId', 'blockedStudentId', 'createdAt'
       ]) && request.resource.data.studentId == request.auth.uid &&
+        blockId == request.auth.uid + '_' + request.resource.data.blockedStudentId &&
+        request.resource.data.blockedStudentId != request.auth.uid &&
+        exists(/databases/$(database)/documents/users/$(request.resource.data.blockedStudentId)) &&
+        get(/databases/$(database)/documents/users/$(request.resource.data.blockedStudentId)).data.role == 'student' &&
         request.resource.data.createdAt == request.time;
       allow read, delete: if isStudent() && resource.data.studentId == request.auth.uid;
       allow update: if false;

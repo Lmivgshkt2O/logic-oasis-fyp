@@ -28,6 +28,12 @@ class ForumRuntimeError(ValueError):
         self.code = code
 
 
+def _document_id(value: str) -> str:
+    if not value or "/" in value or len(value) > 1500:
+        raise ForumRuntimeError("invalid-argument", "Forum document ID is invalid.")
+    return value
+
+
 def _as_datetime(value: Any) -> datetime:
     if hasattr(value, "to_datetime"):
         value = value.to_datetime()
@@ -60,6 +66,13 @@ def _transaction_snapshot(transaction: Any, reference: Any) -> Any:
     if hasattr(value, "exists"):
         return value
     return next(iter(value), None)
+
+
+def _transaction_snapshots(transaction: Any, query: Any) -> list[Any]:
+    value = transaction.get(query)
+    if hasattr(value, "exists"):
+        return [value]
+    return list(value)
 
 
 class ForumRuntimeGateway:
@@ -107,6 +120,7 @@ class ForumRuntimeGateway:
         self._record_participation(event_id=f"answer:{answer_id}", student_id=_required(data, "authorId"), field="answersSubmittedCount", occurred_at=data.get("createdAt"))
 
     def mark_helpful(self, *, answer_id: str, actor_id: str, now: datetime) -> dict[str, Any]:
+        answer_id = _document_id(answer_id)
         answer_ref = self.database.collection("forumAnswers").document(answer_id)
         mark_ref = self.database.collection("forumHelpfulMarks").document(f"{answer_id}_{actor_id}")
         @firestore.transactional
@@ -128,7 +142,56 @@ class ForumRuntimeGateway:
         self._record_participation(event_id=f"helpful:{answer_id}:{actor_id}", student_id=result["answerAuthorId"], field="helpfulReceivedCount", occurred_at=now)
         return result
 
+    def report_content(
+        self,
+        *,
+        target_type: str,
+        target_id: str,
+        reason: str,
+        actor_id: str,
+        now: datetime,
+    ) -> dict[str, Any]:
+        target_id = _document_id(target_id)
+        if target_type not in {"question", "answer"}:
+            raise ForumRuntimeError("invalid-argument", "Report targetType must be question or answer.")
+        clean_reason = reason.strip()
+        if len(clean_reason) < 3 or len(clean_reason) > 500:
+            raise ForumRuntimeError("invalid-argument", "Report reason must be between 3 and 500 characters.")
+
+        target_collection = "forumQuestions" if target_type == "question" else "forumAnswers"
+        target_ref = self.database.collection(target_collection).document(target_id)
+        report_ref = self.database.collection("forumReports").document(
+            f"{actor_id}_{target_type}_{target_id}"
+        )
+
+        @firestore.transactional
+        def report(transaction: Any) -> dict[str, Any]:
+            target = _transaction_snapshot(transaction, target_ref) or _MissingSnapshot()
+            if not target.exists:
+                raise ForumRuntimeError("not-found", "Report target not found.")
+            if _required(target.to_dict(), "authorId") == actor_id:
+                raise ForumRuntimeError("failed-precondition", "You cannot report your own content.")
+
+            existing = _transaction_snapshot(transaction, report_ref) or _MissingSnapshot()
+            if existing.exists:
+                transaction.update(report_ref, {"reason": clean_reason, "updatedAt": now})
+                return {"alreadyReported": True}
+
+            transaction.set(report_ref, {
+                "reporterId": actor_id,
+                "targetType": target_type,
+                "targetId": target_id,
+                "reason": clean_reason,
+                "status": "active",
+                "createdAt": now,
+                "updatedAt": now,
+            })
+            return {"alreadyReported": False}
+
+        return report(self.database.transaction())
+
     def accept_answer(self, *, answer_id: str, actor_id: str, now: datetime) -> dict[str, Any]:
+        answer_id = _document_id(answer_id)
         answer_ref = self.database.collection("forumAnswers").document(answer_id)
         @firestore.transactional
         def accept(transaction: Any) -> dict[str, Any]:
@@ -139,12 +202,50 @@ class ForumRuntimeGateway:
             question_id, author_id = _required(data, "questionId"), _required(data, "authorId")
             question_ref = self.database.collection("forumQuestions").document(question_id)
             question = _transaction_snapshot(transaction, question_ref) or _MissingSnapshot()
-            if not question.exists or _required(question.to_dict(), "authorId") != actor_id:
+            question_data = question.to_dict() if question.exists else {}
+            if not question.exists or _required(question_data, "authorId") != actor_id:
                 raise ForumRuntimeError("permission-denied", "Only the question author may accept an answer.")
             if author_id == actor_id:
                 raise ForumRuntimeError("failed-precondition", "You cannot accept your own answer.")
-            if data.get("acceptedAt") is not None:
+            accepted_answer_id = question_data.get("acceptedAnswerId")
+            if not accepted_answer_id:
+                answer_query = self.database.collection("forumAnswers").where(
+                    "questionId", "==", question_id
+                )
+                legacy_accepted = next(
+                    (
+                        snapshot
+                        for snapshot in _transaction_snapshots(transaction, answer_query)
+                        if snapshot.to_dict().get("acceptedAt") is not None
+                    ),
+                    None,
+                )
+                if legacy_accepted is not None:
+                    if legacy_accepted.id != answer_id:
+                        raise ForumRuntimeError(
+                            "already-exists", "This question already has an accepted answer."
+                        )
+                    transaction.update(question_ref, {
+                        "acceptedAnswerId": answer_id,
+                        "acceptedAt": data["acceptedAt"],
+                        "updatedAt": now,
+                    })
+                    return {"alreadyAccepted": True, "answerAuthorId": author_id}
+            if accepted_answer_id == answer_id and data.get("acceptedAt") is not None:
                 return {"alreadyAccepted": True, "answerAuthorId": author_id}
+            if isinstance(accepted_answer_id, str) and accepted_answer_id:
+                raise ForumRuntimeError(
+                    "already-exists", "This question already has an accepted answer."
+                )
+            if data.get("acceptedAt") is not None:
+                raise ForumRuntimeError(
+                    "failed-precondition", "This answer is already accepted elsewhere."
+                )
+            transaction.update(question_ref, {
+                "acceptedAnswerId": answer_id,
+                "acceptedAt": now,
+                "updatedAt": now,
+            })
             transaction.update(answer_ref, {"acceptedAt": now, "acceptedBy": actor_id})
             return {"alreadyAccepted": False, "answerAuthorId": author_id}
         result = accept(self.database.transaction())

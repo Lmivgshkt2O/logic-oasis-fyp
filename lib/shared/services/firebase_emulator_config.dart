@@ -7,9 +7,14 @@ class FirebaseEmulatorConfig {
   static const enabled = bool.fromEnvironment('USE_FIREBASE_EMULATORS');
   static Future<void> connect() async {
     if (!enabled) return;
-    final host = kIsWeb || defaultTargetPlatform != TargetPlatform.android ? 'localhost' : '10.0.2.2';
+    final host = kIsWeb || defaultTargetPlatform != TargetPlatform.android
+        ? 'localhost'
+        : '10.0.2.2';
     await FirebaseAuth.instance.useAuthEmulator(host, 9099);
     FirebaseFirestore.instance.useFirestoreEmulator(host, 8080);
     FirebaseFunctions.instance.useFunctionsEmulator(host, 5001);
+    FirebaseFunctions.instanceFor(
+      region: 'asia-southeast1',
+    ).useFunctionsEmulator(host, 5001);
   }
 }

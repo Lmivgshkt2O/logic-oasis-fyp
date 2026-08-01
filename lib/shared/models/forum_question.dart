@@ -7,6 +7,7 @@ class ForumQuestion {
     required this.title,
     required this.text,
     this.createdAt,
+    this.acceptedAnswerId,
   });
 
   final String id;
@@ -14,6 +15,7 @@ class ForumQuestion {
   final String title;
   final String text;
   final DateTime? createdAt;
+  final String? acceptedAnswerId;
 
   factory ForumQuestion.fromFirestore(String id, Map<String, dynamic> data) =>
       ForumQuestion(
@@ -22,5 +24,6 @@ class ForumQuestion {
         title: data['title'] as String? ?? '',
         text: data['text'] as String? ?? '',
         createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
+        acceptedAnswerId: data['acceptedAnswerId'] as String?,
       );
 }

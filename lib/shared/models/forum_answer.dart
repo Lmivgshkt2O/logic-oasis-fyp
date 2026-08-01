@@ -39,6 +39,7 @@ class ForumAnswer {
     required this.feedback,
     this.createdAt,
     this.acceptedAt,
+    this.revision = 1,
   });
 
   final String id;
@@ -48,6 +49,7 @@ class ForumAnswer {
   final ForumAnswerFeedback feedback;
   final DateTime? createdAt;
   final DateTime? acceptedAt;
+  final int revision;
 
   factory ForumAnswer.fromFirestore(String id, Map<String, dynamic> data) =>
       ForumAnswer(
@@ -60,5 +62,6 @@ class ForumAnswer {
         ),
         createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
         acceptedAt: (data['acceptedAt'] as Timestamp?)?.toDate(),
+        revision: data['revision'] as int? ?? 1,
       );
 }

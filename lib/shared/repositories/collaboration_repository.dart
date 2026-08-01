@@ -10,7 +10,9 @@ class CollaborationRepository {
     FirebaseFirestore? firestore,
     FirebaseFunctions? functions,
   }) : _firestore = firestore ?? FirebaseFirestore.instance,
-       _functions = functions ?? FirebaseFunctions.instance;
+       _functions =
+           functions ??
+           FirebaseFunctions.instanceFor(region: 'asia-southeast1');
 
   final FirebaseFirestore _firestore;
   final FirebaseFunctions _functions;
@@ -24,6 +26,17 @@ class CollaborationRepository {
         (snapshot) => snapshot.docs
             .map((doc) => ForumQuestion.fromFirestore(doc.id, doc.data()))
             .toList(growable: false),
+      );
+
+  Stream<Set<String>> watchBlockedStudentIds(String studentId) => _firestore
+      .collection('forumBlocks')
+      .where('studentId', isEqualTo: studentId)
+      .snapshots()
+      .map(
+        (snapshot) => snapshot.docs
+            .map((doc) => doc.data()['blockedStudentId'] as String? ?? '')
+            .where((id) => id.isNotEmpty)
+            .toSet(),
       );
 
   Stream<List<ForumAnswer>> watchAnswers(String questionId) => _firestore
@@ -49,6 +62,37 @@ class CollaborationRepository {
     'updatedAt': FieldValue.serverTimestamp(),
   });
 
+  Future<void> editAnswer({
+    required String studentId,
+    required String answerId,
+    required String text,
+  }) async {
+    final reference = _firestore.collection('forumAnswers').doc(answerId);
+    await _firestore.runTransaction((transaction) async {
+      final snapshot = await transaction.get(reference);
+      final data = snapshot.data();
+      if (data == null) throw StateError('Answer not found.');
+      if (data['authorId'] != studentId) {
+        throw StateError('Only the answer author may edit this answer.');
+      }
+      if (data['acceptedAt'] != null) {
+        throw StateError('An accepted answer cannot be edited.');
+      }
+      final revision = (data['revision'] as int? ?? 1) + 1;
+      transaction.update(reference, {
+        'text': text.trim(),
+        'revision': revision,
+        'aiFeedback': {
+          'state': 'pending',
+          'label': 'uncertain',
+          'message': 'Your revised answer is being reviewed.',
+          'revision': revision,
+        },
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    });
+  }
+
   Future<void> submitAnswer({
     required String studentId,
     required String questionId,
@@ -57,6 +101,7 @@ class CollaborationRepository {
     'questionId': questionId,
     'authorId': studentId,
     'text': text.trim(),
+    'revision': 1,
     'createdAt': FieldValue.serverTimestamp(),
     'updatedAt': FieldValue.serverTimestamp(),
   });
@@ -70,15 +115,29 @@ class CollaborationRepository {
       .call({'answerId': answerId});
 
   Future<void> report({
-    required String studentId,
     required String targetType,
     required String targetId,
     required String reason,
-  }) => _firestore.collection('forumReports').add({
-    'reporterId': studentId,
+  }) => _functions.httpsCallable('reportForumContent').call({
     'targetType': targetType,
     'targetId': targetId,
     'reason': reason.trim(),
-    'createdAt': FieldValue.serverTimestamp(),
   });
+
+  Future<void> block({
+    required String studentId,
+    required String blockedStudentId,
+  }) async {
+    final reference = _firestore
+        .collection('forumBlocks')
+        .doc('${studentId}_$blockedStudentId');
+    await _firestore.runTransaction((transaction) async {
+      if ((await transaction.get(reference)).exists) return;
+      transaction.set(reference, {
+        'studentId': studentId,
+        'blockedStudentId': blockedStudentId,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    });
+  }
 }

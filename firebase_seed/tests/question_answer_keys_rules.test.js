@@ -15,6 +15,7 @@ const {
   query,
   setDoc,
   serverTimestamp,
+  updateDoc,
   where,
 } = require("firebase/firestore");
 
@@ -84,7 +85,22 @@ async function main() {
         text: "I added the tens first. How can I check the result?", createdAt: new Date(), updatedAt: new Date(),
       });
       await setDoc(doc(adminDb, "forumAnswers", "forum_a1"), {
-        questionId: "forum_q1", authorId: "student_other", text: "Use subtraction to check the total.", createdAt: new Date(), updatedAt: new Date(),
+        questionId: "forum_q1", authorId: "student_other", text: "Use subtraction to check the total.", revision: 1, createdAt: new Date(), updatedAt: new Date(),
+      });
+      await setDoc(doc(adminDb, "forumAnswers", "forum_accepted"), {
+        questionId: "forum_q1", authorId: "student_other", text: "I checked each place value carefully.",
+        revision: 1, acceptedAt: new Date(), acceptedBy: "student_aiman_y4",
+        createdAt: new Date(), updatedAt: new Date(),
+      });
+      await setDoc(doc(adminDb, "forumAnswers", "forum_legacy"), {
+        questionId: "forum_q1", authorId: "student_other",
+        text: "This older answer predates explicit revisions.",
+        createdAt: new Date(), updatedAt: new Date(),
+      });
+      await setDoc(doc(adminDb, "forumReports", "student_other_question_forum_q1"), {
+        reporterId: "student_other", targetType: "question", targetId: "forum_q1",
+        reason: "This needs review.", status: "active", reviewState: "pending",
+        createdAt: new Date(), updatedAt: new Date(),
       });
       await setDoc(doc(adminDb, "parentLinks", "parent_active_student_aiman_y4"), {
         parentId: "parent_active", studentId: "student_aiman_y4", status: "active",
@@ -211,6 +227,10 @@ async function main() {
     await assertSucceeds(getDoc(doc(studentDb, "forumQuestions", "forum_q1")));
     await assertSucceeds(getDoc(doc(otherStudentDb, "forumAnswers", "forum_a1")));
     await assertFails(getDoc(doc(linkedParentDb, "forumQuestions", "forum_q1")));
+    await assertFails(getDoc(doc(anonymousDb, "forumQuestions", "forum_q1")));
+    await assertFails(getDoc(doc(linkedParentDb, "forumAnswers", "forum_a1")));
+    await assertFails(getDoc(doc(linkedParentDb, "forumReports", "student_other_question_forum_q1")));
+    await assertFails(getDoc(doc(linkedParentDb, "forumBlocks", "student_other_student_aiman_y4")));
     await assertFails(getDoc(doc(studentDb, "forumAiJobs", "forum_a1")));
     await assertSucceeds(setDoc(doc(studentDb, "forumQuestions", "forum_q2"), {
       authorId: "student_aiman_y4", title: "How can I check this answer?",
@@ -220,6 +240,61 @@ async function main() {
     await assertFails(setDoc(doc(otherStudentDb, "forumQuestions", "forum_q1"), {
       authorId: "student_other", title: "Changed question title", text: "This should not replace another learner question.", updatedAt: new Date(),
     }, { merge: true }));
+    await assertSucceeds(setDoc(doc(studentDb, "forumAnswers", "forum_a2"), {
+      questionId: "forum_q1", authorId: "student_aiman_y4",
+      text: "I regrouped the ones and then checked the tens.", revision: 1,
+      createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+    }));
+    await assertSucceeds(setDoc(doc(studentDb, "forumAnswers", "forum_legacy_create"), {
+      questionId: "forum_q1", authorId: "student_aiman_y4",
+      text: "This older client does not send an explicit revision field.",
+      createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+    }));
+    await assertSucceeds(updateDoc(doc(studentDb, "forumAnswers", "forum_a2"), {
+      text: "I regrouped the ones, checked the tens, and verified by subtraction.",
+      revision: 2,
+      aiFeedback: { state: "pending", label: "uncertain", message: "Your revised answer is being reviewed.", revision: 2 },
+      updatedAt: serverTimestamp(),
+    }));
+    await assertFails(updateDoc(doc(studentDb, "forumAnswers", "forum_a1"), {
+      text: "A foreign edit should be rejected.", revision: 2,
+      aiFeedback: { state: "pending", label: "uncertain", message: "Pending.", revision: 2 },
+      updatedAt: serverTimestamp(),
+    }));
+    await assertFails(updateDoc(doc(otherStudentDb, "forumAnswers", "forum_accepted"), {
+      text: "Accepted answers cannot be changed.", revision: 2,
+      aiFeedback: { state: "pending", label: "uncertain", message: "Pending.", revision: 2 },
+      updatedAt: serverTimestamp(),
+    }));
+    await assertFails(updateDoc(doc(studentDb, "forumAnswers", "forum_a2"), {
+      text: "This revision must not inject an arbitrary feedback payload.", revision: 3,
+      aiFeedback: { state: "pending", label: "uncertain", message: { nested: "invalid" }, revision: 3 },
+      updatedAt: serverTimestamp(),
+    }));
+    await assertFails(updateDoc(doc(otherStudentDb, "forumReports", "student_other_question_forum_q1"), {
+      reason: "Duplicate reports converge here.", updatedAt: serverTimestamp(),
+    }));
+    await assertFails(updateDoc(doc(otherStudentDb, "forumReports", "student_other_question_forum_q1"), {
+      reviewState: "resolved", updatedAt: serverTimestamp(),
+    }));
+    await assertFails(setDoc(doc(otherStudentDb, "forumReports", "student_other_answer_forum_a2"), {
+      reporterId: "student_other", targetType: "answer", targetId: "forum_a2",
+      reason: "Client-side reports are not trusted.", status: "active",
+      createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+    }));
+    await assertSucceeds(updateDoc(doc(otherStudentDb, "forumAnswers", "forum_legacy"), {
+      text: "This older answer can enter revision two safely.", revision: 2,
+      aiFeedback: { state: "pending", label: "uncertain", message: "Your revised answer is being reviewed.", revision: 2 },
+      updatedAt: serverTimestamp(),
+    }));
+    await assertSucceeds(setDoc(doc(studentDb, "forumBlocks", "student_aiman_y4_student_other"), {
+      studentId: "student_aiman_y4", blockedStudentId: "student_other", createdAt: serverTimestamp(),
+    }));
+    await assertSucceeds(getDoc(doc(studentDb, "forumBlocks", "student_aiman_y4_student_other")));
+    await assertFails(getDoc(doc(otherStudentDb, "forumBlocks", "student_aiman_y4_student_other")));
+    await assertFails(setDoc(doc(studentDb, "forumBlocks", "student_aiman_y4_student_aiman_y4"), {
+      studentId: "student_aiman_y4", blockedStudentId: "student_aiman_y4", createdAt: serverTimestamp(),
+    }));
 
     console.log("PASS: student can read safe questions/projections but cannot access answer keys, U3-R state, or U8 raw AI data.");
   } finally {
