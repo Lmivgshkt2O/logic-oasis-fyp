@@ -185,7 +185,7 @@ void main() {
     );
     await tester.pump();
     await tester.tap(find.text(question.title));
-    await tester.pumpAndSettle();
+    await tester.pump();
     answers.add(const [first, second]);
     await tester.pump();
     expect(find.text('Accept'), findsNWidgets(2));
@@ -234,7 +234,11 @@ void main() {
     addTearDown(denied.close);
     await tester.pumpWidget(
       MaterialApp(
-        home: QaForumPage(state: AppState(), questionsStream: denied.stream),
+        home: QaForumPage(
+          state: AppState(),
+          questionsStream: denied.stream,
+          blockedStudentIdsStream: Stream.value(const <String>{}),
+        ),
       ),
     );
     denied.addError(
@@ -251,6 +255,7 @@ void main() {
           key: const ValueKey('retryable-forum'),
           state: AppState(),
           questionsStream: retryable.stream,
+          blockedStudentIdsStream: Stream.value(const <String>{}),
         ),
       ),
     );

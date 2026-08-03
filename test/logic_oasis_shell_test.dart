@@ -67,8 +67,11 @@ void main() {
     await _pumpShell(
       tester,
       state,
-      forumPageBuilder: (_) =>
-          QaForumPage(state: state, questionsStream: questions.stream),
+      forumPageBuilder: (_) => QaForumPage(
+        state: state,
+        questionsStream: questions.stream,
+        blockedStudentIdsStream: Stream.value(const <String>{}),
+      ),
     );
 
     expect(find.byType(BottomNavBar), findsOneWidget);
