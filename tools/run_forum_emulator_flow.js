@@ -12,6 +12,7 @@ const {
   getFirestore,
   serverTimestamp,
   setDoc,
+  updateDoc,
 } = require('../firebase_seed/node_modules/firebase/firestore');
 const {
   connectFunctionsEmulator,
@@ -97,8 +98,6 @@ async function eventually(read, predicate, label) {
   const reportContent = httpsCallable(author.functions, 'reportForumContent');
   await markHelpful({answerId});
   await markHelpful({answerId});
-  await acceptAnswer({answerId});
-  await acceptAnswer({answerId});
   await reportContent({targetType: 'answer', targetId: answerId, reason: 'Please review this explanation.'});
   await reportContent({targetType: 'answer', targetId: answerId, reason: 'Please review this updated explanation.'});
   await setDoc(doc(author.db, 'forumBlocks', `${questionAuthor}_${answerAuthor}`), {
@@ -123,20 +122,21 @@ async function eventually(read, predicate, label) {
     adminDb.collection('forumReports').doc(`${questionAuthor}_answer_${answerId}`),
     adminDb.collection('forumBlocks').doc(`${questionAuthor}_${answerAuthor}`),
     adminDb.collection('forumAiJobs').doc(answerId),
-    adminDb.collection('forumAiRuns').doc(answerId),
   ];
   const result = await eventually(
     async () => {
       const snapshots = await Promise.all(resultRefs.map((ref) => ref.get()));
-      const [answer, question, questionSummary, answerSummary, report, block, job, run] =
+      const [answer, question, questionSummary, answerSummary, report, block, job] =
         snapshots.map((snapshot) => snapshot.data());
+      const runSnapshot = job?.logicalInferenceId
+        ? await adminDb.collection('forumAiRuns').doc(job.logicalInferenceId).get()
+        : null;
+      const run = runSnapshot?.data();
       return {answer, question, questionSummary, answerSummary, report, block, job, run};
     },
     (value) => value.answer?.aiFeedback?.state === 'completed' &&
-      value.question?.acceptedAnswerId === answerId &&
       value.questionSummary?.questionsPostedCount === 1 &&
       value.answerSummary?.answersSubmittedCount === 1 &&
-      value.answerSummary?.acceptedAnswersCount === 1 &&
       value.answerSummary?.helpfulReceivedCount === 1 &&
       value.report?.status === 'active' &&
       value.report?.reason === 'Please review this updated explanation.' &&
@@ -145,18 +145,62 @@ async function eventually(read, predicate, label) {
       value.run?.state === 'completed',
     'authenticated collaboration and four counters',
   );
+
+  await updateDoc(doc(peer.db, 'forumAnswers', answerId), {
+    text: 'I regrouped the tens and ones, then checked the total by subtracting.',
+    revision: 2,
+    aiFeedback: {
+      state: 'pending',
+      label: 'uncertain',
+      message: 'Your revised answer is being reviewed.',
+      revision: 2,
+    },
+    updatedAt: serverTimestamp(),
+  });
+  const revised = await eventually(
+    async () => {
+      const [answer, job, runs] = await Promise.all([
+        adminDb.collection('forumAnswers').doc(answerId).get(),
+        adminDb.collection('forumAiJobs').doc(answerId).get(),
+        adminDb.collection('forumAiRuns').where('answerId', '==', answerId).get(),
+      ]);
+      return {answer: answer.data(), job: job.data(), runCount: runs.size};
+    },
+    (value) => value.answer?.aiFeedback?.state === 'completed' &&
+      value.answer?.aiFeedback?.revision === 2 &&
+      value.job?.state === 'completed' &&
+      value.job?.revision === 2 &&
+      value.runCount === 2,
+    'revision-fenced reclassification and immutable runs',
+  );
+  await acceptAnswer({answerId});
+  await acceptAnswer({answerId});
+  const accepted = await eventually(
+    async () => {
+      const [question, answerSummary] = await Promise.all([
+        adminDb.collection('forumQuestions').doc(questionId).get(),
+        adminDb.collection('forumParticipationSummaries').doc(answerAuthor).get(),
+      ]);
+      return {question: question.data(), answerSummary: answerSummary.data()};
+    },
+    (value) => value.question?.acceptedAnswerId === answerId &&
+      value.answerSummary?.acceptedAnswersCount === 1,
+    'idempotent acceptance after revision reclassification',
+  );
   console.log(JSON.stringify({
     parentDenied,
-    acceptedAnswerId: result.question.acceptedAnswerId,
+    acceptedAnswerId: accepted.question.acceptedAnswerId,
     counters: {
       questionsPostedCount: result.questionSummary.questionsPostedCount,
       answersSubmittedCount: result.answerSummary.answersSubmittedCount,
-      acceptedAnswersCount: result.answerSummary.acceptedAnswersCount,
+      acceptedAnswersCount: accepted.answerSummary.acceptedAnswersCount,
       helpfulReceivedCount: result.answerSummary.helpfulReceivedCount,
     },
     feedbackState: result.answer.aiFeedback.state,
     jobState: result.job.state,
     runState: result.run.state,
+    revisedFeedbackRevision: revised.answer.aiFeedback.revision,
+    immutableRunCount: revised.runCount,
     reportStatus: result.report.status,
     blockedStudentId: result.block.blockedStudentId,
   }, null, 2));

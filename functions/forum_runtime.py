@@ -1,8 +1,8 @@
 """Server-owned U10 forum AI and count-only Mutual Aid runtime."""
 from __future__ import annotations
 
-from dataclasses import asdict
-from datetime import datetime, timedelta
+from dataclasses import asdict, dataclass
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 import json
 import os
@@ -20,6 +20,23 @@ FORUM_MODEL_PATH = Path(__file__).resolve().parent / "forum_model.joblib"
 FORUM_MODEL_MANIFEST_PATH = Path(__file__).resolve().parent / "forum_model_manifest.json"
 KUALA_LUMPUR = ZoneInfo("Asia/Kuala_Lumpur")
 COUNTER_FIELDS = ("questionsPostedCount", "answersSubmittedCount", "acceptedAnswersCount", "helpfulReceivedCount")
+FORUM_AI_POLICY_VERSION = "forum-advisory-policy-v1"
+FORUM_AI_LEASE_DURATION = timedelta(minutes=5)
+FORUM_AI_MAX_ATTEMPTS = 3
+
+
+@dataclass(frozen=True)
+class ForumAiClaim:
+    answer_id: str
+    logical_inference_id: str
+    revision: int
+    text_hash: str
+    model_version: str
+    artifact_identity: str
+    policy_version: str
+    fencing_generation: int
+    attempt_count: int
+    event_id: str
 
 
 class ForumRuntimeError(ValueError):
@@ -48,12 +65,58 @@ def malaysia_week_start(value: Any) -> datetime:
     return datetime(monday.year, monday.month, monday.day, tzinfo=KUALA_LUMPUR)
 
 
+def _latest_timestamp(existing: Any, candidate: Any) -> Any:
+    if existing is None:
+        return candidate
+    try:
+        return existing if _as_datetime(existing) >= _as_datetime(candidate) else candidate
+    except ForumRuntimeError:
+        return candidate
+
+
 def feedback_for(label: str) -> str:
     if label == SUFFICIENT:
         return "Thanks for explaining your method. Your peer can now follow the reasoning."
     if label == REVISION:
         return "Please add the steps or mathematical reason behind your answer so a peer can learn from it."
     return "Your answer is saved. You can add a little more about how you reached it if you wish."
+
+
+def _forum_text_hash(value: Any) -> str | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    return sha256(value.strip().encode("utf-8")).hexdigest()
+
+
+def _feedback_payload(
+    *, state: str, prediction: Any, revision: int, logical_inference_id: str,
+) -> dict[str, Any]:
+    if isinstance(prediction, Mapping):
+        label = prediction.get("label", UNCERTAIN)
+        probability = prediction.get("probability")
+        model_version = prediction.get("model_version")
+        calibration_state = prediction.get("calibration_state", "unavailable")
+    elif prediction is not None:
+        label = prediction.label
+        probability = prediction.probability
+        model_version = prediction.model_version
+        calibration_state = prediction.calibration_state
+    else:
+        label = UNCERTAIN
+        probability = None
+        model_version = None
+        calibration_state = "unavailable"
+    return {
+        "state": state,
+        "label": label,
+        "probability": probability,
+        "modelVersion": model_version,
+        "calibrationState": calibration_state,
+        "message": feedback_for(label),
+        "revision": revision,
+        "logicalInferenceId": logical_inference_id,
+        "updatedAt": firestore.SERVER_TIMESTAMP,
+    }
 
 
 def _transaction_snapshot(transaction: Any, reference: Any) -> Any:
@@ -84,32 +147,91 @@ class ForumRuntimeGateway:
         if field not in COUNTER_FIELDS:
             raise ValueError("invalid forum counter")
         event_ref = self.database.collection("forumParticipationEvents").document(event_id)
-        summary_ref = self.database.collection("forumParticipationSummaries").document(student_id)
-        week_start = malaysia_week_start(occurred_at)
+        aggregate_ref = self.database.collection(
+            "forumParticipationAggregateClaims"
+        ).document(event_id)
 
         @firestore.transactional
         def record(transaction: Any) -> None:
-            if (_transaction_snapshot(transaction, event_ref) or _MissingSnapshot()).exists:
+            event = _transaction_snapshot(transaction, event_ref) or _MissingSnapshot()
+            aggregate = _transaction_snapshot(transaction, aggregate_ref) or _MissingSnapshot()
+            if aggregate.exists:
                 return
+            source = event.to_dict() if event.exists else {
+                "studentId": student_id, "counter": field, "occurredAt": occurred_at,
+            }
+            source_student_id = _required(source, "studentId")
+            source_field = source.get("counter")
+            if source_field not in COUNTER_FIELDS:
+                raise ForumRuntimeError(
+                    "failed-precondition", "Forum participation event counter is invalid.",
+                )
+            source_occurred_at = source.get("occurredAt")
+            week_start = malaysia_week_start(source_occurred_at)
+            summary_ref = self.database.collection(
+                "forumParticipationSummaries"
+            ).document(source_student_id)
+            weekly_ref = self.database.collection(
+                "forumParticipationWeeklySummaries"
+            ).document(f"{source_student_id}_{week_start.date().isoformat()}")
+            weekly = _transaction_snapshot(transaction, weekly_ref) or _MissingSnapshot()
+            weekly_data = weekly.to_dict() if weekly.exists else {}
+            weekly_counts = {
+                name: int(weekly_data.get(name, 0)) for name in COUNTER_FIELDS
+            }
             summary = _transaction_snapshot(transaction, summary_ref) or _MissingSnapshot()
             current = summary.to_dict() if summary.exists else {}
             current_week = current.get("weekStart")
             if current_week is not None:
                 try:
-                    same_week = malaysia_week_start(current_week) == week_start
+                    current_week = malaysia_week_start(current_week)
                 except ForumRuntimeError:
-                    same_week = False
-            else:
-                same_week = False
-            counts = {name: int(current.get(name, 0)) if same_week else 0 for name in COUNTER_FIELDS}
-            counts[field] += 1
-            transaction.set(event_ref, {
-                "eventId": event_id, "studentId": student_id, "counter": field,
-                "occurredAt": occurred_at, "weekStart": week_start,
+                    current_week = None
+            # Bootstrap the historical aggregate from the pre-U3 current
+            # projection so the first post-migration event cannot reset it.
+            if not weekly.exists and current_week == week_start:
+                weekly_counts = {
+                    name: int(current.get(name, 0)) for name in COUNTER_FIELDS
+                }
+            bootstrapped_legacy_current_week = (
+                event.exists and not weekly.exists and current_week == week_start
+            )
+            if not bootstrapped_legacy_current_week:
+                weekly_counts[source_field] += 1
+            weekly_last = _latest_timestamp(
+                weekly_data.get("lastParticipationAt") or (
+                    current.get("lastParticipationAt")
+                    if bootstrapped_legacy_current_week else None
+                ),
+                source_occurred_at,
+            )
+            if not event.exists:
+                transaction.set(event_ref, {
+                    "eventId": event_id, "studentId": source_student_id,
+                    "counter": source_field, "occurredAt": source_occurred_at,
+                    "weekStart": week_start,
+                })
+            transaction.set(weekly_ref, {
+                "studentId": source_student_id, "weekStart": week_start, **weekly_counts,
+                "lastParticipationAt": weekly_last, "updatedAt": firestore.SERVER_TIMESTAMP,
             })
-            transaction.set(summary_ref, {
-                "studentId": student_id, "weekStart": week_start, **counts,
-                "lastParticipationAt": occurred_at, "updatedAt": firestore.SERVER_TIMESTAMP,
+            # Historical repairs update their immutable week aggregate but may
+            # never move the linked-parent current-week projection backwards.
+            if current_week is None or week_start >= current_week:
+                transaction.set(summary_ref, {
+                    "studentId": source_student_id, "weekStart": week_start, **weekly_counts,
+                    "lastParticipationAt": _latest_timestamp(
+                        current.get("lastParticipationAt") if current_week == week_start else None,
+                        weekly_last,
+                    ),
+                    "updatedAt": firestore.SERVER_TIMESTAMP,
+                })
+            transaction.set(aggregate_ref, {
+                "eventId": event_id,
+                "studentId": source_student_id,
+                "counter": source_field,
+                "weekStart": week_start,
+                "aggregatedAt": firestore.SERVER_TIMESTAMP,
             })
         record(self.database.transaction())
 
@@ -132,14 +254,26 @@ class ForumRuntimeGateway:
             author_id = _required(answer_data, "authorId")
             if author_id == actor_id:
                 raise ForumRuntimeError("failed-precondition", "You cannot mark your own answer helpful.")
-            if (_transaction_snapshot(transaction, mark_ref) or _MissingSnapshot()).exists:
-                return {"alreadyMarked": True, "answerAuthorId": author_id}
+            existing = _transaction_snapshot(transaction, mark_ref) or _MissingSnapshot()
+            if existing.exists:
+                action_time = existing.to_dict().get("createdAt") or now
+                return {
+                    "alreadyMarked": True, "answerAuthorId": author_id,
+                    "actionOccurredAt": action_time,
+                }
             transaction.set(mark_ref, {"answerId": answer_id, "studentId": actor_id, "createdAt": now})
-            return {"alreadyMarked": False, "answerAuthorId": author_id}
+            return {
+                "alreadyMarked": False, "answerAuthorId": author_id,
+                "actionOccurredAt": now,
+            }
         result = mark(self.database.transaction())
         # The deterministic event is independently idempotent. Replaying it
         # repairs a counter if a prior callable died after writing the mark.
-        self._record_participation(event_id=f"helpful:{answer_id}:{actor_id}", student_id=result["answerAuthorId"], field="helpfulReceivedCount", occurred_at=now)
+        self._record_participation(
+            event_id=f"helpful:{answer_id}:{actor_id}",
+            student_id=result["answerAuthorId"], field="helpfulReceivedCount",
+            occurred_at=result["actionOccurredAt"],
+        )
         return result
 
     def report_content(
@@ -230,9 +364,15 @@ class ForumRuntimeGateway:
                         "acceptedAt": data["acceptedAt"],
                         "updatedAt": now,
                     })
-                    return {"alreadyAccepted": True, "answerAuthorId": author_id}
+                    return {
+                        "alreadyAccepted": True, "answerAuthorId": author_id,
+                        "actionOccurredAt": data["acceptedAt"],
+                    }
             if accepted_answer_id == answer_id and data.get("acceptedAt") is not None:
-                return {"alreadyAccepted": True, "answerAuthorId": author_id}
+                return {
+                    "alreadyAccepted": True, "answerAuthorId": author_id,
+                    "actionOccurredAt": data["acceptedAt"],
+                }
             if isinstance(accepted_answer_id, str) and accepted_answer_id:
                 raise ForumRuntimeError(
                     "already-exists", "This question already has an accepted answer."
@@ -247,56 +387,370 @@ class ForumRuntimeGateway:
                 "updatedAt": now,
             })
             transaction.update(answer_ref, {"acceptedAt": now, "acceptedBy": actor_id})
-            return {"alreadyAccepted": False, "answerAuthorId": author_id}
+            return {
+                "alreadyAccepted": False, "answerAuthorId": author_id,
+                "actionOccurredAt": now,
+            }
         result = accept(self.database.transaction())
         # As above, a retry after a partial failure restores the safe count
         # without ever creating a second acceptance event.
-        self._record_participation(event_id=f"accept:{answer_id}", student_id=result["answerAuthorId"], field="acceptedAnswersCount", occurred_at=now)
+        self._record_participation(
+            event_id=f"accept:{answer_id}",
+            student_id=result["answerAuthorId"], field="acceptedAnswersCount",
+            occurred_at=result["actionOccurredAt"],
+        )
         return result
 
-    def process_answer(self, answer_id: str, data: Mapping[str, Any], classifier: ForumTextClassifier | None) -> str:
+    def process_answer(
+        self,
+        answer_id: str,
+        data: Mapping[str, Any],
+        classifier: ForumTextClassifier | None,
+        *,
+        event_id: str | None = None,
+        now: datetime | None = None,
+    ) -> str:
+        answer_id = _document_id(answer_id)
+        now = now or datetime.now(timezone.utc)
+        audit_event_id = event_id or f"answer:{answer_id}"
+        try:
+            text = _required(data, "text")
+            revision = data.get("revision", 1)
+            if isinstance(revision, bool) or not isinstance(revision, int) or revision < 1:
+                raise ForumRuntimeError(
+                    "failed-precondition", "Forum answer revision is invalid.",
+                )
+        except ForumRuntimeError as error:
+            return self._terminalize_invalid_answer(
+                answer_id=answer_id,
+                data=data,
+                event_id=audit_event_id,
+                error=error,
+            )
+        model_version = classifier.model_version if classifier is not None else "safe-fallback-v1"
+        artifact_identity = (
+            str(getattr(classifier, "artifact_sha256", model_version))
+            if classifier is not None else model_version
+        )
+        text_hash = _forum_text_hash(text)
+        if text_hash is None:
+            raise ForumRuntimeError("failed-precondition", "Forum answer text is invalid.")
+        logical_id = sha256(
+            json.dumps({
+                "answerId": answer_id,
+                "revision": revision,
+                "textHash": text_hash,
+                "modelVersion": model_version,
+                "artifactIdentity": artifact_identity,
+                "policyVersion": FORUM_AI_POLICY_VERSION,
+            }, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
+        claim_or_state = self._claim_answer(
+            answer_id=answer_id,
+            logical_inference_id=logical_id,
+            revision=revision,
+            text_hash=text_hash,
+            model_version=model_version,
+            artifact_identity=artifact_identity,
+            event_id=audit_event_id,
+            now=now,
+        )
+        if isinstance(claim_or_state, str):
+            return claim_or_state
+        claim = claim_or_state
+        try:
+            prediction = classifier.predict(text) if classifier is not None else None
+            return self._finalize_answer(claim, prediction, now=now)
+        except Exception as error:
+            permanent = isinstance(error, (ForumRuntimeError, ValueError, TypeError))
+            state = self._fail_answer(claim, error, permanent=permanent, now=now)
+            if state == "retryable":
+                raise
+            return state
+
+    def _terminalize_invalid_answer(
+        self,
+        *,
+        answer_id: str,
+        data: Mapping[str, Any],
+        event_id: str,
+        error: ForumRuntimeError,
+    ) -> str:
         answer_ref = self.database.collection("forumAnswers").document(answer_id)
         job_ref = self.database.collection("forumAiJobs").document(answer_id)
-        run_ref = self.database.collection("forumAiRuns").document(answer_id)
-        existing = job_ref.get()
-        if existing.exists and (existing.to_dict() or {}).get("state") in {"completed", "fallback", "failed"}:
-            return str(existing.to_dict()["state"])
-        # A retry may arrive after the immutable run committed but before the
-        # job's terminal state did. Recover that deterministic result instead
-        # of trying to create a second run.
-        existing_run = run_ref.get()
-        if existing_run.exists and isinstance((existing_run.to_dict() or {}).get("state"), str):
-            state = existing_run.to_dict()["state"]
-            job_ref.set({"answerId": answer_id, "state": state, "updatedAt": firestore.SERVER_TIMESTAMP}, merge=True)
-            return state
-        job_ref.set({"answerId": answer_id, "state": "processing", "updatedAt": firestore.SERVER_TIMESTAMP}, merge=True)
-        try:
-            if classifier is None:
-                state, prediction = "fallback", None
-            else:
-                prediction = classifier.predict(_required(data, "text"))
-                state = "completed"
-            safe_feedback = feedback_for(prediction.label) if prediction else feedback_for(UNCERTAIN)
-            answer_ref.set({"aiFeedback": {
-                "state": state, "label": prediction.label if prediction else UNCERTAIN,
-                "probability": prediction.probability if prediction else None,
-                "modelVersion": prediction.model_version if prediction else None,
-                "calibrationState": prediction.calibration_state if prediction else "unavailable",
-                "message": safe_feedback, "updatedAt": firestore.SERVER_TIMESTAMP,
-            }}, merge=True)
-            run_ref.create({"answerId": answer_id, "state": state, "prediction": asdict(prediction) if prediction else None, "createdAt": firestore.SERVER_TIMESTAMP})
-            job_ref.set({"answerId": answer_id, "state": state, "updatedAt": firestore.SERVER_TIMESTAMP}, merge=True)
-            return state
-        except Exception as error:
-            recovered_run = run_ref.get()
-            if recovered_run.exists and isinstance((recovered_run.to_dict() or {}).get("state"), str):
-                state = recovered_run.to_dict()["state"]
-                job_ref.set({"answerId": answer_id, "state": state, "updatedAt": firestore.SERVER_TIMESTAMP}, merge=True)
+
+        @firestore.transactional
+        def terminalize(transaction: Any) -> str:
+            answer_snapshot = _transaction_snapshot(transaction, answer_ref) or _MissingSnapshot()
+            current = answer_snapshot.to_dict() if answer_snapshot.exists else {}
+            if (
+                current.get("revision", 1) != data.get("revision", 1)
+                or current.get("text") != data.get("text")
+            ):
+                return "superseded"
+            transaction.set(job_ref, {
+                "answerId": answer_id,
+                "state": "failed",
+                "failureType": "permanent",
+                "errorCode": error.code,
+                "claimEventId": event_id,
+                "attemptCount": 1,
+                "leaseExpiresAt": None,
+                "updatedAt": firestore.SERVER_TIMESTAMP,
+            }, merge=True)
+            return "failed"
+
+        return terminalize(self.database.transaction())
+
+    def _claim_answer(
+        self,
+        *,
+        answer_id: str,
+        logical_inference_id: str,
+        revision: int,
+        text_hash: str,
+        model_version: str,
+        artifact_identity: str,
+        event_id: str,
+        now: datetime,
+    ) -> ForumAiClaim | str:
+        answer_ref = self.database.collection("forumAnswers").document(answer_id)
+        job_ref = self.database.collection("forumAiJobs").document(answer_id)
+        run_ref = self.database.collection("forumAiRuns").document(logical_inference_id)
+
+        @firestore.transactional
+        def claim(transaction: Any) -> ForumAiClaim | str:
+            answer_snapshot = _transaction_snapshot(transaction, answer_ref) or _MissingSnapshot()
+            answer = answer_snapshot.to_dict() if answer_snapshot.exists else {}
+            current_text_hash = _forum_text_hash(answer.get("text"))
+            if answer.get("revision", 1) != revision or current_text_hash != text_hash:
+                return "superseded"
+            job_snapshot = _transaction_snapshot(transaction, job_ref) or _MissingSnapshot()
+            job = job_snapshot.to_dict() if job_snapshot.exists else {}
+            state = job.get("state")
+            feedback = answer.get("aiFeedback")
+            feedback_state = feedback.get("state") if isinstance(feedback, Mapping) else None
+            feedback_revision = feedback.get("revision") if isinstance(feedback, Mapping) else None
+            legacy_terminal_feedback = (
+                not job.get("logicalInferenceId")
+                and state in {"completed", "fallback", "failed"}
+                and feedback_state in {"completed", "fallback", "failed"}
+                and (
+                    feedback_revision == revision
+                    or (feedback_revision is None and revision == 1)
+                )
+            )
+            if legacy_terminal_feedback:
+                return str(state)
+            same_identity = (
+                job.get("logicalInferenceId") == logical_inference_id
+                or (
+                    not job.get("logicalInferenceId")
+                    and state in {"processing", "retryable"}
+                )
+            )
+            # A completed duplicate is a read-only no-op. Run recovery below
+            # is reserved for the partial-failure case where the terminal job
+            # write did not commit.
+            if same_identity and state in {"completed", "fallback", "failed"}:
+                return str(state)
+            run_snapshot = _transaction_snapshot(transaction, run_ref) or _MissingSnapshot()
+            if run_snapshot.exists:
+                run = run_snapshot.to_dict()
+                state = str(run.get("resultState") or run.get("state") or "completed")
+                prediction = run.get("prediction")
+                if run.get("state") != "superseded":
+                    transaction.set(answer_ref, {"aiFeedback": _feedback_payload(
+                        state=state,
+                        prediction=prediction,
+                        revision=revision,
+                        logical_inference_id=logical_inference_id,
+                    )}, merge=True)
+                transaction.set(job_ref, {
+                    "answerId": answer_id, "state": state,
+                    "logicalInferenceId": logical_inference_id,
+                    "artifactIdentity": artifact_identity,
+                    "recoveredFromRun": True, "updatedAt": firestore.SERVER_TIMESTAMP,
+                }, merge=True)
                 return state
-            job_ref.set({"answerId": answer_id, "state": "failed", "errorCode": type(error).__name__, "updatedAt": firestore.SERVER_TIMESTAMP}, merge=True)
-            # Eventarc can retry a transient model/Firestore failure. The job
-            # remains server-only and retry processing is idempotent.
-            raise
+
+            lease_expires_at = job.get("leaseExpiresAt")
+            if (
+                same_identity and state == "processing"
+                and isinstance(lease_expires_at, datetime) and lease_expires_at > now
+            ):
+                return "processing"
+
+            previous_generation = job.get("fencingGeneration", 0)
+            if isinstance(previous_generation, bool) or not isinstance(previous_generation, int):
+                previous_generation = 0
+            previous_attempt = job.get("attemptCount", 0) if same_identity else 0
+            if isinstance(previous_attempt, bool) or not isinstance(previous_attempt, int):
+                previous_attempt = 0
+            attempt_count = previous_attempt + 1
+            fencing_generation = previous_generation + 1
+            lease_expiry = now + FORUM_AI_LEASE_DURATION
+            if attempt_count > FORUM_AI_MAX_ATTEMPTS:
+                transaction.set(job_ref, {
+                    "answerId": answer_id, "state": "failed",
+                    "failureType": "attempts_exhausted",
+                    "attemptCount": previous_attempt,
+                    "logicalInferenceId": logical_inference_id,
+                    "updatedAt": firestore.SERVER_TIMESTAMP,
+                }, merge=True)
+                return "failed"
+            transaction.set(job_ref, {
+                "answerId": answer_id,
+                "state": "processing",
+                "logicalInferenceId": logical_inference_id,
+                "revision": revision,
+                "textHash": text_hash,
+                "modelVersion": model_version,
+                "artifactIdentity": artifact_identity,
+                "policyVersion": FORUM_AI_POLICY_VERSION,
+                "claimEventId": event_id,
+                "attemptCount": attempt_count,
+                "fencingGeneration": fencing_generation,
+                "leaseExpiresAt": lease_expiry,
+                "completedAt": None,
+                "failureType": None,
+                "errorCode": None,
+                "recoveredFromRun": False,
+                "updatedAt": firestore.SERVER_TIMESTAMP,
+            }, merge=True)
+            transaction.set(answer_ref, {"aiFeedback": {
+                "state": "pending", "revision": revision,
+                "logicalInferenceId": logical_inference_id,
+                "updatedAt": firestore.SERVER_TIMESTAMP,
+            }}, merge=True)
+            return ForumAiClaim(
+                answer_id=answer_id,
+                logical_inference_id=logical_inference_id,
+                revision=revision,
+                text_hash=text_hash,
+                model_version=model_version,
+                artifact_identity=artifact_identity,
+                policy_version=FORUM_AI_POLICY_VERSION,
+                fencing_generation=fencing_generation,
+                attempt_count=attempt_count,
+                event_id=event_id,
+            )
+
+        return claim(self.database.transaction())
+
+    def _finalize_answer(self, claim: ForumAiClaim, prediction: Any, *, now: datetime) -> str:
+        answer_ref = self.database.collection("forumAnswers").document(claim.answer_id)
+        job_ref = self.database.collection("forumAiJobs").document(claim.answer_id)
+        run_ref = self.database.collection("forumAiRuns").document(claim.logical_inference_id)
+
+        @firestore.transactional
+        def finalize(transaction: Any) -> str:
+            existing_run = _transaction_snapshot(transaction, run_ref) or _MissingSnapshot()
+            if existing_run.exists:
+                run = existing_run.to_dict()
+                return str(run.get("resultState") or run.get("state") or "completed")
+            answer_snapshot = _transaction_snapshot(transaction, answer_ref) or _MissingSnapshot()
+            job_snapshot = _transaction_snapshot(transaction, job_ref) or _MissingSnapshot()
+            answer = answer_snapshot.to_dict() if answer_snapshot.exists else {}
+            job = job_snapshot.to_dict() if job_snapshot.exists else {}
+            current_text_hash = _forum_text_hash(answer.get("text"))
+            compatible = (
+                job.get("state") == "processing"
+                and job.get("logicalInferenceId") == claim.logical_inference_id
+                and job.get("fencingGeneration") == claim.fencing_generation
+                and job.get("artifactIdentity") == claim.artifact_identity
+                and answer.get("revision", 1) == claim.revision
+                and current_text_hash == claim.text_hash
+            )
+            result_state = "completed" if prediction is not None else "fallback"
+            run_state = result_state if compatible else "superseded"
+            if (
+                not compatible
+                and job.get("logicalInferenceId") == claim.logical_inference_id
+                and job.get("fencingGeneration") != claim.fencing_generation
+            ):
+                return "superseded"
+            transaction.create(run_ref, {
+                "answerId": claim.answer_id,
+                "logicalInferenceId": claim.logical_inference_id,
+                "revision": claim.revision,
+                "textHash": claim.text_hash,
+                "modelVersion": claim.model_version,
+                "artifactIdentity": claim.artifact_identity,
+                "policyVersion": claim.policy_version,
+                "fencingGeneration": claim.fencing_generation,
+                "claimEventId": claim.event_id,
+                "state": run_state,
+                "resultState": result_state,
+                "prediction": asdict(prediction) if prediction is not None else None,
+                "createdAt": firestore.SERVER_TIMESTAMP,
+            })
+            if not compatible:
+                return "superseded"
+            transaction.set(answer_ref, {"aiFeedback": _feedback_payload(
+                state=result_state,
+                prediction=prediction,
+                revision=claim.revision,
+                logical_inference_id=claim.logical_inference_id,
+            )}, merge=True)
+            transaction.set(job_ref, {
+                "state": result_state,
+                "completedAt": firestore.SERVER_TIMESTAMP,
+                "leaseExpiresAt": None,
+                "updatedAt": firestore.SERVER_TIMESTAMP,
+            }, merge=True)
+            return result_state
+
+        return finalize(self.database.transaction())
+
+    def _fail_answer(
+        self,
+        claim: ForumAiClaim,
+        error: Exception,
+        *,
+        permanent: bool,
+        now: datetime,
+    ) -> str:
+        job_ref = self.database.collection("forumAiJobs").document(claim.answer_id)
+        answer_ref = self.database.collection("forumAnswers").document(claim.answer_id)
+
+        @firestore.transactional
+        def fail(transaction: Any) -> str:
+            job_snapshot = _transaction_snapshot(transaction, job_ref) or _MissingSnapshot()
+            answer_snapshot = _transaction_snapshot(transaction, answer_ref) or _MissingSnapshot()
+            job = job_snapshot.to_dict() if job_snapshot.exists else {}
+            answer = answer_snapshot.to_dict() if answer_snapshot.exists else {}
+            if (
+                job.get("logicalInferenceId") != claim.logical_inference_id
+                or job.get("fencingGeneration") != claim.fencing_generation
+            ):
+                return "superseded"
+            exhausted = claim.attempt_count >= FORUM_AI_MAX_ATTEMPTS
+            state = "failed" if permanent or exhausted else "retryable"
+            transaction.set(job_ref, {
+                "state": state,
+                "failureType": (
+                    "permanent" if permanent else
+                    "attempts_exhausted" if exhausted else "transient"
+                ),
+                "errorCode": type(error).__name__,
+                "leaseExpiresAt": None if state == "failed" else now,
+                "updatedAt": firestore.SERVER_TIMESTAMP,
+            }, merge=True)
+            if (
+                state == "failed"
+                and answer.get("revision", 1) == claim.revision
+                and _forum_text_hash(answer.get("text")) == claim.text_hash
+            ):
+                transaction.set(answer_ref, {"aiFeedback": _feedback_payload(
+                    state="fallback",
+                    prediction=None,
+                    revision=claim.revision,
+                    logical_inference_id=claim.logical_inference_id,
+                )}, merge=True)
+            return state
+
+        return fail(self.database.transaction())
 
 
 def load_forum_classifier(
@@ -311,7 +765,10 @@ def load_forum_classifier(
         if manifest.get("evidenceState") == "emulator_fixture_only" and os.environ.get("FUNCTIONS_EMULATOR") != "true":
             return None
         classifier = ForumTextClassifier.load(path)
-        return classifier if manifest.get("modelVersion") == classifier.model_version else None
+        if manifest.get("modelVersion") != classifier.model_version:
+            return None
+        classifier.artifact_sha256 = manifest["artifactSha256"]
+        return classifier
     except Exception:
         return None
 

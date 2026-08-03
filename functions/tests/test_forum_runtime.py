@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 import json
 import os
@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "functions"))
 
 from forum_runtime import (
+    ForumAiClaim,
     ForumRuntimeError,
     ForumRuntimeGateway,
     _transaction_snapshot,
@@ -18,7 +19,7 @@ from forum_runtime import (
     load_forum_classifier,
     malaysia_week_start,
 )
-from logic_oasis_ai.forum_ai.classifier import REVISION, SUFFICIENT, UNCERTAIN
+from logic_oasis_ai.forum_ai.classifier import ForumPrediction, REVISION, SUFFICIENT, UNCERTAIN
 
 
 class _Snapshot:
@@ -81,7 +82,17 @@ class _Transaction:
         self.database.rows[(reference.collection, reference.identifier)].update(values)
 
     def set(self, reference, values, **_kwargs):
-        self.database.rows[(reference.collection, reference.identifier)] = dict(values)
+        key = (reference.collection, reference.identifier)
+        if _kwargs.get("merge"):
+            self.database.rows.setdefault(key, {}).update(values)
+        else:
+            self.database.rows[key] = dict(values)
+
+    def create(self, reference, values):
+        key = (reference.collection, reference.identifier)
+        if key in self.database.rows:
+            raise RuntimeError("already exists")
+        self.database.rows[key] = dict(values)
 
 
 class _Database:
@@ -96,6 +107,426 @@ class _Database:
 
 
 class ForumRuntimeTests(unittest.TestCase):
+    def test_delayed_counter_repairs_origin_week_without_regressing_current_projection(self):
+        old = datetime(2026, 7, 27, tzinfo=timezone.utc)
+        current = datetime(2026, 8, 3, tzinfo=timezone.utc)
+        database = _Database({})
+        gateway = ForumRuntimeGateway(database)
+
+        with patch("forum_runtime.firestore.transactional", lambda function: function):
+            gateway._record_participation(
+                event_id="answer:new", student_id="student-a",
+                field="answersSubmittedCount", occurred_at=current,
+            )
+            gateway._record_participation(
+                event_id="answer:old", student_id="student-a",
+                field="answersSubmittedCount", occurred_at=old,
+            )
+
+        current_summary = database.rows[("forumParticipationSummaries", "student-a")]
+        old_week = database.rows[(
+            "forumParticipationWeeklySummaries", "student-a_2026-07-27",
+        )]
+        self.assertEqual(malaysia_week_start(current), current_summary["weekStart"])
+        self.assertEqual(1, current_summary["answersSubmittedCount"])
+        self.assertEqual(1, old_week["answersSubmittedCount"])
+
+    def test_out_of_order_same_week_event_keeps_latest_participation_timestamp(self):
+        later = datetime(2026, 8, 3, 10, tzinfo=timezone.utc)
+        earlier = datetime(2026, 8, 3, 9, tzinfo=timezone.utc)
+        database = _Database({})
+        gateway = ForumRuntimeGateway(database)
+
+        with patch("forum_runtime.firestore.transactional", lambda function: function):
+            gateway._record_participation(
+                event_id="answer:later", student_id="student-a",
+                field="answersSubmittedCount", occurred_at=later,
+            )
+            gateway._record_participation(
+                event_id="question:earlier", student_id="student-a",
+                field="questionsPostedCount", occurred_at=earlier,
+            )
+
+        weekly = database.rows[(
+            "forumParticipationWeeklySummaries", "student-a_2026-08-03",
+        )]
+        current = database.rows[("forumParticipationSummaries", "student-a")]
+        self.assertEqual(later, weekly["lastParticipationAt"])
+        self.assertEqual(later, current["lastParticipationAt"])
+
+    def test_duplicate_helpful_repairs_using_the_action_original_timestamp(self):
+        original = datetime(2026, 7, 27, tzinfo=timezone.utc)
+        retry = datetime(2026, 8, 3, tzinfo=timezone.utc)
+        database = _Database({
+            ("forumAnswers", "a1"): {"authorId": "student-a"},
+            ("forumHelpfulMarks", "a1_student-b"): {
+                "answerId": "a1", "studentId": "student-b", "createdAt": original,
+            },
+        })
+        gateway = ForumRuntimeGateway(database)
+
+        with patch("forum_runtime.firestore.transactional", lambda function: function):
+            result = gateway.mark_helpful(
+                answer_id="a1", actor_id="student-b", now=retry,
+            )
+
+        event = database.rows[("forumParticipationEvents", "helpful:a1:student-b")]
+        self.assertTrue(result["alreadyMarked"])
+        self.assertEqual(original, event["occurredAt"])
+
+    def test_existing_ledger_event_backfills_weekly_aggregate_once(self):
+        occurred_at = datetime(2026, 7, 27, tzinfo=timezone.utc)
+        database = _Database({
+            ("forumParticipationEvents", "answer:legacy"): {
+                "eventId": "answer:legacy", "studentId": "student-a",
+                "counter": "answersSubmittedCount", "occurredAt": occurred_at,
+                "weekStart": malaysia_week_start(occurred_at),
+            },
+        })
+        gateway = ForumRuntimeGateway(database)
+
+        with patch("forum_runtime.firestore.transactional", lambda function: function):
+            for _ in range(2):
+                gateway._record_participation(
+                    event_id="answer:legacy", student_id="student-a",
+                    field="answersSubmittedCount", occurred_at=occurred_at,
+                )
+
+        weekly = database.rows[(
+            "forumParticipationWeeklySummaries", "student-a_2026-07-27",
+        )]
+        self.assertEqual(1, weekly["answersSubmittedCount"])
+        self.assertIn(
+            ("forumParticipationAggregateClaims", "answer:legacy"), database.rows,
+        )
+
+    def test_concurrent_duplicate_claims_run_inference_once(self):
+        now = datetime(2026, 8, 3, tzinfo=timezone.utc)
+        answer = {
+            "authorId": "student-a", "questionId": "q1", "revision": 1,
+            "text": "I added the tens and then checked the ones.",
+        }
+        database = _Database({("forumAnswers", "a1"): dict(answer)})
+        gateway = ForumRuntimeGateway(database)
+
+        class ReentrantClassifier:
+            model_version = "model-v1"
+            calls = 0
+
+            def predict(self, _text):
+                self.calls += 1
+                if self.calls == 1:
+                    self.duplicate_state = gateway.process_answer(
+                        "a1", answer, self, event_id="event-duplicate", now=now,
+                    )
+                return ForumPrediction(SUFFICIENT, 0.9, self.model_version)
+
+        classifier = ReentrantClassifier()
+        with patch("forum_runtime.firestore.transactional", lambda function: function):
+            state = gateway.process_answer(
+                "a1", answer, classifier, event_id="event-first", now=now,
+            )
+
+        self.assertEqual("completed", state)
+        self.assertEqual("processing", classifier.duplicate_state)
+        self.assertEqual(1, classifier.calls)
+        self.assertEqual(1, len([
+            key for key in database.rows if key[0] == "forumAiRuns"
+        ]))
+
+    def test_invalid_answer_is_terminalized_without_retrying_eventarc(self):
+        now = datetime(2026, 8, 3, tzinfo=timezone.utc)
+        database = _Database({
+            ("forumAnswers", "a1"): {
+                "authorId": "student-a", "revision": 0, "text": "",
+            },
+        })
+        gateway = ForumRuntimeGateway(database)
+
+        with patch("forum_runtime.firestore.transactional", lambda function: function):
+            self.assertEqual(
+                "failed",
+                gateway.process_answer(
+                    "a1", database.rows[("forumAnswers", "a1")], None,
+                    event_id="invalid-event", now=now,
+                ),
+            )
+
+        job = database.rows[("forumAiJobs", "a1")]
+        self.assertEqual("failed", job["state"])
+        self.assertEqual("permanent", job["failureType"])
+
+    def test_artifact_hash_changes_logical_inference_identity(self):
+        now = datetime(2026, 8, 3, tzinfo=timezone.utc)
+        answer = {"authorId": "student-a", "revision": 1, "text": "My checked steps."}
+        database = _Database({("forumAnswers", "a1"): dict(answer)})
+        gateway = ForumRuntimeGateway(database)
+
+        def classifier(artifact_hash):
+            return type("Classifier", (), {
+                "model_version": "model-v1",
+                "artifact_sha256": artifact_hash,
+                "predict": lambda self, _text: ForumPrediction(
+                    SUFFICIENT, 0.9, self.model_version,
+                ),
+            })()
+
+        with patch("forum_runtime.firestore.transactional", lambda function: function):
+            self.assertEqual("completed", gateway.process_answer(
+                "a1", answer, classifier("artifact-a"), event_id="event-a", now=now,
+            ))
+            self.assertEqual("completed", gateway.process_answer(
+                "a1", answer, classifier("artifact-b"), event_id="event-b", now=now,
+            ))
+
+        runs = [key for key in database.rows if key[0] == "forumAiRuns"]
+        self.assertEqual(2, len(runs))
+
+    def test_missing_classifier_finishes_with_safe_fallback_once(self):
+        now = datetime(2026, 8, 3, tzinfo=timezone.utc)
+        answer = {"authorId": "student-a", "revision": 1, "text": "My checked steps."}
+        database = _Database({("forumAnswers", "a1"): dict(answer)})
+        gateway = ForumRuntimeGateway(database)
+
+        with patch("forum_runtime.firestore.transactional", lambda function: function):
+            self.assertEqual(
+                "fallback",
+                gateway.process_answer("a1", answer, None, event_id="event-a", now=now),
+            )
+            self.assertEqual(
+                "fallback",
+                gateway.process_answer("a1", answer, None, event_id="event-b", now=now),
+            )
+
+        self.assertEqual("fallback", database.rows[("forumAiJobs", "a1")]["state"])
+        self.assertEqual("fallback", database.rows[("forumAnswers", "a1")]["aiFeedback"]["state"])
+        self.assertEqual(1, len([
+            key for key in database.rows if key[0] == "forumAiRuns"
+        ]))
+
+    def test_legacy_terminal_job_is_not_reprocessed_after_identity_migration(self):
+        now = datetime(2026, 8, 3, tzinfo=timezone.utc)
+        answer = {
+            "authorId": "student-a", "revision": 1, "text": "My checked steps.",
+            "aiFeedback": {"state": "completed", "label": SUFFICIENT},
+        }
+        database = _Database({
+            ("forumAnswers", "a1"): dict(answer),
+            ("forumAiJobs", "a1"): {
+                "answerId": "a1", "state": "completed", "modelVersion": "model-v1",
+            },
+        })
+        gateway = ForumRuntimeGateway(database)
+
+        class Classifier:
+            model_version = "model-v1"
+            calls = 0
+
+            def predict(self, _text):
+                self.calls += 1
+                return ForumPrediction(SUFFICIENT, 0.9, self.model_version)
+
+        classifier = Classifier()
+        with patch("forum_runtime.firestore.transactional", lambda function: function):
+            state = gateway.process_answer(
+                "a1", answer, classifier, event_id="migration-retry", now=now,
+            )
+
+        self.assertEqual("completed", state)
+        self.assertEqual(0, classifier.calls)
+        self.assertFalse(any(key[0] == "forumAiRuns" for key in database.rows))
+
+    def test_expired_lease_is_reclaimed_with_newer_fencing_generation(self):
+        now = datetime(2026, 8, 3, tzinfo=timezone.utc)
+        answer = {"authorId": "student-a", "revision": 1, "text": "My steps."}
+        database = _Database({
+            ("forumAnswers", "a1"): dict(answer),
+            ("forumAiJobs", "a1"): {
+                "state": "processing", "fencingGeneration": 4, "attemptCount": 1,
+                "leaseExpiresAt": now - timedelta(seconds=1),
+            },
+        })
+        gateway = ForumRuntimeGateway(database)
+        classifier = type("Classifier", (), {
+            "model_version": "model-v1",
+            "predict": lambda self, text: ForumPrediction(SUFFICIENT, 0.9, self.model_version),
+        })()
+
+        with patch("forum_runtime.firestore.transactional", lambda function: function):
+            self.assertEqual("completed", gateway.process_answer(
+                "a1", answer, classifier, event_id="event-retry", now=now,
+            ))
+
+        job = database.rows[("forumAiJobs", "a1")]
+        self.assertEqual(5, job["fencingGeneration"])
+        self.assertEqual(2, job["attemptCount"])
+
+    def test_old_fencing_generation_cannot_finalize_or_replace_new_revision(self):
+        now = datetime(2026, 8, 3, tzinfo=timezone.utc)
+        answer = {"authorId": "student-a", "revision": 2, "text": "New reasoning."}
+        database = _Database({
+            ("forumAnswers", "a1"): dict(answer),
+            ("forumAiJobs", "a1"): {
+                "state": "processing", "logicalInferenceId": "new-run",
+                "fencingGeneration": 2, "revision": 2,
+            },
+        })
+        gateway = ForumRuntimeGateway(database)
+        stale = ForumAiClaim(
+            answer_id="a1", logical_inference_id="old-run", revision=1,
+            text_hash="old-hash", model_version="model-v1",
+            artifact_identity="artifact-v1", policy_version="policy-v1",
+            fencing_generation=1, attempt_count=1, event_id="old-event",
+        )
+
+        with patch("forum_runtime.firestore.transactional", lambda function: function):
+            state = gateway._finalize_answer(
+                stale, ForumPrediction(SUFFICIENT, 0.9, "model-v1"), now=now,
+            )
+
+        self.assertEqual("superseded", state)
+        self.assertNotIn("aiFeedback", database.rows[("forumAnswers", "a1")])
+        self.assertEqual("processing", database.rows[("forumAiJobs", "a1")]["state"])
+        self.assertEqual("superseded", database.rows[("forumAiRuns", "old-run")]["state"])
+
+    def test_reclaimed_same_identity_lease_lets_only_new_fencing_generation_win(self):
+        now = datetime(2026, 8, 3, tzinfo=timezone.utc)
+        text = "I regrouped and checked each place value."
+        text_hash = sha256(text.encode("utf-8")).hexdigest()
+        logical_id = "same-logical-run"
+        database = _Database({
+            ("forumAnswers", "a1"): {
+                "authorId": "student-a", "revision": 1, "text": text,
+            },
+            ("forumAiJobs", "a1"): {
+                "state": "processing", "logicalInferenceId": logical_id,
+                "fencingGeneration": 2, "revision": 1, "textHash": text_hash,
+                "artifactIdentity": "artifact-v1",
+            },
+        })
+        gateway = ForumRuntimeGateway(database)
+        old_claim = ForumAiClaim(
+            answer_id="a1", logical_inference_id=logical_id, revision=1,
+            text_hash=text_hash, model_version="model-v1",
+            artifact_identity="artifact-v1", policy_version="policy-v1",
+            fencing_generation=1, attempt_count=1, event_id="old-event",
+        )
+        winning_claim = ForumAiClaim(
+            answer_id="a1", logical_inference_id=logical_id, revision=1,
+            text_hash=text_hash, model_version="model-v1",
+            artifact_identity="artifact-v1", policy_version="policy-v1",
+            fencing_generation=2, attempt_count=2, event_id="retry-event",
+        )
+        prediction = ForumPrediction(SUFFICIENT, 0.9, "model-v1")
+
+        with patch("forum_runtime.firestore.transactional", lambda function: function):
+            self.assertEqual(
+                "superseded", gateway._finalize_answer(old_claim, prediction, now=now),
+            )
+            self.assertNotIn(("forumAiRuns", logical_id), database.rows)
+            self.assertEqual(
+                "completed", gateway._finalize_answer(winning_claim, prediction, now=now),
+            )
+
+        self.assertEqual("completed", database.rows[("forumAiRuns", logical_id)]["state"])
+        self.assertEqual("completed", database.rows[("forumAnswers", "a1")]["aiFeedback"]["state"])
+
+    def test_out_of_order_old_revision_does_not_replace_new_terminal_job_or_feedback(self):
+        now = datetime(2026, 8, 3, tzinfo=timezone.utc)
+        old = {"authorId": "student-a", "revision": 1, "text": "Old reasoning."}
+        current = {"authorId": "student-a", "revision": 2, "text": "New reasoning."}
+        database = _Database({("forumAnswers", "a1"): dict(current)})
+        gateway = ForumRuntimeGateway(database)
+        classifier = type("Classifier", (), {
+            "model_version": "model-v1",
+            "predict": lambda self, text: ForumPrediction(SUFFICIENT, 0.9, self.model_version),
+        })()
+
+        with patch("forum_runtime.firestore.transactional", lambda function: function):
+            self.assertEqual("completed", gateway.process_answer(
+                "a1", current, classifier, event_id="new", now=now,
+            ))
+            new_job = dict(database.rows[("forumAiJobs", "a1")])
+            new_feedback = dict(database.rows[("forumAnswers", "a1")]["aiFeedback"])
+            self.assertEqual("superseded", gateway.process_answer(
+                "a1", old, classifier, event_id="old", now=now + timedelta(seconds=1),
+            ))
+
+        self.assertEqual(new_job, database.rows[("forumAiJobs", "a1")])
+        self.assertEqual(new_feedback, database.rows[("forumAnswers", "a1")]["aiFeedback"])
+
+    def test_immutable_run_repairs_terminal_job_and_feedback_after_partial_failure(self):
+        now = datetime(2026, 8, 3, tzinfo=timezone.utc)
+        answer = {"authorId": "student-a", "revision": 1, "text": "My reasoning."}
+        text_hash = sha256(answer["text"].encode("utf-8")).hexdigest()
+        logical_id = "winning-run"
+        prediction = ForumPrediction(SUFFICIENT, 0.9, "model-v1")
+        database = _Database({
+            ("forumAnswers", "a1"): dict(answer),
+            ("forumAiRuns", logical_id): {
+                "answerId": "a1", "logicalInferenceId": logical_id,
+                "revision": 1, "textHash": text_hash,
+                "state": "completed", "resultState": "completed",
+                "prediction": {
+                    "label": prediction.label, "probability": prediction.probability,
+                    "model_version": prediction.model_version,
+                    "calibration_state": prediction.calibration_state,
+                },
+            },
+        })
+        gateway = ForumRuntimeGateway(database)
+
+        with patch("forum_runtime.firestore.transactional", lambda function: function):
+            state = gateway._claim_answer(
+                answer_id="a1", logical_inference_id=logical_id, revision=1,
+                text_hash=text_hash, model_version="model-v1",
+                artifact_identity="artifact-v1", event_id="retry", now=now,
+            )
+
+        self.assertEqual("completed", state)
+        self.assertEqual("completed", database.rows[("forumAiJobs", "a1")]["state"])
+        self.assertEqual("completed", database.rows[("forumAnswers", "a1")]["aiFeedback"]["state"])
+
+    def test_transient_failure_is_bounded_and_permanent_failure_terminates(self):
+        now = datetime(2026, 8, 3, tzinfo=timezone.utc)
+        answer = {"authorId": "student-a", "revision": 1, "text": "My steps."}
+
+        class TransientClassifier:
+            model_version = "model-v1"
+            def predict(self, _text):
+                raise ConnectionError("temporary")
+
+        database = _Database({("forumAnswers", "a1"): dict(answer)})
+        gateway = ForumRuntimeGateway(database)
+        with patch("forum_runtime.firestore.transactional", lambda function: function):
+            for attempt in range(2):
+                with self.assertRaises(ConnectionError):
+                    gateway.process_answer(
+                        "a1", answer, TransientClassifier(),
+                        event_id=f"event-{attempt}", now=now + timedelta(minutes=attempt * 6),
+                    )
+            state = gateway.process_answer(
+                "a1", answer, TransientClassifier(), event_id="event-3",
+                now=now + timedelta(minutes=12),
+            )
+        self.assertEqual("failed", state)
+        self.assertEqual("attempts_exhausted", database.rows[("forumAiJobs", "a1")]["failureType"])
+        self.assertEqual("fallback", database.rows[("forumAnswers", "a1")]["aiFeedback"]["state"])
+
+        database = _Database({("forumAnswers", "a2"): dict(answer)})
+        gateway = ForumRuntimeGateway(database)
+        permanent = type("Classifier", (), {
+            "model_version": "model-v1",
+            "predict": lambda self, _text: (_ for _ in ()).throw(
+                ForumRuntimeError("failed-precondition", "invalid artifact")
+            ),
+        })()
+        with patch("forum_runtime.firestore.transactional", lambda function: function):
+            self.assertEqual("failed", gateway.process_answer(
+                "a2", answer, permanent, event_id="event-p", now=now,
+            ))
+        self.assertEqual("permanent", database.rows[("forumAiJobs", "a2")]["failureType"])
+        self.assertEqual("fallback", database.rows[("forumAnswers", "a2")]["aiFeedback"]["state"])
     def test_reports_are_server_owned_deterministic_and_preserve_review_fields(self):
         now = datetime(2026, 8, 1, tzinfo=timezone.utc)
         later = datetime(2026, 8, 1, 1, tzinfo=timezone.utc)
@@ -179,6 +610,42 @@ class ForumRuntimeTests(unittest.TestCase):
         self.assertEqual(
             database.rows[("forumQuestions", "q1")]["acceptedAnswerId"], "a1",
         )
+
+    def test_duplicate_acceptance_repairs_the_original_week_only(self):
+        original = datetime(2026, 7, 27, tzinfo=timezone.utc)
+        retry = datetime(2026, 8, 3, tzinfo=timezone.utc)
+        database = _Database({
+            ("forumQuestions", "q1"): {
+                "authorId": "question-author", "acceptedAnswerId": "a1",
+                "acceptedAt": original,
+            },
+            ("forumAnswers", "a1"): {
+                "questionId": "q1", "authorId": "student-a",
+                "acceptedAt": original, "acceptedBy": "question-author",
+            },
+            ("forumParticipationSummaries", "student-a"): {
+                "studentId": "student-a", "weekStart": malaysia_week_start(retry),
+                "questionsPostedCount": 0, "answersSubmittedCount": 1,
+                "helpfulReceivedCount": 0, "acceptedAnswersCount": 0,
+                "lastParticipationAt": retry,
+            },
+        })
+        gateway = ForumRuntimeGateway(database)
+
+        with patch("forum_runtime.firestore.transactional", lambda function: function):
+            result = gateway.accept_answer(
+                answer_id="a1", actor_id="question-author", now=retry,
+            )
+
+        event = database.rows[("forumParticipationEvents", "accept:a1")]
+        historical = database.rows[(
+            "forumParticipationWeeklySummaries", "student-a_2026-07-27",
+        )]
+        current = database.rows[("forumParticipationSummaries", "student-a")]
+        self.assertTrue(result["alreadyAccepted"])
+        self.assertEqual(original, event["occurredAt"])
+        self.assertEqual(1, historical["acceptedAnswersCount"])
+        self.assertEqual(0, current["acceptedAnswersCount"])
 
     def test_legacy_answer_acceptance_blocks_a_second_answer(self):
         now = datetime(2026, 8, 1, tzinfo=timezone.utc)

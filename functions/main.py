@@ -1309,6 +1309,36 @@ def processFinalizedQuizAttempt(event: firestore_fn.Event[Any]) -> None:
 getattr(processFinalizedQuizAttempt, "__firebase_endpoint__").eventTrigger["retry"] = True
 
 
+class _ForumClassifierUnavailable(RuntimeError):
+    pass
+
+
+@lru_cache(maxsize=1)
+def _cached_verified_forum_classifier() -> Any:
+    classifier = load_forum_classifier()
+    if classifier is None:
+        # Do not pin a failed/missing verification for the life of a warm
+        # instance. A repaired deployment may be retried on the next event.
+        raise _ForumClassifierUnavailable
+    return classifier
+
+
+def _forum_classifier() -> Any:
+    try:
+        return _cached_verified_forum_classifier()
+    except _ForumClassifierUnavailable:
+        return None
+
+
+def _forum_answer_needs_reprocessing(
+    before: dict[str, Any], after: dict[str, Any],
+) -> bool:
+    return (
+        before.get("revision") != after.get("revision")
+        or before.get("text") != after.get("text")
+    )
+
+
 @firestore_fn.on_document_created(
     document="forumQuestions/{questionId}",
     region=FUNCTION_REGION,
@@ -1333,8 +1363,34 @@ def processForumAnswer(event: firestore_fn.Event[Any]) -> None:
     gateway = ForumRuntimeGateway(firestore_db())
     data = snapshot.to_dict()
     gateway.record_answer(snapshot.id, data)
-    gateway.process_answer(snapshot.id, data, load_forum_classifier())
+    gateway.process_answer(
+        snapshot.id, data, _forum_classifier(), event_id=getattr(event, "id", None),
+    )
+
+
+@firestore_fn.on_document_updated(
+    document="forumAnswers/{answerId}",
+    region=FUNCTION_REGION,
+    service_account=FORUM_RUNTIME_SERVICE_ACCOUNT,
+)
+def reprocessForumAnswer(event: firestore_fn.Event[Any]) -> None:
+    change = event.data
+    if change is None:
+        return
+    before, after = change.before, change.after
+    if not before.exists or not after.exists:
+        return
+    before_data, after_data = before.to_dict(), after.to_dict()
+    if not _forum_answer_needs_reprocessing(before_data, after_data):
+        return
+    ForumRuntimeGateway(firestore_db()).process_answer(
+        after.id,
+        after_data,
+        _forum_classifier(),
+        event_id=getattr(event, "id", None),
+    )
 
 
 getattr(processForumQuestion, "__firebase_endpoint__").eventTrigger["retry"] = True
 getattr(processForumAnswer, "__firebase_endpoint__").eventTrigger["retry"] = True
+getattr(reprocessForumAnswer, "__firebase_endpoint__").eventTrigger["retry"] = True

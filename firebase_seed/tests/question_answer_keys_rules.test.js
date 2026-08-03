@@ -95,6 +95,13 @@ async function main() {
       await setDoc(doc(adminDb, "forumAnswers", "forum_legacy"), {
         questionId: "forum_q1", authorId: "student_other",
         text: "This older answer predates explicit revisions.",
+        aiFeedback: {
+          state: "completed", label: "clear", probability: 0.9,
+          modelVersion: "forum-explanation-nb-v1",
+          calibrationState: "not_calibrated",
+          message: "Thanks for explaining your method.", revision: 1,
+          logicalInferenceId: "legacy-run", updatedAt: new Date(),
+        },
         createdAt: new Date(), updatedAt: new Date(),
       });
       await setDoc(doc(adminDb, "forumReports", "student_other_question_forum_q1"), {
