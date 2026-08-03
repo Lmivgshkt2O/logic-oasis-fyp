@@ -8,7 +8,14 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from logic_oasis_ai.forum_ai.classifier import (
-    REVISION, SUFFICIENT, ForumTextClassifier, train_classifier,
+    CONTROLLED_REVISION,
+    CONTROLLED_SUFFICIENT,
+    REVISION,
+    SUFFICIENT,
+    VECTORIZER_CONTRACT,
+    ForumTextClassifier,
+    build_forum_vectorizer,
+    train_classifier,
 )
 from logic_oasis_ai.forum_ai.dataset import load_labelled_examples
 
@@ -39,6 +46,49 @@ class NaiveBayesForumTests(unittest.TestCase):
                 self.classifier.predict("I split it into equal groups and checked."),
                 restored.predict("I split it into equal groups and checked."),
             )
+
+    def test_vectorizer_is_constructed_from_the_declared_contract(self):
+        vectorizer = build_forum_vectorizer()
+        self.assertEqual(tuple(VECTORIZER_CONTRACT["ngramRange"]), vectorizer.ngram_range)
+        self.assertEqual(VECTORIZER_CONTRACT["minimumDocumentFrequency"], vectorizer.min_df)
+        self.assertEqual(VECTORIZER_CONTRACT["sublinearTf"], vectorizer.sublinear_tf)
+
+    def test_both_controlled_demo_variants_preserve_runtime_output_labels(self):
+        rows = [
+            ("First I regroup, then I check the total.", CONTROLLED_SUFFICIENT),
+            ("I divide into equal groups because each share is equal.", CONTROLLED_SUFFICIENT),
+            ("The answer is 12.", CONTROLLED_REVISION),
+            ("Jawapannya 24 sahaja.", CONTROLLED_REVISION),
+        ]
+        for variant in ("MultinomialNB", "ComplementNB"):
+            with self.subTest(variant=variant):
+                classifier = train_classifier(rows, variant=variant)
+                self.assertIn(
+                    classifier.predict("First I regroup, then I check the total.").label,
+                    {SUFFICIENT, REVISION, "uncertain"},
+                )
+
+    def test_controlled_labels_map_exactly_to_runtime_advisory_labels(self):
+        class DeterministicPipeline:
+            classes_ = [CONTROLLED_REVISION, CONTROLLED_SUFFICIENT]
+
+            def __init__(self, probabilities):
+                self.probabilities = probabilities
+
+            def predict_proba(self, _texts):
+                return [self.probabilities]
+
+        cases = (
+            ([0.1, 0.9], SUFFICIENT),
+            ([0.9, 0.1], REVISION),
+            ([0.45, 0.55], "uncertain"),
+        )
+        for probabilities, expected in cases:
+            with self.subTest(probabilities=probabilities):
+                classifier = ForumTextClassifier(
+                    DeterministicPipeline(probabilities),
+                )
+                self.assertEqual(expected, classifier.predict("Test explanation").label)
 
     def test_emulator_fixture_is_deidentified_and_explicitly_test_only(self):
         examples = load_labelled_examples(

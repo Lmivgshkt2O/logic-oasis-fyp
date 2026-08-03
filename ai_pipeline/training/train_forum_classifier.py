@@ -7,9 +7,41 @@ from collections import Counter
 from hashlib import sha256
 from pathlib import Path
 import tempfile
+from typing import Iterable
 
-from logic_oasis_ai.forum_ai.classifier import MODEL_VERSION, train_classifier
+from logic_oasis_ai.forum_ai.classifier import (
+    CONTROLLED_REVISION,
+    CONTROLLED_SUFFICIENT,
+    MODEL_VERSION,
+    ForumTextClassifier,
+    train_classifier,
+)
 from logic_oasis_ai.forum_ai.dataset import grouped_rows, load_labelled_examples
+from forum_controlled_demo.schema import EVIDENCE_LEVEL, PROVENANCE
+from forum_controlled_demo.build_forum_dataset import ForumDatasetRow
+
+
+def train_controlled_demo_candidate(
+    rows: Iterable[ForumDatasetRow],
+    *,
+    variant: str,
+    model_version: str,
+) -> ForumTextClassifier:
+    """Train only from schema-validated fictional controlled-demo rows."""
+    values = tuple(rows)
+    if not values or any(
+        row.provenance != PROVENANCE or row.evidence_level != EVIDENCE_LEVEL
+        for row in values
+    ):
+        raise ValueError("controlled-demo candidate requires fictional controlled provenance")
+    labels = {row.label for row in values}
+    if labels != {CONTROLLED_SUFFICIENT, CONTROLLED_REVISION}:
+        raise ValueError("controlled-demo candidate requires both declared rubric labels")
+    return train_classifier(
+        [(row.text, row.label) for row in values],
+        model_version=model_version,
+        variant=variant,
+    )
 
 
 def train(*, dataset_path: Path, artifact_path: Path, report_path: Path) -> dict[str, object]:
