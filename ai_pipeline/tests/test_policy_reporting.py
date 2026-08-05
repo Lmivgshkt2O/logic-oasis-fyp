@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 
-from logic_oasis_ai.policy_evaluation import PolicyArm
+import evaluation.visualizations as visualizations
+from logic_oasis_ai.policy_evaluation import DecisionDirection, PolicyArm
 from logic_oasis_ai.prediction_contract import PredictionContract
 from logic_oasis_ai.sources.csv_source import load_csv_files
 from training.export_real_attempts import (
@@ -26,6 +29,8 @@ from evaluation.report_templates import (
 )
 from evaluation.visualizations import (
     VisualizationError,
+    _oscillation_count,
+    _oscillation_rate,
     build_evidence_package,
     derive_claim_level,
 )
@@ -318,6 +323,69 @@ class PolicyReportingTests(unittest.TestCase):
         second, _, _, _, _ = evidence_for(dataset, seed=9)
         self.assertEqual(report_sha256(first), report_sha256(second))
         self.assertEqual(first, second)
+
+    def test_rendered_report_contains_every_template_section(self):
+        template_path = (
+            Path(__file__).resolve().parents[1] / "reports" / "policy_comparison_template.md"
+        )
+        template_headings = [
+            line.strip("# ").strip()
+            for line in template_path.read_text(encoding="utf-8").splitlines()
+            if line.startswith("## ")
+        ]
+        self.assertTrue(template_headings)
+        dataset = pseudonymized(build_dataset(four_student_history()))
+        evidence, metrics, run_manifest, _, _ = evidence_for(dataset)
+        markdown = render_evidence_markdown(evidence, run_manifest, metrics)
+        for heading in template_headings:
+            self.assertIn(f"## {heading}", markdown, heading)
+
+    def test_oscillation_counts_only_alternating_non_hold_directions(self):
+        dataset = pseudonymized(build_dataset(four_student_history()))
+        result = replayed(dataset, bank_catalog=full_bank_catalog())
+        base = result.decisions_for(PolicyArm.P3A)[0]
+        up = replace(
+            base,
+            source_attempt_sequence=1,
+            direction=DecisionDirection.UP,
+            decision_id="osc-up-1",
+        )
+        down = replace(
+            base,
+            source_attempt_sequence=2,
+            direction=DecisionDirection.DOWN,
+            decision_id="osc-down-1",
+        )
+        up_again = replace(
+            base,
+            source_attempt_sequence=3,
+            direction=DecisionDirection.UP,
+            decision_id="osc-up-2",
+        )
+        hold = replace(
+            base,
+            source_attempt_sequence=4,
+            direction=DecisionDirection.HOLD,
+            decision_id="osc-hold-1",
+        )
+        self.assertEqual(_oscillation_count((up, down, up_again)), 2)
+        self.assertEqual(_oscillation_count((up, hold, up_again)), 0)
+        self.assertEqual(_oscillation_count((up, down, hold, up_again)), 2)
+        self.assertEqual(_oscillation_rate((up, down, up_again, hold)), round(2 / 3, 8))
+
+    def test_calibration_band_with_sufficient_observations_is_reliable(self):
+        dataset = pseudonymized(build_dataset(four_student_history()))
+        baseline, _, _, _, _ = evidence_for(dataset)
+        self.assertTrue(baseline["bktReliabilityCurve"])
+        with patch.object(
+            visualizations,
+            "MIN_CALIBRATION_OBSERVATIONS",
+            1,
+        ):
+            lowered, _, _, _, _ = evidence_for(dataset)
+        self.assertTrue(
+            any(band["status"] == "reliable" for band in lowered["bktReliabilityCurve"])
+        )
 
 
 if __name__ == "__main__":
