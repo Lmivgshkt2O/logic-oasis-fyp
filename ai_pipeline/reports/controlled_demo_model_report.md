@@ -2,12 +2,12 @@
 
 - Claim level: `controlled_demonstration_only`
 - Evaluation status: `evaluated`
-- Dataset: `controlled-demo-dataset-v1` (`0c307297355fcf9315594d8386c8b5fa297771f176bf11e7b2223aa318107aef`)
-- Catalogue SHA-256: `2ef2a006e0fad0474204e94a7449b35d79618090b28de7086dec23976df7306f`
-- Configuration SHA-256: `d18cc9017e121885741c7fbdbb4aff0ffb9310202e6f4d5dc82c27185032f668`
+- Dataset: `controlled-demo-dataset-v1` (`adb666f4a497044c6e908b1f57048da564b965fca8795234471ec13b8285b2c6`)
+- Catalogue SHA-256: `5a19431be1188ddc8df32fbfa4c610c5b3d912811984c861d79029ec15606af0`
+- Configuration SHA-256: `7e47adae0d00a84bd7cff39686029221255d9f096240c70263eacb03f3a1fdc7`
 - Evaluation report SHA-256: `7c269eb0212b6a9196ee61de6f4a1169dbe4119aaef4250727959c2f8668c614`
 - Model artifact SHA-256: `9a32079d95a37dc1d3eeecc52f5e7723e12ac1ee3dd8f6eb9dc609a3fa11f39a`
-- Artifact manifest SHA-256: `4b68b7dcbb6c43a8b391b51fc6eaee9c01e26249ded6fb955b8754b3f76d9f2d`
+- Artifact manifest SHA-256: `470f7dca79f14035d910aae45958d6f21f85423b44d01c6bc5830ffbb914ed4e`
 - Random seed: `20260716`
 - Training groups: `challenge-transfer-v1, steady-recovery-v1, threshold-variation-v1`
 - Held-out groups: `scaffolded-progress-v1`
