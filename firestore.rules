@@ -204,6 +204,42 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // AQC-4 policy-evaluation collections are server-owned. The callable
+    // control plane and the U8 runtime use the Admin SDK and are not
+    // constrained by these rules; clients are terminally denied even though
+    // the default deny rule below would also protect them.
+    match /policyEvaluationStudies/{studyVersion} {
+      allow read, write: if false;
+    }
+
+    match /policyEvaluationConsents/{consentId} {
+      allow read, write: if false;
+    }
+
+    match /policyEvaluationEnrollments/{enrollmentId} {
+      allow read, write: if false;
+    }
+
+    match /policyEvaluationAllocationBlocks/{blockId} {
+      allow read, write: if false;
+    }
+
+    match /policyEvaluationDecisionAudits/{decisionId} {
+      allow read, write: if false;
+    }
+
+    match /policyEvaluationProbes/{probeId} {
+      allow read, write: if false;
+    }
+
+    match /policyEvaluationOutcomes/{outcomeId} {
+      allow read, write: if false;
+    }
+
+    match /policyEvaluationAdminAudits/{auditId} {
+      allow read, write: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }
