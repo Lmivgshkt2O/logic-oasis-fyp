@@ -18,3 +18,12 @@ active registry and this report.
 
 No synthetic or seed data can support a comparison, superiority, calibration,
 or promotion claim.
+
+## Policy-comparison boundary
+
+Bank-selection policy comparison (P1 score threshold, P2 BKT-plus-score
+agreement, P3 guarded BKT) is a separate evidence slice. It is produced by the
+offline replay pipeline and follows the template in
+`ai_pipeline/reports/policy_comparison_template.md`. This report remains a U7
+model comparison only (Decision Tree, XGBoost, MLP) and never claims that one
+bank-selection policy is better than another.
