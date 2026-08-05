@@ -387,10 +387,10 @@ final-claim gates.
 
 BKT state is keyed by `(studentId, subtopicId, skillId)`, not merely student/skill. This makes the per-student/subtopic sequence authoritative for replay while keeping a skill that appears in another subtopic as a distinct state. Pre-amendment attempts without `sourceAttemptSequence` are `legacy_no_sequence` and cannot enter final BKT replay, training, or runtime projection logic.
 
-Before real training, the supervisor must approve `0.60` with a curriculum
-rationale or approve a new criterion and label version. Record approver, date,
-and rationale with the dataset/evaluation report; do not tune after final-test
-results are seen. `contentVersion` is retained on each U3/U6 row. U7 currently
+Before real training, the developer records the declared `0.60` criterion with
+a curriculum rationale or declares a new criterion and label version. Record
+release owner, date, and rationale with the dataset/evaluation report; do not
+tune after final-test results are seen. `contentVersion` is retained on each U3/U6 row. U7 currently
 groups labels by student/subtopic, so real-data training must first resolve
 content transitions. Recommended initial policy: label only same-version pairs
 and censor cross-version pairs until an approved equivalence policy exists.
