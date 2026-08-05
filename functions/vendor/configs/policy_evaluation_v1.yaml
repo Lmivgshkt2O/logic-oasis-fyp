@@ -1,0 +1,85 @@
+manifestVersion: policy-evaluation-v1
+study:
+  studyVersion: policy-evaluation-study-v1
+  status: draft
+  allowedStatuses:
+    - draft
+    - enrolling
+    - active
+    - closed
+    - archived
+  liveApprovalRequired: true
+  defaultClaimLabel: pipeline_demo_only
+claimLabels:
+  mechanics: pipeline_demo_only
+  offlineReplay: descriptive_replay_only
+  controlledPilot: controlled_pilot
+  modelAssisted: model_assisted_separate
+policyArms:
+  P1:
+    policyVersion: score-threshold-v1
+    evidenceMode: score_only
+    claimLabel: controlled_pilot
+  P2:
+    policyVersion: bkt-score-agreement-v1
+    evidenceMode: bkt_score_agreement
+    claimLabel: controlled_pilot
+  P3a:
+    policyVersion: guarded-bkt-study-v1
+    evidenceMode: bkt_only_study
+    claimLabel: controlled_pilot
+  P3b:
+    policyVersion: guarded-bkt-model-assisted-v1
+    evidenceMode: model_assisted
+    claimLabel: model_assisted_separate
+scoreRules:
+  denominator: totalQuestions
+  promotionAtLeast: 0.80
+  demotionAtMost: 0.40
+  promotionInclusive: true
+  demotionInclusive: true
+  p1BelowPromotion: hold
+  p1AutomaticDemotion: false
+  p2Disagreement: hold
+  p2Neutral: hold
+adaptivePolicy:
+  policyVersion: adaptive-policy-v1
+  sourceSha256: 1b53aef77a8027b4256f915663ee894225c17efe4f876bff2e23a38ed17eef16
+commonSafetyEnvelope:
+  difficultyOrder:
+    - Easy
+    - Moderate
+    - Hard
+  activeCompatibleBanksOnly: true
+  maximumMovementLevels: 1
+  preventImmediateReversal: true
+  preferUnseenBanks: true
+  unavailableBankBehavior: hold
+outcomes:
+  outcomeProtocolVersion: policy-outcomes-v1
+  frozenPredictionTarget: next_attempt_support_needed
+  primaryMetric: false_promotion_burden
+  safetyMetric: false_demotion_or_unnecessary_hold_rate
+  challengeOpportunityMetric: challenge_opportunity
+  noLaterOutcome: censored
+  counterfactualDifficultyMismatch: censored
+reasonCodes:
+  - p1_score_promote
+  - p1_score_hold
+  - p2_agreement_promote
+  - p2_agreement_demote
+  - p2_disagreement_hold
+  - p2_neutral_hold
+  - p3_cold_start_easy
+  - p3_move_up_mastery
+  - p3_move_up_bkt_fallback
+  - p3_move_down_support
+  - p3_stay_easy_support
+  - p3_stay_hard_mastery
+  - p3_stay_build_evidence
+  - p3_stay_target_zone
+  - anti_oscillation_hold
+  - hard_requires_more_evidence
+  - difficulty_upper_bound_hold
+  - difficulty_lower_bound_hold
+  - no_eligible_bank

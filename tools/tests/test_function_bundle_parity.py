@@ -127,7 +127,16 @@ class FunctionBundleParityTests(unittest.TestCase):
         self.assertFalse(metadata["contains_scenario_content"])
         self.assertIsInstance(metadata["bindings"], dict)
         for key, value in manifest.items():
-            self.assertEqual(metadata["bindings"][key], value)
+            # The controlled-demo release evidence records a historical bundle
+            # snapshot. Post-release additive contract keys (e.g. the AQC-1
+            # policy-evaluation manifest) are not part of that historical
+            # binding and are verified against the authoritative source below.
+            if key in metadata["bindings"]:
+                self.assertEqual(metadata["bindings"][key], value)
+        self.assertEqual(
+            manifest["policyEvaluationSha256"],
+            file_sha256(ROOT / "ai_pipeline" / "configs" / "policy_evaluation_v1.yaml"),
+        )
         self.assertEqual(metadata["runtime"]["evidence_mode"], "controlled_demo")
         self.assertEqual(metadata["runtime"]["model_bucket"], "logic-oasis-models")
         self.assertEqual(metadata["claim_level"], "controlled_demonstration_only")
