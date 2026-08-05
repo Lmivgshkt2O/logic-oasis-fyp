@@ -17,6 +17,7 @@ CONFIG_HASH_FILES = {
     "featureSchemaSha256": "feature_schema.yaml",
     "adaptivePolicySha256": "adaptive_policy_v1.yaml",
     "weakTopicRankingPolicySha256": "weak_topic_ranking_v1.yaml",
+    "policyEvaluationSha256": "policy_evaluation_v1.yaml",
 }
 CONFIGS = tuple(CONFIG_HASH_FILES.values())
 

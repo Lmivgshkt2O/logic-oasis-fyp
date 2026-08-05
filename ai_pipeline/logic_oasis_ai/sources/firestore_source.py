@@ -19,6 +19,67 @@ SOURCE_SCHEMA_VERSION = "attempt-evidence-v2"
 APPROVED_PROVENANCE = frozenset({"real", "emulator_verified"})
 KNOWN_PROVENANCE = APPROVED_PROVENANCE | frozenset({"seed_demo", "synthetic_test"})
 
+POLICY_EVALUATION_AUDIT_FIELDS = (
+    "policyEvaluationDecisionId",
+    "policyEvaluationStudyVersion",
+    "policyEvaluationAssignedArm",
+    "policyEvaluationDeliveredBankId",
+    "policyEvaluationDeliveredDifficulty",
+    "policyEvaluationReasonCode",
+    "policyEvaluationSelectorConfigVersion",
+)
+ALLOWED_AUDIT_ARMS = frozenset({"P1", "P2", "P3a", "P3b"})
+ALLOWED_AUDIT_DIFFICULTIES = frozenset({"Easy", "Moderate", "Hard"})
+
+
+@dataclass(frozen=True)
+class PolicyEvaluationAuditJoin:
+    """Server-only join fields linking a trusted attempt to its decision audit.
+
+    These fields are validated but never exposed to clients; they exist so the
+    offline evaluator can join policy decision audits by server attempt ID.
+    """
+
+    decision_id: str
+    study_version: str
+    assigned_arm: str
+    reason_code: str
+    selector_config_version: str
+    delivered_bank_id: str | None = None
+    delivered_difficulty: str | None = None
+
+    def __post_init__(self) -> None:
+        for name in (
+            "decision_id",
+            "study_version",
+            "assigned_arm",
+            "reason_code",
+            "selector_config_version",
+        ):
+            if not getattr(self, name):
+                raise ValueError(f"{name} is required for a policy evaluation audit join")
+        if self.assigned_arm not in ALLOWED_AUDIT_ARMS:
+            raise ValueError(f"policy evaluation arm is not allowed: {self.assigned_arm}")
+        if (
+            self.delivered_difficulty is not None
+            and self.delivered_difficulty not in ALLOWED_AUDIT_DIFFICULTIES
+        ):
+            raise ValueError(
+                f"policy evaluation delivered difficulty is not allowed: "
+                f"{self.delivered_difficulty}"
+            )
+
+    def to_document(self) -> dict[str, object]:
+        return {
+            "policyEvaluationDecisionId": self.decision_id,
+            "policyEvaluationStudyVersion": self.study_version,
+            "policyEvaluationAssignedArm": self.assigned_arm,
+            "policyEvaluationDeliveredBankId": self.delivered_bank_id,
+            "policyEvaluationDeliveredDifficulty": self.delivered_difficulty,
+            "policyEvaluationReasonCode": self.reason_code,
+            "policyEvaluationSelectorConfigVersion": self.selector_config_version,
+        }
+
 
 @dataclass(frozen=True)
 class AttemptContext:
@@ -58,6 +119,9 @@ class SourceDataset:
     schema_version: str = SOURCE_SCHEMA_VERSION
     student_key_by_student_id: Mapping[str, str] = field(default_factory=dict)
     attempt_key_by_attempt_id: Mapping[str, str] = field(default_factory=dict)
+    policy_evaluation_audit_by_attempt: Mapping[str, PolicyEvaluationAuditJoin] = field(
+        default_factory=dict
+    )
 
 
 def load_firestore_dataset(
@@ -129,12 +193,19 @@ def load_firestore_dataset(
         _validate_pair_audit_context(attempt, contexts[attempt.attempt_id], rows, metrics)
         frozen_responses[attempt.attempt_id] = rows
 
+    audits = {
+        attempt_id: audit
+        for attempt_id, data in attempts.items()
+        if (audit := _optional_policy_evaluation_audit(data)) is not None
+    }
+
     return SourceDataset(
         attempts=ordered_attempts,
         responses_by_attempt=frozen_responses,
         attempt_context_by_id=contexts,
         response_metrics_by_id=metrics,
         provenance=provenance,
+        policy_evaluation_audit_by_attempt=audits,
     )
 
 
@@ -254,3 +325,35 @@ def _validate_pair_audit_context(
             or response_metrics.question_version != context.content_version
         ):
             raise ValueError("response question/content version conflicts with its attempt")
+
+
+def _optional_policy_evaluation_audit(
+    data: Mapping[str, Any],
+) -> PolicyEvaluationAuditJoin | None:
+    present = [field for field in POLICY_EVALUATION_AUDIT_FIELDS if data.get(field)]
+    if not present:
+        return None
+    if len(present) < len(POLICY_EVALUATION_AUDIT_FIELDS) - 2:
+        raise ValueError(
+            "policy evaluation audit join fields must be provided together"
+        )
+    return PolicyEvaluationAuditJoin(
+        decision_id=_required_string(data, "policyEvaluationDecisionId"),
+        study_version=_required_string(data, "policyEvaluationStudyVersion"),
+        assigned_arm=_required_string(data, "policyEvaluationAssignedArm"),
+        reason_code=_required_string(data, "policyEvaluationReasonCode"),
+        selector_config_version=_required_string(
+            data, "policyEvaluationSelectorConfigVersion"
+        ),
+        delivered_bank_id=_optional_string(data, "policyEvaluationDeliveredBankId"),
+        delivered_difficulty=_optional_string(
+            data, "policyEvaluationDeliveredDifficulty"
+        ),
+    )
+
+
+def _optional_string(data: Mapping[str, Any], field: str) -> str | None:
+    value = data.get(field)
+    if value is None or value == "":
+        return None
+    return _required_string(data, field)
