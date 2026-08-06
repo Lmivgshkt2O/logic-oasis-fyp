@@ -29,6 +29,7 @@ from logic_oasis_ai.sources.firestore_source import (
 
 EXPORT_SCHEMA_VERSION = "pseudonymized-attempt-export-v2"
 PROTECTED_RELEASE_PREFIX = "gs://logic-oasis-fyp-protected-data/real-data-releases/"
+POLICY_EVALUATION_EXPORT_KEY_PREFIX = "logic-oasis-policy-evaluation-export-key-v"
 
 ATTEMPT_FIELDS = (
     "attemptId", "sessionId", "studentKey", "totalQuestions", "correctCount", "score",
@@ -111,6 +112,10 @@ def export_real_attempts(
     """
     if dataset.provenance != "real":
         raise ValueError("only approved real records may be exported for final evaluation")
+    if release.export_key_version.startswith(POLICY_EVALUATION_EXPORT_KEY_PREFIX):
+        raise ValueError(
+            "real-data export must not reuse the dedicated policy-evaluation export key"
+        )
     audits = dict(policy_evaluation_audits or {})
     _validate_audit_joins(dataset, audits)
     output = Path(output_directory)

@@ -16,6 +16,7 @@ from training.delete_real_data_release import (
 )
 from training.export_real_attempts import (
     PROTECTED_RELEASE_PREFIX,
+    POLICY_EVALUATION_EXPORT_KEY_PREFIX,
     RealDataRelease,
     export_real_attempts,
     hmac_pseudonym,
@@ -157,6 +158,12 @@ class RealDataReleaseGovernanceTests(unittest.TestCase):
         )
         self.assertTrue(may_destroy_key_version(certificate, release_id=release.release_id, export_key_version=release.export_key_version))
         self.assertFalse(may_destroy_key_version(certificate, release_id=release.release_id, export_key_version="logic-oasis-export-pseudonymization-key-v2"))
+
+    def test_real_data_release_rejects_the_dedicated_policy_evaluation_key(self) -> None:
+        with self.assertRaisesRegex(ValueError, "HMAC Secret Manager"):
+            approved_release(
+                export_key_version=f"{POLICY_EVALUATION_EXPORT_KEY_PREFIX}1"
+            )
 
 
 if __name__ == "__main__":
