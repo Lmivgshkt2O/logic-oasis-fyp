@@ -29,6 +29,10 @@ class MemoryGateway:
         self.statuses: dict[str, dict] = {}
         self.finalized: list[dict] = []
         self.registry: dict | None = None
+        self.enrollment_doc: dict | None = None
+        self.previous_assignment_doc: dict | None = None
+        self.policy_audits: dict[str, dict] = {}
+        self.policy_probes: dict[str, dict] = {}
 
     def attempt(self, attempt_id):
         return self.attempt_doc if attempt_id == self.attempt_doc["attemptId"] else None
@@ -50,13 +54,20 @@ class MemoryGateway:
     def banks(self, attempt):
         return [{"bankId": "bank_easy_2", "difficultyLevel": "Easy", "isActive": True}]
 
+    def enrollment(self, attempt):
+        return self.enrollment_doc
+
+    def previous_assignment(self, attempt):
+        return self.previous_assignment_doc
+
     def active_registry(self):
         return self.registry
 
     def record_retry(self, attempt, code):
         self.jobs[attempt["attemptId"]].update({"retryState": "retry_pending", "errorCode": code})
 
-    def finalize(self, attempt, *, state, code, raw_run, snapshots, assignment, mastery):
+    def finalize(self, attempt, *, state, code, raw_run, snapshots, assignment, mastery,
+                 policy_audit=None, policy_probe=None):
         job = self.jobs[attempt["attemptId"]]
         if job["status"] in ai_runtime.TERMINAL_STATES:
             return job["status"]
@@ -66,6 +77,10 @@ class MemoryGateway:
             status["modelEvidenceState"] = "controlled_demonstration"
         self.statuses[attempt["attemptId"]] = status
         self.finalized.append({"state": state, "raw": raw_run, "snapshots": snapshots, "assignment": assignment, "mastery": mastery})
+        if policy_audit is not None:
+            self.policy_audits.setdefault(policy_audit["decisionId"], dict(policy_audit))
+        if policy_probe is not None:
+            self.policy_probes.setdefault(policy_probe["decisionId"], dict(policy_probe))
         return state
 
 
@@ -726,6 +741,112 @@ class AiRuntimeTests(unittest.TestCase):
 
         exposure = {bank["bankId"]: bank["exposureCount"] for bank in banks}
         self.assertEqual({"moderate-a": 2, "moderate-b": 0}, exposure)
+
+
+class PolicyEvaluationRuntimeTests(unittest.TestCase):
+    def setUp(self) -> None:
+        ai_runtime._clear_controlled_demo_native_cache()
+        self.gateway = MemoryGateway(trusted_attempt(), trusted_responses())
+        self.bundle = RuntimeBundle.from_runtime_root(
+            ROOT / "ai_pipeline",
+            evidence_mode="real_evaluated_only",
+            model_bucket="logic-oasis-models",
+        )
+
+    def enrollment(self, arm: str) -> dict:
+        return {
+            "enrollmentId": f"enr-{arm}",
+            "studentId": "student-1",
+            "yearLevel": 4,
+            "topicId": "topic-1",
+            "subtopicId": "subtopic-1",
+            "studyVersion": "study-v1",
+            "assignedArm": arm,
+            "status": "active",
+        }
+
+    def test_enrolled_learner_gets_blinded_assignment_audit_and_probe(self) -> None:
+        self.gateway.enrollment_doc = self.enrollment("P1")
+
+        process_finalized_attempt(
+            "attempt-1", gateway=self.gateway, bundle=self.bundle, provenance="real"
+        )
+
+        assignment = self.gateway.finalized[-1]["assignment"]
+        self.assertEqual("assignment-delivery-v1", assignment["policyVersion"])
+        self.assertEqual("build_evidence", assignment["reasonCode"])
+        self.assertEqual("bank_easy_2", assignment["bankId"])
+        self.assertNotIn("masteryProbability", assignment)
+        self.assertNotIn("supportRisk", assignment)
+        self.assertNotIn("usedBktFallback", assignment)
+        self.assertEqual(1, len(self.gateway.policy_audits))
+        audit = next(iter(self.gateway.policy_audits.values()))
+        self.assertEqual("P1", audit["assignedArm"])
+        self.assertEqual("P1", audit["deliveredArm"])
+        self.assertEqual("study-v1", audit["studyVersion"])
+        self.assertEqual("p1_score_hold", audit["reasonCode"])
+        self.assertTrue(audit["decisionId"].startswith("policy-decision-"))
+        self.assertIn("redactedInputs", audit)
+        self.assertNotIn("masteryProbability", audit["redactedInputs"])
+        self.assertEqual(1, len(self.gateway.policy_probes))
+        probe = next(iter(self.gateway.policy_probes.values()))
+        self.assertEqual("scheduled", probe["status"])
+        self.assertEqual("pending_form_catalogue", probe["probeFormStatus"])
+        self.assertNotIn("assignedArm", probe)
+        self.assertNotIn("arm", probe)
+
+    def test_non_enrolled_learner_keeps_production_p3_path(self) -> None:
+        process_finalized_attempt(
+            "attempt-1", gateway=self.gateway, bundle=self.bundle, provenance="real"
+        )
+
+        assignment = self.gateway.finalized[-1]["assignment"]
+        self.assertEqual("adaptive-policy-v1", assignment["policyVersion"])
+        self.assertEqual({}, self.gateway.policy_audits)
+        self.assertEqual({}, self.gateway.policy_probes)
+
+    def test_retry_does_not_duplicate_audit_or_probe(self) -> None:
+        self.gateway.enrollment_doc = self.enrollment("P1")
+        first = process_finalized_attempt(
+            "attempt-1", gateway=self.gateway, bundle=self.bundle, provenance="real"
+        )
+        terminal = process_finalized_attempt(
+            "attempt-1", gateway=self.gateway, bundle=self.bundle, provenance="real"
+        )
+
+        self.assertIn(first, ai_runtime.TERMINAL_STATES)
+        self.assertEqual(first, terminal)
+        self.assertEqual(1, len(self.gateway.policy_audits))
+        self.assertEqual(1, len(self.gateway.policy_probes))
+
+    def test_p3b_without_compatible_model_records_deviation(self) -> None:
+        self.gateway.enrollment_doc = self.enrollment("P3b")
+
+        process_finalized_attempt(
+            "attempt-1", gateway=self.gateway, bundle=self.bundle, provenance="real"
+        )
+
+        assignment = self.gateway.finalized[-1]["assignment"]
+        self.assertEqual("assignment-delivery-v1", assignment["policyVersion"])
+        audit = next(iter(self.gateway.policy_audits.values()))
+        self.assertEqual("P3b", audit["assignedArm"])
+        self.assertEqual("P3a", audit["deliveredArm"])
+        self.assertEqual("p3b_incompatible_model", audit["protocolDeviation"])
+        self.assertTrue(audit["usedBktFallback"])
+
+    def test_selector_failure_falls_back_to_safe_p3_with_protected_audit(self) -> None:
+        self.gateway.enrollment_doc = self.enrollment("P9")
+
+        process_finalized_attempt(
+            "attempt-1", gateway=self.gateway, bundle=self.bundle, provenance="real"
+        )
+
+        assignment = self.gateway.finalized[-1]["assignment"]
+        self.assertEqual("adaptive-policy-v1", assignment["policyVersion"])
+        audit = next(iter(self.gateway.policy_audits.values()))
+        self.assertEqual("selector_failed", audit["protocolDeviation"])
+        self.assertEqual("selector_failed", audit["reasonCode"])
+        self.assertEqual({}, self.gateway.policy_probes)
 
 
 if __name__ == "__main__":
