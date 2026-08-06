@@ -161,6 +161,15 @@ class AttemptValidationTests(unittest.TestCase):
                 student_id="student-b", session_id=self.session["sessionId"], now=NOW,
             )
 
+    def test_finalized_attempt_never_carries_policy_evaluation_fields(self) -> None:
+        self._submit_all()
+        finalized = self.service.finalize_session(
+            student_id="student-a", session_id=self.session["sessionId"], now=NOW,
+        )
+        serialized = repr(finalized)
+        for forbidden in ("policyEvaluation", "assignedArm", "studyVersion"):
+            self.assertNotIn(forbidden, serialized)
+
 
 if __name__ == "__main__":
     unittest.main()
