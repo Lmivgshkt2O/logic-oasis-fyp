@@ -496,3 +496,30 @@ rows in both the primary Grade 6 cohort and the predeclared Grades 4-6
 fallback under the frozen J2 contract. Any remedy requires a separately
 justified, versioned methodology amendment approved before model-result
 inspection; J3 made no such change. J4-J6 were not executed.
+
+## 22. J3A methodology-amendment feasibility (diagnostic only, 2026-08-08)
+
+J3A analyzed whether the canonical U7 student-subtopic unit is better served by
+a source-native skill identity. Diagnostic only: no model trained, no metrics,
+no held-out split created, no J4-J6 work, and the frozen J2 contract was **not
+modified**. Full report:
+`ai_pipeline/reports/u7_assistments_j3a_compatibility_feasibility.md`.
+
+- **Candidate A (exact `sourceSkillCode` episodes):** structurally viable.
+  Grade 6: 18,062 outcome-valid / 17,671 feature-valid episodes; 5,379 labelled
+  pairs (true 1,021, false 4,358) across 815 learners; potential held-out gate
+  reached. Grades 4-6: 27,586 outcome-valid / 27,104 feature-valid episodes;
+  8,077 labelled pairs (true 1,600, false 6,477) across 1,376 learners;
+  potential held-out gate reached. Identical-problem-set censors: 320 (Grade 6)
+  and 487 (Grades 4-6). Chronology ambiguities: 0.
+- **Candidate B:** not evaluated (Candidate A is structurally viable; selection
+  rules permit B only when A is unusable).
+- **Candidate C (sensitivity only):** identical-set sequence pairs 338 (Grade 6)
+  and 560 (Grades 4-6); next-rate below mastery 39 / 87; limitation retained
+  that same-question retests do not show generalization.
+- **Proposed delta (not applied):** compatibility identity becomes same
+  learner + exact non-null `sourceSkillCode`, with one skill episode per
+  completed assignment and all other frozen rules unchanged.
+
+**J3A decision: AMENDMENT CANDIDATE A RECOMMENDED**, pending a separately
+approved, versioned methodology amendment. No contract change was applied.
