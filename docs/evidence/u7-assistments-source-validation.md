@@ -451,3 +451,48 @@ the primary Grade 6 result is never silently replaced.
 
 **J2 decision: READY FOR J3** (pipeline complete, auditable, and frozen;
 Grade 6 labelled-pair sufficiency is J3's gate decision, not a J2 blocker).
+
+## 21. J3 readiness record (2026-08-08)
+
+Plan alignment: the evaluation-plan fallback wording was updated to match the
+already frozen J2 contract (exact Grades 4, 5, and 6 Mathematics pooled), with
+the fallback stated as secondary external-domain evidence, Grade 6
+insufficiency reported separately, grade kept as audit/filter metadata only
+(never a base feature), no KSSR equivalence claim, and the fallback recorded as
+frozen before J2 outcome inspection (not post-result dataset shopping).
+
+### Primary Grade 6 readiness
+
+**INSUFFICIENT_FOR_MODEL_COMPARISON.** Zero valid labelled current -> next
+pairs under the frozen J2 contract. No meaningless Grade 6 split or model
+training was performed; the result is reported separately and never replaced.
+
+### Predeclared Grades 4-6 fallback
+
+Same frozen reconstruction/label rules, cohort scope widened only to exact
+Grades 4-6 Mathematics (compatibility unchanged: same learner + same sequence;
+pooling does not change current -> next semantics).
+
+- Cohort-eligible started: 59,985; completed: 46,853.
+- Outcome-valid: 25,106; feature-valid: 24,790 (grade 4: 5,336; grade 5:
+  3,672; grade 6: 13,296) across 3,019 feature-valid learners.
+- Candidate current -> next pairs: 700; censored: identical-problem-set 560,
+  next-not-outcome-valid 140, no-next 24,090, chronology-ambiguous 0.
+- **Labelled rows: 0** (true 0, false 0).
+- Feature audit: no model-ready rows; frozen admissibility (correct_rate in
+  [0,1]; mean_response_time_ms in (0, 1,800,000]) enforced, not retuned.
+- BKT readiness: 63,846 learner-skill-sequence groups with graded
+  skill-tagged responses; deterministic ordering available; no BKT ablation
+  run; BKT cannot attach to the base dataset while labelled rows are zero.
+- No student-grouped split was created (no gate reached); no model trained.
+
+Protected J3 outputs (outside Git): `u7_model_table_v1.csv` (header only),
+`u7_audit_table_v1.csv` (header only), `u7_readiness_manifest.json` with
+verified hashes, provenance `external_real`, no raw identifiers, key material,
+or local paths.
+
+**J3 decision: NOT READY FOR J4.** Blocker: zero valid labelled current -> next
+rows in both the primary Grade 6 cohort and the predeclared Grades 4-6
+fallback under the frozen J2 contract. Any remedy requires a separately
+justified, versioned methodology amendment approved before model-result
+inspection; J3 made no such change. J4-J6 were not executed.

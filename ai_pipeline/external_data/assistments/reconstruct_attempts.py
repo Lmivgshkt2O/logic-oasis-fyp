@@ -64,6 +64,7 @@ ATTEMPT_FIELDS = (
     "attemptEndedAt",
     "completed",
     "cohortEligible",
+    "sourceGrade",
     "validityLevel",
     "featureValid",
     "attemptCensorReason",
@@ -154,6 +155,7 @@ class AttemptRecord:
     attemptEndedAt: datetime | None
     completed: bool
     cohortEligible: bool
+    sourceGrade: str | None
     validityLevel: str
     featureValid: bool
     attemptCensorReason: str | None
@@ -188,6 +190,7 @@ class AttemptRecord:
             "attemptEndedAt": self.attemptEndedAt.isoformat() if self.attemptEndedAt else "",
             "completed": self.completed,
             "cohortEligible": self.cohortEligible,
+            "sourceGrade": self.sourceGrade or "",
             "validityLevel": self.validityLevel,
             "featureValid": self.featureValid,
             "attemptCensorReason": self.attemptCensorReason or "",
@@ -298,6 +301,7 @@ def build_attempt_from_rows(
     *,
     contract: Mapping[str, Any],
     release_id: str,
+    cohort_grades: Sequence[str] = ("6",),
 ) -> AttemptRecord:
     """Reconstruct one assignment instance as an external attempt."""
     normalized = _normalize_rows(rows)
@@ -324,6 +328,7 @@ def build_attempt_from_rows(
             attemptEndedAt=None,
             completed=False,
             cohortEligible=False,
+            sourceGrade=None,
             validityLevel=INVALID,
             featureValid=False,
             attemptCensorReason=REASON_NO_START,
@@ -345,7 +350,8 @@ def build_attempt_from_rows(
 
     grades = {r["grade"] for r in normalized if r["grade"]}
     subjects = {r["subject"] for r in normalized if r["subject"]}
-    cohort_eligible = grades == {PRIMARY_GRADE} and subjects == {PRIMARY_SUBJECT}
+    cohort_eligible = grades.issubset(set(cohort_grades)) and subjects == {PRIMARY_SUBJECT}
+    source_grade = grades.pop() if len(grades) == 1 else None
 
     problems: dict[str, list[Mapping[str, Any]]] = {}
     for row in normalized:
@@ -389,6 +395,7 @@ def build_attempt_from_rows(
         attemptEndedAt=ended_at,
         completed=completed,
         cohortEligible=cohort_eligible,
+        sourceGrade=source_grade,
         validityLevel=validity,
         featureValid=feature_valid,
         attemptCensorReason=reason,
@@ -424,6 +431,7 @@ def reconstruct_attempts(
     *,
     contract: Mapping[str, Any],
     release_id: str,
+    cohort_grades: Sequence[str] = ("6",),
 ) -> tuple[list[AttemptRecord], list[ProblemOutcome], Counter[str]]:
     """Build attempts and problem outcomes from the normalized action rows."""
     records: list[AttemptRecord] = []
@@ -433,7 +441,7 @@ def reconstruct_attempts(
 
     for _, group in frame.groupby(["externalAssignmentKey"], observed=True, sort=False):
         rows = group.to_dict("records")
-        record = build_attempt_from_rows(rows, contract=contract, release_id=release_id)
+        record = build_attempt_from_rows(rows, contract=contract, release_id=release_id, cohort_grades=cohort_grades)
         if record.attemptCensorReason == REASON_NO_START:
             summary["assignmentsExcludedNoInWindowStart"] += 1
             continue
@@ -508,6 +516,7 @@ def main() -> None:
     parser.add_argument("--processed-dir", required=True, help="Protected processed output directory")
     parser.add_argument("--contract", default=None, help="J2 contract YAML path (default: repo copy)")
     parser.add_argument("--release-id", default="assistments-edm-cup-2023-release-v1")
+    parser.add_argument("--cohort-grades", default="6", help="Comma-separated cohort grades (frozen default 6; predeclared fallback 4,5,6)")
     parser.add_argument("--force", action="store_true")
     args = parser.parse_args()
 
@@ -522,8 +531,14 @@ def main() -> None:
     if (attempts_path.exists() or outcomes_path.exists()) and not args.force:
         raise FileExistsError("protected J2 attempt outputs are immutable; use --force")
 
+    cohort_grades = tuple(grade.strip() for grade in args.cohort_grades.split(",") if grade.strip())
     frame = read_action_rows(args.action_rows)
-    records, outcomes, summary = reconstruct_attempts(frame, contract=contract, release_id=args.release_id)
+    records, outcomes, summary = reconstruct_attempts(
+        frame,
+        contract=contract,
+        release_id=args.release_id,
+        cohort_grades=cohort_grades,
+    )
     write_attempts_csv(records, attempts_path)
     write_problem_outcomes_csv(outcomes, outcomes_path)
     summary_path = processed / "j2_reconstruction_summary.json"
