@@ -32,6 +32,8 @@ from .metrics import compute_metrics
 from .outcomes import attach_outcomes
 from .replay import derive_bank_catalog, load_bank_catalog_csv, replay_policies
 from .reporting import build_markdown_report, build_machine_report, render_machine_json
+from .report_templates import render_decision_audit_csv, render_evidence_markdown
+from .visualizations import build_evidence_package
 
 
 def _parse_args(argv: Sequence[str]) -> argparse.Namespace:
@@ -135,6 +137,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     manifest_path = output / "run_manifest.json"
     machine_path = output / "machine_report.json"
     markdown_path = output / "policy_comparison_report.md"
+    evidence_path = output / "evidence_package.json"
+    evidence_markdown_path = output / "policy_comparison_evidence.md"
+    audit_csv_path = output / "decision_audit.csv"
     write_run_manifest(run_manifest, manifest_path)
     machine_report = build_machine_report(
         run_manifest,
@@ -150,10 +155,30 @@ def main(argv: Sequence[str] | None = None) -> int:
         ),
         encoding="utf-8",
     )
+    evidence_package = build_evidence_package(
+        replay_result,
+        outcome_result,
+        metrics,
+        run_manifest,
+        random_seed=run_manifest.random_seed,
+    )
+    evidence_path.write_text(
+        render_machine_json(evidence_package), encoding="utf-8"
+    )
+    evidence_markdown_path.write_text(
+        render_evidence_markdown(evidence_package, run_manifest, metrics),
+        encoding="utf-8",
+    )
+    audit_csv_path.write_text(
+        render_decision_audit_csv(evidence_package), encoding="utf-8"
+    )
     print(f"claimLevel={metrics.claim_label}")
     print(f"manifest={manifest_path}")
     print(f"machineReport={machine_path}")
     print(f"markdownReport={markdown_path}")
+    print(f"evidencePackage={evidence_path}")
+    print(f"evidenceMarkdown={evidence_markdown_path}")
+    print(f"decisionAuditCsv={audit_csv_path}")
     return 0
 
 
