@@ -337,3 +337,117 @@ All 2,820,378 normalized rows carry strictly conforming HMAC pseudonym keys
 output hashes, counts, usage terms, and `containsRawIdentifiers: false`.
 The pseudonym key lives only in the protected external-data root
 (`pseudonym_key_v1.txt`) and never appears in the manifest or the repository.
+
+## 19. J2 methodology freeze (recorded 2026-08-08, before J2 data build)
+
+Contract version: **`assistments-j2-attempt-label-contract-v1`** (frozen
+config: `ai_pipeline/external_data/assistments/assistments_j2_contract_v1.yaml`).
+These decisions are fixed before J2 reconstruction and must not be tuned after
+observing J3 held-out composition or J4 model performance.
+
+- **Primary cohort:** `sourceGrade == "6"` AND `sourceSubject == "Mathematics"`.
+  `Grade 6 Accelerated` is not merged into the primary cohort. Grades are not
+  broadened during J2. Predeclared J3-only fallback: pooled exact Grades 4, 5,
+  and 6 (Mathematics), reported as a separate secondary/fallback analysis that
+  never silently replaces the primary Grade 6 result.
+- **Compatibility rule:** two attempts are compatible only when they share the
+  same `externalStudentKey` and the same `externalSequenceKey`. Cross-sequence
+  pairing to inflate sample size is forbidden.
+- **Completion rule:** one attempt is one learner-specific in-unit assignment
+  (`externalStudentKey` + `externalAssignmentKey` + `externalSequenceKey`); it
+  requires a valid `assignment_started` event and at least one later
+  `assignment_finished` event. Attempt start/ordering timestamp is
+  `assignment_started`. Incomplete assignments are not final U7 attempts.
+- **Correctness rule:** `problem_started` -> first later valid graded response;
+  `correct_response` = 1, `wrong_response` = 0; all later responses ignored;
+  `open_response`, `answer_requested`, hints, explanations, and unit-test score
+  files never determine correctness.
+- **30-minute telemetry-quality rule (project-defined, not an ASSISTments
+  property):** valid `response_time_ms` = first graded response timestamp minus
+  problem-start timestamp, with `0 < response_time_ms <= 1_800_000` (30
+  minutes). Negative/zero rejected; > 30 minutes censored from timing evidence
+  (no clipping/winsorizing); no proxy timings (assignment duration, inter-event
+  time, hint time). Counts and percentages are recorded for valid, censored,
+  zero, negative, and missing/ambiguous cases.
+- **Minimum evidence counts:** `minimum_valid_graded_problems = 3`,
+  `minimum_valid_response_time_pairs = 3`. OUTCOME-VALID = completed + exact
+  Grade 6 Mathematics cohort + valid identity + >= 3 valid first-graded
+  outcomes. FEATURE-VALID = outcome-valid + >= 3 valid uncensored
+  response-time pairs. Assignments are not forced to contain exactly five
+  problems.
+- **Feature construction:** `correct_rate` = correct first graded responses /
+  valid first graded responses; `mean_response_time_ms` = mean of valid
+  uncensored pairs only (a censored-timing problem still contributes its
+  correctness). Base schema remains `quiz-attempt-features-v2` with exactly
+  `correct_rate` and `mean_response_time_ms`; grade, skill, sequence, hint, and
+  problem count are never base features.
+- **Mastery criterion:** `masteryCriterion = 0.60`, frozen; never tuned after
+  model results. `next_attempt_support_needed = true` when the immediate
+  compatible next outcome-valid attempt's `correct_rate < 0.60`, else false.
+- **Target/censoring rules:** the immediate chronological next assignment for
+  the same learner + sequence is used without skipping intervening
+  assignments. Missing, incomplete, not-outcome-valid, or chronology-ambiguous
+  next assignments censor the target; no farther-ahead search. Censored rows
+  never convert into either class. Identical valid problem-key sets censor the
+  pair as `immediate_identical_problem_set_repeat`; partial overlap is kept
+  with problem-overlap rate as audit metadata only.
+- **Unresolved metadata treatment:** problems absent from `problem_details`
+  retain correctness and response-time contribution when identity and graded
+  action semantics are valid; `sourceSkillCode`/`externalContentKey` are never
+  fabricated and their count remains audited. BKT-only analyses exclude rows
+  with missing skill codes without altering the base DT/XGBoost/MLP dataset.
+- **BKT boundary:** J2 preserves event lineage but runs no final BKT ablation;
+  eligibility requires non-null `sourceSkillCode` and deterministic response
+  ordering. BKT remains a named ablation, never a fourth directly comparable
+  classifier.
+- **Chronology:** attempts are ordered within learner + sequence by
+  `assignment_started`; lexical assignment-key order never resolves ties.
+  Indistinguishable start timestamps mark the affected pairing
+  `chronology_ambiguous` and censor it.
+- **Provenance/privacy:** all J2 outputs are `external_real` /
+  `assistments_edm_cup_2023`; native Logic Oasis fields are never fabricated;
+  learner-level outputs stay in the protected directory outside Git; only
+  code, schema/config, tests, aggregate counts, and non-identifying evidence
+  reports enter the repository.
+
+## 20. J2 execution record (2026-08-08)
+
+J2 ran against the verified J1 release using the frozen contract
+`assistments-j2-attempt-label-contract-v1`. Protected outputs:
+`external_attempts_v1.csv`, `external_problem_outcomes_v1.csv`,
+`external_labels_v1.csv`, and `j2_manifest.json` (all hashes verified in the
+manifest; provenance `external_real`; no raw identifiers, key material, or
+local paths).
+
+- Assignments: 80,337 started in-window (377 excluded for no in-window
+  `assignment_started`); Grade 6 started = 30,199; Grade 6 completed = 24,630.
+- Attempts: outcome-valid = 13,520; feature-valid = 13,296
+  (224 outcome-valid attempts lack >= 3 valid response-time pairs).
+- Problem correctness/timing exclusions: no-graded-response = 223,103;
+  no-problem-start = 0; multiple-starts = 0; zero-duration = 0;
+  negative-duration = 0; ambiguous pairing = 0.
+- Response-time quality (30-minute project-defined rule): computed durations
+  n = 390,539; censored > 30 min = 8,931 (2.29%). Before filter: min 73 ms,
+  median 21.9 s, mean ~82 min, max ~135 days. After filter (valid <= 30 min):
+  n = 381,608, min 73 ms, median 20.9 s, mean ~73 s, max 1,797,914 ms.
+- Unresolved problem metadata: 3,483 problems (2,872 contributed graded
+  outcomes; 2,863 contributed valid timing) with no fabricated skill/content.
+- Chronology ambiguities: 0.
+- Identical-question-set censors: 338 (`immediate_identical_problem_set_repeat`).
+- Labels: candidate current -> next pairs = 419 (of 13,296 feature-valid
+  currents; 12,877 had no next attempt). Censored: next-not-outcome-valid = 81;
+  labelled pairs = 0; target true = 0; target false = 0.
+- Unique learners: 5,891 represented in attempts; 0 with labelled pairs.
+- BKT-eligible sequences (>= 1 graded response with non-null skill code):
+  2,398; no BKT ablation was run.
+
+Limitation recorded for J3: the Grade 6 primary cohort yields **zero labelled
+current -> next pairs** under the frozen immediate-next, outcome-valid,
+identical-problem-set, and 30-minute rules. The dominant censors are
+last-in-chain attempts (12,877) and identical fluency-round problem sets
+(338). This is a data-structure finding, not a pipeline failure; the predeclared
+J3-only Grades 4-6 fallback exists for the J3 statistical-sufficiency gate, and
+the primary Grade 6 result is never silently replaced.
+
+**J2 decision: READY FOR J3** (pipeline complete, auditable, and frozen;
+Grade 6 labelled-pair sufficiency is J3's gate decision, not a J2 blocker).

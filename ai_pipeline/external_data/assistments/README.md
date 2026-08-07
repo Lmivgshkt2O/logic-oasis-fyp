@@ -4,8 +4,9 @@ This directory implements the J0 physical-source and U7-feasibility validation
 for the approved **external real-data** evaluation route described in
 `docs/plans/2026-08-07-001-feat-u7-assistments-edm-cup-2023-external-real-data-evaluation-plan.md`.
 
-Status: **J0 GO for base U7** and **J1 adapter + manifest complete** (see
-`docs/evidence/u7-assistments-source-validation.md`). J2 has not been started.
+Status: **J0 GO**, **J1 adapter + manifest complete**, and **J2 attempts +
+labels + manifest complete** (see
+`docs/evidence/u7-assistments-source-validation.md`). J3 has not been started.
 
 ## Provenance boundary
 
@@ -71,8 +72,16 @@ logic-oasis-private-data/
   pseudonymization, staged atomic output, and manifest.
 - `manifest.py` - auditable release manifest (source hashes, counts, terms,
   no-raw-identifier declaration).
+- `assistments_j2_contract_v1.yaml` - frozen J2 attempt/label methodology.
+- `j2_contract.py` - J2 constants and contract validation.
+- `reconstruct_attempts.py` - J2 attempt reconstruction (completion,
+  first-graded correctness, 30-minute timing rule, validity levels).
+- `build_labels.py` - J2 current -> immediate-next labels, censoring, and the
+  J2 manifest.
 - `tests/test_assistments_schema_contract.py` - J0 schema-contract tests.
 - `tests/test_assistments_adapter.py` - J1 adapter/manifest tests.
+- `tests/test_assistments_attempt_reconstruction.py` - J2 reconstruction tests.
+- `tests/test_assistments_next_attempt_labels.py` - J2 label/censor tests.
 
 The plan proposed these files; `assistments_contract.py` is a small addition so
 the inspector and tests share one versioned contract instead of duplicating
@@ -97,6 +106,27 @@ python -m external_data.assistments.adapter `
 Outputs are written to a staging directory and atomically promoted, so a failed
 run never leaves a partial release.  Reruns require `--force` (the release path
 is immutable by default).
+
+## Running the J2 build
+
+```powershell
+cd C:\Users\zyonn\Documents\FYP\logic_oasis\ai_pipeline
+python -m external_data.assistments.reconstruct_attempts `
+  --action-rows <protected>\processed\external_action_rows_v1.csv `
+  --processed-dir <protected>\processed
+python -m external_data.assistments.build_labels `
+  --attempts <protected>\processed\external_attempts_v1.csv `
+  --action-rows <protected>\processed\external_action_rows_v1.csv `
+  --problem-outcomes <protected>\processed\external_problem_outcomes_v1.csv `
+  --processed-dir <protected>\processed
+```
+
+J2 emits protected attempts, problem outcomes, labels, and `j2_manifest.json`.
+The frozen rules are: Grade 6 Mathematics primary cohort; one in-unit
+assignment per attempt; first-graded-response correctness; 30-minute
+response-time rule; >= 3 graded problems and >= 3 timing pairs; immediate-next
+pairing without skipping; `masteryCriterion = 0.60`; identical problem-set
+repeats censored; BKT left to a later named ablation.
 
 ### Detected source quirk handled by the adapter
 
