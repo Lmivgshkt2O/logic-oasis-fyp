@@ -312,6 +312,24 @@ class AdapterIntegrationTests(unittest.TestCase):
             with self.assertRaises(FileNotFoundError):
                 run_adapter(raw, root / "processed", release_id=RELEASE_ID, pseudonym_key=KEY)
 
+    def test_all_rows_outside_window_yields_valid_empty_release(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            raw = tiny_raw_dir(root)
+            write_csv(raw / "action_logs.csv", ACTION_LOG_HEADER, [
+                ["A1", str(BEFORE_WINDOW_TS), "P1", "", "", "", "", "problem_started", "", ""],
+                ["A1", str(BEFORE_WINDOW_TS + 10), "P1", "", "", "", "", "correct_response", "", ""],
+            ])
+            result = run_adapter(raw, root / "processed", release_id=RELEASE_ID, pseudonym_key=KEY)
+            output = Path(result["actionRows"])
+            with output.open(newline="", encoding="utf-8") as handle:
+                rows = list(csv.DictReader(handle))
+            self.assertEqual(rows, [])
+            manifest = json.loads(Path(result["manifest"]).read_text(encoding="utf-8"))
+            validate_manifest(manifest)
+            self.assertEqual(manifest["counts"]["normalizedRowsEmitted"], 0)
+            self.assertEqual(manifest["counts"]["rowsOutsideWindowExcluded"], 2)
+
 
 class ManifestTests(unittest.TestCase):
     def test_manifest_requires_hashes_and_provenance(self):

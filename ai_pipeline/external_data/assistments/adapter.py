@@ -279,13 +279,6 @@ def run_adapter(
 
     try:
         assignment_ids, totals = write_eligible_action_rows(raw, temp_path)
-        assignment_lookup = load_assignment_lookup(
-            raw / "assignment_details.csv",
-            assignment_ids,
-        )
-        problem_skills = load_problem_skill_map(raw / "problem_details.csv")
-        sequence_metadata = load_sequence_metadata(raw / "sequence_details.csv")
-
         excluded: Counter[str] = Counter()
         unresolved: Counter[str] = Counter()
         rows_by_action: Counter[str] = Counter()
@@ -299,24 +292,31 @@ def run_adapter(
         with staged_output.open("w", newline="", encoding="utf-8") as handle:
             writer = csv.DictWriter(handle, fieldnames=EXTERNAL_ACTION_ROW_FIELDS)
             writer.writeheader()
-            for normalized in stream_normalized_rows(
-                temp_path,
-                release_id=release_id,
-                pseudonym_key=pseudonym_key,
-                assignment_lookup=assignment_lookup,
-                problem_skills=problem_skills,
-                sequence_metadata=sequence_metadata,
-                excluded=excluded,
-                unresolved=unresolved,
-            ):
-                writer.writerow(normalized.to_csv_row())
-                emitted += 1
-                rows_by_action[normalized.sourceActionType] += 1
-                rows_by_grade[normalized.sourceGrade or "none"] += 1
-                unique_students.add(normalized.externalStudentKey)
-                unique_assignments.add(normalized.externalAssignmentKey)
-                if normalized.externalProblemKey:
-                    unique_problems.add(normalized.externalProblemKey)
+            if temp_path.exists():
+                assignment_lookup = load_assignment_lookup(
+                    raw / "assignment_details.csv",
+                    assignment_ids,
+                )
+                problem_skills = load_problem_skill_map(raw / "problem_details.csv")
+                sequence_metadata = load_sequence_metadata(raw / "sequence_details.csv")
+                for normalized in stream_normalized_rows(
+                    temp_path,
+                    release_id=release_id,
+                    pseudonym_key=pseudonym_key,
+                    assignment_lookup=assignment_lookup,
+                    problem_skills=problem_skills,
+                    sequence_metadata=sequence_metadata,
+                    excluded=excluded,
+                    unresolved=unresolved,
+                ):
+                    writer.writerow(normalized.to_csv_row())
+                    emitted += 1
+                    rows_by_action[normalized.sourceActionType] += 1
+                    rows_by_grade[normalized.sourceGrade or "none"] += 1
+                    unique_students.add(normalized.externalStudentKey)
+                    unique_assignments.add(normalized.externalAssignmentKey)
+                    if normalized.externalProblemKey:
+                        unique_problems.add(normalized.externalProblemKey)
 
         hashes = dict(source_hashes) if source_hashes else source_file_hashes(raw)
         counts = {
