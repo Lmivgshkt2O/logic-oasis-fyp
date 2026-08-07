@@ -42,6 +42,7 @@ from test_policy_replay import replayed, run_manifest_for
 UTC = timezone.utc
 NOW = datetime(2026, 8, 1, tzinfo=UTC)
 WINDOW = OutcomeWindow(max_later_attempts=5, max_calendar_duration_days=90)
+CONFIGS = Path(__file__).resolve().parents[1] / "configs"
 
 
 def approved_release(release_id: str = "release-aqc3"):
@@ -386,6 +387,54 @@ class PolicyReportingTests(unittest.TestCase):
         self.assertTrue(
             any(band["status"] == "reliable" for band in lowered["bktReliabilityCurve"])
         )
+
+    def test_cli_runner_emits_the_full_evidence_package(self) -> None:
+        import evaluation.run_policy_comparison as runner
+
+        dataset = pseudonymized(build_dataset(four_student_history()))
+        with TemporaryDirectory() as csv_directory, TemporaryDirectory() as output_directory:
+            export_real_attempts(
+                dataset,
+                csv_directory,
+                release=approved_release(),
+                pseudonymization_key="runner-test-key",
+            )
+            code = runner.main(
+                [
+                    "--attempts-csv",
+                    str(Path(csv_directory) / "attempts.csv"),
+                    "--responses-csv",
+                    str(Path(csv_directory) / "responses.csv"),
+                    "--provenance",
+                    "real",
+                    "--dataset-version",
+                    "runner-v1",
+                    "--output-dir",
+                    output_directory,
+                    "--claim-label",
+                    "pipeline_demo_only",
+                    "--policy-evaluation-manifest",
+                    str(CONFIGS / "policy_evaluation_v1.yaml"),
+                    "--adaptive-policy-config",
+                    str(CONFIGS / "adaptive_policy_v1.yaml"),
+                ]
+            )
+            self.assertEqual(0, code)
+            output = Path(output_directory)
+            for name in (
+                "run_manifest.json",
+                "machine_report.json",
+                "policy_comparison_report.md",
+                "evidence_package.json",
+                "policy_comparison_evidence.md",
+                "decision_audit.csv",
+            ):
+                self.assertTrue((output / name).exists(), name)
+            evidence_text = (output / "policy_comparison_evidence.md").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn("Claim level", evidence_text)
+            self.assertIn("Promotion-safety forest plot data", evidence_text)
 
 
 if __name__ == "__main__":
