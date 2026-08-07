@@ -439,7 +439,7 @@ local paths).
   labelled pairs = 0; target true = 0; target false = 0.
 - Unique learners: 5,891 represented in attempts; 0 with labelled pairs.
 - BKT-eligible sequences (>= 1 graded response with non-null skill code):
-  2,398; no BKT ablation was run.
+  2,402; no BKT ablation was run.
 
 Limitation recorded for J3: the Grade 6 primary cohort yields **zero labelled
 current -> next pairs** under the frozen immediate-next, outcome-valid,

@@ -209,6 +209,8 @@ def _normalize_rows(rows: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
     normalized: list[dict[str, Any]] = []
     for row in rows:
         raw_ts = row.get("sourceTimestamp")
+        if raw_ts is None or raw_ts == "":
+            raise ValueError("attempt reconstruction requires a sourceTimestamp on every row")
         timestamp = raw_ts if isinstance(raw_ts, datetime) else pd.to_datetime(raw_ts, utc=True).to_pydatetime()
         problem_key = row.get("externalProblemKey")
         normalized.append(
@@ -441,7 +443,7 @@ def reconstruct_attempts(
             summary[f"problemStatus_{outcome.responseTimeStatus}"] += 1
             if outcome.unresolvedMetadata:
                 summary["unresolvedMetadataProblems"] += 1
-            if outcome.graded and outcome.responseTimeStatus == RT_VALID:
+            if outcome.graded:
                 if any(r.get("sourceSkillCode") for r in rows if r.get("externalProblemKey") == outcome.externalProblemKey):
                     bkt_sequences.add(record.externalSequenceKey)
 
