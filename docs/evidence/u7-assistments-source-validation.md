@@ -607,3 +607,65 @@ No model was trained, no SHAP or BKT ablation ran, and J4 was not executed.
 
 **J3-v2 decision: READY FOR J4** for the Grade 6 primary v2 dataset under the
 approved contract (frozen split manifest in the protected directory).
+
+## 24. J4 external model comparison record (2026-08-08)
+
+Full report: `ai_pipeline/reports/u7_assistments_j4_model_comparison.md`
+(aggregate; no learner-level data). Protected J4 manifest:
+`j4_external_manifest.json` (verified hashes, provenance `external_real`,
+artifact status `evidence_only_external`, no raw identifiers or local paths).
+
+### Frozen inputs (verified before training)
+
+Contract `assistments-j2-attempt-label-contract-v2`; features exactly
+`correct_rate`, `mean_response_time_ms`; mastery 0.60; split seed 20260716;
+training 653 learners / 4,376 rows (846 true, 3,530 false); held-out 2
+learners / 25 rows (2 true, 23 false); zero learner overlap; both classes in
+both partitions. Row identity SHA-256 (all): `0474a94e...`; train:
+`09eb1b25...`; held-out: `7969c906...`.
+
+### Frozen held-out results (evaluated once; 2 learners / 2 positives)
+
+| Model | Accuracy | Precision | Recall | F1 | ROC-AUC | PR-AUC | Log loss | Brier |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Decision Tree | 0.48 | 0.133 | 1.000 | 0.235 | 0.717 | 0.167 | 0.743 | 0.269 |
+| XGBoost | 0.92 | 0.000 | 0.000 | 0.000 | 0.848 | 0.292 | 0.324 | 0.092 |
+| MLP | 0.92 | 0.000 | 0.000 | 0.000 | 0.717 | 0.191 | 0.346 | 0.101 |
+
+Confusion matrices: DT [[10,13],[0,2]]; XGBoost and MLP [[23,0],[2,0]]
+(all-negative prediction; the 0.92 accuracy equals predicting the majority
+class, so precision/recall/F1/PR-AUC and probability quality are decisive).
+Baseline context: positive prevalence 0.193; majority-class accuracy 0.807.
+
+### Training-only repeated student-grouped stability (5 folds, seed 20260716)
+
+Validation folds: 131/131/131/130/130 learners; held-out learners excluded;
+whole learners kept together; preprocessing refit per fold.
+
+| Model | ROC-AUC (mean+/-std) | PR-AUC | Recall | F1 | Log loss | Brier |
+|---|---:|---:|---:|---:|---:|---:|
+| Decision Tree | 0.677 +/- 0.022 | 0.320 +/- 0.030 | 0.692 | 0.407 | 0.668 | 0.224 |
+| XGBoost | 0.687 +/- 0.021 | 0.347 +/- 0.031 | 0.029 | 0.054 | 0.457 | 0.145 |
+| MLP | 0.664 +/- 0.021 | 0.295 +/- 0.013 | 0.054 | 0.092 | 0.476 | 0.153 |
+
+XGBoost has the best grouped ROC-AUC/PR-AUC/calibration but near-zero recall;
+Decision Tree has the best recall at low precision. The grouped ROC-AUC gap
+between XGBoost and Decision Tree is ~0.010, well inside fold variability, so
+no stable practical advantage is established.
+
+### Conclusion
+
+**MODEL COMPARISON COMPLETED** (metrics exist; no stable advantage). No
+cautious-advantage claim is made: the frozen held-out set has only 2
+independent learners and 2 positive rows, XGBoost's 0.92 held-out accuracy is
+all-negative prediction, and the grouped stability evidence shows no
+consistent winner across precision/recall/F1/AUC/calibration. All artifacts
+remain `evidence_only_external`; no promotion occurred; production adaptive
+policy was not modified.
+
+Limitations: tiny held-out (2 learners / 2 positives); ASSISTments external
+U.S.-curriculum evidence is not direct KSSR validation; class imbalance means
+accuracy near 81-92% must not be read in isolation.
+
+**J4 readiness: READY FOR J5** (SHAP interpretability, operational evidence,
+and the conditional BKT ablation remain; J5 was not executed in this run).

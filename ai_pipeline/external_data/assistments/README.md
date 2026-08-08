@@ -164,6 +164,21 @@ learners); the frozen student-grouped split (seed 20260716) is in the
 protected readiness manifest. Grades 4-6 remain the declared secondary
 analysis.
 
+## Running J4 (frozen external comparison)
+
+```powershell
+python -m external_data.assistments.run_j4 `
+  --processed-dir <protected>\processed\v2 `
+  --report ..\..\reports\u7_assistments_j4_model_comparison.md `
+  --j4-manifest-out <protected>\processed\v2\j4_external_manifest.json
+```
+
+Trains Decision Tree / XGBoost / MLP on the frozen Grade 6 training partition,
+evaluates once on the 2-learner held-out set, and adds 5-fold training-only
+student-grouped stability evidence. Result: **MODEL COMPARISON COMPLETED** (no
+stable advantage); artifacts remain `evidence_only_external` and are never
+promoted.
+
 ### Detected source quirk handled by the adapter
 
 819 action-log `problem_id` values are absent from `problem_details`
