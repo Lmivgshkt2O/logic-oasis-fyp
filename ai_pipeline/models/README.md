@@ -35,3 +35,19 @@ The metrics in `../reports/controlled_demo_model_report.md` demonstrate only
 deterministic mechanics and fit to fictional scenarios. They do not establish
 real-student accuracy, learning improvement, calibration, or superiority over
 Decision Tree or MLP.
+
+## ASSISTments external-real-data evidence status (U7 J0-J6)
+
+The external evaluation completed a held-out comparison on ASSISTments EDM Cup
+2023 Grade 6 Mathematics (2022-2023, `external_real`,
+`assistments-j2-attempt-label-contract-v2`, seed 20260716). Result: **MODEL
+COMPARISON COMPLETED; NO STABLE OVERALL MODEL ADVANTAGE ESTABLISHED**, with an
+explicit small-held-out limitation (2 learners / 2 positives). See
+`docs/evidence/u7-assistments-external-real-data-release.md` and
+`../reports/u7_assistments_j4_model_comparison.md`.
+
+No ASSISTments-trained Decision Tree, XGBoost, or MLP artifact is registered or
+promoted. All external classifiers remain **`evidence_only_external`**
+candidate/evidence artifacts; none may be activated in the runtime model
+registry, and none changes production adaptive-policy behaviour. Promotion
+would require a separate target-domain/supervisor approval gate.

@@ -723,3 +723,43 @@ promotion; no KSSR validation claim.
 
 **J5 readiness: READY FOR J6** (final report consolidation in
 `model_comparison.md`; J6 was not executed in this run).
+
+## 26. J6 final release record (2026-08-08)
+
+All J0-J5 evidence was re-verified before consolidation (source hashes, J1
+release, preserved v1 zero-label evidence, J3A diagnostics, J2-v2/J3-v2
+manifests and hashes, J4 identity/conclusion, J5 SHAP/BKT evidence; no
+conflicts). Final authoritative contract: `external_real`; ASSISTments EDM Cup
+2023; 2022-01-01/2023-12-31; exact Grade 6 Mathematics; contract
+`assistments-j2-attempt-label-contract-v2`; prediction unit one learner +
+exact `sourceSkillCode` episode in one completed assignment; mastery 0.60;
+target `next_attempt_support_needed`; base features exactly `correct_rate` and
+`mean_response_time_ms`; split seed 20260716.
+
+Final reports updated/created:
+
+- `ai_pipeline/reports/model_comparison.md` - now records the completed
+  external-real-data comparison (no longer "no final model-performance
+  result"); demonstration, external-real-data, and native runtime evidence are
+  kept separate.
+- `docs/evidence/u7-assistments-external-real-data-release.md` - full release
+  record (dataset, terms, hashes, window, cohort, contract, metrics, grouped
+  stability, held-out limitations, SHAP, BKT ablation, operational evidence,
+  limitations, promotion decision).
+- `ai_pipeline/models/README.md` - external artifacts remain
+  `evidence_only_external`; no registration or promotion.
+
+Final status: **U7 EXTERNAL-REAL-DATA EVALUATION COMPLETE**; evidence level
+held-out external-real-data comparison with explicit small-held-out
+limitation; model-superiority NOT ESTABLISHED; BKT-feature improvement NOT
+ESTABLISHED; production promotion NOT APPROVED. Consistency tests
+(`tests/test_assistments_u7_release_consistency.py`) verify report values
+against the protected manifests, contract/provenance/feature invariants, no
+raw identifiers or learner-level datasets in Git, unchanged J4/BKT
+conclusions, and no production-active external artifact. All affected U7/J0-J6
+regression suites pass.
+
+Post-J6 boundary: adaptive-question-bank P1/P2/P3a evaluation is not started
+automatically; the next separate activity is reuse of the compatible external
+learner-skill histories for the Adaptive Question Bank Comparison and
+Selection Stage-B work, subject to its own mapping/evidence gate.
