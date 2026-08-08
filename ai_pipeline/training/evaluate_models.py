@@ -423,6 +423,7 @@ def evaluate_external_fair_comparison(
     test_learner_keys: Iterable[str],
     contract_version: str,
     dataset_version: str,
+    extra_feature: str | None = None,
 ) -> ExternalComparisonReport:
     """Fit and evaluate DT/XGBoost/MLP once on the frozen external split."""
     rows = tuple(examples)
@@ -433,8 +434,11 @@ def evaluate_external_fair_comparison(
     if random_seed != RANDOM_SEED:
         raise ValueError(f"U7 requires deterministic random seed {RANDOM_SEED}")
     columns = feature_names(rows)
-    if columns != EXTERNAL_FEATURE_COLUMNS:
-        raise ValueError("external evaluation requires exactly correct_rate and mean_response_time_ms")
+    expected_columns = EXTERNAL_FEATURE_COLUMNS
+    if extra_feature is not None:
+        expected_columns = EXTERNAL_FEATURE_COLUMNS + (extra_feature,)
+    if columns != expected_columns:
+        raise ValueError(f"external evaluation requires exactly {expected_columns}")
 
     train_keys = frozenset(train_learner_keys)
     test_keys = frozenset(test_learner_keys)
@@ -529,6 +533,7 @@ def repeated_grouped_validation(
     *,
     random_seed: int,
     n_folds: int = 5,
+    extra_feature: str | None = None,
 ) -> GroupedStabilityReport:
     """Training-only deterministic student-grouped stability evaluation.
 
@@ -546,8 +551,11 @@ def repeated_grouped_validation(
     if random_seed != RANDOM_SEED:
         raise ValueError(f"U7 requires deterministic random seed {RANDOM_SEED}")
     columns = feature_names(rows)
-    if columns != EXTERNAL_FEATURE_COLUMNS:
-        raise ValueError("external grouped validation requires exactly the two base features")
+    expected_columns = EXTERNAL_FEATURE_COLUMNS
+    if extra_feature is not None:
+        expected_columns = EXTERNAL_FEATURE_COLUMNS + (extra_feature,)
+    if columns != expected_columns:
+        raise ValueError(f"external grouped validation requires exactly {expected_columns}")
     groups = sorted({row.student_key for row in rows})
     if len(groups) < n_folds:
         raise ValueError("grouped validation requires at least n_folds learners")
