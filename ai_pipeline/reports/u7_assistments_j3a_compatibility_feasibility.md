@@ -165,3 +165,18 @@ exact `sourceSkillCode` produces one student-skill episode per assignment:
 versioned methodology amendment). Counts above demonstrate feasibility;
 no contract change is applied by this diagnostic run.
 
+## Correction addendum (2026-08-08, during v2 implementation)
+
+The exact-cohort filter was corrected during v2 implementation: episodes from
+assignments with no resolvable `Grade N` metadata (empty `sourceGrade`) are no
+longer treated as cohort-eligible. Re-run diagnostics with the correction:
+
+- Grade 6: 48,579 cohort episodes; **4,401 labelled pairs** (true 848 / false
+  3,553) across 655 learners; potential held-out gate.
+- Grades 4-6: 83,981 cohort episodes; **7,099 labelled pairs** (true 1,427 /
+  false 5,672) across 1,216 learners; potential held-out gate.
+
+The tables above reflect the original diagnostic (5,379 / 8,077 labelled
+pairs) and are superseded by this addendum. The approved v2 implementation
+uses the corrected cohort; its final counts are recorded in
+`docs/evidence/u7-assistments-source-validation.md` (section 23).

@@ -523,3 +523,87 @@ modified**. Full report:
 
 **J3A decision: AMENDMENT CANDIDATE A RECOMMENDED**, pending a separately
 approved, versioned methodology amendment. No contract change was applied.
+
+### J3A addendum (exact-cohort correction, 2026-08-08)
+
+During v2 implementation the exact-cohort filter was corrected: episodes from
+assignments with no resolvable ``Grade N`` metadata (empty ``sourceGrade``) are
+no longer treated as cohort-eligible (an empty grade set is not a subset of
+``{"6"}``). The J3A diagnostics were re-run with this correction:
+
+- Grade 6: 48,579 cohort episodes; **4,401 labelled pairs** (true 848 / false
+  3,553) across 655 learners; potential held-out gate.
+- Grades 4-6: 83,981 cohort episodes; **7,099 labelled pairs** (true 1,427 /
+  false 5,672) across 1,216 learners; potential held-out gate.
+
+These corrected diagnostic counts are still feasibility diagnostics, not the
+final v2 model dataset.
+
+## 23. V2 methodology amendment and J2-v2/J3-v2 execution record (2026-08-08)
+
+### Approved amendment (pre-model)
+
+Contract **`assistments-j2-attempt-label-contract-v2`** is approved and
+implemented. The only contract delta from v1 is the compatibility/attempt
+interpretation: same `externalStudentKey` + **exact non-null
+`sourceSkillCode`**, with the prediction unit being one learner-specific
+exact-skill episode inside one completed assignment
+(`externalStudentKey + externalAssignmentKey + exact non-null
+sourceSkillCode`), using only that skill's responses and never mixing skills.
+The amendment is motivated by the source semantic mismatch (multi-skill
+assignments; identical fluency-round problem sets) and is explicitly **not**
+motivated by model performance (no model has been trained or evaluated).
+The v1 contract and the original J2/J3 zero-label evidence are preserved.
+Exact-cohort correction: episodes with no resolvable `Grade N` metadata are
+excluded from the cohort (978 previously-misclassified Grade 6 labelled rows
+were removed).
+
+### J2-v2 (protected, v1 untouched)
+
+Grade 6 primary: cohort episodes 48,579; outcome-valid 15,048; feature-valid
+14,722; null-skill problems excluded 3,483. Pairs: candidate 10,893;
+identical-problem-set 294; next-not-outcome-valid 6,198; no-next 3,829;
+chronology-ambiguous 0; **labelled 4,401** (true 848 / false 3,553).
+
+Grades 4-6 fallback: cohort episodes 83,981; outcome-valid 24,572;
+feature-valid 24,155; candidate 17,533; identical 461; next-not-outcome-valid
+9,973; no-next 6,622; chronology-ambiguous 0; **labelled 7,099** (true 1,427 /
+false 5,672).
+
+Note: v2 chains include same-learner/same-skill episodes from outside the
+cohort as non-skippable intervening episodes (strict no-skip), which shifts 12
+Grade 6 pairs from no-next to next-not-outcome-valid relative to the J3A
+diagnostic; labelled counts are unchanged.
+
+Protected v2 outputs: `external_skill_attempts_v2.csv`,
+`external_skill_problem_outcomes_v2.csv`, `external_labels_v2.csv`,
+`j2_v2_reconstruction_summary.json`, `j2_v2_manifest.json` (contract v2 +
+predecessor v1 hashes, amendment rationale, source release lineage, mastery
+0.60, timing contract, feature schema, counts, provenance `external_real`,
+`containsRawIdentifiers: false`). v1 protected files verified unchanged.
+
+### J3-v2 Grade 6 primary (final primary external cohort)
+
+- **HELD_OUT_COMPARISON** gate reached.
+- Labelled rows: **4,401** (true 848 = 19.27%; false 3,553 = 80.73%).
+- Unique labelled learners: **655** (true-class 362; false-class 617); all
+  labelled rows are exact grade 6.
+- Feature audit (no missing values): `correct_rate` min 0, median 0.8, mean
+  0.7605, max 1.0; `mean_response_time_ms` min 2,178.7, median 46,877.6, mean
+  88,262.2, max 1,231,694 (all within the frozen (0, 1,800,000] rule).
+- Deterministic student-grouped split (seed `20260716`), frozen in the
+  protected readiness manifest: train 653 learners / 4,376 rows (846 true,
+  3,530 false); held-out 2 learners / 25 rows (2 true, 23 false); zero learner
+  overlap; both classes in both partitions.
+
+### J3-v2 Grades 4-6 secondary analysis
+
+HELD_OUT_COMPARISON reached: 7,099 labelled rows (1,427 true / 5,672 false)
+across 1,216 learners; split train 1,214 learners / 7,086 rows, held-out 2
+learners / 13 rows. Grade 6 remains the primary cohort; the Grades 4-6 result
+is the declared secondary analysis and never replaces it.
+
+No model was trained, no SHAP or BKT ablation ran, and J4 was not executed.
+
+**J3-v2 decision: READY FOR J4** for the Grade 6 primary v2 dataset under the
+approved contract (frozen split manifest in the protected directory).

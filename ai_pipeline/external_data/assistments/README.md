@@ -4,9 +4,10 @@ This directory implements the J0 physical-source and U7-feasibility validation
 for the approved **external real-data** evaluation route described in
 `docs/plans/2026-08-07-001-feat-u7-assistments-edm-cup-2023-external-real-data-evaluation-plan.md`.
 
-Status: **J0 GO**, **J1 adapter + manifest complete**, and **J2 attempts +
-labels + manifest complete** (see
-`docs/evidence/u7-assistments-source-validation.md`). J3 has not been started.
+Status: **J0 GO**, **J1 complete**, **J2-v1 + J3-v1 complete (zero labels)**,
+**J3A diagnostic complete**, and the **v2 amendment approved and implemented**
+(J2-v2 + J3-v2; Grade 6 primary READY FOR J4). See
+`docs/evidence/u7-assistments-source-validation.md`.
 
 ## Provenance boundary
 
@@ -82,6 +83,14 @@ logic-oasis-private-data/
 - `tests/test_assistments_adapter.py` - J1 adapter/manifest tests.
 - `tests/test_assistments_attempt_reconstruction.py` - J2 reconstruction tests.
 - `tests/test_assistments_next_attempt_labels.py` - J2 label/censor tests.
+- `assistments_j2_contract_v2.yaml` - approved v2 contract (skill-episode
+  compatibility delta; predecessor v1).
+- `skill_episodes.py` - v2 production core: learner + exact-skill episodes and
+  pairing.
+- `reconstruct_skill_episodes.py` - v2 episode reconstruction CLI.
+- `build_labels_v2.py` - v2 labels and `j2_v2_manifest.json`.
+- `build_u7_dataset_v2.py` - J3-v2 model table, gates, and frozen split.
+- `tests/test_assistments_j2_v2.py` - v2 focused tests.
 
 The plan proposed these files; `assistments_contract.py` is a small addition so
 the inspector and tests share one versioned contract instead of duplicating
@@ -127,6 +136,33 @@ assignment per attempt; first-graded-response correctness; 30-minute
 response-time rule; >= 3 graded problems and >= 3 timing pairs; immediate-next
 pairing without skipping; `masteryCriterion = 0.60`; identical problem-set
 repeats censored; BKT left to a later named ablation.
+
+## Running the V2 build (approved skill-episode amendment)
+
+The v2 contract maps the prediction unit to one learner + exact non-null
+`sourceSkillCode` episode inside one completed assignment. It is a pre-model
+methodology amendment (source semantic mismatch, not model performance); the
+v1 contract and evidence remain preserved.
+
+```powershell
+python -m external_data.assistments.reconstruct_skill_episodes `
+  --action-rows <protected>\processed\external_action_rows_v1.csv `
+  --processed-dir <protected>\processed\v2 --cohort-grades 6
+python -m external_data.assistments.build_labels_v2 `
+  --episodes <protected>\processed\v2\external_skill_attempts_v2.csv `
+  --action-rows <protected>\processed\external_action_rows_v1.csv `
+  --problem-outcomes <protected>\processed\v2\external_skill_problem_outcomes_v2.csv `
+  --processed-dir <protected>\processed\v2
+python -m external_data.assistments.build_u7_dataset_v2 `
+  --labels <protected>\processed\v2\external_labels_v2.csv `
+  --episodes <protected>\processed\v2\external_skill_attempts_v2.csv `
+  --processed-dir <protected>\processed\v2 --cohort-label "Grade 6"
+```
+
+Grade 6 primary reached the held-out gate with 4,401 labelled rows (655
+learners); the frozen student-grouped split (seed 20260716) is in the
+protected readiness manifest. Grades 4-6 remain the declared secondary
+analysis.
 
 ### Detected source quirk handled by the adapter
 
