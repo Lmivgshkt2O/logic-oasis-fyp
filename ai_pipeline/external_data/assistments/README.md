@@ -179,6 +179,21 @@ student-grouped stability evidence. Result: **MODEL COMPARISON COMPLETED** (no
 stable advantage); artifacts remain `evidence_only_external` and are never
 promoted.
 
+## Running J5 (SHAP, operational, BKT ablation)
+
+```powershell
+python -m external_data.assistments.run_j5 `
+  --processed-dir <protected>\processed\v2 `
+  --action-rows <protected>\processed\external_action_rows_v1.csv `
+  --report ..\..\reports\u7_assistments_j5_architecture_evidence.md `
+  --j5-manifest-out <protected>\processed\v2\j5_architecture_manifest.json
+```
+
+Produces XGBoost global/local SHAP, operational evidence, model complexity,
+the v2 BKT lineage gate, and the named base vs +BKT ablation. Result: SHAP and
+operational evidence completed; BKT gate passed; BKT feature showed no stable
+improvement. J4's conclusion is preserved.
+
 ### Detected source quirk handled by the adapter
 
 819 action-log `problem_id` values are absent from `problem_details`

@@ -669,3 +669,57 @@ accuracy near 81-92% must not be read in isolation.
 
 **J4 readiness: READY FOR J5** (SHAP interpretability, operational evidence,
 and the conditional BKT ablation remain; J5 was not executed in this run).
+
+## 25. J5 architecture evidence record (2026-08-08)
+
+Full report: `ai_pipeline/reports/u7_assistments_j5_architecture_evidence.md`.
+Protected manifest: `j5_architecture_manifest.json` (verified, aggregate,
+`external_real`, no raw identifiers). J4 was verified before J5 code and its
+conclusion is preserved: **MODEL COMPARISON COMPLETED; NO STABLE ADVANTAGE
+ESTABLISHED**. No model was retuned, no threshold changed, no split changed.
+
+### XGBoost global SHAP (frozen two-feature model, training rows)
+
+Ranking by mean |SHAP|: `correct_rate` (0.4365, mean SHAP -0.0796) then
+`mean_response_time_ms` (0.2069, mean SHAP -0.0308). Base value -1.434.
+Interpretation boundary recorded: SHAP describes how the frozen model's two
+input features contributed to predicted support-risk probabilities; it is not
+causal evidence. Local examples (low/median/high predicted risk) export only
+features, probabilities, base value, and SHAP contributions; they demonstrate
+explanation, not accuracy or causality.
+
+### Operational evidence (same machine, same input, warm-up + 10 runs)
+
+| Model | Serialized size (bytes) | Latency median (ms) | Invalid predictions |
+|---|---:|---:|---:|
+| Decision Tree | 3,604 | 0.773 | 0 |
+| XGBoost | 56,167 | 5.621 | 0 |
+| MLP | 9,116 | 1.259 | 0 |
+
+Complexity: DT realized depth 4, 31 nodes, 16 leaves; XGBoost 40 trees at
+depth 3 over 2 features; MLP hidden (8,), 3 layers, 33 parameters, 20 epochs,
+early stopping disabled. MLP's weaker native interpretability is recorded.
+
+### BKT v2 lineage gate and named ablation
+
+The v2 gate **passed** (rechecked, not inherited from J0): 388,777 graded
+observations, 43,260 learner-skill states, deterministic ordering
+`(sourceTimestamp, assignment key, problem key)`, non-null skills, no
+cross-skill mixing, no future injection. BKT uses frozen `bkt-v1` parameters
+(prior 0.35, learn 0.18, guess 0.20, slip 0.10), never calibrated on the
+held-out set.
+
+Ablation (4,401 eligible rows, 655 learners; base vs +BKT identical except the
+BKT feature; training-only 5-fold grouped): Decision Tree deltas all 0.0;
+XGBoost ROC-AUC +0.0026 / PR-AUC +0.0009 / log loss -0.0010; MLP ROC-AUC
++0.019 / PR-AUC +0.042 but F1 -0.089 / precision -0.241 / recall -0.053.
+All deltas are inside grouped variability: **the BKT feature shows no stable
+improvement**.
+
+**J5 conclusion: SHAP/operational evidence completed; BKT ablation completed;
+BKT feature showed no stable improvement.** The J4 conclusion is not
+rewritten; all artifacts remain `evidence_only_external`; no registry
+promotion; no KSSR validation claim.
+
+**J5 readiness: READY FOR J6** (final report consolidation in
+`model_comparison.md`; J6 was not executed in this run).
