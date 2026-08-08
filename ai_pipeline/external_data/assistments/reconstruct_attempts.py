@@ -350,7 +350,7 @@ def build_attempt_from_rows(
 
     grades = {r["grade"] for r in normalized if r["grade"]}
     subjects = {r["subject"] for r in normalized if r["subject"]}
-    cohort_eligible = grades.issubset(set(cohort_grades)) and subjects == {PRIMARY_SUBJECT}
+    cohort_eligible = bool(grades) and grades.issubset(set(cohort_grades)) and subjects == {PRIMARY_SUBJECT}
     source_grade = grades.pop() if len(grades) == 1 else None
 
     problems: dict[str, list[Mapping[str, Any]]] = {}

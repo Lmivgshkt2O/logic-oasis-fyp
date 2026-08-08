@@ -124,7 +124,7 @@ def build_episodes(
         ended_at = max(finish_times) if finish_times else None
         grades = {r["grade"] for r in rows if r["grade"]}
         subjects = {r["subject"] for r in rows if r["subject"]}
-        cohort_eligible = grades.issubset(set(cohort_grades)) and subjects == {PRIMARY_SUBJECT}
+        cohort_eligible = bool(grades) and grades.issubset(set(cohort_grades)) and subjects == {PRIMARY_SUBJECT}
         grade = grades.pop() if len(grades) == 1 else None
 
         problems: dict[str, list[Mapping[str, Any]]] = {}

@@ -16,6 +16,7 @@ from .assistments_contract import PROVENANCE, SOURCE_DATASET
 
 
 J2_CONTRACT_VERSION = "assistments-j2-attempt-label-contract-v1"
+J2_CONTRACT_VERSION_V2 = "assistments-j2-attempt-label-contract-v2"
 
 MASTERY_CRITERION = 0.60
 MIN_VALID_GRADED_PROBLEMS = 3
@@ -70,22 +71,65 @@ def validate_j2_contract(contract: Mapping[str, Any]) -> Mapping[str, Any]:
     """Fail-closed validation of the frozen J2 contract structure."""
     if contract.get("contractVersion") != J2_CONTRACT_VERSION:
         raise ValueError("J2 contract version is not assistments-j2-attempt-label-contract-v1")
+    compatibility = contract.get("compatibilityIdentity")
+    if not isinstance(compatibility, dict) or compatibility.get("crossSequencePairingForSampleSize") is not False:
+        raise ValueError("compatibility identity must forbid cross-sequence pairing")
+    if not isinstance(contract.get("attemptChronology"), dict):
+        raise ValueError("attemptChronology is required")
+    _validate_frozen_rule_sections(contract, evidence_section="minimumAssignmentEvidence")
+    return contract
 
-    cohort = contract.get("primaryCohort")
-    if not isinstance(cohort, dict) or cohort.get("sourceGrade") != PRIMARY_GRADE:
-        raise ValueError("primary cohort sourceGrade must be 6")
-    if cohort.get("sourceSubject") != PRIMARY_SUBJECT:
-        raise ValueError("primary cohort sourceSubject must be Mathematics")
 
+def validate_j2_contract_v2(contract: Mapping[str, Any]) -> Mapping[str, Any]:
+    """Fail-closed validation of the v2 amended (skill-episode) contract."""
+    if contract.get("contractVersion") != J2_CONTRACT_VERSION_V2:
+        raise ValueError("J2 contract version is not assistments-j2-attempt-label-contract-v2")
+    if contract.get("predecessor") != J2_CONTRACT_VERSION:
+        raise ValueError("v2 contract predecessor must be assistments-j2-attempt-label-contract-v1")
+
+    amendment = contract.get("amendment")
+    if not isinstance(amendment, dict) or amendment.get("motivatedBy") != "source-semantic-mismatch":
+        raise ValueError("v2 amendment must be motivated by source-semantic-mismatch")
+    if amendment.get("notMotivatedByModelPerformance") is not True:
+        raise ValueError("v2 amendment must declare it is not motivated by model performance")
+
+    attempt_unit = contract.get("attemptUnit")
+    if not isinstance(attempt_unit, dict) or attempt_unit.get("v2Unit") != "one learner-specific exact-skill episode inside one completed external assignment":
+        raise ValueError("v2 attempt unit must be a learner-specific exact-skill episode")
+    if attempt_unit.get("usesOnlyResponsesOfThatSkill") is not True or attempt_unit.get("neverMixSkillsInOneEpisode") is not True:
+        raise ValueError("v2 episodes must never mix sourceSkillCode values")
+
+    compatibility = contract.get("compatibilityIdentity")
+    if not isinstance(compatibility, dict) or compatibility.get("v2Rule") != "same externalStudentKey AND exact non-null sourceSkillCode":
+        raise ValueError("v2 compatibility identity must be same learner + exact non-null sourceSkillCode")
+    if compatibility.get("crossSkillPairing") is not False:
+        raise ValueError("v2 must forbid cross-skill pairing")
+
+    null_skill = contract.get("nullSkillExclusion")
+    if not isinstance(null_skill, dict) or null_skill.get("nullSkillEpisodesCannotEnterV2BaseDataset") is not True:
+        raise ValueError("v2 must exclude null-skill episodes from the base dataset")
+    if null_skill.get("neverAssignOrInferSkillCode") is not True:
+        raise ValueError("v2 must never assign or infer a skill code")
+    if not isinstance(contract.get("episodeChronology"), dict):
+        raise ValueError("episodeChronology is required")
+
+    _validate_frozen_rule_sections(contract, evidence_section="minimumEpisodeEvidence")
+    return contract
+
+
+def _validate_frozen_rule_sections(contract: Mapping[str, Any], *, evidence_section: str) -> None:
+    """Validate the rules that v1 and v2 share unchanged."""
     attempt_unit = contract.get("attemptUnit")
     if not isinstance(attempt_unit, dict) or not attempt_unit.get("requiresAssignmentStarted"):
         raise ValueError("attempt unit must require assignment_started")
     if not attempt_unit.get("requiresLaterAssignmentFinished"):
         raise ValueError("attempt unit must require a later assignment_finished")
 
-    compatibility = contract.get("compatibilityIdentity")
-    if not isinstance(compatibility, dict) or compatibility.get("crossSequencePairingForSampleSize") is not False:
-        raise ValueError("compatibility identity must forbid cross-sequence pairing")
+    cohort = contract.get("primaryCohort")
+    if not isinstance(cohort, dict) or cohort.get("sourceGrade") != PRIMARY_GRADE:
+        raise ValueError("primary cohort sourceGrade must be 6")
+    if cohort.get("sourceSubject") != PRIMARY_SUBJECT:
+        raise ValueError("primary cohort sourceSubject must be Mathematics")
 
     correctness = contract.get("problemCorrectness")
     if not isinstance(correctness, dict) or correctness.get("openResponseUngraded") is not True:
@@ -99,9 +143,9 @@ def validate_j2_contract(contract: Mapping[str, Any]) -> Mapping[str, Any]:
     if quality.get("thresholdMinutes") != 30 or quality.get("projectDefinedRule") is not True:
         raise ValueError("the 30-minute rule must be recorded as project-defined")
 
-    evidence = contract.get("minimumAssignmentEvidence")
+    evidence = contract.get(evidence_section)
     if not isinstance(evidence, dict):
-        raise ValueError("minimumAssignmentEvidence is required")
+        raise ValueError(f"{evidence_section} is required")
     if evidence.get("minimumValidGradedProblems") != MIN_VALID_GRADED_PROBLEMS:
         raise ValueError("minimumValidGradedProblems must be 3")
     if evidence.get("minimumValidResponseTimePairs") != MIN_VALID_RESPONSE_TIME_PAIRS:
@@ -120,8 +164,11 @@ def validate_j2_contract(contract: Mapping[str, Any]) -> Mapping[str, Any]:
         raise ValueError("masteryCriterion tuning after model results is forbidden")
 
     leakage = contract.get("futureLeakageBoundary")
-    if not isinstance(leakage, dict) or leakage.get("currentFeaturesFromCurrentAssignmentOnly") is not True:
-        raise ValueError("future-leakage boundary must restrict features to the current assignment")
+    if not isinstance(leakage, dict) or not (
+        leakage.get("currentFeaturesFromCurrentAssignmentOnly") is True
+        or leakage.get("currentFeaturesFromCurrentEpisodeOnly") is True
+    ):
+        raise ValueError("future-leakage boundary must restrict features to the current attempt/episode")
 
     provenance = contract.get("provenancePrivacy")
     if not isinstance(provenance, dict) or provenance.get("provenance") != PROVENANCE:
@@ -129,15 +176,16 @@ def validate_j2_contract(contract: Mapping[str, Any]) -> Mapping[str, Any]:
     if provenance.get("sourceDataset") != SOURCE_DATASET:
         raise ValueError("J2 sourceDataset must be assistments_edm_cup_2023")
 
+    next_rule = contract.get("nextCompatibleAttemptRule")
+    if next_rule is None:
+        next_rule = contract.get("nextCompatibleEpisodeRule")
+    if not isinstance(next_rule, dict):
+        raise ValueError("nextCompatibleAttemptRule/nextCompatibleEpisodeRule is required")
     for section in (
         "multipleOrAmbiguousStarts",
-        "attemptChronology",
-        "nextCompatibleAttemptRule",
         "identicalQuestionRepeatRule",
         "unresolvedProblemMetadata",
         "bktBoundary",
     ):
         if not isinstance(contract.get(section), dict):
             raise ValueError(f"{section} is required")
-    return contract
-
