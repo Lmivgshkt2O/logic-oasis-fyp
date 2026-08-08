@@ -1,16 +1,17 @@
 """AQC-E3 protected 2022-2023 exact-skill adaptive attempt reconstruction.
 
 This module reconstructs policy-ready historical states from the frozen
-ASSISTments evaluation-period lineage under assistments-adaptive-contract-v1.1,
+ASSISTments evaluation-period lineage under assistments-adaptive-contract-v1.2,
 reusing the validated U7-v2 exact-skill episode reconstruction and the frozen
 U7 BKT replay.  The semantic unit is one externalStudentKey + one completed
 externalAssignmentKey + one exact non-null sourceSkillCode; skills never mix.
 
 No policy selector is imported or called.  Attempt proxy difficulty uses ONLY
 the frozen E2 problem-difficulty catalog; E3 never recalibrates or re-tiers
-problems.  If an attempt mixes problems with and without a frozen tier, the
-contract does not define the purity denominator, so reconstruction fails
-closed with ``PurityDenominatorAmbiguity`` rather than inventing a rule.
+problems.  The v1.2 purity rule is: proxyDifficultyPurity =
+dominantTierCount / validProblemCount over ALL valid graded problems, with
+untiered problems remaining in the denominator and contributing to no tier
+numerator; dominant-tier ties fail closed (no arbitrary selection).
 """
 
 from __future__ import annotations
@@ -33,7 +34,7 @@ from ..bkt_external import (
     build_mastery_at_episodes,
 )
 from .external_policy_contract import (
-    EXTERNAL_ADAPTIVE_CONTRACT_V1_1_VERSION,
+    EXTERNAL_ADAPTIVE_CONTRACT_V1_2_VERSION,
     load_external_adaptive_contract,
     verify_frozen_policy_hashes,
     verify_shared_aqc_constants,
@@ -42,6 +43,7 @@ from .schemas import (
     ATTEMPT_PURITY_THRESHOLD,
     EXTERNAL_PROVENANCE,
     ExternalAdaptiveAttemptV1,
+    ProxyDifficulty,
     problem_set_fingerprint,
 )
 
@@ -71,6 +73,8 @@ ATTEMPT_FIELDS = (
     "previousObservedProxyDifficulty",
     "freshProblemFraction",
     "skillProxyStatus",
+    "currentTierCensorReason",
+    "coldHistory",
     "chronologyAmbiguous",
     "provenance",
 )
@@ -80,16 +84,14 @@ class ReconstructionError(ValueError):
     """Raised when E3 reconstruction cannot proceed safely."""
 
 
-class PurityDenominatorAmbiguity(ReconstructionError):
-    """The contract does not define the purity denominator for mixed coverage."""
-
-
 @dataclass(frozen=True)
 class AdaptiveAttemptRecord:
     """One reconstructed external adaptive attempt (E1-compatible core + audit)."""
 
     attempt: ExternalAdaptiveAttemptV1
     skill_proxy_status: str
+    current_tier_censor_reason: str | None
+    cold_history: bool
     chronology_ambiguous: bool
 
     def to_csv_row(self) -> dict[str, str]:
@@ -123,6 +125,8 @@ class AdaptiveAttemptRecord:
                 f"{a.fresh_problem_fraction:.8f}" if a.fresh_problem_fraction is not None else ""
             ),
             "skillProxyStatus": self.skill_proxy_status,
+            "currentTierCensorReason": self.current_tier_censor_reason or "",
+            "coldHistory": str(self.cold_history).lower(),
             "chronologyAmbiguous": str(self.chronology_ambiguous).lower(),
             "provenance": a.provenance,
         }
@@ -130,6 +134,7 @@ class AdaptiveAttemptRecord:
 
 def verify_stage_b_frozen(
     *,
+    contract_path_v1_2: str | Path,
     contract_path_v1_1: str | Path,
     contract_path_v1: str | Path,
     e2_catalog_path: str | Path,
@@ -139,12 +144,17 @@ def verify_stage_b_frozen(
     expected_e2_catalog_hash: str = E2_CATALOG_HASH,
 ) -> dict[str, object]:
     """Fail-closed verification of every frozen E1/E2 artifact E3 depends on."""
+    v12 = load_external_adaptive_contract(
+        contract_path_v1_2, version=EXTERNAL_ADAPTIVE_CONTRACT_V1_2_VERSION
+    )
+    from .external_policy_contract import EXTERNAL_ADAPTIVE_CONTRACT_V1_1_VERSION
+
     v11 = load_external_adaptive_contract(
         contract_path_v1_1, version=EXTERNAL_ADAPTIVE_CONTRACT_V1_1_VERSION
     )
     v1 = load_external_adaptive_contract(contract_path_v1)
-    verify_frozen_policy_hashes(v11, configs_dir)
-    verify_shared_aqc_constants(v11)
+    verify_frozen_policy_hashes(v12, configs_dir)
+    verify_shared_aqc_constants(v12)
 
     catalog = Path(e2_catalog_path)
     manifest = Path(e2_manifest_path)
@@ -154,25 +164,33 @@ def verify_stage_b_frozen(
     if not isinstance(manifest_data, dict):
         raise ReconstructionError("E2 manifest must be a JSON object")
 
-    if v11.contract_sha256 != manifest_data.get("contractHash"):
-        raise ReconstructionError("v1.1 contract hash does not match the frozen E2 manifest")
+    if v12.predecessor_contract_version != v11.contract_version:
+        raise ReconstructionError("v1.2 predecessor is not v1.1")
+    if v12.predecessor_contract_sha256 != v11.contract_sha256:
+        raise ReconstructionError("v1.1 predecessor hash is not preserved by v1.2")
     if v11.predecessor_contract_sha256 != v1.contract_sha256:
         raise ReconstructionError("v1 predecessor hash is not preserved by v1.1")
+    if manifest_data.get("contractHash") != v11.contract_sha256:
+        raise ReconstructionError("E2 manifest contract hash is not the frozen v1.1 hash")
+    if v12.amendment_reason != "attempt_proxy_difficulty_purity_denominator_clarification":
+        raise ReconstructionError("v1.2 amendment reason is not frozen")
+    if v12.purity_denominator_rule is None:
+        raise ReconstructionError("v1.2 purity denominator rule is missing")
     if catalog_hash != expected_e2_catalog_hash:
         raise ReconstructionError("E2 catalog hash changed since the E2 freeze")
     if manifest_hash != expected_e2_manifest_hash:
         raise ReconstructionError("E2 manifest hash changed since the E2 freeze")
-    if v11.provenance != EXTERNAL_PROVENANCE:
+    if v12.provenance != EXTERNAL_PROVENANCE:
         raise ReconstructionError("provenance is not external_real")
     import yaml
 
-    raw_v11 = yaml.safe_load(Path(contract_path_v1_1).read_text(encoding="utf-8"))
-    cohort = raw_v11["dataset"]["primaryCohort"]
+    raw_v12 = yaml.safe_load(Path(contract_path_v1_2).read_text(encoding="utf-8"))
+    cohort = raw_v12["dataset"]["primaryCohort"]
     if cohort.get("sourceGrade") != "6" or cohort.get("sourceSubject") != "Mathematics":
         raise ReconstructionError("primary cohort is not exact Grade 6 Mathematics")
     if cohort.get("gradeSixAcceleratedMerged") is not False:
         raise ReconstructionError("Grade 6 Accelerated must stay separate")
-    if not v11.windows_are_disjoint:
+    if not v12.windows_are_disjoint:
         raise ReconstructionError("calibration/evaluation windows are not disjoint")
     if not manifest_data.get("evaluationLearnersExcludedFromCalibration"):
         raise ReconstructionError("evaluation learners were not excluded from calibration")
@@ -194,27 +212,34 @@ def verify_stage_b_frozen(
     if len(eligible_skills) != manifest_data.get("skillCounts", {}).get("skillsFullThreeTierEligible"):
         raise ReconstructionError("derived eligible skill count does not match the E2 manifest")
     for guard in ("Logic Oasis bankId", "finalizationStatus", "validationStatus"):
-        if guard not in v11.never_fabricate_native_fields:
+        if guard not in v12.never_fabricate_native_fields:
             raise ReconstructionError(f"native-field fabrication guard is missing: {guard}")
     for native in ("bankId", "finalizationStatus", "validationStatus"):
         if native in str(manifest_data) or native in ATTEMPT_FIELDS:
             raise ReconstructionError("native fields must never be fabricated")
+    source_release_hashes = manifest_data.get("sourceReleaseHashes")
+    if not isinstance(source_release_hashes, dict):
+        raise ReconstructionError("E2 manifest source release hashes are missing")
 
     return {
         "verified": True,
-        "contractVersionV1_1": v11.contract_version,
-        "contractHashV1_1": v11.contract_sha256,
-        "predecessorContractVersion": v1.contract_version,
-        "predecessorContractHash": v1.contract_sha256,
+        "contractVersionV1_2": v12.contract_version,
+        "contractHashV1_2": v12.contract_sha256,
+        "predecessorContractVersionV1_1": v11.contract_version,
+        "predecessorContractHashV1_1": v11.contract_sha256,
+        "predecessorContractVersionV1": v1.contract_version,
+        "predecessorContractHashV1": v1.contract_sha256,
         "e2CatalogHash": catalog_hash,
         "e2ManifestHash": manifest_hash,
         "provenance": EXTERNAL_PROVENANCE,
-        "calibrationWindow": [v11.calibration_window[0].isoformat(), v11.calibration_window[1].isoformat()],
-        "evaluationWindow": [v11.evaluation_window[0].isoformat(), v11.evaluation_window[1].isoformat()],
+        "calibrationWindow": [v12.calibration_window[0].isoformat(), v12.calibration_window[1].isoformat()],
+        "evaluationWindow": [v12.evaluation_window[0].isoformat(), v12.evaluation_window[1].isoformat()],
         "eligibleSkillCount": len(eligible_skills),
         "eligibleSkillCodesHash": _canonical_sha256(sorted(eligible_skills)),
         "eligibleSkills": sorted(eligible_skills),
         "derivedTierRecords": tier_records,
+        "purityDenominatorRule": dict(v12.purity_denominator_rule),
+        "sourceReleaseHashes": dict(source_release_hashes),
     }
 
 
@@ -255,31 +280,26 @@ def derive_gate_eligible_skills(
     return frozenset(eligible), {skill: dict(counts) for skill, counts in sorted(per_skill.items())}
 
 
-def dominant_tier_fraction(
-    tiers: Sequence[str | None],
-) -> tuple[str | None, float]:
-    """Frozen attempt-tier rule for fully covered attempts.
+def attempt_purity(tiers: Sequence[str | None]) -> tuple[str | None, float]:
+    """v1.2 attempt purity: dominant_tier_count / valid_problem_count.
 
-    All problems tiered -> dominant fraction over the attempt's problems
-    (contract example: easy, easy, easy, moderate, easy -> 4/5).  No problems
-    tiered -> no dominant tier (fraction 0.0).  Mixed coverage -> the contract
-    does not define the purity denominator; raise PurityDenominatorAmbiguity.
+    Untiered problems remain in the valid-problem denominator and never enter
+    any tier count.  A non-unique dominant tier fails closed (no arbitrary
+    selection).  The frozen 2/3 threshold is inclusive.
     """
-    if not tiers:
-        raise ReconstructionError("an attempt requires at least one problem")
-    tiered = [tier for tier in tiers if tier is not None]
-    if not tiered:
+    valid_count = len(tiers)
+    if valid_count < 1:
+        raise ReconstructionError("an attempt requires at least one valid problem")
+    counts = Counter(tier for tier in tiers if tier is not None)
+    if not counts:
         return None, 0.0
-    if len(tiered) != len(tiers):
-        raise PurityDenominatorAmbiguity(
-            "the frozen contract does not define whether uncalibrated problems "
-            "belong in the attempt purity denominator"
-        )
-    counts = Counter(tiered)
-    dominant, count = counts.most_common(1)[0]
-    fraction = count / len(tiers)
-    if fraction >= float(ATTEMPT_PURITY_THRESHOLD.numerator / ATTEMPT_PURITY_THRESHOLD.denominator):
-        return dominant, fraction
+    dominant_count = max(counts.values())
+    dominant_tiers = [tier for tier, count in counts.items() if count == dominant_count]
+    fraction = dominant_count / valid_count
+    if len(dominant_tiers) != 1:
+        return None, fraction
+    if fraction >= float(ATTEMPT_PURITY_THRESHOLD):
+        return dominant_tiers[0], fraction
     return None, fraction
 
 
@@ -301,6 +321,7 @@ def build_attempt_records(
         grouped.setdefault((learner, skill), []).append(episode)
 
     prior_exposure: dict[tuple[str, str], set[str]] = {}
+    previous_tier_by_key: dict[tuple[str, str], str] = {}
     for (learner, skill) in sorted(grouped):
         ordered = sorted(
             grouped[(learner, skill)],
@@ -322,6 +343,11 @@ def build_attempt_records(
                 seen_starts[started_at] = assignment
             problem_keys = _parse_problem_keys(episode.get("gradedProblemKeys"))
             episode_tiers = [tiers.get(key, None) for key in problem_keys]
+            current_tier, purity = attempt_purity(episode_tiers)
+            previous_observed = previous_tier_by_key.get(key)
+            cold_history = previous_observed is None
+            if current_tier is not None:
+                previous_tier_by_key[key] = current_tier
             prior = prior_exposure.get(key, set())
             fresh = (
                 sum(1 for problem in problem_keys if problem not in prior) / len(problem_keys)
@@ -361,32 +387,28 @@ def build_attempt_records(
                     bkt_mastery_probability=bkt.mastery_probability,
                     bkt_evidence_count=bkt.evidence_count,
                     bkt_version=BKT_MODEL_VERSION,
-                    current_proxy_difficulty=None,
-                    proxy_difficulty_purity=None,
+                    current_proxy_difficulty=(
+                        ProxyDifficulty(current_tier) if current_tier is not None else None
+                    ),
+                    proxy_difficulty_purity=purity,
                     external_problem_set_fingerprint=problem_set_fingerprint(skill, tuple(problem_keys)),
-                    previous_observed_proxy_difficulty=None,
+                    previous_observed_proxy_difficulty=(
+                        ProxyDifficulty(previous_observed) if previous_observed is not None else None
+                    ),
                     fresh_problem_fraction=fresh,
                     provenance=EXTERNAL_PROVENANCE,
                 ),
                 skill_proxy_status=skill_status,
+                current_tier_censor_reason=(
+                    None if current_tier is not None else "mixed_proxy_difficulty"
+                ),
+                cold_history=cold_history,
                 chronology_ambiguous=chronology_ambiguous,
             )
+            summary[f"attempts_current_tier_{current_tier or 'null'}"] += 1
+            summary["attempts_with_previous_observed_tier" if previous_observed else "attempts_cold_history"] += 1
             records.append(record)
     return records, summary
-
-
-def detect_purity_denominator_ambiguity(
-    episodes: Sequence[Mapping[str, object]],
-    tiers: Mapping[str, str],
-) -> int:
-    """Count attempts whose problems mix tiered and untiered problems."""
-    mixed = 0
-    for episode in episodes:
-        problem_keys = _parse_problem_keys(episode.get("gradedProblemKeys"))
-        tiered = [key for key in problem_keys if key in tiers]
-        if 0 < len(tiered) < len(problem_keys):
-            mixed += 1
-    return mixed
 
 
 def run_bkt_states(
@@ -427,6 +449,74 @@ def write_attempts_csv(
         writer.writeheader()
         for record in rows:
             writer.writerow(record.to_csv_row())
+    return destination
+
+
+def build_e3_manifest(
+    *,
+    contract_version: str,
+    contract_hash: str,
+    predecessor_contract_version: str,
+    predecessor_contract_hash: str,
+    amendment_reason: str,
+    purity_denominator_rule: Mapping[str, object],
+    difficulty_catalog_version: str,
+    difficulty_catalog_hash: str,
+    dataset_release_id: str,
+    source_release_hashes: Mapping[str, str],
+    evaluation_start,
+    evaluation_end,
+    eligible_skill_count: int,
+    eligible_skill_codes_hash: str,
+    bkt_version: str,
+    attempt_purity_threshold: Fraction,
+    problem_set_fingerprint_version: str,
+    fresh_problem_rule: str,
+    chronology_rule: str,
+    counts: Mapping[str, int],
+    tier_counts: Mapping[str, int],
+    attempts_sha256: str,
+) -> dict[str, object]:
+    """Deterministic E3 manifest (no timestamps; rerun reproduces the hash)."""
+    return {
+        "manifestSchemaVersion": "assistments-e3-attempt-manifest-v1",
+        "contractVersion": contract_version,
+        "contractHash": contract_hash,
+        "predecessorContractVersion": predecessor_contract_version,
+        "predecessorContractHash": predecessor_contract_hash,
+        "amendmentReason": amendment_reason,
+        "purityDenominatorRule": dict(purity_denominator_rule),
+        "difficultyCatalogVersion": difficulty_catalog_version,
+        "difficultyCatalogHash": difficulty_catalog_hash,
+        "datasetReleaseId": dataset_release_id,
+        "sourceReleaseHashes": dict(sorted(source_release_hashes.items())),
+        "provenance": EXTERNAL_PROVENANCE,
+        "evaluationStart": evaluation_start.isoformat(),
+        "evaluationEnd": evaluation_end.isoformat(),
+        "primaryCohort": "exact Grade 6 Mathematics",
+        "eligibleSkillCount": eligible_skill_count,
+        "eligibleSkillCodesHash": eligible_skill_codes_hash,
+        "bktVersion": bkt_version,
+        "attemptReconstructionVersion": ATTEMPT_RECONSTRUCTION_VERSION,
+        "attemptPurityThreshold": (
+            f"{attempt_purity_threshold.numerator}/{attempt_purity_threshold.denominator}"
+        ),
+        "problemSetFingerprintVersion": problem_set_fingerprint_version,
+        "freshProblemRule": fresh_problem_rule,
+        "chronologyRule": chronology_rule,
+        "counts": dict(sorted(counts.items())),
+        "tierCounts": dict(sorted(tier_counts.items())),
+        "attemptsSha256": attempts_sha256,
+        "containsRawIdentifiers": False,
+        "productionPromotionAllowed": False,
+    }
+
+
+def write_manifest(manifest: Mapping[str, object], path: str | Path) -> Path:
+    destination = Path(path)
+    destination.write_text(
+        json.dumps(dict(manifest), indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     return destination
 
 

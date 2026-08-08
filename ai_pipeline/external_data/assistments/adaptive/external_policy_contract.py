@@ -44,6 +44,10 @@ from .schemas import (
 
 EXTERNAL_ADAPTIVE_CONTRACT_VERSION = "assistments-adaptive-contract-v1"
 EXTERNAL_ADAPTIVE_CONTRACT_V1_1_VERSION = "assistments-adaptive-contract-v1.1"
+EXTERNAL_ADAPTIVE_CONTRACT_V1_2_VERSION = "assistments-adaptive-contract-v1.2"
+AMENDED_CONTRACT_VERSIONS = frozenset(
+    {EXTERNAL_ADAPTIVE_CONTRACT_V1_1_VERSION, EXTERNAL_ADAPTIVE_CONTRACT_V1_2_VERSION}
+)
 
 REQUIRED_EXTERNAL_METRICS = frozenset(
     {
@@ -108,6 +112,7 @@ class ExternalAdaptiveContract:
     predecessor_contract_sha256: str | None = None
     amendment_reason: str | None = None
     tertile_boundary_rule: Mapping[str, object] | None = None
+    purity_denominator_rule: Mapping[str, object] | None = None
 
     @property
     def windows_are_disjoint(self) -> bool:
@@ -120,7 +125,7 @@ def load_external_adaptive_contract(
     version: str = EXTERNAL_ADAPTIVE_CONTRACT_VERSION,
 ) -> ExternalAdaptiveContract:
     """Load and fail-closed validate the frozen external contract YAML."""
-    if version not in (EXTERNAL_ADAPTIVE_CONTRACT_VERSION, EXTERNAL_ADAPTIVE_CONTRACT_V1_1_VERSION):
+    if version not in AMENDED_CONTRACT_VERSIONS | {EXTERNAL_ADAPTIVE_CONTRACT_VERSION}:
         raise ExternalContractError(f"unsupported external adaptive contract version: {version}")
     source = Path(path)
     try:
@@ -142,7 +147,7 @@ def load_external_adaptive_contract(
         "censoringVocabulary", "externalMetrics", "claimLevels",
         "stageBQuestions", "sourceAbstraction", "governance",
     }
-    if version == EXTERNAL_ADAPTIVE_CONTRACT_V1_1_VERSION:
+    if version in AMENDED_CONTRACT_VERSIONS:
         expected_keys = base_keys | {
             "predecessorContractVersion",
             "predecessorContractSha256",
@@ -162,27 +167,42 @@ def load_external_adaptive_contract(
     predecessor_contract_sha256: str | None = None
     amendment_reason: str | None = None
     tertile_boundary_rule: Mapping[str, object] | None = None
-    if version == EXTERNAL_ADAPTIVE_CONTRACT_V1_1_VERSION:
+    purity_denominator_rule: Mapping[str, object] | None = None
+    if version in AMENDED_CONTRACT_VERSIONS:
         predecessor_contract_version = _string(data, "predecessorContractVersion")
-        if predecessor_contract_version != EXTERNAL_ADAPTIVE_CONTRACT_VERSION:
+        expected_predecessor = (
+            EXTERNAL_ADAPTIVE_CONTRACT_VERSION
+            if version == EXTERNAL_ADAPTIVE_CONTRACT_V1_1_VERSION
+            else EXTERNAL_ADAPTIVE_CONTRACT_V1_1_VERSION
+        )
+        if predecessor_contract_version != expected_predecessor:
             raise ExternalContractError(
-                "v1.1 predecessor must be assistments-adaptive-contract-v1"
+                f"amended contract predecessor must be {expected_predecessor}"
             )
         predecessor_contract_sha256 = _sha256(data, "predecessorContractSha256")
         amendment = _mapping(data, "amendment")
-        _require_exact_keys(
-            amendment,
-            {
-                "reason", "scope", "fixesUnderspecifiedImplementationDetail",
-                "motivatedByPolicyPerformance", "policyResultsExistedBeforeAmendment",
-                "v1Preserved", "rationale",
-            },
-            "amendment",
-        )
+        amendment_keys = {
+            "reason", "scope", "fixesUnderspecifiedImplementationDetail",
+            "motivatedByPolicyPerformance", "policyResultsExistedBeforeAmendment",
+            "v1Preserved", "rationale",
+        }
+        if version == EXTERNAL_ADAPTIVE_CONTRACT_V1_2_VERSION:
+            amendment_keys.add("v1_1Preserved")
+        _require_exact_keys(amendment, amendment_keys, "amendment")
         amendment_reason = _string(amendment, "reason")
-        if amendment_reason != "deterministic_discrete_tertile_boundary_clarification":
+        expected_reason = (
+            "deterministic_discrete_tertile_boundary_clarification"
+            if version == EXTERNAL_ADAPTIVE_CONTRACT_V1_1_VERSION
+            else "attempt_proxy_difficulty_purity_denominator_clarification"
+        )
+        if amendment_reason != expected_reason:
             raise ExternalContractError("amendment reason is not the frozen clarification")
-        if _string(amendment, "scope") != "within_skill_tertile_boundaries_only":
+        expected_scope = (
+            "within_skill_tertile_boundaries_only"
+            if version == EXTERNAL_ADAPTIVE_CONTRACT_V1_1_VERSION
+            else "attempt_purity_denominator_only"
+        )
+        if _string(amendment, "scope") != expected_scope:
             raise ExternalContractError("amendment scope is not within-skill tertile boundaries only")
         if not _bool(amendment, "fixesUnderspecifiedImplementationDetail"):
             raise ExternalContractError("amendment must fix an underspecified implementation detail")
@@ -192,6 +212,11 @@ def load_external_adaptive_contract(
             raise ExternalContractError("no policy result may have existed before the amendment")
         if not _bool(amendment, "v1Preserved"):
             raise ExternalContractError("v1 must remain preserved")
+        if (
+            version == EXTERNAL_ADAPTIVE_CONTRACT_V1_2_VERSION
+            and not _bool(amendment, "v1_1Preserved")
+        ):
+            raise ExternalContractError("v1.1 must remain preserved")
 
     predecessors = _mapping(data, "predecessorContracts")
     shared_aqc = _mapping(predecessors, "sharedAqcPolicyContract")
@@ -207,6 +232,22 @@ def load_external_adaptive_contract(
     if _string(u7, "attemptLabelContract") != "assistments-j2-attempt-label-contract-v2":
         raise ExternalContractError("U7 attempt-label contract is not the v2 contract")
     _sha256(u7, "attemptLabelContractSha256")
+    if version == EXTERNAL_ADAPTIVE_CONTRACT_V1_2_VERSION:
+        history = _mapping(predecessors, "externalAdaptiveContracts")
+        v1_history = _mapping(history, "v1")
+        v1_1_history = _mapping(history, "v1_1")
+        if (
+            _string(v1_history, "contractVersion") != EXTERNAL_ADAPTIVE_CONTRACT_VERSION
+            or _sha256(v1_history, "contractSha256")
+            != "46997eaf92d6c9aba0dc7d8d196080bc03bd59093ef5b2f04a1fd6fc4e424170"
+        ):
+            raise ExternalContractError("v1 predecessor history is not preserved")
+        if (
+            _string(v1_1_history, "contractVersion") != EXTERNAL_ADAPTIVE_CONTRACT_V1_1_VERSION
+            or _sha256(v1_1_history, "contractSha256")
+            != "e54085ddfe1e00e1cd12d02639f02a70681c767a2ea51697548890e8211f63de"
+        ):
+            raise ExternalContractError("v1.1 predecessor history is not preserved")
 
     dataset = _mapping(data, "dataset")
     provenance = _string(dataset, "provenance")
@@ -271,7 +312,7 @@ def load_external_adaptive_contract(
     tiering = _mapping(proxy, "withinSkillTiering")
     if _string(tiering, "tieringScope") != "exact_sourceSkillCode_only":
         raise ExternalContractError("proxy tiers must be constructed within exact sourceSkillCode")
-    if version == EXTERNAL_ADAPTIVE_CONTRACT_V1_1_VERSION:
+    if version in AMENDED_CONTRACT_VERSIONS:
         boundary = _mapping(tiering, "tertileBoundaryRule")
         _require_exact_keys(
             boundary,
@@ -334,6 +375,39 @@ def load_external_adaptive_contract(
         raise ExternalContractError("attempt purity denominator is not frozen at 3")
     if _string(attempt_tier, "mixedCensorReason") != "mixed_proxy_difficulty":
         raise ExternalContractError("mixed-tier censor reason is not frozen")
+    if version == EXTERNAL_ADAPTIVE_CONTRACT_V1_2_VERSION:
+        purity_rule = _mapping(attempt_tier, "purityDenominatorRule")
+        _require_exact_keys(
+            purity_rule,
+            {
+                "validProblemCount", "easyCount", "moderateCount", "hardCount",
+                "dominantTierCount", "proxyDifficultyPurity", "untieredProblems",
+                "assignment", "dominantTierTies", "examples",
+            },
+            "purityDenominatorRule",
+        )
+        if _string(purity_rule, "proxyDifficultyPurity") != "dominantTierCount / validProblemCount":
+            raise ExternalContractError("v1.2 purity formula is not the frozen denominator rule")
+        untiered = _mapping(purity_rule, "untieredProblems")
+        _require_exact_keys(
+            untiered,
+            {
+                "remainInValidProblemCount", "contributeToNoTierCount",
+                "neverInventedTier", "neverDroppedToIncreasePurity",
+                "purityIsNeverDominantOverTieredOnlyCount",
+            },
+            "untieredProblems",
+        )
+        if not _bool(untiered, "remainInValidProblemCount"):
+            raise ExternalContractError("untiered problems must remain in the denominator")
+        if not _bool(untiered, "contributeToNoTierCount"):
+            raise ExternalContractError("untiered problems must never enter a tier numerator")
+        if not _bool(untiered, "neverDroppedToIncreasePurity"):
+            raise ExternalContractError("untiered problems must never be dropped")
+        ties = _mapping(purity_rule, "dominantTierTies")
+        if _string(ties, "rule") != "no unique dominant tier -> currentProxyDifficulty = null (fail closed, no arbitrary selection)":
+            raise ExternalContractError("v1.2 dominant-tier tie rule is not frozen")
+        purity_denominator_rule = dict(purity_rule)
 
     availability = _mapping(data, "tierAvailability")
     if _string(availability, "semantics") != "proxy_tier_catalog_availability":
@@ -506,6 +580,7 @@ def load_external_adaptive_contract(
         predecessor_contract_sha256=predecessor_contract_sha256,
         amendment_reason=amendment_reason,
         tertile_boundary_rule=tertile_boundary_rule,
+        purity_denominator_rule=purity_denominator_rule,
     )
 
 

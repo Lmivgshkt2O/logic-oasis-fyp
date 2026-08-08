@@ -16,9 +16,8 @@ import unittest
 from external_data.assistments.adaptive.adaptive_attempts import (
     ATTEMPT_FIELDS,
     AdaptiveAttemptRecord,
-    PurityDenominatorAmbiguity,
+    attempt_purity,
     build_attempt_records,
-    dominant_tier_fraction,
     problem_set_fingerprint,
 )
 from external_data.assistments.adaptive.schemas import (
@@ -77,6 +76,7 @@ class E3VerificationTests(unittest.TestCase):
         ai = Path(__file__).resolve().parents[1]
         adaptive = ai / "external_data" / "assistments" / "adaptive"
         result = verify_stage_b_frozen(
+            contract_path_v1_2=adaptive / "assistments_adaptive_contract_v1_2.yaml",
             contract_path_v1_1=adaptive / "assistments_adaptive_contract_v1_1.yaml",
             contract_path_v1=adaptive / "assistments_adaptive_contract_v1.yaml",
             e2_catalog_path=Path(
@@ -299,28 +299,59 @@ class BktChronologyTests(unittest.TestCase):
 
 
 class PurityAndFingerprintTests(unittest.TestCase):
-    def test_purity_two_thirds_assigns_dominant_tier(self) -> None:
-        tier, fraction = dominant_tier_fraction(
-            ["proxy_easy", "proxy_easy", "proxy_easy", "proxy_moderate", "proxy_easy"]
-        )
+    def test_four_easy_zero_untiered_is_easy(self) -> None:
+        tier, fraction = attempt_purity(["proxy_easy"] * 4)
+        self.assertEqual(tier, "proxy_easy")
+        self.assertAlmostEqual(fraction, 1.0)
+
+    def test_four_easy_one_moderate_is_easy(self) -> None:
+        tier, fraction = attempt_purity(["proxy_easy"] * 4 + ["proxy_moderate"])
         self.assertEqual(tier, "proxy_easy")
         self.assertAlmostEqual(fraction, 0.8)
 
-    def test_purity_below_two_thirds_is_mixed(self) -> None:
-        tier, fraction = dominant_tier_fraction(
-            ["proxy_easy", "proxy_easy", "proxy_moderate", "proxy_hard", "proxy_moderate"]
+    def test_four_easy_one_moderate_two_untiered_is_below_two_thirds(self) -> None:
+        tier, fraction = attempt_purity(
+            ["proxy_easy"] * 4 + ["proxy_moderate", None, None]
         )
         self.assertIsNone(tier)
-        self.assertAlmostEqual(fraction, 0.4)
+        self.assertAlmostEqual(fraction, 4 / 7)
+
+    def test_five_easy_two_untiered_is_easy(self) -> None:
+        tier, fraction = attempt_purity(["proxy_easy"] * 5 + [None, None])
+        self.assertEqual(tier, "proxy_easy")
+        self.assertAlmostEqual(fraction, 5 / 7)
+
+    def test_one_easy_six_untiered_is_null(self) -> None:
+        tier, fraction = attempt_purity(["proxy_easy"] + [None] * 6)
+        self.assertIsNone(tier)
+        self.assertAlmostEqual(fraction, 1 / 7)
 
     def test_all_untiered_problems_have_no_dominant_tier(self) -> None:
-        tier, fraction = dominant_tier_fraction([None, None, None])
+        tier, fraction = attempt_purity([None, None, None])
         self.assertIsNone(tier)
         self.assertEqual(fraction, 0.0)
 
-    def test_mixed_tiered_and_untiered_raises_denominator_ambiguity(self) -> None:
-        with self.assertRaises(PurityDenominatorAmbiguity):
-            dominant_tier_fraction(["proxy_easy", "proxy_easy", None])
+    def test_equal_dominant_tier_counts_select_nothing(self) -> None:
+        tier, fraction = attempt_purity(
+            ["proxy_easy"] * 3 + ["proxy_moderate"] * 3 + [None] * 3
+        )
+        self.assertIsNone(tier)
+        self.assertAlmostEqual(fraction, 3 / 9)
+
+    def test_untiered_problems_remain_in_denominator(self) -> None:
+        # Removing the two untiered problems would change 4/7 (< 2/3) to 4/5
+        # (>= 2/3); the v1.2 rule prohibits dropping them.
+        with_untiered, _ = attempt_purity(
+            ["proxy_easy"] * 4 + ["proxy_moderate", None, None]
+        )
+        without_untiered, _ = attempt_purity(["proxy_easy"] * 4 + ["proxy_moderate"])
+        self.assertIsNone(with_untiered)
+        self.assertEqual(without_untiered, "proxy_easy")
+
+    def test_untiered_problems_never_enter_a_tier_numerator(self) -> None:
+        tier, fraction = attempt_purity(["proxy_easy", None, None, None])
+        self.assertIsNone(tier)
+        self.assertAlmostEqual(fraction, 0.25)
 
     def test_fingerprint_is_deterministic_and_never_a_bank_id(self) -> None:
         first = problem_set_fingerprint("6.NS.A.1", ("p3", "p1", "p2"))
@@ -437,6 +468,64 @@ class ExposureAndSequenceTests(unittest.TestCase):
         self.assertEqual(summary["chronology_ambiguous_attempts"], 1)
         self.assertTrue(any(record.chronology_ambiguous for record in records))
 
+    def test_previous_observed_tier_uses_observed_history_only(self) -> None:
+        base = EVALUATION_WINDOW_START
+        tiers = {
+            "p1": "proxy_easy",
+            "p2": "proxy_easy",
+            "p3": "proxy_moderate",
+            "p4": "proxy_easy",
+            "p5": "proxy_easy",
+        }
+        records, _ = build_attempt_records(
+            [
+                episode(assignment="assignment-1", started=base, keys=("p1", "p2", "p3"), correct=2),
+                episode(
+                    assignment="assignment-2",
+                    started=base + timedelta(days=1),
+                    keys=("p4", "p5", "p3"),
+                    correct=2,
+                ),
+            ],
+            tiers=tiers,
+            eligible_skills=frozenset({"6.NS.A.1"}),
+            bkt_states={
+                "episode-student-1-assignment-1-6.NS.A.1": BktStateAt(
+                    "student-1", "6.NS.A.1", 0.72, 3, base
+                ),
+                "episode-student-1-assignment-2-6.NS.A.1": BktStateAt(
+                    "student-1", "6.NS.A.1", 0.72, 6, base + timedelta(days=1)
+                ),
+            },
+            release_id=RELEASE_ID,
+        )
+        ordered = sorted(records, key=lambda record: record.attempt.external_attempt_sequence)
+        self.assertIsNone(ordered[0].attempt.previous_observed_proxy_difficulty)
+        self.assertTrue(ordered[0].cold_history)
+        self.assertEqual(
+            ordered[1].attempt.previous_observed_proxy_difficulty.value,
+            "proxy_easy",
+        )
+        self.assertFalse(ordered[1].cold_history)
+
+    def test_current_tier_censor_reason_is_mixed_for_sub_threshold(self) -> None:
+        base = EVALUATION_WINDOW_START
+        tiers = {
+            "p1": "proxy_easy",
+            "p2": "proxy_easy",
+            "p3": "proxy_moderate",
+            "p4": "proxy_hard",
+        }
+        records, _ = build_attempt_records(
+            [episode(assignment="assignment-1", started=base, keys=("p1", "p2", "p3", "p4"))],
+            tiers=tiers,
+            eligible_skills=frozenset({"6.NS.A.1"}),
+            bkt_states=bkt_state("episode-student-1-assignment-1-6.NS.A.1"),
+            release_id=RELEASE_ID,
+        )
+        self.assertIsNone(records[0].attempt.current_proxy_difficulty)
+        self.assertEqual(records[0].current_tier_censor_reason, "mixed_proxy_difficulty")
+
 
 class GovernanceAndNoPolicyTests(unittest.TestCase):
     def test_provenance_remains_external_real(self) -> None:
@@ -476,9 +565,14 @@ class GovernanceAndNoPolicyTests(unittest.TestCase):
         self.assertEqual(first, second)
 
     def test_diagnostic_declares_no_raw_identifiers_and_no_production(self) -> None:
-        # The runner's blocked diagnostic summary contract (verified statically).
-        runner = Path(__file__).resolve().parents[1] / "external_data" / "assistments" / "adaptive" / "run_adaptive_attempt_reconstruction.py"
-        source = runner.read_text(encoding="utf-8")
+        module = (
+            Path(__file__).resolve().parents[1]
+            / "external_data"
+            / "assistments"
+            / "adaptive"
+            / "adaptive_attempts.py"
+        )
+        source = module.read_text(encoding="utf-8")
         self.assertIn('"containsRawIdentifiers": False', source)
         self.assertIn('"productionPromotionAllowed": False', source)
 
