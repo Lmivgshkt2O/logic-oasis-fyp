@@ -1,19 +1,83 @@
 {
-  "artifactSha256": "50d840fbd38740db48d045fc5fefe99427e655eab16af69ce3369c84095a5132",
-  "authorGroupedSplit": "not_evaluable_small_fixture_dataset",
-  "calibrationState": "not_calibrated",
-  "claimBoundary": "This artifact validates integration only; it is not evidence of performance with learners.",
-  "classBalance": {
-    "needs_reasoning": 3,
-    "sufficient_reasoning": 3
+  "abstentionPolicyVersion": "forum-advisory-policy-v1",
+  "artifactSha256": "8307a480b5d5e61612b878653b2182d609ae594024ecae192e3677ace99a0049",
+  "artifactSizeBytes": 17634,
+  "baselineComparisonResult": "naive_bayes_advantage_demonstrated",
+  "bundleManifestSha256": "9cab444c6aef883313e7484417874be1af37179e3c81d801e9c3289ca5db019f",
+  "candidateGateStatus": "passed",
+  "candidateManifestSha256": "45364c713b72351801afc00c37b5692085cf43d2c1225ca1eaf962c3cf2bfea5",
+  "catalogueSha256": "614aefeffe4929f9b096452a4bb5e473cf671c809231a42edf2e8358b1f01c3a",
+  "claimLevel": "controlled_demonstration_only",
+  "codeRevision": "6bbf09894cff4c4b59109f83838e0e3240f543b4100a84fd94978a26e0e153e2",
+  "codeRevisionKind": "sha256_bounded_release_sources_v1",
+  "datasetManifestSha256": "ce31bd081ea5e3f72d09171bfe7829d110a8fc5045fd202d3fe88255941c8d03",
+  "datasetSha256": "5d096d6ab1c6ce59428c9d89b8d972d743d6d613ae249b619c1c51579b3a8399",
+  "dependencies": {
+    "joblib": "1.5.3",
+    "numpy": "2.4.6",
+    "scikit-learn": "1.9.0"
   },
-  "datasetSha256": "c948c565309202cb52e02d6e771bd17b0228926af4898de446237adca6bb7f80",
-  "evidenceState": "emulator_fixture_only",
-  "modelVersion": "forum-explanation-nb-v1",
-  "precisionRecallF1": "not_claimed_small_fixture_dataset",
-  "provenance": [
-    "synthetic_test"
-  ],
-  "rowCount": 6,
-  "rubricVersion": "forum-explanation-rubric-v1"
+  "deploymentRuntimeHashes": {
+    "forum_runtime.py": "74fe6e5eee0d9915f0ec72aa25862f25cbf9b393141a54c371f075fe881c0e14",
+    "main.py": "9b37870c2636ef54f9d5af75a5282aa5424073421ae966ce671929dde5ee9b17"
+  },
+  "deploymentScope": "controlled_demo",
+  "deploymentState": "pending_cloud_deployment",
+  "evaluationReportSha256": "9bb9b4d1387ce943b88be042c6aade23594eb2aa9ea7413099ea44cf3f9ebb1a",
+  "evidenceLevel": "controlled_demonstration",
+  "failedGates": [],
+  "isActive": true,
+  "lifecycleStatus": "released",
+  "manifestSchemaVersion": "forum-model-release-manifest-v1",
+  "modelType": "MultinomialNB",
+  "modelVersion": "forum-controlled-demo-nb-v1",
+  "outputContract": {
+    "abstained": "uncertain",
+    "answer_only_or_insufficient": "needs_reasoning",
+    "explanation_sufficient": "sufficient_reasoning"
+  },
+  "preprocessingVersion": "forum-text-preprocessing-v1",
+  "releaseId": "forum-controlled-demo-nb-v1-release-1",
+  "releaseRationale": "Developer-released FYP1 controlled-demonstration model. Not evaluated on real learner forum responses.",
+  "releaseScope": "fyp1_forum_controlled_demo",
+  "releasedAt": "2026-08-09T00:00:00Z",
+  "releasedBy": "developer",
+  "rubricSha256": "678505add7d4901d49ce1636baf8289877480383e3515b38e847b114da7ba05b",
+  "runtimeEnvironmentFingerprint": {
+    "architecture": "AMD64",
+    "joblibVersion": "1.5.3",
+    "numpyVersion": "2.4.6",
+    "operatingSystem": "Windows",
+    "pyYamlVersion": "6.0.3",
+    "pythonImplementation": "CPython",
+    "pythonVersion": "3.12.13",
+    "scikitLearnVersion": "1.9.0",
+    "sha256": "5d4dd28a180370bd6acabd01a1b53ddacb30c6572cba994afb95018d2270ae94"
+  },
+  "semanticReproducibilityStatus": "verified_same_runtime_contract",
+  "sourceRuntimeHashes": {
+    "__init__.py": "d9af6a77ae46aac8374e8be62841997efe15b3addab403dd410bc914c144a39e",
+    "classifier.py": "8d8d1bee018ae9adc6a6fe3ed6f828ea1693f6b6098b81d24ee4ebdf93837118"
+  },
+  "splitManifestSha256": "6c994001f0d1791030664310ba4bc3b807421b74364141ec7f82572d2945ba6d",
+  "supersedesReleaseId": null,
+  "trainingDataProvenance": "expert_authored_controlled_demo",
+  "vectorizerContract": {
+    "abstentionPolicyVersion": "forum-advisory-policy-v1",
+    "abstentionThreshold": 0.6,
+    "family": "TfidfVectorizer",
+    "languageNormalization": "unicode_whitespace_casefold_v1",
+    "minimumDocumentFrequency": 1,
+    "ngramRange": [
+      1,
+      2
+    ],
+    "preprocessingVersion": "forum-text-preprocessing-v1",
+    "sublinearTf": true,
+    "tokenization": "sklearn_word_unicode_v1"
+  },
+  "vendorRuntimeHashes": {
+    "__init__.py": "d9af6a77ae46aac8374e8be62841997efe15b3addab403dd410bc914c144a39e",
+    "classifier.py": "8d8d1bee018ae9adc6a6fe3ed6f828ea1693f6b6098b81d24ee4ebdf93837118"
+  }
 }

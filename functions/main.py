@@ -5,11 +5,15 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 from hashlib import sha256
+import json
+import logging
 import os
 from pathlib import Path
 import sys
 from typing import Any, Callable
 from uuid import uuid4
+
+LOGGER = logging.getLogger(__name__)
 
 import firebase_admin
 from firebase_admin import auth as admin_auth
@@ -97,6 +101,12 @@ PARENT_INVITATION_CONTINUE_URL = params.StringParam(
 )
 AI_MODEL_EVIDENCE_MODE = params.StringParam(
     "AI_MODEL_EVIDENCE_MODE", default="real_evaluated_only"
+)
+FORUM_MODEL_EVIDENCE_MODE = params.StringParam(
+    "FORUM_MODEL_EVIDENCE_MODE", default="real_evaluated_only"
+)
+FORUM_RUNTIME_CODE_REVISION = params.StringParam(
+    "FORUM_RUNTIME_CODE_REVISION", default=""
 )
 AI_MODEL_BUCKET = params.StringParam("AI_MODEL_BUCKET", default="")
 PARENT_INVITATION_ANDROID_PACKAGE = params.StringParam(
@@ -1313,9 +1323,28 @@ class _ForumClassifierUnavailable(RuntimeError):
     pass
 
 
-@lru_cache(maxsize=1)
-def _cached_verified_forum_classifier() -> Any:
-    classifier = load_forum_classifier()
+def _active_forum_registry_documents() -> list[dict[str, Any]]:
+    snapshots = list(
+        firestore_db().collection("modelRegistry")
+        .where("isActive", "==", True)
+        .stream()
+    )
+    documents = [dict(snapshot.to_dict() or {}) for snapshot in snapshots]
+    return [
+        document for document in documents
+        if document.get("releaseScope") == "fyp1_forum_controlled_demo"
+    ]
+
+
+@lru_cache(maxsize=2)
+def _cached_verified_forum_classifier(
+    evidence_mode: str, code_revision: str, registry_payload: str,
+) -> Any:
+    registry_documents = json.loads(registry_payload)
+    classifier = load_forum_classifier(
+        evidence_mode=evidence_mode, code_revision=code_revision,
+        registry_documents=registry_documents,
+    )
     if classifier is None:
         # Do not pin a failed/missing verification for the life of a warm
         # instance. A repaired deployment may be retried on the next event.
@@ -1325,8 +1354,17 @@ def _cached_verified_forum_classifier() -> Any:
 
 def _forum_classifier() -> Any:
     try:
-        return _cached_verified_forum_classifier()
-    except _ForumClassifierUnavailable:
+        registry_documents = _active_forum_registry_documents()
+        registry_payload = json.dumps(
+            registry_documents, sort_keys=True, separators=(",", ":"), default=str,
+        )
+        return _cached_verified_forum_classifier(
+            _resolved_string_param(FORUM_MODEL_EVIDENCE_MODE),
+            _resolved_string_param(FORUM_RUNTIME_CODE_REVISION),
+            registry_payload,
+        )
+    except Exception:
+        LOGGER.warning("forum_model_registry_lookup_failed code=registry_unavailable")
         return None
 
 

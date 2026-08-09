@@ -3,7 +3,9 @@ from hashlib import sha256
 import json
 import os
 from pathlib import Path
+import shutil
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -744,6 +746,143 @@ class ForumRuntimeTests(unittest.TestCase):
                     os.environ["FUNCTIONS_EMULATOR"] = previous
                 else:
                     os.environ.pop("FUNCTIONS_EMULATOR", None)
+
+    def test_controlled_release_loads_only_in_controlled_mode(self):
+        release_manifest = json.loads(
+            (ROOT / "functions/forum_model_manifest.json").read_text(encoding="utf-8")
+        )
+        revision = release_manifest["codeRevision"]
+        controlled = {
+            "FORUM_MODEL_EVIDENCE_MODE": "controlled_demo",
+            "FORUM_RUNTIME_CODE_REVISION": revision,
+        }
+        with patch.dict(os.environ, controlled, clear=False):
+            self.assertIsNotNone(load_forum_classifier(registry_documents=[release_manifest]))
+        with self.assertLogs("forum_runtime", level="WARNING") as logs, patch.dict(
+            os.environ,
+            {**controlled, "FORUM_MODEL_EVIDENCE_MODE": "real_evaluated_only"},
+            clear=False,
+        ):
+            self.assertIsNone(load_forum_classifier(registry_documents=[release_manifest]))
+        rendered = " ".join(logs.output)
+        self.assertIn("mode_or_registry_incompatible", rendered)
+        self.assertNotIn("learner", rendered)
+
+    def test_every_binding_is_validated_before_joblib_load(self):
+        original = json.loads(
+            (ROOT / "functions/forum_model_manifest.json").read_text(encoding="utf-8")
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            artifact = root / "forum_model.joblib"
+            shutil.copyfile(ROOT / "functions/forum_model.joblib", artifact)
+            shutil.copyfile(ROOT / "functions/forum_runtime.py", root / "forum_runtime.py")
+            shutil.copyfile(ROOT / "functions/main.py", root / "main.py")
+            shutil.copytree(
+                ROOT / "functions/vendor/logic_oasis_ai/forum_ai",
+                root / "vendor/logic_oasis_ai/forum_ai",
+            )
+            shutil.copyfile(
+                ROOT / "functions/vendor/bundle_manifest.json",
+                root / "vendor/bundle_manifest.json",
+            )
+            manifest = root / "forum_model_manifest.json"
+            manifest.write_text(json.dumps(original), encoding="utf-8")
+            sentinel = type("Classifier", (), {"model_version": original["modelVersion"]})()
+            with patch(
+                "forum_runtime.ForumTextClassifier.load", return_value=sentinel,
+            ) as valid_load:
+                self.assertIs(
+                    sentinel,
+                    load_forum_classifier(
+                        artifact,
+                        manifest,
+                        registry_documents=[original],
+                        evidence_mode="controlled_demo",
+                        code_revision=original["codeRevision"],
+                    ),
+                )
+                valid_load.assert_called_once_with(artifact)
+            for field in (
+                "artifactSha256", "catalogueSha256", "datasetSha256",
+                "evaluationReportSha256", "bundleManifestSha256", "codeRevision",
+            ):
+                with self.subTest(field=field):
+                    broken = dict(original)
+                    broken[field] = "0" * 64
+                    manifest.write_text(json.dumps(broken), encoding="utf-8")
+                    with patch.dict(os.environ, {
+                        "FORUM_MODEL_EVIDENCE_MODE": "controlled_demo",
+                        "FORUM_RUNTIME_CODE_REVISION": original["codeRevision"],
+                    }, clear=False), patch(
+                        "forum_runtime.ForumTextClassifier.load",
+                    ) as unsafe_load:
+                        self.assertIsNone(
+                            load_forum_classifier(
+                                artifact, manifest, registry_documents=[original],
+                            )
+                        )
+                        unsafe_load.assert_not_called()
+            manifest.write_text(json.dumps(original), encoding="utf-8")
+            vendored_classifier = root / "vendor/logic_oasis_ai/forum_ai/classifier.py"
+            vendored_classifier.write_bytes(vendored_classifier.read_bytes() + b"\n# tampered\n")
+            with patch(
+                "forum_runtime.ForumTextClassifier.load",
+            ) as unsafe_load:
+                self.assertIsNone(
+                    load_forum_classifier(
+                        artifact,
+                        manifest,
+                        registry_documents=[original],
+                        evidence_mode="controlled_demo",
+                        code_revision=original["codeRevision"],
+                    )
+                )
+                unsafe_load.assert_not_called()
+
+    def test_zero_or_multiple_active_compatible_releases_fail_closed(self):
+        release = json.loads(
+            (ROOT / "functions/forum_model_manifest.json").read_text(encoding="utf-8")
+        )
+        env = {
+            "FORUM_MODEL_EVIDENCE_MODE": "controlled_demo",
+            "FORUM_RUNTIME_CODE_REVISION": release["codeRevision"],
+        }
+        with patch.dict(os.environ, env, clear=False):
+            self.assertIsNone(load_forum_classifier(registry_documents=[]))
+            self.assertIsNone(load_forum_classifier(registry_documents=[release, release]))
+
+    def test_demo_student_answer_reaches_genuine_nb_once_without_corpus_or_text_log(self):
+        release = json.loads(
+            (ROOT / "functions/forum_model_manifest.json").read_text(encoding="utf-8")
+        )
+        with patch.dict(os.environ, {
+            "FORUM_MODEL_EVIDENCE_MODE": "controlled_demo",
+            "FORUM_RUNTIME_CODE_REVISION": release["codeRevision"],
+        }, clear=False):
+            classifier = load_forum_classifier(registry_documents=[release])
+        self.assertIsNotNone(classifier)
+        self.assertEqual("MultinomialNB", type(classifier.pipeline.named_steps["classifier"]).__name__)
+        answer = {
+            "authorId": "u10-demo-student", "questionId": "u10-demo-question",
+            "revision": 1,
+            "text": "I regrouped the tens first, subtracted each place, and checked by adding back.",
+        }
+        database = _Database({("forumAnswers", "u10-demo-answer"): dict(answer)})
+        with patch("forum_runtime.firestore.transactional", lambda function: function):
+            state = ForumRuntimeGateway(database).process_answer(
+                "u10-demo-answer", answer, classifier,
+                event_id="u10-demo-event", now=datetime(2026, 8, 9, tzinfo=timezone.utc),
+            )
+        self.assertEqual("completed", state)
+        self.assertEqual(1, sum(key[0] == "forumAiJobs" for key in database.rows))
+        self.assertEqual(1, sum(key[0] == "forumAiRuns" for key in database.rows))
+        ai_records = {
+            str(key): value for key, value in database.rows.items()
+            if key[0] in {"forumAiJobs", "forumAiRuns"}
+        }
+        self.assertNotIn(answer["text"], json.dumps(ai_records, default=str))
+        self.assertFalse(any("training" in key[0].casefold() or "dataset" in key[0].casefold() for key in database.rows))
 
 
 if __name__ == "__main__":

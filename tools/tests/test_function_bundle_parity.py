@@ -83,6 +83,14 @@ class FunctionBundleParityTests(unittest.TestCase):
                 for manifest_key, filename in CONFIG_HASH_FILES.items()
             },
         }
+        if "forumRuntimeBundle" in stored:
+            expected["forumRuntimeBundle"] = {
+                "bundleSchemaVersion": "forum-runtime-bundle-v1",
+                "files": {
+                    name: file_sha256(PACKAGE / "forum_ai" / name)
+                    for name in ("__init__.py", "classifier.py")
+                },
+            }
         self.assertEqual(expected, stored)
 
     def test_vendored_package_and_configs_are_byte_identical_without_stale_files(self) -> None:
@@ -127,6 +135,8 @@ class FunctionBundleParityTests(unittest.TestCase):
         self.assertFalse(metadata["contains_scenario_content"])
         self.assertIsInstance(metadata["bindings"], dict)
         for key, value in manifest.items():
+            if key == "forumRuntimeBundle":
+                continue
             self.assertEqual(metadata["bindings"][key], value)
         self.assertEqual(metadata["runtime"]["evidence_mode"], "controlled_demo")
         self.assertEqual(metadata["runtime"]["model_bucket"], "logic-oasis-models")

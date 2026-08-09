@@ -51,6 +51,24 @@ HASH_FIELDS = frozenset({
     "trainingDatasetSha256", "evaluationReportSha256", "scenarioCatalogueSha256",
     "controlledDemoConfigSha256",
 })
+FORUM_CONTROLLED_VALUES = MappingProxyType({
+    "manifestSchemaVersion": "forum-model-release-manifest-v1",
+    "lifecycleStatus": "released",
+    "isActive": True,
+    "trainingDataProvenance": "expert_authored_controlled_demo",
+    "evidenceLevel": "controlled_demonstration",
+    "releaseScope": "fyp1_forum_controlled_demo",
+    "deploymentScope": "controlled_demo",
+    "claimLevel": "controlled_demonstration_only",
+    "candidateGateStatus": "passed",
+    "failedGates": [],
+})
+FORUM_HASH_FIELDS = frozenset({
+    "artifactSha256", "catalogueSha256", "datasetSha256",
+    "datasetManifestSha256", "splitManifestSha256", "rubricSha256",
+    "evaluationReportSha256", "candidateManifestSha256",
+    "bundleManifestSha256", "codeRevision",
+})
 def validate_controlled_demo_registry_document(document: Mapping[str, object]) -> None:
     if any(document.get(field) != value for field, value in CONTROLLED_VALUES.items()):
         raise ValueError("registry document does not match the controlled-demo activation scope")
@@ -113,3 +131,119 @@ def promote_controlled_demo_model(
         return dict(document)
 
     return promote(database.transaction())
+
+
+def validate_forum_controlled_demo_registry_document(
+    document: Mapping[str, object],
+) -> None:
+    if any(document.get(field) != value for field, value in FORUM_CONTROLLED_VALUES.items()):
+        raise ValueError("forum registry document does not match controlled-demo activation scope")
+    if any(
+        not isinstance(document.get(field), str) or not SHA256_PATTERN.fullmatch(document[field])
+        for field in FORUM_HASH_FIELDS
+    ):
+        raise ValueError("forum registry hash bindings must be lowercase SHA-256 values")
+    if any(
+        not isinstance(document.get(field), str) or not str(document[field]).strip()
+        for field in ("releaseId", "releasedBy", "releasedAt", "releaseRationale", "modelType", "modelVersion")
+    ):
+        raise ValueError("forum registry release metadata is incomplete")
+    if not str(document["releasedAt"]).endswith("Z"):
+        raise ValueError("forum release timestamp must be UTC")
+    if "not evaluated on real learner forum responses" not in str(document["releaseRationale"]).casefold():
+        raise ValueError("forum release rationale must state the learner-evidence limitation")
+
+
+def promote_forum_controlled_demo_model(
+    database: Any,
+    release_manifest: Mapping[str, object],
+    *,
+    now: datetime | None = None,
+) -> Mapping[str, object]:
+    """Create an immutable forum release and switch its scoped active pointer."""
+    document = dict(release_manifest)
+    timestamp = now or datetime.now(timezone.utc)
+    if timestamp.tzinfo is None:
+        raise ValueError("promotion timestamp must include a timezone")
+    validate_forum_controlled_demo_registry_document(document)
+    document["promotedAt"] = timestamp
+    collection = database.collection("modelRegistry")
+    release_ref = collection.document(str(document["releaseId"]))
+
+    @firestore.transactional
+    def promote(transaction: Any) -> Mapping[str, object]:
+        scoped = list(
+            collection.where("releaseScope", "==", "fyp1_forum_controlled_demo")
+            .get(transaction=transaction)
+        )
+        active = [
+            snapshot for snapshot in scoped
+            if (snapshot.to_dict() or {}).get("isActive") is True
+        ]
+        existing = release_ref.get(transaction=transaction)
+        if len(active) > 1:
+            raise ValueError("forum registry contains multiple active records")
+        if existing.exists:
+            raise ValueError("forum release ID is immutable and already registered")
+        if active:
+            prior = dict(active[0].to_dict() or {})
+            if document.get("supersedesReleaseId") != prior.get("releaseId"):
+                raise ValueError("replacement must identify the active forum release")
+            transaction.update(active[0].reference, {
+                "isActive": False,
+                "lifecycleStatus": "superseded",
+            })
+        elif document.get("supersedesReleaseId") is not None:
+            prior_ref = collection.document(str(document["supersedesReleaseId"]))
+            prior_snapshot = prior_ref.get(transaction=transaction)
+            prior = dict(prior_snapshot.to_dict() or {})
+            if (
+                not prior_snapshot.exists
+                or prior.get("releaseScope") != "fyp1_forum_controlled_demo"
+                or prior.get("isActive") is True
+                or prior.get("lifecycleStatus") not in {"revoked", "superseded"}
+            ):
+                raise ValueError("superseded forum release is not compatible history")
+        transaction.create(release_ref, document)
+        return dict(document)
+
+    return promote(database.transaction())
+
+
+def revoke_forum_controlled_demo_model(
+    database: Any, release_id: str,
+) -> Mapping[str, object]:
+    """Deactivate one active forum release without deleting its audit record."""
+    if not release_id:
+        raise ValueError("forum release ID is required")
+    collection = database.collection("modelRegistry")
+    release_ref = collection.document(release_id)
+
+    @firestore.transactional
+    def revoke(transaction: Any) -> Mapping[str, object]:
+        scoped = list(
+            collection.where("releaseScope", "==", "fyp1_forum_controlled_demo")
+            .get(transaction=transaction)
+        )
+        active = [
+            item for item in scoped
+            if (item.to_dict() or {}).get("isActive") is True
+        ]
+        if len(active) != 1 or active[0].id != release_id:
+            raise ValueError("forum registry must contain only the requested active release")
+        snapshot = release_ref.get(transaction=transaction)
+        document = dict(snapshot.to_dict() or {})
+        if (
+            not snapshot.exists
+            or document.get("releaseScope") != "fyp1_forum_controlled_demo"
+            or document.get("lifecycleStatus") != "released"
+            or document.get("isActive") is not True
+        ):
+            raise ValueError("only the active released forum record may be revoked")
+        transaction.update(release_ref, {
+            "isActive": False,
+            "lifecycleStatus": "revoked",
+        })
+        return {**document, "isActive": False, "lifecycleStatus": "revoked"}
+
+    return revoke(database.transaction())

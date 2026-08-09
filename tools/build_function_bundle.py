@@ -34,6 +34,12 @@ def tree_sha256(path: Path) -> str:
 
 
 def build_bundle() -> dict[str, object]:
+    manifest_path = VENDOR / "bundle_manifest.json"
+    existing = (
+        json.loads(manifest_path.read_text(encoding="utf-8"))
+        if manifest_path.is_file()
+        else {}
+    )
     target_package = VENDOR / "logic_oasis_ai"
     target_configs = VENDOR / "configs"
     if target_package.exists():
@@ -52,7 +58,15 @@ def build_bundle() -> dict[str, object]:
             for manifest_key, filename in CONFIG_HASH_FILES.items()
         },
     }
-    (VENDOR / "bundle_manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    if "forumRuntimeBundle" in existing:
+        manifest["forumRuntimeBundle"] = {
+            "bundleSchemaVersion": "forum-runtime-bundle-v1",
+            "files": {
+                name: file_sha256(PACKAGE / "forum_ai" / name)
+                for name in ("__init__.py", "classifier.py")
+            },
+        }
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return manifest
 
 

@@ -4,16 +4,21 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
+import importlib.metadata
 import json
+import logging
 import os
 from pathlib import Path
+import re
 from typing import Any, Mapping
 from zoneinfo import ZoneInfo
 
 from firebase_admin import firestore
 from logic_oasis_ai.forum_ai.classifier import (
-    ForumTextClassifier, REVISION, SUFFICIENT, UNCERTAIN,
+    ForumTextClassifier, NAIVE_BAYES_VARIANTS, REVISION, SUFFICIENT, UNCERTAIN,
 )
+LOGGER = logging.getLogger(__name__)
+SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
 
 FORUM_RUNTIME_SERVICE_ACCOUNT = "logic-oasis-forum-runtime@logic-oasis-fyp.iam.gserviceaccount.com"
 FORUM_MODEL_PATH = Path(__file__).resolve().parent / "forum_model.joblib"
@@ -23,6 +28,22 @@ COUNTER_FIELDS = ("questionsPostedCount", "answersSubmittedCount", "acceptedAnsw
 FORUM_AI_POLICY_VERSION = "forum-advisory-policy-v1"
 FORUM_AI_LEASE_DURATION = timedelta(minutes=5)
 FORUM_AI_MAX_ATTEMPTS = 3
+FORUM_RELEASE_MANIFEST_SCHEMA = "forum-model-release-manifest-v1"
+FORUM_CONTROLLED_MODE = "controlled_demo"
+FORUM_REAL_EVALUATED_MODE = "real_evaluated_only"
+_SHA256_FIELDS = (
+    "artifactSha256", "catalogueSha256", "datasetSha256", "datasetManifestSha256",
+    "splitManifestSha256", "rubricSha256", "evaluationReportSha256",
+    "candidateManifestSha256", "bundleManifestSha256",
+)
+_CONTROLLED_RELEASE_VALUES = {
+    "lifecycleStatus": "released", "isActive": True,
+    "trainingDataProvenance": "expert_authored_controlled_demo",
+    "evidenceLevel": "controlled_demonstration",
+    "releaseScope": "fyp1_forum_controlled_demo",
+    "deploymentScope": "controlled_demo",
+    "claimLevel": "controlled_demonstration_only",
+}
 
 
 @dataclass(frozen=True)
@@ -755,22 +776,151 @@ class ForumRuntimeGateway:
 
 def load_forum_classifier(
     path: Path = FORUM_MODEL_PATH, manifest_path: Path = FORUM_MODEL_MANIFEST_PATH,
+    *, registry_documents: list[Mapping[str, Any]] | None = None,
+    evidence_mode: str | None = None, code_revision: str | None = None,
 ) -> ForumTextClassifier | None:
     try:
-        if not path.is_file() or not manifest_path.is_file():
-            return None
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        if not isinstance(manifest, dict) or manifest.get("artifactSha256") != sha256(path.read_bytes()).hexdigest():
+        if not isinstance(manifest, dict):
             return None
         if manifest.get("evidenceState") == "emulator_fixture_only" and os.environ.get("FUNCTIONS_EMULATOR") != "true":
             return None
+        if manifest.get("evidenceState") == "emulator_fixture_only":
+            if manifest.get("artifactSha256") != sha256(path.read_bytes()).hexdigest():
+                return None
+            classifier = ForumTextClassifier.load(path)
+            return classifier if manifest.get("modelVersion") == classifier.model_version else None
+
+        mode = evidence_mode or os.environ.get("FORUM_MODEL_EVIDENCE_MODE", FORUM_REAL_EVALUATED_MODE)
+        revision = code_revision or os.environ.get("FORUM_RUNTIME_CODE_REVISION", "")
+        documents = [] if registry_documents is None else list(registry_documents)
+        compatible = [
+            item for item in documents
+            if isinstance(item, Mapping)
+            and item.get("lifecycleStatus") == "released"
+            and item.get("isActive") is True
+            and item.get("deploymentScope") == FORUM_CONTROLLED_MODE
+        ]
+        if mode != FORUM_CONTROLLED_MODE or len(compatible) != 1:
+            _log_forum_activation_failure("mode_or_registry_incompatible", manifest, revision)
+            return None
+        release = compatible[0]
+        # The bundled immutable record must be the selected registry record.
+        if any(release.get(key) != value for key, value in manifest.items()):
+            _log_forum_activation_failure("registry_manifest_mismatch", manifest, revision)
+            return None
+        if not _controlled_forum_release_valid(manifest, path, manifest_path, revision):
+            _log_forum_activation_failure("release_validation_failed", manifest, revision)
+            return None
+        # joblib is intentionally beyond the complete validation boundary.
         classifier = ForumTextClassifier.load(path)
         if manifest.get("modelVersion") != classifier.model_version:
+            _log_forum_activation_failure("classifier_version_mismatch", manifest, revision)
             return None
         classifier.artifact_sha256 = manifest["artifactSha256"]
         return classifier
     except Exception:
+        _log_forum_activation_failure(
+            "activation_exception",
+            locals().get("manifest"),
+            code_revision or "",
+        )
         return None
+
+
+def _log_forum_activation_failure(
+    code: str, manifest: object, code_revision: str,
+) -> None:
+    release_id = manifest.get("releaseId", "unknown") if isinstance(manifest, Mapping) else "unknown"
+    LOGGER.warning(
+        "forum_model_activation_failed code=%s release_id=%s code_revision=%s",
+        code,
+        release_id,
+        code_revision or "missing",
+    )
+
+
+def _controlled_forum_release_valid(
+    manifest: Mapping[str, Any], artifact_path: Path, manifest_path: Path, code_revision: str,
+) -> bool:
+    if manifest.get("manifestSchemaVersion") != FORUM_RELEASE_MANIFEST_SCHEMA:
+        return False
+    if any(manifest.get(key) != value for key, value in _CONTROLLED_RELEASE_VALUES.items()):
+        return False
+    if manifest.get("modelType") not in NAIVE_BAYES_VARIANTS:
+        return False
+    if not isinstance(manifest.get("releaseId"), str) or not manifest.get("releaseId"):
+        return False
+    if not isinstance(manifest.get("releasedBy"), str) or not manifest.get("releasedBy"):
+        return False
+    released_at = manifest.get("releasedAt")
+    if not isinstance(released_at, str) or not released_at.endswith("Z"):
+        return False
+    rationale = manifest.get("releaseRationale")
+    if not isinstance(rationale, str) or "not evaluated on real learner forum responses" not in rationale.casefold():
+        return False
+    if manifest.get("codeRevision") != code_revision or not code_revision:
+        return False
+    if manifest.get("codeRevisionKind") != "sha256_bounded_release_sources_v1":
+        return False
+    if any(
+        not isinstance(manifest.get(field), str)
+        or not SHA256_PATTERN.fullmatch(manifest[field])
+        for field in _SHA256_FIELDS
+    ):
+        return False
+    artifact_bytes = artifact_path.read_bytes()
+    if sha256(artifact_bytes).hexdigest() != manifest.get("artifactSha256"):
+        return False
+    if manifest.get("artifactSizeBytes") != len(artifact_bytes):
+        return False
+    if manifest.get("candidateGateStatus") != "passed" or manifest.get("failedGates") != []:
+        return False
+    if manifest.get("semanticReproducibilityStatus") != "verified_same_runtime_contract":
+        return False
+    if manifest.get("baselineComparisonResult") not in {
+        "naive_bayes_advantage_demonstrated", "no_controlled_scenario_advantage_demonstrated",
+    }:
+        return False
+    dependencies = manifest.get("dependencies")
+    if not isinstance(dependencies, Mapping) or set(dependencies) != {"joblib", "numpy", "scikit-learn"}:
+        return False
+    if any(importlib.metadata.version(name) != version for name, version in dependencies.items()):
+        return False
+    source_hashes = manifest.get("sourceRuntimeHashes")
+    vendor_hashes = manifest.get("vendorRuntimeHashes")
+    if source_hashes != vendor_hashes or not isinstance(vendor_hashes, Mapping):
+        return False
+    vendor_root = manifest_path.parent / "vendor/logic_oasis_ai/forum_ai"
+    if any(
+        sha256((vendor_root / name).read_bytes()).hexdigest() != expected
+        for name, expected in vendor_hashes.items()
+    ):
+        return False
+    deployment_hashes = manifest.get("deploymentRuntimeHashes")
+    if not isinstance(deployment_hashes, Mapping) or set(deployment_hashes) != {"forum_runtime.py", "main.py"}:
+        return False
+    if any(
+        sha256((manifest_path.parent / name).read_bytes()).hexdigest() != expected
+        for name, expected in deployment_hashes.items()
+    ):
+        return False
+    bundle_path = manifest_path.parent / "vendor/bundle_manifest.json"
+    bundle_bytes = bundle_path.read_bytes()
+    if sha256(bundle_bytes).hexdigest() != manifest.get("bundleManifestSha256"):
+        return False
+    bundle = json.loads(bundle_bytes)
+    forum_bundle = bundle.get("forumRuntimeBundle") if isinstance(bundle, dict) else None
+    if not isinstance(forum_bundle, Mapping) or forum_bundle.get("bundleSchemaVersion") != "forum-runtime-bundle-v1":
+        return False
+    if forum_bundle.get("files") != vendor_hashes:
+        return False
+    vectorizer = manifest.get("vectorizerContract")
+    if not isinstance(vectorizer, Mapping) or vectorizer.get("family") != "TfidfVectorizer":
+        return False
+    if manifest.get("abstentionPolicyVersion") != vectorizer.get("abstentionPolicyVersion"):
+        return False
+    return True
 
 
 def _required(data: Mapping[str, Any], key: str) -> str:
