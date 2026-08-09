@@ -24,12 +24,17 @@ from logic_oasis_ai.prediction_contract import (
 from external_data.assistments.adaptive.matched_outcomes import (
     CLAIM_LEVEL,
     FrozenBootstrapConfig,
+    MIN_INDEPENDENT_LEARNERS_FOR_CI,
+    SPARSE_CI_FLAG,
     MatchedOutcomeError,
     OutcomeGateError,
+    attach_outcomes,
     attach_matched_outcome,
+    bkt_calibration,
     build_next_tier_lookup,
     classify_matched_row,
     matched_outcome_summary,
+    policy_direction_outcome_summary,
     require_frozen_bootstrap_config,
     structural_matching,
     student_clustered_bootstrap,
@@ -327,7 +332,27 @@ class OutcomeContractTests(unittest.TestCase):
 class BootstrapGateTests(unittest.TestCase):
     def test_outcome_rate_gate_requires_frozen_ci_config(self) -> None:
         with self.assertRaises(OutcomeGateError):
-            require_frozen_bootstrap_config()
+            require_frozen_bootstrap_config(None)
+
+    def test_frozen_config_is_returned_from_v13_contract(self) -> None:
+        from external_data.assistments.adaptive.external_policy_contract import (
+            EXTERNAL_ADAPTIVE_CONTRACT_V1_3_VERSION,
+            load_external_adaptive_contract,
+        )
+
+        contract = load_external_adaptive_contract(
+            AI_PIPELINE
+            / "external_data"
+            / "assistments"
+            / "adaptive"
+            / "assistments_adaptive_contract_v1_3.yaml",
+            version=EXTERNAL_ADAPTIVE_CONTRACT_V1_3_VERSION,
+        )
+        config = require_frozen_bootstrap_config(contract)
+        self.assertEqual(config.seed, 20260716)
+        self.assertEqual(config.iterations, 2000)
+        self.assertEqual(config.confidence_level, 0.95)
+        self.assertEqual(config.version, "assistments-adaptive-contract-v1.3")
 
     def test_student_clustered_bootstrap_clusters_by_learner(self) -> None:
         config = FrozenBootstrapConfig(version="test-v1", seed=20260809, iterations=2000, confidence_level=0.95)
@@ -363,6 +388,7 @@ class GovernanceAndVerificationTests(unittest.TestCase):
             e2_catalog_path=protected / "e2/assistments_problem_difficulty_proxy_v1.csv",
             e2_manifest_path=protected / "e2/e2_calibration_manifest.json",
             contract_path_v1_2=adaptive / "assistments_adaptive_contract_v1_2.yaml",
+            contract_path_v1_3=adaptive / "assistments_adaptive_contract_v1_3.yaml",
             contract_path_v1_1=adaptive / "assistments_adaptive_contract_v1_1.yaml",
             contract_path_v1=adaptive / "assistments_adaptive_contract_v1.yaml",
             configs_dir=AI_PIPELINE / "configs",
@@ -373,6 +399,7 @@ class GovernanceAndVerificationTests(unittest.TestCase):
         self.assertTrue(naming["consistent"])
         self.assertNotEqual(naming["decisionAuditHash"], naming["decisionAuditFileSha256"])
         self.assertEqual(result["u7OutcomeContract"]["masteryCriterion"], 0.60)
+        self.assertIn("contractHashV1_3", result)
 
     def test_tampered_e5_audit_is_rejected(self) -> None:
         adaptive = AI_PIPELINE / "external_data" / "assistments" / "adaptive"
@@ -393,6 +420,7 @@ class GovernanceAndVerificationTests(unittest.TestCase):
                     e2_catalog_path=protected / "e2/assistments_problem_difficulty_proxy_v1.csv",
                     e2_manifest_path=protected / "e2/e2_calibration_manifest.json",
                     contract_path_v1_2=adaptive / "assistments_adaptive_contract_v1_2.yaml",
+                    contract_path_v1_3=adaptive / "assistments_adaptive_contract_v1_3.yaml",
                     contract_path_v1_1=adaptive / "assistments_adaptive_contract_v1_1.yaml",
                     contract_path_v1=adaptive / "assistments_adaptive_contract_v1.yaml",
                     configs_dir=AI_PIPELINE / "configs",
@@ -452,6 +480,166 @@ class GovernanceAndVerificationTests(unittest.TestCase):
         first = matched_outcome_summary(structural_matching(decisions, attempts))
         second = matched_outcome_summary(structural_matching(decisions, attempts))
         self.assertEqual(first, second)
+
+
+class V1_3OutcomeAnalysisTests(unittest.TestCase):
+    def test_frozen_config_values(self) -> None:
+        self.assertEqual(MIN_INDEPENDENT_LEARNERS_FOR_CI, 10)
+        self.assertEqual(SPARSE_CI_FLAG, "sparse_independent_learner_evidence")
+
+    def test_less_than_10_learners_suppresses_ci(self) -> None:
+        attempts = [
+            attempt(f"a{u}0", f"u{u}", "6.NS.A.1", tier="proxy_easy", ts=BASE + _day(u * 2))
+            for u in range(3)
+        ] + [
+            attempt(f"a{u}1", f"u{u}", "6.NS.A.1", tier="proxy_moderate", ts=BASE + _day(u * 2 + 1))
+            for u in range(3)
+        ]
+        decisions = [
+            decision(f"a{u}0", "P1", "up", "proxy_easy", f"u{u}")
+            for u in range(3)
+        ]
+        rows = structural_matching(decisions, attempts)
+        results = attach_outcomes(rows, attempts)
+        config = FrozenBootstrapConfig(
+            version="assistments-adaptive-contract-v1.3",
+            seed=20260716,
+            iterations=2000,
+            confidence_level=0.95,
+        )
+        summary = policy_direction_outcome_summary(results, config)
+        up = summary["P1"]["up"]
+        self.assertLess(up["independentLearners"], 10)
+        self.assertIsNone(up["confidenceInterval"])
+        self.assertEqual(up["ciStatus"], SPARSE_CI_FLAG)
+
+    def test_10_or_more_learners_permits_ci(self) -> None:
+        attempts = [
+            attempt(f"a{i}0", f"u{i}", "6.NS.A.1", tier="proxy_easy", ts=BASE + _day(i * 2))
+            for i in range(20)
+        ] + [
+            attempt(f"a{i}1", f"u{i}", "6.NS.A.1", tier="proxy_moderate", ts=BASE + _day(i * 2 + 1))
+            for i in range(20)
+        ]
+        decisions = [
+            decision(f"a{i}0", "P1", "up", "proxy_easy", f"u{i}")
+            for i in range(20)
+        ]
+        rows = structural_matching(decisions, attempts)
+        results = attach_outcomes(rows, attempts)
+        config = FrozenBootstrapConfig(
+            version="assistments-adaptive-contract-v1.3",
+            seed=20260716,
+            iterations=2000,
+            confidence_level=0.95,
+        )
+        summary = policy_direction_outcome_summary(results, config)
+        up = summary["P1"]["up"]
+        self.assertGreaterEqual(up["independentLearners"], 10)
+        self.assertIsNotNone(up["confidenceInterval"])
+        self.assertEqual(up["ciStatus"], "computed")
+
+    def test_repeated_rows_from_one_learner_do_not_increase_learner_count(self) -> None:
+        attempts = [
+            attempt("a1", "u1", "6.NS.A.1", tier="proxy_easy"),
+            attempt("a2", "u1", "6.NS.A.1", tier="proxy_moderate", ts=BASE + _day(1)),
+            attempt("a3", "u1", "6.NS.A.1", tier="proxy_easy", ts=BASE + _day(2)),
+            attempt("a4", "u1", "6.NS.A.1", tier="proxy_moderate", ts=BASE + _day(3)),
+            attempt("a5", "u2", "6.NS.A.1", tier="proxy_easy", ts=BASE + _day(4)),
+            attempt("a6", "u2", "6.NS.A.1", tier="proxy_moderate", ts=BASE + _day(5)),
+        ]
+        decisions = [
+            decision("a1", "P1", "up", "proxy_easy", "u1"),
+            decision("a3", "P1", "up", "proxy_easy", "u1"),
+            decision("a5", "P1", "up", "proxy_easy", "u2"),
+        ]
+        rows = structural_matching(decisions, attempts)
+        results = attach_outcomes(rows, attempts)
+        matched = [r for r in results if r.outcome_status == "matched"]
+        self.assertEqual(len(matched), 3)
+        learners = {r.external_student_key for r in matched}
+        # u1 contributes two matched rows but counts as ONE independent learner.
+        self.assertEqual(len(learners), 2)
+
+    def test_brier_semantics_use_later_success_one(self) -> None:
+        attempts = [
+            attempt("a1", "u1", "6.NS.A.1", tier="proxy_easy", correct=0.50),
+            attempt("a2", "u1", "6.NS.A.1", tier="proxy_moderate", ts=BASE + _day(1), correct=0.90),
+        ]
+        # a1 mastery is 0.6 (from the attempt() helper); next success -> (0.6-1)^2.
+        config = FrozenBootstrapConfig(
+            version="v1.3", seed=20260716, iterations=2000, confidence_level=0.95
+        )
+        calibration = bkt_calibration(
+            attempts,
+            ["a1"],
+            config,
+        )
+        self.assertIsNotNone(calibration["brierScore"])
+        expected = (0.6 - 1.0) ** 2
+        self.assertAlmostEqual(calibration["brierScore"], expected)
+
+    def test_e6_manifest_binds_frozen_e5_decision_audit(self) -> None:
+        from external_data.assistments.adaptive.matched_outcomes import (
+            E5_DECISION_AUDIT_HASH,
+            build_e6_manifest,
+        )
+
+        verification = {
+            "contractHashV1_3": "0" * 64,
+            "e2CatalogHash": "1" * 64,
+            "e3AttemptsHash": "2" * 64,
+            "e4ReadinessManifestHash": "3" * 64,
+            "e5DecisionAuditHash": E5_DECISION_AUDIT_HASH,
+            "e5ManifestHash": "4" * 64,
+        }
+        structural = {
+            p: {
+                "matchedOutcomes": 0,
+                "matchedLearners": 0,
+                "matchedSkills": 0,
+                "matchedByDirection": {"up": 0, "hold": 0, "down": 0},
+                "censorCounts": {},
+                "matchedOutcomeCoverage": 0.0,
+            }
+            for p in ("P1", "P2", "P3a")
+        }
+        empty_summary = {
+            p: {
+                d: {
+                    "matchedDecisions": 0,
+                    "independentLearners": 0,
+                    "skills": 0,
+                    "supportNeededCount": 0,
+                    "laterSuccessCount": 0,
+                    "observedSupportNeededRate": 0.0,
+                    "observedLaterSuccessRate": 0.0,
+                    "confidenceInterval": None,
+                    "ciStatus": "not_estimable",
+                }
+                for d in ("up", "hold", "down")
+            }
+            for p in ("P1", "P2", "P3a")
+        }
+        config = FrozenBootstrapConfig(
+            version="assistments-adaptive-contract-v1.3",
+            seed=20260716,
+            iterations=2000,
+            confidence_level=0.95,
+        )
+        manifest = build_e6_manifest(
+            verification=verification,
+            structural_summary=structural,
+            outcome_summary=empty_summary,
+            eb4={p: {"matchedUpDecisions": 0} for p in ("P1", "P2", "P3a")},
+            bkt_cal={"populationRowCount": 0, "populationLearnerCount": 0},
+            coverage={p: {} for p in ("P1", "P2", "P3a")},
+            bootstrap_config=config,
+            matched_outcomes_hash="0" * 64,
+        )
+        self.assertEqual(manifest["e5DecisionAuditHash"], E5_DECISION_AUDIT_HASH)
+        self.assertFalse(manifest["causalClaimAllowed"])
+        self.assertFalse(manifest["productionPromotionAllowed"])
 
 
 def _day(n: int):

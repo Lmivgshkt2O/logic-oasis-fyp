@@ -45,8 +45,13 @@ from .schemas import (
 EXTERNAL_ADAPTIVE_CONTRACT_VERSION = "assistments-adaptive-contract-v1"
 EXTERNAL_ADAPTIVE_CONTRACT_V1_1_VERSION = "assistments-adaptive-contract-v1.1"
 EXTERNAL_ADAPTIVE_CONTRACT_V1_2_VERSION = "assistments-adaptive-contract-v1.2"
+EXTERNAL_ADAPTIVE_CONTRACT_V1_3_VERSION = "assistments-adaptive-contract-v1.3"
 AMENDED_CONTRACT_VERSIONS = frozenset(
-    {EXTERNAL_ADAPTIVE_CONTRACT_V1_1_VERSION, EXTERNAL_ADAPTIVE_CONTRACT_V1_2_VERSION}
+    {
+        EXTERNAL_ADAPTIVE_CONTRACT_V1_1_VERSION,
+        EXTERNAL_ADAPTIVE_CONTRACT_V1_2_VERSION,
+        EXTERNAL_ADAPTIVE_CONTRACT_V1_3_VERSION,
+    }
 )
 
 REQUIRED_EXTERNAL_METRICS = frozenset(
@@ -113,6 +118,7 @@ class ExternalAdaptiveContract:
     amendment_reason: str | None = None
     tertile_boundary_rule: Mapping[str, object] | None = None
     purity_denominator_rule: Mapping[str, object] | None = None
+    statistical_reporting: Mapping[str, object] | None = None
 
     @property
     def windows_are_disjoint(self) -> bool:
@@ -153,6 +159,8 @@ def load_external_adaptive_contract(
             "predecessorContractSha256",
             "amendment",
         }
+        if version == EXTERNAL_ADAPTIVE_CONTRACT_V1_3_VERSION:
+            expected_keys = expected_keys | {"statisticalReporting"}
     else:
         expected_keys = base_keys
     _require_exact_keys(data, expected_keys, "external adaptive contract")
@@ -168,12 +176,15 @@ def load_external_adaptive_contract(
     amendment_reason: str | None = None
     tertile_boundary_rule: Mapping[str, object] | None = None
     purity_denominator_rule: Mapping[str, object] | None = None
+    statistical_reporting: Mapping[str, object] | None = None
     if version in AMENDED_CONTRACT_VERSIONS:
         predecessor_contract_version = _string(data, "predecessorContractVersion")
         expected_predecessor = (
             EXTERNAL_ADAPTIVE_CONTRACT_VERSION
             if version == EXTERNAL_ADAPTIVE_CONTRACT_V1_1_VERSION
             else EXTERNAL_ADAPTIVE_CONTRACT_V1_1_VERSION
+            if version == EXTERNAL_ADAPTIVE_CONTRACT_V1_2_VERSION
+            else EXTERNAL_ADAPTIVE_CONTRACT_V1_2_VERSION
         )
         if predecessor_contract_version != expected_predecessor:
             raise ExternalContractError(
@@ -188,12 +199,23 @@ def load_external_adaptive_contract(
         }
         if version == EXTERNAL_ADAPTIVE_CONTRACT_V1_2_VERSION:
             amendment_keys.add("v1_1Preserved")
+        if version == EXTERNAL_ADAPTIVE_CONTRACT_V1_3_VERSION:
+            amendment_keys.update(
+                {
+                    "v1_1Preserved",
+                    "v1_2Preserved",
+                    "outcomeValuesInspectedBeforeAmendment",
+                    "policyOutcomeRatesExistedBeforeAmendment",
+                }
+            )
         _require_exact_keys(amendment, amendment_keys, "amendment")
         amendment_reason = _string(amendment, "reason")
         expected_reason = (
             "deterministic_discrete_tertile_boundary_clarification"
             if version == EXTERNAL_ADAPTIVE_CONTRACT_V1_1_VERSION
             else "attempt_proxy_difficulty_purity_denominator_clarification"
+            if version == EXTERNAL_ADAPTIVE_CONTRACT_V1_2_VERSION
+            else "external_stage_b_descriptive_cluster_bootstrap_and_calibration_reporting_freeze"
         )
         if amendment_reason != expected_reason:
             raise ExternalContractError("amendment reason is not the frozen clarification")
@@ -201,6 +223,8 @@ def load_external_adaptive_contract(
             "within_skill_tertile_boundaries_only"
             if version == EXTERNAL_ADAPTIVE_CONTRACT_V1_1_VERSION
             else "attempt_purity_denominator_only"
+            if version == EXTERNAL_ADAPTIVE_CONTRACT_V1_2_VERSION
+            else "statistical_reporting_configuration_only"
         )
         if _string(amendment, "scope") != expected_scope:
             raise ExternalContractError("amendment scope is not within-skill tertile boundaries only")
@@ -217,6 +241,18 @@ def load_external_adaptive_contract(
             and not _bool(amendment, "v1_1Preserved")
         ):
             raise ExternalContractError("v1.1 must remain preserved")
+        if (
+            version == EXTERNAL_ADAPTIVE_CONTRACT_V1_3_VERSION
+            and not _bool(amendment, "v1_2Preserved")
+        ):
+            raise ExternalContractError("v1.2 must remain preserved")
+        if version == EXTERNAL_ADAPTIVE_CONTRACT_V1_3_VERSION and (
+            _bool(amendment, "outcomeValuesInspectedBeforeAmendment")
+            or _bool(amendment, "policyOutcomeRatesExistedBeforeAmendment")
+        ):
+            raise ExternalContractError(
+                "no outcome value or policy outcome rate may have existed before the amendment"
+            )
 
     predecessors = _mapping(data, "predecessorContracts")
     shared_aqc = _mapping(predecessors, "sharedAqcPolicyContract")
@@ -232,7 +268,7 @@ def load_external_adaptive_contract(
     if _string(u7, "attemptLabelContract") != "assistments-j2-attempt-label-contract-v2":
         raise ExternalContractError("U7 attempt-label contract is not the v2 contract")
     _sha256(u7, "attemptLabelContractSha256")
-    if version == EXTERNAL_ADAPTIVE_CONTRACT_V1_2_VERSION:
+    if version in (EXTERNAL_ADAPTIVE_CONTRACT_V1_2_VERSION, EXTERNAL_ADAPTIVE_CONTRACT_V1_3_VERSION):
         history = _mapping(predecessors, "externalAdaptiveContracts")
         v1_history = _mapping(history, "v1")
         v1_1_history = _mapping(history, "v1_1")
@@ -248,6 +284,14 @@ def load_external_adaptive_contract(
             != "e54085ddfe1e00e1cd12d02639f02a70681c767a2ea51697548890e8211f63de"
         ):
             raise ExternalContractError("v1.1 predecessor history is not preserved")
+        if version == EXTERNAL_ADAPTIVE_CONTRACT_V1_3_VERSION:
+            v1_2_history = _mapping(history, "v1_2")
+            if (
+                _string(v1_2_history, "contractVersion") != EXTERNAL_ADAPTIVE_CONTRACT_V1_2_VERSION
+                or _sha256(v1_2_history, "contractSha256")
+                != "d82b50432157f9321808dfced5ad7cb55960ce2dbc3501987ab17a23de725955"
+            ):
+                raise ExternalContractError("v1.2 predecessor history is not preserved")
 
     dataset = _mapping(data, "dataset")
     provenance = _string(dataset, "provenance")
@@ -375,7 +419,7 @@ def load_external_adaptive_contract(
         raise ExternalContractError("attempt purity denominator is not frozen at 3")
     if _string(attempt_tier, "mixedCensorReason") != "mixed_proxy_difficulty":
         raise ExternalContractError("mixed-tier censor reason is not frozen")
-    if version == EXTERNAL_ADAPTIVE_CONTRACT_V1_2_VERSION:
+    if version in (EXTERNAL_ADAPTIVE_CONTRACT_V1_2_VERSION, EXTERNAL_ADAPTIVE_CONTRACT_V1_3_VERSION):
         purity_rule = _mapping(attempt_tier, "purityDenominatorRule")
         _require_exact_keys(
             purity_rule,
@@ -408,6 +452,61 @@ def load_external_adaptive_contract(
         if _string(ties, "rule") != "no unique dominant tier -> currentProxyDifficulty = null (fail closed, no arbitrary selection)":
             raise ExternalContractError("v1.2 dominant-tier tie rule is not frozen")
         purity_denominator_rule = dict(purity_rule)
+
+    if version == EXTERNAL_ADAPTIVE_CONTRACT_V1_3_VERSION:
+        statistical = _mapping(data, "statisticalReporting")
+        _require_exact_keys(
+            statistical,
+            {
+                "studentClusteredBootstrap",
+                "ciSparsityGuard",
+                "bktCalibration",
+                "outcomeContractUnchanged",
+            },
+            "statisticalReporting",
+        )
+        bootstrap = _mapping(statistical, "studentClusteredBootstrap")
+        confidence = bootstrap.get("confidenceLevel")
+        confidence_ok = (
+            isinstance(confidence, (float, int))
+            and not isinstance(confidence, bool)
+            and float(confidence) == 0.95
+        )
+        if (
+            _string(bootstrap, "bootstrapUnit") != "externalStudentKey"
+            or _positive_int(bootstrap, "bootstrapResamples") != 2000
+            or _positive_int(bootstrap, "bootstrapSeed") != 20260716
+            or not confidence_ok
+            or _string(bootstrap, "intervalMethod") != "percentile"
+            or _string(bootstrap, "resamplingMethod") != "learner_cluster_with_replacement"
+        ):
+            raise ExternalContractError("student-clustered bootstrap is not the frozen configuration")
+        if not _bool(bootstrap, "sameConfigurationForAllPolicies"):
+            raise ExternalContractError("bootstrap must use the same configuration for all policies")
+        if not _bool(bootstrap, "noPolicyDifferenceSuperiorityInterval"):
+            raise ExternalContractError("policy-difference superiority intervals are forbidden")
+        guard = _mapping(statistical, "ciSparsityGuard")
+        if _positive_int(guard, "minimumIndependentLearnersForCI") != 10:
+            raise ExternalContractError("sparse-CI guard is not frozen at 10 independent learners")
+        if _string(guard, "sparseFlag") != "sparse_independent_learner_evidence":
+            raise ExternalContractError("sparse-CI flag is not frozen")
+        calibration = _mapping(statistical, "bktCalibration")
+        if _string(calibration, "bandSource") != "aqc3_reliability_curve":
+            raise ExternalContractError("BKT calibration band source is not the frozen AQC-3 curve")
+        expected_bands = [
+            {"lower": 0.00, "upper": 0.20, "upperInclusive": False},
+            {"lower": 0.20, "upper": 0.40, "upperInclusive": False},
+            {"lower": 0.40, "upper": 0.60, "upperInclusive": False},
+            {"lower": 0.60, "upper": 0.80, "upperInclusive": False},
+            {"lower": 0.80, "upper": 1.00, "upperInclusive": True},
+        ]
+        if calibration.get("bands") != expected_bands:
+            raise ExternalContractError("BKT calibration bands are not the frozen AQC-3 bands")
+        if not _bool(calibration, "onePointZeroBelongsToHighestBand"):
+            raise ExternalContractError("1.0 must belong to the highest BKT band")
+        if not _bool(calibration, "brierScoreDeclared"):
+            raise ExternalContractError("Brier score must be declared")
+        statistical_reporting = dict(statistical)
 
     availability = _mapping(data, "tierAvailability")
     if _string(availability, "semantics") != "proxy_tier_catalog_availability":
@@ -581,6 +680,7 @@ def load_external_adaptive_contract(
         amendment_reason=amendment_reason,
         tertile_boundary_rule=tertile_boundary_rule,
         purity_denominator_rule=purity_denominator_rule,
+        statistical_reporting=statistical_reporting,
     )
 
 

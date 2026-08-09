@@ -43,6 +43,15 @@ E5_DECISION_AUDIT_FILE_HASH = (
 E4_MANIFEST_HASH = "bf8a0b20c94aea98e5b0d66df9ce0efcac1985f039f7b86e8218d3ed2a6c1b9c"
 CLAIM_LEVEL = "external_descriptive_replay"
 TIERS = ("proxy_easy", "proxy_moderate", "proxy_hard")
+MIN_INDEPENDENT_LEARNERS_FOR_CI = 10
+SPARSE_CI_FLAG = "sparse_independent_learner_evidence"
+BKT_BANDS = (
+    {"lower": 0.00, "upper": 0.20, "upperInclusive": False},
+    {"lower": 0.20, "upper": 0.40, "upperInclusive": False},
+    {"lower": 0.40, "upper": 0.60, "upperInclusive": False},
+    {"lower": 0.60, "upper": 0.80, "upperInclusive": False},
+    {"lower": 0.80, "upper": 1.00, "upperInclusive": True},
+)
 
 
 class OutcomeGateError(ValueError):
@@ -97,6 +106,7 @@ def verify_e6_inputs(
     e2_catalog_path: str | Path,
     e2_manifest_path: str | Path,
     contract_path_v1_2: str | Path,
+    contract_path_v1_3: str | Path,
     contract_path_v1_1: str | Path,
     contract_path_v1: str | Path,
     configs_dir: str | Path,
@@ -104,6 +114,20 @@ def verify_e6_inputs(
     """Fail-closed verification of every frozen E1-E5 artifact and the U7
     outcome contract, including the explicit E5 hash-naming resolution."""
     from .readiness_audit import verify_frozen_lineage
+    from .external_policy_contract import (
+        EXTERNAL_ADAPTIVE_CONTRACT_V1_3_VERSION,
+        load_external_adaptive_contract,
+    )
+
+    v13 = load_external_adaptive_contract(
+        contract_path_v1_3,
+        version=EXTERNAL_ADAPTIVE_CONTRACT_V1_3_VERSION,
+    )
+    if v13.predecessor_contract_sha256 != "d82b50432157f9321808dfced5ad7cb55960ce2dbc3501987ab17a23de725955":
+        raise MatchedOutcomeError("v1.3 predecessor is not the frozen v1.2 hash")
+    if v13.statistical_reporting is None:
+        raise MatchedOutcomeError("v1.3 statistical reporting is not frozen")
+    require_frozen_bootstrap_config(v13)
 
     verification = verify_frozen_lineage(
         contract_path_v1_2=contract_path_v1_2,
@@ -145,6 +169,8 @@ def verify_e6_inputs(
     return {
         "verified": True,
         "contractHashV1_2": verification["contractHashV1_2"],
+        "contractHashV1_3": v13.contract_sha256,
+        "statisticalReporting": dict(v13.statistical_reporting),
         "e2CatalogHash": verification["e2CatalogHash"],
         "e3AttemptsHash": verification["e3AttemptsHash"],
         "e4ReadinessManifestHash": E4_MANIFEST_HASH,
@@ -359,10 +385,18 @@ def matched_outcome_summary(
     return summary
 
 
-def require_frozen_bootstrap_config() -> FrozenBootstrapConfig:
-    """Return the frozen CI config, or fail closed with the E6 gate blocker."""
-    raise OutcomeGateError(
-        "student-clustered descriptive CI configuration not frozen"
+def require_frozen_bootstrap_config(contract=None) -> FrozenBootstrapConfig:
+    """Return the frozen CI config from the v1.3 contract, or fail closed."""
+    if contract is None or getattr(contract, "statistical_reporting", None) is None:
+        raise OutcomeGateError(
+            "student-clustered descriptive CI configuration not frozen"
+        )
+    bootstrap = contract.statistical_reporting["studentClusteredBootstrap"]
+    return FrozenBootstrapConfig(
+        version="assistments-adaptive-contract-v1.3",
+        seed=int(bootstrap["bootstrapSeed"]),
+        iterations=int(bootstrap["bootstrapResamples"]),
+        confidence_level=float(bootstrap["confidenceLevel"]),
     )
 
 
@@ -418,6 +452,402 @@ def attach_matched_outcome(
     if next_correct_rate is None or not 0.0 <= next_correct_rate <= 1.0:
         raise MatchedOutcomeError("invalid next correctness outcome")
     return next_correct_rate < mastery_criterion
+
+
+@dataclass(frozen=True)
+class MatchedOutcomeResult:
+    external_state_key: str
+    external_student_key: str
+    source_skill_code: str
+    policy: str
+    proposed_direction: str
+    proposed_target_proxy_difficulty: str
+    current_proxy_difficulty: str
+    next_external_attempt_key: str | None
+    next_observed_proxy_difficulty: str | None
+    outcome_status: str
+    support_needed: bool | None
+    later_success: bool | None
+
+
+def attach_outcomes(
+    rows: Sequence[MatchedOutcomeRow],
+    attempts: Sequence[object],
+    *,
+    mastery_criterion: float = DEFAULT_MASTERY_CRITERION,
+) -> list[MatchedOutcomeResult]:
+    """Attach the frozen U7 outcome ONLY for tier-matched rows.
+
+    Mismatched/censored rows keep support_needed/later_success None; their
+    outcome values are never read.
+    """
+    by_attempt = {a.external_attempt_key: a for a in attempts}
+    results: list[MatchedOutcomeResult] = []
+    for row in rows:
+        if row.outcome_status != "matched":
+            results.append(
+                MatchedOutcomeResult(
+                    external_state_key=row.external_state_key,
+                    external_student_key=row.external_student_key,
+                    source_skill_code=row.source_skill_code,
+                    policy=row.policy,
+                    proposed_direction=row.proposed_direction,
+                    proposed_target_proxy_difficulty=row.proposed_target_proxy_difficulty,
+                    current_proxy_difficulty=row.current_proxy_difficulty,
+                    next_external_attempt_key=row.next_external_attempt_key,
+                    next_observed_proxy_difficulty=row.next_observed_proxy_difficulty,
+                    outcome_status=row.outcome_status,
+                    support_needed=None,
+                    later_success=None,
+                )
+            )
+            continue
+        next_attempt = by_attempt[row.next_external_attempt_key]
+        support = attach_matched_outcome(
+            row,
+            next_attempt.correct_rate,
+            mastery_criterion=mastery_criterion,
+        )
+        results.append(
+            MatchedOutcomeResult(
+                external_state_key=row.external_state_key,
+                external_student_key=row.external_student_key,
+                source_skill_code=row.source_skill_code,
+                policy=row.policy,
+                proposed_direction=row.proposed_direction,
+                proposed_target_proxy_difficulty=row.proposed_target_proxy_difficulty,
+                current_proxy_difficulty=row.current_proxy_difficulty,
+                next_external_attempt_key=row.next_external_attempt_key,
+                next_observed_proxy_difficulty=row.next_observed_proxy_difficulty,
+                outcome_status=row.outcome_status,
+                support_needed=support,
+                later_success=not support,
+            )
+        )
+    return results
+
+
+def _ci_or_sparse(
+    subset: Sequence[MatchedOutcomeResult],
+    learner_count: int,
+    bootstrap_config: FrozenBootstrapConfig,
+) -> tuple[list[float] | None, str | None]:
+    if learner_count == 0:
+        return None, "not_estimable"
+    if learner_count < MIN_INDEPENDENT_LEARNERS_FOR_CI:
+        return None, SPARSE_CI_FLAG
+    rows = [
+        {
+            "externalStudentKey": result.external_student_key,
+            "support": int(bool(result.support_needed)),
+        }
+        for result in subset
+    ]
+    lower, upper = student_clustered_bootstrap(
+        rows,
+        config=bootstrap_config,
+        value_key="support",
+    )
+    return [lower, upper], None
+
+
+def policy_direction_outcome_summary(
+    results: Sequence[MatchedOutcomeResult],
+    bootstrap_config: FrozenBootstrapConfig,
+) -> dict[str, object]:
+    """Policy/direction matched outcome summary with frozen CI guard."""
+    summary: dict[str, object] = {}
+    for policy in ("P1", "P2", "P3a"):
+        policy_outcomes: dict[str, object] = {}
+        for direction in ("up", "hold", "down"):
+            subset = [
+                result
+                for result in results
+                if result.policy == policy
+                and result.proposed_direction == direction
+                and result.outcome_status == "matched"
+            ]
+            learner_count = len({r.external_student_key for r in subset})
+            support_count = sum(1 for r in subset if r.support_needed)
+            success_count = sum(1 for r in subset if r.later_success)
+            total = len(subset)
+            ci, ci_flag = _ci_or_sparse(subset, learner_count, bootstrap_config)
+            policy_outcomes[direction] = {
+                "matchedDecisions": total,
+                "independentLearners": learner_count,
+                "skills": len({r.source_skill_code for r in subset}),
+                "supportNeededCount": support_count,
+                "laterSuccessCount": success_count,
+                "observedSupportNeededRate": _rate(support_count, total),
+                "observedLaterSuccessRate": _rate(success_count, total),
+                "confidenceInterval": ci,
+                "ciStatus": "computed" if ci is not None else ci_flag,
+            }
+        summary[policy] = policy_outcomes
+    return summary
+
+
+def eb4_metrics(
+    summary: Mapping[str, object],
+) -> dict[str, object]:
+    """EB4: matched-UP support-needed vs later-success by policy."""
+    result: dict[str, object] = {}
+    for policy in ("P1", "P2", "P3a"):
+        up = summary[policy]["up"]
+        result[policy] = {
+            "matchedUpDecisions": up["matchedDecisions"],
+            "independentLearners": up["independentLearners"],
+            "skills": up["skills"],
+            "supportNeededCount": up["supportNeededCount"],
+            "laterSuccessCount": up["laterSuccessCount"],
+            "observedSupportNeededRate": up["observedSupportNeededRate"],
+            "observedLaterSuccessRate": up["observedLaterSuccessRate"],
+            "confidenceInterval": up["confidenceInterval"],
+            "ciStatus": up["ciStatus"],
+        }
+    return result
+
+
+def bkt_calibration(
+    attempts: Sequence[object],
+    shared_state_keys: Sequence[str],
+    bootstrap_config: FrozenBootstrapConfig,
+    *,
+    mastery_criterion: float = DEFAULT_MASTERY_CRITERION,
+) -> dict[str, object]:
+    """Policy-independent BKT calibration (current mastery vs later success)."""
+    lookup = build_next_tier_lookup(attempts)
+    by_attempt = {a.external_attempt_key: a for a in attempts}
+    calibration_rows: list[tuple[str, float, bool]] = []
+    for key in shared_state_keys:
+        next_key, _tier, ambiguous, valid = lookup.get(key, (None, None, False, False))
+        if next_key is None or ambiguous or not valid:
+            continue
+        current = by_attempt[key]
+        next_attempt = by_attempt[next_key]
+        if current.problem_keys and set(current.problem_keys) == set(next_attempt.problem_keys):
+            continue
+        support = next_attempt.correct_rate < mastery_criterion
+        calibration_rows.append(
+            (current.external_student_key, current.bkt_mastery_probability, support)
+        )
+    band_rows: list[dict[str, object]] = []
+    for band in BKT_BANDS:
+        lower = float(band["lower"])
+        upper = float(band["upper"])
+        inclusive = bool(band["upperInclusive"])
+        subset = [
+            row
+            for row in calibration_rows
+            if lower <= row[1] < upper or (inclusive and row[1] == upper)
+        ]
+        learner_count = len({row[0] for row in subset})
+        success = sum(1 for row in subset if not row[2])
+        mean_mastery = sum(row[1] for row in subset) / len(subset) if subset else None
+        ci, ci_flag = _calibration_band_ci(subset, learner_count, bootstrap_config)
+        band_rows.append(
+            {
+                "bandLower": lower,
+                "bandUpper": upper,
+                "bandUpperInclusive": inclusive,
+                "rowCount": len(subset),
+                "independentLearners": learner_count,
+                "meanPredictedMastery": mean_mastery,
+                "observedLaterSuccessRate": _rate(success, len(subset)),
+                "confidenceInterval": ci,
+                "ciStatus": "computed" if ci is not None else ci_flag,
+            }
+        )
+    brier = (
+        sum(
+            (mastery - (0.0 if support else 1.0)) ** 2
+            for _learner, mastery, support in calibration_rows
+        )
+        / len(calibration_rows)
+        if calibration_rows
+        else None
+    )
+    return {
+        "populationRowCount": len(calibration_rows),
+        "populationLearnerCount": len({row[0] for row in calibration_rows}),
+        "brierScore": brier,
+        "bands": band_rows,
+        "masteryCriterion": mastery_criterion,
+    }
+
+
+def _calibration_band_ci(
+    subset: Sequence[tuple[str, float, bool]],
+    learner_count: int,
+    bootstrap_config: FrozenBootstrapConfig,
+) -> tuple[list[float] | None, str | None]:
+    if learner_count == 0:
+        return None, "not_estimable"
+    if learner_count < MIN_INDEPENDENT_LEARNERS_FOR_CI:
+        return None, SPARSE_CI_FLAG
+    rows = [
+        {
+            "externalStudentKey": learner,
+            "support": 0 if support else 1,
+        }
+        for learner, _mastery, support in subset
+    ]
+    lower, upper = student_clustered_bootstrap(
+        rows,
+        config=bootstrap_config,
+        value_key="support",
+    )
+    return [lower, upper], None
+
+
+def matched_outcome_results_hash(results: Sequence[MatchedOutcomeResult]) -> str:
+    payload = json.dumps(
+        [
+            {
+                "state": r.external_state_key,
+                "policy": r.policy,
+                "direction": r.proposed_direction,
+                "status": r.outcome_status,
+                "supportNeeded": r.support_needed,
+            }
+            for r in sorted(results, key=lambda r: (r.external_state_key, r.policy))
+        ],
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return sha256(payload).hexdigest()
+
+
+MATCHED_OUTCOME_CSV_FIELDS = (
+    "externalStateKey",
+    "externalStudentKey",
+    "sourceSkillCode",
+    "policy",
+    "proposedDirection",
+    "proposedTargetProxyDifficulty",
+    "currentProxyDifficulty",
+    "nextExternalAttemptKey",
+    "nextObservedProxyDifficulty",
+    "outcomeStatus",
+    "supportNeeded",
+    "laterSuccess",
+)
+
+
+def write_matched_outcomes_csv(
+    results: Sequence[MatchedOutcomeResult],
+    path: str | Path,
+) -> Path:
+    destination = Path(path)
+    with destination.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=MATCHED_OUTCOME_CSV_FIELDS)
+        writer.writeheader()
+        for result in sorted(
+            results, key=lambda r: (r.external_state_key, r.policy)
+        ):
+            writer.writerow(
+                {
+                    "externalStateKey": result.external_state_key,
+                    "externalStudentKey": result.external_student_key,
+                    "sourceSkillCode": result.source_skill_code,
+                    "policy": result.policy,
+                    "proposedDirection": result.proposed_direction,
+                    "proposedTargetProxyDifficulty": result.proposed_target_proxy_difficulty,
+                    "currentProxyDifficulty": result.current_proxy_difficulty,
+                    "nextExternalAttemptKey": result.next_external_attempt_key or "",
+                    "nextObservedProxyDifficulty": result.next_observed_proxy_difficulty or "",
+                    "outcomeStatus": result.outcome_status,
+                    "supportNeeded": (
+                        "true" if result.support_needed is True else "false" if result.support_needed is False else ""
+                    ),
+                    "laterSuccess": (
+                        "true" if result.later_success is True else "false" if result.later_success is False else ""
+                    ),
+                }
+            )
+    return destination
+
+
+def build_e6_manifest(
+    *,
+    verification: Mapping[str, object],
+    structural_summary: Mapping[str, object],
+    outcome_summary: Mapping[str, object],
+    eb4: Mapping[str, object],
+    bkt_cal: Mapping[str, object],
+    coverage: Mapping[str, object],
+    bootstrap_config: FrozenBootstrapConfig,
+    matched_outcomes_hash: str,
+) -> dict[str, object]:
+    """Deterministic E6 outcome manifest (no timestamps/local paths)."""
+    return {
+        "manifestSchemaVersion": E6_MANIFEST_VERSION,
+        "contractVersion": "assistments-adaptive-contract-v1.3",
+        "contractHash": verification["contractHashV1_3"],
+        "u7OutcomeContractVersion": PREDICTION_LABEL_VERSION,
+        "u7OutcomeTarget": PREDICTION_TARGET,
+        "masteryCriterion": DEFAULT_MASTERY_CRITERION,
+        "e2DifficultyCatalogHash": verification["e2CatalogHash"],
+        "e3AttemptHash": verification["e3AttemptsHash"],
+        "e4ReadinessManifestHash": verification["e4ReadinessManifestHash"],
+        "e5DecisionAuditHash": verification["e5DecisionAuditHash"],
+        "e5ManifestHash": verification["e5ManifestHash"],
+        "sharedStateCount": 2090,
+        "policyDecisionCounts": {"P1": 2090, "P2": 2090, "P3a": 2090},
+        "policyMatchedOutcomeCounts": {
+            policy: structural_summary[policy]["matchedOutcomes"]
+            for policy in ("P1", "P2", "P3a")
+        },
+        "policyMatchedUpCounts": {
+            policy: structural_summary[policy]["matchedByDirection"]["up"]
+            for policy in ("P1", "P2", "P3a")
+        },
+        "policyMatchedHoldCounts": {
+            policy: structural_summary[policy]["matchedByDirection"]["hold"]
+            for policy in ("P1", "P2", "P3a")
+        },
+        "policyMatchedDownCounts": {
+            policy: structural_summary[policy]["matchedByDirection"]["down"]
+            for policy in ("P1", "P2", "P3a")
+        },
+        "policyCensorCounts": {
+            policy: structural_summary[policy]["censorCounts"]
+            for policy in ("P1", "P2", "P3a")
+        },
+        "policyMatchedLearnerCounts": {
+            policy: structural_summary[policy]["matchedLearners"]
+            for policy in ("P1", "P2", "P3a")
+        },
+        "policyMatchedSkillCounts": {
+            policy: structural_summary[policy]["matchedSkills"]
+            for policy in ("P1", "P2", "P3a")
+        },
+        "observedSupportAfterMatchedUpCounts": {
+            policy: outcome_summary[policy]["up"]["supportNeededCount"]
+            for policy in ("P1", "P2", "P3a")
+        },
+        "observedSuccessAfterMatchedUpCounts": {
+            policy: outcome_summary[policy]["up"]["laterSuccessCount"]
+            for policy in ("P1", "P2", "P3a")
+        },
+        "policyDirectionOutcomeSummary": outcome_summary,
+        "eb4": eb4,
+        "matchedCoverageMetrics": coverage,
+        "bktCalibrationPopulationCount": bkt_cal["populationRowCount"],
+        "bktCalibrationLearnerCount": bkt_cal["populationLearnerCount"],
+        "bktCalibrationMetrics": bkt_cal,
+        "bootstrapConfigVersion": bootstrap_config.version,
+        "bootstrapSeed": bootstrap_config.seed,
+        "bootstrapResamples": bootstrap_config.iterations,
+        "confidenceLevel": bootstrap_config.confidence_level,
+        "matchedOutcomesSha256": matched_outcomes_hash,
+        "claimLevel": CLAIM_LEVEL,
+        "provenance": "external_real",
+        "containsRawIdentifiers": False,
+        "productionPromotionAllowed": False,
+        "p3bExecuted": False,
+        "causalClaimAllowed": False,
+    }
 
 
 def _rate(numerator: int, denominator: int) -> float:

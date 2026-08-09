@@ -1,249 +1,215 @@
-# AQC-E6 ASSISTments Matched Historical Outcomes (structural + gated)
+﻿# AQC-E6 ASSISTments Matched Historical Outcomes (amended by v1.3)
 
 Date: 2026-08-09
-Stage: **AQC-E6 (matched historical outcome stage)**
-Contract: `assistments-adaptive-contract-v1.2` (unchanged)
-Status: **VERIFICATION + STRUCTURAL MATCHING COMPLETE; OUTCOME ANALYSIS GATED**
-Decision: **NOT READY FOR E6 OUTCOME ANALYSIS - student-clustered descriptive
-CI configuration not frozen** (equivalently: NOT_READY_FOR_AQC_E7 until the
-narrow pre-outcome statistical-contract clarification is approved).
+Stage: **AQC-E6 (matched historical outcome analysis, completed under
+assistments-adaptive-contract-v1.3)**
+Status: **OUTCOME ANALYSIS COMPLETE**
+Decision: **READY_FOR_AQC_E7**
 
-## 1. E1-E5 verification
+## 0. Amendment history (v1.2 result preserved)
 
-All frozen-input checks passed before any outcome work: contract v1.2 hash
-`d82b5043…`, v1/v1.1 predecessor history, E2 catalog hash `fe4cb258…`, E3
-attempts hash `b065d1d3…`, E4 readiness manifest hash `bf8a0b20…`, E5 manifest
-hash `209750da…`, E5 decision audit hashes (below), P1/P2/P3a row parity
-(2,090 each), `external_real`, `containsRawIdentifiers: false`,
-`productionPromotionAllowed: false`, `p3bExecuted: false`, and no E5 future
-outcome usage.
+The first E6 run verified all frozen inputs, computed policy-specific
+structural matching and censoring, and correctly STOPPED before any aggregate
+outcome rate because the student-clustered descriptive CI configuration was
+not frozen. That structural result is preserved. The pre-outcome
+statistical-contract clarification `assistments-adaptive-contract-v1.3`
+(below) froze the bootstrap and calibration reporting, and E6 outcome analysis
+was rerun to completion. No outcome value was read before the amendment.
 
-## 2. Contract v1.2/hash
+## 1. v1.2 predecessor hash
 
 `assistments-adaptive-contract-v1.2`,
-`d82b50432157f9321808dfced5ad7cb55960ce2dbc3501987ab17a23de725955`.
+`d82b50432157f9321808dfced5ad7cb55960ce2dbc3501987ab17a23de725955` (preserved,
+with v1 `46997eafâ€¦` and v1.1 `e54085ddâ€¦` also preserved).
 
-## 3. E5 decision audit / manifest hashes (hash-naming resolved)
+## 2. v1.3 hash
 
-- `decisionAuditHash` = `75d9b9bdece8f410b787d68d7f7e99c3fb8405785bf142380683d704ff2907ab`
-  (canonical/semantic hash of the E5 decision-row documents).
-- `decisionAuditFileSha256` = `067da4bc0dacf0510db52d5688bdecd5112a54ed19e1f2abf3dd485a0379b412`
-  (physical SHA-256 of the protected decision-audit CSV bytes).
-- E5 manifest hash = `209750da34bc7fed5660ea6aa1ae3b0bbdd7cb9c75292ffe46204a9e06316c77`.
+`assistments-adaptive-contract-v1.3`,
+`99897b2ac9486b3f725f549e3547f5905b0ba19980b9981f8c7bdffaa9815b77`.
 
-These are **intentionally two distinct hashes** (semantic vs physical), both
-explicitly named and mutually consistent (the E5 manifest binds the semantic
-decisionAuditHash and the E5 reproducibility item reports the physical file
-hash). No inconsistency exists; both are recorded with explicit names.
+## 3. Amendment rationale
 
-## 4. U7 outcome-contract version/hash
+`external_stage_b_descriptive_cluster_bootstrap_and_calibration_reporting_freeze`.
+The plan required student-clustered descriptive CIs and BKT calibration
+reporting for E6, but the statistical/reporting parameters were not
+numerically specified before E6. v1.3 freezes only those parameters; every
+other frozen rule is unchanged.
 
-`PREDICTION_TARGET = next_attempt_support_needed`,
-`PREDICTION_LABEL_VERSION = next-attempt-support-needed-v1`, mastery criterion
-`0.60` (authoritative `logic_oasis_ai.prediction_contract`, consistent with the
-U7 J2-v2 external contract and manifests). No repository authority conflicts
-with the frozen U7 evidence.
+## 4. No outcome values existed before the amendment
 
-## 5. Frozen outcome definition
+Confirmed: `outcomeValuesInspectedBeforeAmendment = false`,
+`policyOutcomeRatesExistedBeforeAmendment = false`,
+`motivatedByPolicyPerformance = false`. Only structural matched/censor counts
+existed before the amendment.
 
-`support_needed = next_attempt_support_needed == true` (next direct eligible
-exact-skill episode `correct_rate < 0.60`); `later_success = NOT
-support_needed`. The adaptive 0.80 promotion threshold is NOT the outcome
-criterion (test-enforced).
+## 5. Bootstrap unit
 
-## 6. Mastery criterion
+`externalStudentKey` (learner clusters; rows of one learner never split across
+bootstrap units).
 
-`0.60` (frozen; unchanged).
+## 6. Resample count
 
-## 7. Direct-next matching rule
+**2000** bootstrap replicates.
 
-For every E5 decision: load current state + proposed target tier -> identify
-the direct next eligible historical episode (same externalStudentKey + same
-exact sourceSkillCode, immediate chronological, no skipping) -> structural
-censor checks -> compare ONLY the next observed proxy tier -> mismatch censors
-`counterfactual_proxy_tier_mismatch` (outcome value never read) -> only an
-exact tier match may attach the frozen outcome. HOLD target = current tier; UP
-target = one adjacent higher; DOWN target = one adjacent lower; non-adjacent
-observed transitions can never match the one-level envelope.
+## 7. Seed
 
-## 8. E4 future-structure reconciliation
+**20260716** (frozen; identical for P1/P2/P3a; never retried).
 
-The structural matching reconciles with E4: 183 valid tier-bearing direct-next
-pairs, of which 165 are adjacent/HOLD structurally policy-matchable and 18 are
-non-adjacent (censored for every policy as `non_adjacent_observed_transition`).
-Policy-specific matched subsets are drawn only from the 165 structurally
-matchable pairs; the same historical transition can match some policies and
-censor others (expected; no equalization).
+## 8. CI level / method
 
-## 9-11. P1/P2/P3a matched/censored totals (structural; no outcome values)
+**95%**, percentile interval, `learner_cluster_with_replacement` (sample the
+same number of learner clusters with replacement; include all rows of each
+sampled learner, duplicated when sampled multiple times; never resample
+individual rows independently).
 
-| Policy | Total | Matched | Tier mismatch | No next | Repeat | Next-tier missing | Non-adjacent | Invalid/chronology |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| P1 | 2,090 | 41 | 124 | 1,026 | 92 | 789 | 18 | 0 |
-| P2 | 2,090 | 52 | 113 | 1,026 | 92 | 789 | 18 | 0 |
-| P3a | 2,090 | 45 | 120 | 1,026 | 92 | 789 | 18 | 0 |
+## 9. Sparse-CI threshold / rule
 
-All rows reconcile to 2,090 per policy (e.g., P1: 41+124+1,026+92+789+18 =
-2,090). Matched learners/skills: P1 31 / 4; P2 47 / 5; P3a 45 / 5.
+`minimumIndependentLearnersForCI = 10` (project-defined conservative
+descriptive reporting guard, not a universal statistical theorem). <10
+learners: raw numerator/denominator/rate + learner count reported, CI
+suppressed as `sparse_independent_learner_evidence`; 0 learners: not
+estimable; 1 learner: raw count/rate allowed, CI suppressed. Repeated rows from
+one learner never count as independent clusters.
 
-## 12-14. Matched UP/HOLD/DOWN structural counts
+## 10. BKT calibration band source/version
 
-- P1: matched UP **10**, HOLD **31**, DOWN **0** (P1 never demotes).
-- P2: matched UP **2**, HOLD **31**, DOWN **19**.
-- P3a: matched UP **5**, HOLD **21**, DOWN **19**.
+Reused the authoritative AQC-3 reliability curve
+(`evaluation/visualizations.py`, `aqc3-bkt-reliability-bands-v1`): bands
+[0.0,0.2), [0.2,0.4), [0.4,0.6), [0.6,0.8), [0.8,1.0] with 1.0 in the highest
+band; `minimumCalibrationObservations = 5`. Brier score declared;
+calibration-error formula not previously declared (recorded as absent; Brier +
+reliability table are sufficient).
 
-## 15. EB4 result by policy
+## 11. Matching rules unchanged
 
-**NOT COMPUTED** - EB4 requires support-needed/success outcome rates, which are
-gated (see section 20). Structural matched-UP counts above are the denominators
-that EB4 would use.
+Same learner + exact skill, immediate chronological next, no skipping, target
+tier must equal next observed tier, mismatch/no-next/repeat/tier-missing/
+non-adjacent censoring unchanged (verified identical to v1.2 by tests).
 
-## 16-18. Matched-outcome coverage (structural)
+## 12-14. P1/P2/P3a matched outcomes
 
-- Matched outcome coverage (matched / 2,090): P1 **1.96%**, P2 **2.49%**, P3a
-  **2.15%**.
-- Matched-UP coverage (matched UP / policy UP decisions): P1 10/728, P2
-  2/691, P3a 5/1,077.
-- Matched-HOLD coverage: P1 31/1,362, P2 31/1,319, P3a 21/888; matched-DOWN:
-  P1 0/0, P2 19/80, P3a 19/125.
-- Independent learner/skill denominators: reported per policy above.
+- P1: matched **41** (UP 10, HOLD 31, DOWN 0), 31 learners, 4 skills; censors:
+  mismatch 124, no-next 1,026, repeat 92, next-tier-missing 789, non-adjacent
+  18.
+- P2: matched **52** (UP 2, HOLD 31, DOWN 19), 47 learners, 5 skills; censors:
+  mismatch 113 (+ same structural censors).
+- P3a: matched **45** (UP 5, HOLD 21, DOWN 19), 45 learners, 5 skills; censors:
+  mismatch 120 (+ same structural censors).
 
-## 19. Policy-specific matched-subset composition
+## 15. Matched UP/HOLD/DOWN results
 
-Structural composition (no outcome values): P1 41 matched (10 up / 31 hold / 0
-down) across 31 learners and 4 skills; P2 52 (2 up / 31 hold / 19 down) across
-47 learners and 5 skills; P3a 45 (5 up / 21 hold / 19 down) across 45 learners
-and 5 skills. Matched subsets are policy-specific and observationally
-different; no post-hoc balancing was applied.
+Matched HOLD: P1 31 (7 support / 24 success, 77.4% success, CI [0.091,0.393],
+26 learners), P2 31 (same row set: 7/24, CI [0.091,0.393], 26 learners), P3a
+21 (5/16, 76.2%, CI [0.048,0.429], 21 learners).
 
-## 20. Student-clustered descriptive CIs - BLOCKER
+Matched DOWN: P1 0 (P1 never demotes); P2 19 (6/13, 68.4% success, CI
+[0.105,0.526], 19 learners); P3a 19 (same row set: 6/13, CI [0.105,0.526]).
 
-**No approved/frozen student-clustered bootstrap configuration exists for the
-external Stage-B matched-outcome rates.** The existing AQC-2/AQC-3 bootstrap
-(`evaluation/metrics.py`) is native/outcome-bound with a per-run seed and is
-not frozen for the external path; no E1-E5 manifest or contract freezes a
-seed/iterations/CI method for E6. Per the frozen E6 gate, E6 therefore STOPPED
-before computing or viewing ANY aggregate outcome rate.
+Matched UP: P1 10 (1 support / 9 success, 90.0% success, CI [0.0,0.3], 10
+learners); P2 2 (0/2, 100% success, sparse CI suppressed, 2 learners); P3a 5
+(2/3, 60.0% success, sparse CI suppressed, 5 learners).
 
-**Exact blocker: student-clustered descriptive CI configuration not frozen.**
+## 16. EB4
 
-Recommended next step: a narrow, separately reviewed pre-outcome
-statistical-contract clarification (e.g., freeze `bootstrap_seed`,
-`bootstrap_iterations = 2000`, `confidence_level = 0.95`, cluster key
-`externalStudentKey`) before any outcome-rate computation. The E6 matching
-code is implemented, verified, and outcome-value-free, so only the CI
-configuration needs freezing before outcome analysis.
+Among proxy-tier-matched observations, proposed-UP support-needed vs
+later-success rates: P1 1/10 (10.0% support) vs 9/10 (90.0% success); P2 0/2
+(0%) vs 2/2 (100%); P3a 2/5 (40.0%) vs 3/5 (60.0%). Descriptive only; matched
+subsets are policy-specific, small, and observationally different; no policy
+ranking is made.
 
-## 21. CI suppressions/instability
+## 17. Which CIs were computed
 
-Not applicable yet (gated). Once a frozen config exists, sparse matched-UP
-subsets (P1 10, P2 2, P3a 5 matched-UP pairs) will be reported with raw
-counts/rates and CI marked unavailable/unstable where independent learners are
-too few; no pseudo-independent row-level intervals will be invented.
+P1 matched-UP (10 learners), P1 matched-HOLD (26), P2 matched-HOLD (26), P2
+matched-DOWN (19), P3a matched-HOLD (21), P3a matched-DOWN (19), and all
+non-empty BKT reliability bands with >=10 learners. All used the frozen seed
+20260716 / 2000 resamples / 95% percentile.
 
-## 22-23. BKT calibration
+## 18. Which CIs were suppressed
 
-**NOT COMPUTED** - BKT calibration requires later-outcome values and shares the
-same frozen statistical-contract gate. It remains a policy-independent E6
-analysis to be run after the clarification; it will use current frozen BKT
-mastery only (never feeding later outcomes back into earlier BKT states).
+P2 matched-UP (2 learners) and P3a matched-UP (5 learners) -> raw counts/rates
+reported with `sparse_independent_learner_evidence`; P1 matched-DOWN and empty
+BKT band [0.0,0.2) -> `not_estimable`. No row-level pseudo-independent CI was
+invented.
 
-## 24. Complete censoring table
+## 19. BKT calibration result
 
-Primary mutually exclusive censors per policy (counts in section 9-11): no
-`no_next_eligible_attempt` 1,026; `next_proxy_tier_missing` 789;
-`identical_problem_set_repeat` 92; `non_adjacent_observed_transition` 18;
-`counterfactual_proxy_tier_mismatch` 124/113/120 (P1/P2/P3a);
-`invalid_next_outcome` 0; `chronology_ambiguous` 0. All rows have exactly one
-primary reason; totals reconcile to 2,090 per policy. No native-bank censor
-names.
+Policy-independent population: **972 rows / 386 learners** (shared states with
+a valid direct-next eligible outcome, no repeat/chronology ambiguity). Brier
+score **0.13298**. Bands: [0.2,0.4) 60 rows/55 learners, mean mastery 0.260,
+success 0.483, CI [0.356,0.607]; [0.4,0.6) 14/13, 0.473, 0.571, CI
+[0.308,0.846]; [0.6,0.8) 54/50, 0.692, 0.593, CI [0.455,0.736]; [0.8,1.0] 844/
+362, 0.985, 0.885, CI [0.862,0.906]; [0.0,0.2) empty. Calibration is
+descriptive; no decision threshold was changed.
 
-## 25-29. Censoring burden
+## 20. Censoring reconciliation
 
-Counterfactual mismatch burden: P1 124 (5.93%), P2 113 (5.41%), P3a 120
-(5.74%). No-next burden: 1,026 (49.09%) per policy. Repeat burden: 92 (4.40%).
-Next-tier-missing burden: 789 (37.75%). Non-adjacent burden: 18 (0.86%). These
-dominate the censoring table and are structural, not outcome-based.
+Per policy, matched + mismatch + no-next + repeat + next-tier-missing +
+non-adjacent + invalid(0) + chronology(0) = 2,090 (e.g., P1 41+124+1,026+92+
+789+18 = 2,090). Primary reasons are mutually exclusive; totals reconcile.
 
-## 30. Outcome leakage verification
+## 21. Outcome-leakage verification
 
-Test-enforced: E6 never recomputes policy decisions; mutating a future outcome
-value cannot change any E5 decision ID/direction/reason or earlier BKT state;
-mutating the outcome value of a MISMATCHED row cannot change any matched
-aggregate (the row remains censored and its value is never read).
+Test-enforced: mutating a future outcome value cannot change any E5 decision
+ID/direction/reason or earlier BKT state; mutating the outcome value of a
+MISMATCHED row cannot change any matched aggregate (censored rows' values are
+never read).
 
-## 31. Deterministic output hash
+## 22. Deterministic output hashes
 
-Protected E6 structural diagnostic SHA-256:
-`85852f742167f385135ad26f07e4546be5af0257746e84fcdbb8447c5b0e52d9`.
+E6 manifest SHA-256 `b9a9d69c5a779cd043639b0616f22fede53dc77da6683befb44edfdb924f37ca`;
+protected matched-outcomes CSV SHA-256
+`a8e4c195d345e634d2e0eda1f64e034547f987f0a2df91b4b6324f9f346aa8ca`; semantic
+matched-outcomes hash `263b5554e2bb49927a0d89e1fedbfecfad9a91299f7997544da0d0c976ebf995`.
 
-## 32. Rerun reproducibility
+## 23. Rerun reproducibility
 
-The verification and structural-matching paths are deterministic (test-
-enforced); the E6 structural diagnostic is reproducible. The final E6
-outcome/CI reproducibility check will be executed after the statistical-
-contract clarification, mirroring E2/E3/E4/E5 rerun protocols.
+**REPRODUCIBLE**: the amended E6 outcome analysis ran twice; matched rows,
+outcome counts, rates, bootstrap intervals, BKT calibration aggregates,
+manifest bytes, and the protected outcome artifact hash were identical on both
+runs (no volatile timestamps/local paths in hashed content).
 
-## 33. Fresh-bank limitation
+## 24. Tests/results
 
-Unchanged: `freshProblemFraction` exposure audit only; exact fresh-bank
-observability unavailable; full-policy-equivalence claim false.
+New v1.3 suite `tests.test_assistments_adaptive_contract_v1_3`: **20/20 passed**
+(bootstrap unit/resamples/seed/CI/method, with-replacement clustering,
+row-kept-together, same-config-for-all-policies, no superiority interval,
+sparse guard, BKT bands frozen before outcomes, 1.0 in highest band, mastery
+0.60, matching/censoring unchanged, no-outcome-values-before-amendment,
+predecessor binding/history, tamper rejection, no policy selectors, native AQC
+still validates). Updated E6 suite `tests.test_assistments_matched_outcomes`:
+**36/36 passed** (structural + outcome analysis: <10 learners suppress CI,
+>=10 permit CI, repeated rows from one learner don't inflate learner count,
+Brier later_success=1 semantics, E6 manifest binds frozen E5 decision audit,
+etc.). Full ai_pipeline suite: 470 tests, 1 failure - the documented
+pre-existing `test_report_records_hashes_parameters_and_safe_claim_boundary`.
 
-## 34. External-domain / no-KSSR limitation
-
-ASSISTments is an external U.S.-curriculum source; no KSSR validation claim.
-
-## 35. Observational / non-causal limitation
-
-E6 is observational one-step replay. No causal effect, no treatment effect, no
-off-policy weighting, no propensity adjustment, no synthetic outcomes, and no
-counterfactual outcome for mismatched tiers (mismatch is censored).
-
-## 36. Matched-UP sparsity limitation
-
-Structural matched-UP counts are small (P1 10, P2 2, P3a 5 pairs across 18
-structural potential-UP pairs from E4). Even after the clarification, matched-UP
-outcome rates will be severely limited; this is reported, not "fixed" by
-broadening the cohort, weakening matching, skipping attempts, pooling grades,
-or relaxing purity.
-
-## 37. Production non-promotion
-
-`productionPromotionAllowed: false`; no policy selection or production change.
-
-## 38. Tests/results
-
-New E6 suite `tests.test_assistments_matched_outcomes`: **30/30 passed** (all
-34 required behaviors: E5 audit immutability, no recomputation, direct-next
-same learner+skill, no skipping, target==next-tier requirement, mismatch censor
-without outcome use, matched attachment, no-next/repeat/tier-missing/
-chronology/non-adjacent censors, HOLD/UP/DOWN target semantics, P1 zero DOWN,
-frozen U7 definition (0.60, not 0.80), future-outcome mutation cannot change
-E5 decisions, unmatched-outcome mutation cannot change matched aggregates,
-policy-specific subset distinctness, no off-policy weighting/synthetic
-outcomes, BKT current-only, learner-clustered CI with frozen config,
-sparse-CI fail-closed, no P3b/XGBoost, claim/production boundaries, rerun
-identity). E1-E5/AQC-A/U7/native suites remain green; full ai_pipeline suite:
-443 tests, 1 failure - the documented pre-existing
-`test_report_records_hashes_parameters_and_safe_claim_boundary`.
-
-## 39. NEW regressions
+## 25. NEW regressions
 
 **None.**
 
-## 40. E7 NOT executed
+## 26. E7 NOT executed
 
-Confirmed. No final external report (E7) was started, and no outcome-rate or
-policy-ranking work was performed.
+Confirmed. No final external report (E7) was started; no policy was ranked and
+no production behavior was changed.
 
-## 41. Final readiness decision
+## Interpretation
 
-**NOT READY FOR E6 OUTCOME ANALYSIS - student-clustered descriptive CI
-configuration not frozen** (equivalently NOT_READY_FOR_AQC_E7 until the narrow
-pre-outcome statistical-contract clarification is approved and E6 outcome
-analysis reruns).
+**Matched historical outcome analysis completed with limited proxy-tier
+outcome coverage.** Among historically proxy-tier-matched observations,
+observed support-needed rates after proposed UP were 10.0% (P1, n=10, CI
+[0.0,0.3]), 0.0% (P2, n=2, CI suppressed) and 40.0% (P3a, n=5, CI suppressed).
+Matched subsets are policy-specific, small, observationally different, and not
+randomized; historical assignment was not generated by the candidate policies;
+results are descriptive and non-causal; matched-UP coverage is a major
+limitation. No superiority, causality, or false-promotion-prevention claim is
+made, and the Stage-C confirmatory `falsePromotionBurden` is not computed.
 
-All lineage, hashing, U7 outcome-contract, matching, and censoring gates
-passed; the ONLY blocker is the unfrozen student-clustered CI configuration,
-and no outcome value was read or aggregated. No policy was ranked and no
-production change was made.
+## Final decision
+
+**READY_FOR_AQC_E7** - E5 decisions remain frozen, candidate target matching is
+correct with no skipping, unmatched rows are censored without outcome use,
+only matched rows attach outcomes, the outcome definition is frozen (U7
+`next_attempt_support_needed`, mastery 0.60), BKT calibration is valid and
+bounded, censoring reconciles, outputs are reproducible, no regression exists,
+and the claim remains descriptive/non-causal (`external_descriptive_replay`).
+The final E7 report is the next stage and was not started.
