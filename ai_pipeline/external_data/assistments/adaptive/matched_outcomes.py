@@ -555,7 +555,12 @@ def policy_direction_outcome_summary(
     results: Sequence[MatchedOutcomeResult],
     bootstrap_config: FrozenBootstrapConfig,
 ) -> dict[str, object]:
-    """Policy/direction matched outcome summary with frozen CI guard."""
+    """Policy/direction matched outcome summary with labeled frozen CIs.
+
+    The bootstrapped CI is the SUPPORT-NEEDED CI (bootstrap values are
+    support_needed indicators).  The success CI is derived as the exact
+    complement: successCi = [1 - supportUpper, 1 - supportLower].
+    """
     summary: dict[str, object] = {}
     for policy in ("P1", "P2", "P3a"):
         policy_outcomes: dict[str, object] = {}
@@ -571,17 +576,23 @@ def policy_direction_outcome_summary(
             support_count = sum(1 for r in subset if r.support_needed)
             success_count = sum(1 for r in subset if r.later_success)
             total = len(subset)
-            ci, ci_flag = _ci_or_sparse(subset, learner_count, bootstrap_config)
+            support_ci, ci_flag = _ci_or_sparse(subset, learner_count, bootstrap_config)
+            success_ci = (
+                [1.0 - support_ci[1], 1.0 - support_ci[0]]
+                if support_ci is not None
+                else None
+            )
             policy_outcomes[direction] = {
                 "matchedDecisions": total,
                 "independentLearners": learner_count,
                 "skills": len({r.source_skill_code for r in subset}),
                 "supportNeededCount": support_count,
                 "laterSuccessCount": success_count,
-                "observedSupportNeededRate": _rate(support_count, total),
-                "observedLaterSuccessRate": _rate(success_count, total),
-                "confidenceInterval": ci,
-                "ciStatus": "computed" if ci is not None else ci_flag,
+                "supportNeededRate": _rate(support_count, total),
+                "successRate": _rate(success_count, total),
+                "supportNeededCi": support_ci,
+                "successCi": success_ci,
+                "ciStatus": "computed" if support_ci is not None else ci_flag,
             }
         summary[policy] = policy_outcomes
     return summary
@@ -600,9 +611,10 @@ def eb4_metrics(
             "skills": up["skills"],
             "supportNeededCount": up["supportNeededCount"],
             "laterSuccessCount": up["laterSuccessCount"],
-            "observedSupportNeededRate": up["observedSupportNeededRate"],
-            "observedLaterSuccessRate": up["observedLaterSuccessRate"],
-            "confidenceInterval": up["confidenceInterval"],
+            "supportNeededRate": up["supportNeededRate"],
+            "successRate": up["successRate"],
+            "supportNeededCi": up["supportNeededCi"],
+            "successCi": up["successCi"],
             "ciStatus": up["ciStatus"],
         }
     return result
@@ -644,7 +656,7 @@ def bkt_calibration(
         learner_count = len({row[0] for row in subset})
         success = sum(1 for row in subset if not row[2])
         mean_mastery = sum(row[1] for row in subset) / len(subset) if subset else None
-        ci, ci_flag = _calibration_band_ci(subset, learner_count, bootstrap_config)
+        success_ci, ci_flag = _bkt_band_success_ci(subset, learner_count, bootstrap_config)
         band_rows.append(
             {
                 "bandLower": lower,
@@ -654,8 +666,8 @@ def bkt_calibration(
                 "independentLearners": learner_count,
                 "meanPredictedMastery": mean_mastery,
                 "observedLaterSuccessRate": _rate(success, len(subset)),
-                "confidenceInterval": ci,
-                "ciStatus": "computed" if ci is not None else ci_flag,
+                "successCi": success_ci,
+                "ciStatus": "computed" if success_ci is not None else ci_flag,
             }
         )
     brier = (
@@ -676,11 +688,12 @@ def bkt_calibration(
     }
 
 
-def _calibration_band_ci(
+def _bkt_band_success_ci(
     subset: Sequence[tuple[str, float, bool]],
     learner_count: int,
     bootstrap_config: FrozenBootstrapConfig,
 ) -> tuple[list[float] | None, str | None]:
+    """BKT band CI bootstraps the LATER-SUCCESS indicator (0/1)."""
     if learner_count == 0:
         return None, "not_estimable"
     if learner_count < MIN_INDEPENDENT_LEARNERS_FOR_CI:

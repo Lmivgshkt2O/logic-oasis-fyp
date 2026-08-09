@@ -510,7 +510,8 @@ class V1_3OutcomeAnalysisTests(unittest.TestCase):
         summary = policy_direction_outcome_summary(results, config)
         up = summary["P1"]["up"]
         self.assertLess(up["independentLearners"], 10)
-        self.assertIsNone(up["confidenceInterval"])
+        self.assertIsNone(up["supportNeededCi"])
+        self.assertIsNone(up["successCi"])
         self.assertEqual(up["ciStatus"], SPARSE_CI_FLAG)
 
     def test_10_or_more_learners_permits_ci(self) -> None:
@@ -536,7 +537,8 @@ class V1_3OutcomeAnalysisTests(unittest.TestCase):
         summary = policy_direction_outcome_summary(results, config)
         up = summary["P1"]["up"]
         self.assertGreaterEqual(up["independentLearners"], 10)
-        self.assertIsNotNone(up["confidenceInterval"])
+        self.assertIsNotNone(up["supportNeededCi"])
+        self.assertIsNotNone(up["successCi"])
         self.assertEqual(up["ciStatus"], "computed")
 
     def test_repeated_rows_from_one_learner_do_not_increase_learner_count(self) -> None:
@@ -612,9 +614,10 @@ class V1_3OutcomeAnalysisTests(unittest.TestCase):
                     "skills": 0,
                     "supportNeededCount": 0,
                     "laterSuccessCount": 0,
-                    "observedSupportNeededRate": 0.0,
-                    "observedLaterSuccessRate": 0.0,
-                    "confidenceInterval": None,
+                    "supportNeededRate": 0.0,
+                    "successRate": 0.0,
+                    "supportNeededCi": None,
+                    "successCi": None,
                     "ciStatus": "not_estimable",
                 }
                 for d in ("up", "hold", "down")
@@ -640,6 +643,221 @@ class V1_3OutcomeAnalysisTests(unittest.TestCase):
         self.assertEqual(manifest["e5DecisionAuditHash"], E5_DECISION_AUDIT_HASH)
         self.assertFalse(manifest["causalClaimAllowed"])
         self.assertFalse(manifest["productionPromotionAllowed"])
+
+
+class CiLabelConsistencyTests(unittest.TestCase):
+    """E6 reporting-consistency: support/success rates and CI complements."""
+
+    def _summary(self, matched: list[tuple[str, str, str, bool]]) -> dict[str, object]:
+        config = FrozenBootstrapConfig(
+            version="assistments-adaptive-contract-v1.3",
+            seed=20260716,
+            iterations=2000,
+            confidence_level=0.95,
+        )
+        # matched rows: (state_key, learner, policy, support_needed)
+        attempts = []
+        for index, (state_key, learner, _policy, _support) in enumerate(matched):
+            attempts.append(
+                attempt(
+                    state_key,
+                    learner,
+                    "6.NS.A.1",
+                    tier="proxy_easy",
+                    ts=BASE + _day(index * 2),
+                )
+            )
+            attempts.append(
+                attempt(
+                    f"{state_key}-n",
+                    learner,
+                    "6.NS.A.1",
+                    tier="proxy_moderate",
+                    ts=BASE + _day(index * 2 + 1),
+                    correct=0.50 if _support else 0.80,
+                )
+            )
+        decisions = [
+            decision(state_key, policy, "up", "proxy_easy", learner)
+            for state_key, learner, policy, _support in matched
+        ]
+        rows = structural_matching(decisions, attempts)
+        results = attach_outcomes(rows, attempts)
+        summary = policy_direction_outcome_summary(results, config)
+        return summary
+
+    def test_support_and_success_rates_use_their_counts_over_denominator(self) -> None:
+        matched = [
+            ("s1", "u1", "P1", True),
+            ("s2", "u2", "P1", False),
+            ("s3", "u3", "P1", False),
+            ("s4", "u4", "P1", False),
+            ("s5", "u5", "P1", False),
+            ("s6", "u6", "P1", False),
+            ("s7", "u7", "P1", False),
+            ("s8", "u8", "P1", False),
+            ("s9", "u9", "P1", False),
+            ("s10", "u10", "P1", False),
+        ]
+        summary = self._summary(matched)
+        up = summary["P1"]["up"]
+        self.assertEqual(up["supportNeededCount"], 1)
+        self.assertEqual(up["laterSuccessCount"], 9)
+        self.assertEqual(up["matchedDecisions"], 10)
+        self.assertAlmostEqual(up["supportNeededRate"], 0.1)
+        self.assertAlmostEqual(up["successRate"], 0.9)
+
+    def test_support_plus_success_equals_denominator(self) -> None:
+        matched = [("s1", "u1", "P1", True), ("s2", "u2", "P1", False)]
+        summary = self._summary(matched)
+        up = summary["P1"]["up"]
+        self.assertEqual(
+            up["supportNeededCount"] + up["laterSuccessCount"],
+            up["matchedDecisions"],
+        )
+
+    def test_success_rate_is_one_minus_support_rate(self) -> None:
+        matched = [("s1", "u1", "P1", True), ("s2", "u2", "P1", False)]
+        summary = self._summary(matched)
+        up = summary["P1"]["up"]
+        self.assertAlmostEqual(up["successRate"], 1.0 - up["supportNeededRate"])
+
+    def test_displayed_support_ci_belongs_to_support_rate(self) -> None:
+        matched = [
+            ("s1", "u1", "P1", True),
+            ("s2", "u2", "P1", False),
+            ("s3", "u3", "P1", False),
+            ("s4", "u4", "P1", False),
+            ("s5", "u5", "P1", False),
+            ("s6", "u6", "P1", False),
+            ("s7", "u7", "P1", False),
+            ("s8", "u8", "P1", False),
+            ("s9", "u9", "P1", False),
+            ("s10", "u10", "P1", False),
+        ]
+        summary = self._summary(matched)
+        up = summary["P1"]["up"]
+        support_ci = up["supportNeededCi"]
+        self.assertIsNotNone(support_ci)
+        # The bootstrapped support CI must straddle the support rate (0.1).
+        self.assertLessEqual(support_ci[0], 0.1)
+        self.assertGreaterEqual(support_ci[1], 0.1)
+
+    def test_displayed_success_ci_belongs_to_success_rate(self) -> None:
+        matched = [
+            ("s1", "u1", "P1", True),
+            ("s2", "u2", "P1", False),
+            ("s3", "u3", "P1", False),
+            ("s4", "u4", "P1", False),
+            ("s5", "u5", "P1", False),
+            ("s6", "u6", "P1", False),
+            ("s7", "u7", "P1", False),
+            ("s8", "u8", "P1", False),
+            ("s9", "u9", "P1", False),
+            ("s10", "u10", "P1", False),
+        ]
+        summary = self._summary(matched)
+        up = summary["P1"]["up"]
+        success_ci = up["successCi"]
+        self.assertIsNotNone(success_ci)
+        self.assertLessEqual(success_ci[0], 0.9)
+        self.assertGreaterEqual(success_ci[1], 0.9)
+
+    def test_success_ci_is_exact_complement_of_support_ci(self) -> None:
+        matched = [
+            ("s1", "u1", "P1", True),
+            ("s2", "u2", "P1", False),
+            ("s3", "u3", "P1", False),
+            ("s4", "u4", "P1", False),
+            ("s5", "u5", "P1", False),
+            ("s6", "u6", "P1", False),
+            ("s7", "u7", "P1", False),
+            ("s8", "u8", "P1", False),
+            ("s9", "u9", "P1", False),
+            ("s10", "u10", "P1", False),
+        ]
+        summary = self._summary(matched)
+        up = summary["P1"]["up"]
+        support_ci = up["supportNeededCi"]
+        success_ci = up["successCi"]
+        self.assertIsNotNone(support_ci)
+        self.assertIsNotNone(success_ci)
+        self.assertAlmostEqual(success_ci[0], 1.0 - support_ci[1])
+        self.assertAlmostEqual(success_ci[1], 1.0 - support_ci[0])
+
+    def test_sparse_subsets_remain_suppressed_for_both_representations(self) -> None:
+        matched = [("s1", "u1", "P3a", True), ("s2", "u2", "P3a", False)]
+        summary = self._summary(matched)
+        up = summary["P3a"]["up"]
+        self.assertLess(up["independentLearners"], 10)
+        self.assertIsNone(up["supportNeededCi"])
+        self.assertIsNone(up["successCi"])
+        self.assertEqual(up["ciStatus"], SPARSE_CI_FLAG)
+
+    def test_no_outcome_counts_change_with_labeling(self) -> None:
+        matched = [("s1", "u1", "P1", True), ("s2", "u2", "P1", False)]
+        first = self._summary(matched)
+        second = self._summary(matched)
+        self.assertEqual(
+            first["P1"]["up"]["supportNeededCount"],
+            second["P1"]["up"]["supportNeededCount"],
+        )
+        self.assertEqual(
+            first["P1"]["up"]["laterSuccessCount"],
+            second["P1"]["up"]["laterSuccessCount"],
+        )
+
+    def test_bootstrap_settings_are_frozen(self) -> None:
+        config = FrozenBootstrapConfig(
+            version="assistments-adaptive-contract-v1.3",
+            seed=20260716,
+            iterations=2000,
+            confidence_level=0.95,
+        )
+        self.assertEqual(config.seed, 20260716)
+        self.assertEqual(config.iterations, 2000)
+        self.assertEqual(config.confidence_level, 0.95)
+
+    def test_matched_row_hash_is_unchanged_by_labeling(self) -> None:
+        from external_data.assistments.adaptive.matched_outcomes import (
+            matched_outcome_results_hash,
+        )
+
+        matched = [("s1", "u1", "P1", True), ("s2", "u2", "P1", False)]
+        summary = self._summary(matched)
+        self.assertIn("P1", summary)
+        # The labeling correction never changes the underlying row documents.
+        config = FrozenBootstrapConfig(
+            version="assistments-adaptive-contract-v1.3",
+            seed=20260716,
+            iterations=2000,
+            confidence_level=0.95,
+        )
+        attempts = [
+            attempt("s10", "u1", "6.NS.A.1", tier="proxy_easy"),
+            attempt("s11", "u1", "6.NS.A.1", tier="proxy_moderate", ts=BASE + _day(1)),
+            attempt("s20", "u2", "6.NS.A.1", tier="proxy_easy"),
+            attempt("s21", "u2", "6.NS.A.1", tier="proxy_moderate", ts=BASE + _day(1)),
+        ]
+        decisions = [
+            decision("s10", "P1", "up", "proxy_easy", "u1"),
+            decision("s20", "P1", "up", "proxy_easy", "u2"),
+        ]
+        rows = structural_matching(decisions, attempts)
+        results = attach_outcomes(rows, attempts)
+        first_hash = matched_outcome_results_hash(results)
+        second_hash = matched_outcome_results_hash(results)
+        self.assertEqual(first_hash, second_hash)
+
+    def test_e5_decision_hash_is_unchanged(self) -> None:
+        from external_data.assistments.adaptive.matched_outcomes import (
+            E5_DECISION_AUDIT_HASH,
+        )
+
+        self.assertEqual(
+            E5_DECISION_AUDIT_HASH,
+            "75d9b9bdece8f410b787d68d7f7e99c3fb8405785bf142380683d704ff2907ab",
+        )
 
 
 def _day(n: int):

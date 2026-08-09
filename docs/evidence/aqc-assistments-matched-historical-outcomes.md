@@ -105,17 +105,21 @@ Matched HOLD: P1 31 (7 support / 24 success, 77.4% success, CI [0.091,0.393],
 Matched DOWN: P1 0 (P1 never demotes); P2 19 (6/13, 68.4% success, CI
 [0.105,0.526], 19 learners); P3a 19 (same row set: 6/13, CI [0.105,0.526]).
 
-Matched UP: P1 10 (1 support / 9 success, 90.0% success, CI [0.0,0.3], 10
-learners); P2 2 (0/2, 100% success, sparse CI suppressed, 2 learners); P3a 5
-(2/3, 60.0% success, sparse CI suppressed, 5 learners).
+Matched UP: P1 10 (support-needed 1/10 = 10.0% with supportNeededCi
+[0.0,0.3]; later success 9/10 = 90.0% with successCi [0.7,1.0], 10 learners);
+P2 2 (0/2 = 0% support / 100% success, sparse CI suppressed for both
+representations, 2 learners); P3a 5 (2/5 = 40.0% support / 3/5 = 60.0%
+success, sparse CI suppressed for both representations, 5 learners).
 
 ## 16. EB4
 
 Among proxy-tier-matched observations, proposed-UP support-needed vs
-later-success rates: P1 1/10 (10.0% support) vs 9/10 (90.0% success); P2 0/2
-(0%) vs 2/2 (100%); P3a 2/5 (40.0%) vs 3/5 (60.0%). Descriptive only; matched
-subsets are policy-specific, small, and observationally different; no policy
-ranking is made.
+later-success rates: P1 1/10 (10.0% support, supportNeededCi [0.0,0.3]) vs
+9/10 (90.0% success, successCi [0.7,1.0]); P2 0/2 (0%) vs 2/2 (100%); P3a
+2/5 (40.0%) vs 3/5 (60.0%). CIs for P2/P3a are suppressed
+(sparse_independent_learner_evidence). Descriptive only; matched subsets are
+policy-specific, small, and observationally different; no policy ranking is
+made.
 
 ## 17. Which CIs were computed
 
@@ -156,7 +160,8 @@ never read).
 
 ## 22. Deterministic output hashes
 
-E6 manifest SHA-256 `b9a9d69c5a779cd043639b0616f22fede53dc77da6683befb44edfdb924f37ca`;
+E6 manifest SHA-256 `8d4024b83daf5d63b239ce0acf0419d51c15f21b6cd854550f404a382e3862c4`
+(reporting-label corrected; matched rows/outcomes unchanged);
 protected matched-outcomes CSV SHA-256
 `a8e4c195d345e634d2e0eda1f64e034547f987f0a2df91b4b6324f9f346aa8ca`; semantic
 matched-outcomes hash `263b5554e2bb49927a0d89e1fedbfecfad9a91299f7997544da0d0c976ebf995`.
