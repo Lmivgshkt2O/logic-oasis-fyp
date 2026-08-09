@@ -26,10 +26,10 @@ runtime:
 bindings:
   bundleVersion: u8-ai-runtime-v1
   modelVersion: controlled-demo-xgboost-v1
-  packageSha256: 6641a757868f826484ac1e1063a1c4da92f467bbd7c34e68e8e3a788b3ffdfbd
+  packageSha256: 0955871b3c35b0ec4eb61043f92bb8bbf6bef1a0ba544e83ec3d170d82c3fff3
   artifactSha256: 9a32079d95a37dc1d3eeecc52f5e7723e12ac1ee3dd8f6eb9dc609a3fa11f39a
   publicationManifestSha256: 470f7dca79f14035d910aae45958d6f21f85423b44d01c6bc5830ffbb914ed4e
-  deploymentManifestSha256: e85ac628e796466b1aa9650b50b956662dcec33c2959a40b50a1301e002d757b
+  deploymentManifestSha256: 459222fb89750da8196e3573b4343e8390e914e52bf51b032765257860d1059b
   trainingDatasetVersion: controlled-demo-dataset-v1
   trainingDatasetSha256: adb666f4a497044c6e908b1f57048da564b965fca8795234471ec13b8285b2c6
   scenarioCatalogueSha256: 5a19431be1188ddc8df32fbfa4c610c5b3d912811984c861d79029ec15606af0

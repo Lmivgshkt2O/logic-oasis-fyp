@@ -2,7 +2,7 @@
   "adaptivePolicySha256": "1b53aef77a8027b4256f915663ee894225c17efe4f876bff2e23a38ed17eef16",
   "bundleVersion": "u8-ai-runtime-v1",
   "featureSchemaSha256": "e9eb98fb23badfcf68618af737662a7efc9dbc1b17d91dc0a32004aad26865d6",
-  "packageSha256": "6641a757868f826484ac1e1063a1c4da92f467bbd7c34e68e8e3a788b3ffdfbd",
-  "policyEvaluationSha256": "a12d251e5910a034c081950a8bede8dc7753329db0e9c540af108143e9a43a61",
+  "packageSha256": "0955871b3c35b0ec4eb61043f92bb8bbf6bef1a0ba544e83ec3d170d82c3fff3",
+  "policyEvaluationSha256": "0f94928f8ee69ceac92668c110c881e916e7dda8c0b5fac833bdf759bf6f5a87",
   "weakTopicRankingPolicySha256": "37164e70e6bbae4b821e58bb03587acef65457f0d2800b4aa1da4e3ed5244848"
 }
