@@ -1,4 +1,8 @@
 /* Authenticated U10 smoke: two students, one parent, four idempotent counters. */
+const crypto = require('crypto');
+const assert = require('node:assert/strict');
+const fs = require('fs');
+const path = require('path');
 const admin = require('../firebase_seed/node_modules/firebase-admin');
 const {deleteApp, initializeApp} = require('../firebase_seed/node_modules/firebase/app');
 const {
@@ -9,6 +13,7 @@ const {
 const {
   connectFirestoreEmulator,
   doc,
+  getDoc,
   getFirestore,
   serverTimestamp,
   setDoc,
@@ -26,7 +31,32 @@ const adminDb = admin.firestore();
 const stamp = `${Date.now()}`;
 const questionId = `emulator-question-${stamp}`;
 const answerId = `emulator-answer-${stamp}`;
+const fallbackAnswerId = `emulator-fallback-answer-${stamp}`;
 const clientApps = [];
+let currentStep = 'startup';
+const repositoryRoot = path.resolve(__dirname, '..');
+const releaseManifest = JSON.parse(
+  fs.readFileSync(path.join(repositoryRoot, 'functions', 'forum_model_manifest.json'), 'utf8'),
+);
+const controlledEvidenceFiles = [
+  'ai_pipeline/forum_controlled_demo/forum_scenario_catalog_v1.yaml',
+  'ai_pipeline/forum_controlled_demo/generated/forum_controlled_demo_v1.jsonl',
+  'ai_pipeline/forum_controlled_demo/generated/forum_controlled_demo_v1_manifest.json',
+  'ai_pipeline/forum_controlled_demo/generated/forum_controlled_demo_split_manifest.json',
+  'ai_pipeline/forum_controlled_demo/generated/forum_controlled_demo_candidate.joblib',
+  'ai_pipeline/forum_controlled_demo/generated/forum_controlled_demo_candidate_manifest.json',
+  'ai_pipeline/reports/forum_controlled_demo_report.json',
+  'ai_pipeline/reports/forum_controlled_demo_report.md',
+];
+
+function controlledEvidenceSha256() {
+  const digest = crypto.createHash('sha256');
+  for (const relative of controlledEvidenceFiles) {
+    digest.update(relative);
+    digest.update(fs.readFileSync(path.join(repositoryRoot, relative)));
+  }
+  return digest.digest('hex');
+}
 
 function client(name) {
   const app = initializeApp({projectId, apiKey: 'demo-key'}, name);
@@ -58,25 +88,44 @@ async function register(clientState, role) {
 
 async function eventually(read, predicate, label) {
   const deadline = Date.now() + 30000;
-  let latest;
   while (Date.now() < deadline) {
-    latest = await read();
+    const latest = await read();
     if (predicate(latest)) return latest;
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
-  throw new Error(`Timed out waiting for ${label}: ${JSON.stringify(latest)}`);
+  throw new Error(`Timed out waiting for ${label}`);
+}
+
+async function expectDenied(read, label) {
+  try {
+    await read();
+  } catch (error) {
+    if (`${error.code}`.includes('permission-denied')) return;
+    throw error;
+  }
+  throw new Error(`Linked parent unexpectedly read ${label}`);
 }
 
 (async () => {
+  currentStep = 'seed controlled release';
+  const corpusSha256Before = controlledEvidenceSha256();
+  await adminDb.collection('modelRegistry').doc(releaseManifest.releaseId).set(releaseManifest);
   const author = client(`question-author-${stamp}`);
   const peer = client(`answer-author-${stamp}`);
   const parent = client(`parent-${stamp}`);
-  const [questionAuthor, answerAuthor] = await Promise.all([
+  currentStep = 'register emulator users';
+  const [questionAuthor, answerAuthor, parentUid] = await Promise.all([
     register(author, 'student'),
     register(peer, 'student'),
     register(parent, 'parent'),
   ]);
+  await adminDb.collection('parentLinks').doc(`${parentUid}_${questionAuthor}`).set({
+    parentId: parentUid,
+    studentId: questionAuthor,
+    status: 'active',
+  });
 
+  currentStep = 'create question and answer';
   await setDoc(doc(author.db, 'forumQuestions', questionId), {
     authorId: questionAuthor,
     title: 'How can I check this addition?',
@@ -96,6 +145,7 @@ async function eventually(read, predicate, label) {
   const markHelpful = httpsCallable(author.functions, 'markForumAnswerHelpful');
   const acceptAnswer = httpsCallable(author.functions, 'acceptForumAnswer');
   const reportContent = httpsCallable(author.functions, 'reportForumContent');
+  currentStep = 'invoke collaboration callables';
   await markHelpful({answerId});
   await markHelpful({answerId});
   await reportContent({targetType: 'answer', targetId: answerId, reason: 'Please review this explanation.'});
@@ -123,6 +173,7 @@ async function eventually(read, predicate, label) {
     adminDb.collection('forumBlocks').doc(`${questionAuthor}_${answerAuthor}`),
     adminDb.collection('forumAiJobs').doc(answerId),
   ];
+  currentStep = 'await first controlled inference';
   const result = await eventually(
     async () => {
       const snapshots = await Promise.all(resultRefs.map((ref) => ref.get()));
@@ -142,10 +193,14 @@ async function eventually(read, predicate, label) {
       value.report?.reason === 'Please review this updated explanation.' &&
       value.block?.blockedStudentId === answerAuthor &&
       value.job?.state === 'completed' &&
-      value.run?.state === 'completed',
+      value.run?.state === 'completed' &&
+      value.run?.modelVersion === releaseManifest.modelVersion &&
+      value.run?.artifactIdentity === releaseManifest.artifactSha256 &&
+      value.run?.claimLevel === 'controlled_demonstration_only',
     'authenticated collaboration and four counters',
   );
 
+  currentStep = 'revise answer';
   await updateDoc(doc(peer.db, 'forumAnswers', answerId), {
     text: 'I regrouped the tens and ones, then checked the total by subtracting.',
     revision: 2,
@@ -187,6 +242,68 @@ async function eventually(read, predicate, label) {
       value.answerSummary?.acceptedAnswersCount === 1,
     'idempotent acceptance after revision reclassification',
   );
+  currentStep = 'verify linked-parent projection';
+  const linkedParentSummary = await getDoc(
+    doc(parent.db, 'forumParticipationSummaries', questionAuthor),
+  );
+  if (linkedParentSummary.data()?.questionsPostedCount !== 1) {
+    throw new Error('Linked parent did not receive the count-only forum summary');
+  }
+  const deniedParentReads = [
+    ['question', 'forumQuestions', questionId],
+    ['answer', 'forumAnswers', answerId],
+    ['report', 'forumReports', `${questionAuthor}_answer_${answerId}`],
+    ['block', 'forumBlocks', `${questionAuthor}_${answerAuthor}`],
+    ['AI job', 'forumAiJobs', answerId],
+    ['AI run', 'forumAiRuns', result.job.logicalInferenceId],
+    ['model registry', 'modelRegistry', releaseManifest.releaseId],
+  ];
+  await Promise.all(deniedParentReads.map(([label, collection, identifier]) =>
+    expectDenied(() => getDoc(doc(parent.db, collection, identifier)), label),
+  ));
+
+  currentStep = 'revoke release and verify fallback';
+  const controlledRunBeforeRevocation = result.run;
+  await adminDb.collection('modelRegistry').doc(releaseManifest.releaseId).update({
+    isActive: false,
+    lifecycleStatus: 'revoked',
+  });
+  await setDoc(doc(peer.db, 'forumAnswers', fallbackAnswerId), {
+    questionId,
+    authorId: answerAuthor,
+    text: 'I used another worked step and checked the total again.',
+    revision: 1,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  const fallback = await eventually(
+    async () => {
+      const [answer, job] = await Promise.all([
+        adminDb.collection('forumAnswers').doc(fallbackAnswerId).get(),
+        adminDb.collection('forumAiJobs').doc(fallbackAnswerId).get(),
+      ]);
+      return {answer: answer.data(), job: job.data()};
+    },
+    (value) => value.answer?.aiFeedback?.state === 'fallback' &&
+      value.job?.state === 'fallback' &&
+      value.job?.modelVersion === 'safe-fallback-v1' &&
+      value.job?.artifactIdentity === 'safe-fallback-v1' &&
+      value.job?.claimLevel === 'safe_fallback_only' &&
+      /^[0-9a-f]{64}$/.test(value.job?.logicalInferenceId || ''),
+    'safe fallback after controlled release revocation',
+  );
+  const preservedRun = (
+    await adminDb.collection('forumAiRuns').doc(result.job.logicalInferenceId).get()
+  ).data();
+  assert.deepStrictEqual(
+    preservedRun,
+    controlledRunBeforeRevocation,
+    'Controlled run changed after release revocation',
+  );
+  const corpusSha256After = controlledEvidenceSha256();
+  if (corpusSha256After !== corpusSha256Before) {
+    throw new Error('Controlled evidence corpus changed during inference rehearsal');
+  }
   console.log(JSON.stringify({
     parentDenied,
     acceptedAnswerId: accepted.question.acceptedAnswerId,
@@ -199,14 +316,32 @@ async function eventually(read, predicate, label) {
     feedbackState: result.answer.aiFeedback.state,
     jobState: result.job.state,
     runState: result.run.state,
+    releaseId: releaseManifest.releaseId,
+    modelVersion: result.run.modelVersion,
+    artifactIdentity: result.run.artifactIdentity,
+    claimLevel: result.run.claimLevel,
     revisedFeedbackRevision: revised.answer.aiFeedback.revision,
     immutableRunCount: revised.runCount,
     reportStatus: result.report.status,
     blockedStudentId: result.block.blockedStudentId,
+    linkedParentSummaryRead: true,
+    linkedParentRawReadsDenied: deniedParentReads.length,
+    revokedReleaseFallbackState: fallback.answer.aiFeedback.state,
+    fallbackModelVersion: fallback.job.modelVersion,
+    fallbackArtifactIdentity: fallback.job.artifactIdentity,
+    fallbackClaimLevel: fallback.job.claimLevel,
+    fallbackLogicalInferenceIdPresent: /^[0-9a-f]{64}$/.test(fallback.job.logicalInferenceId),
+    preservedControlledRunState: preservedRun.state,
+    corpusSha256Before,
+    corpusSha256After,
   }, null, 2));
   await cleanup();
 })().catch(async (error) => {
-  console.error(error.stack || error);
+  console.error(JSON.stringify({
+    step: currentStep,
+    code: error.code || null,
+    errorType: error.name || 'Error',
+  }));
   await cleanup();
   process.exitCode = 1;
 });

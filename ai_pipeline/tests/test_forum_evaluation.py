@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 from hashlib import sha256
 import json
+import joblib
 import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -427,18 +428,65 @@ class ForumControlledDemoEvaluationTests(unittest.TestCase):
                 report_directory=root / "reports",
                 operator_role="developer",
             )
-            committed = {
+            deterministic = {
                 "dataset": committed_generated / "forum_controlled_demo_v1.jsonl",
                 "manifest": committed_generated / "forum_controlled_demo_v1_manifest.json",
                 "split_manifest": committed_generated / "forum_controlled_demo_split_manifest.json",
-                "candidate": committed_generated / "forum_controlled_demo_candidate.joblib",
-                "candidate_manifest": committed_generated / "forum_controlled_demo_candidate_manifest.json",
-                "report_json": committed_reports / "forum_controlled_demo_report.json",
                 "report_markdown": committed_reports / "forum_controlled_demo_report.md",
             }
-            for key, committed_path in committed.items():
+            for key, committed_path in deterministic.items():
                 with self.subTest(key=key):
                     self.assertEqual(committed_path.read_bytes(), paths[key].read_bytes())
+
+            committed_candidate_path = committed_generated / "forum_controlled_demo_candidate.joblib"
+            committed_candidate = joblib.load(committed_candidate_path)
+            fresh_candidate = joblib.load(paths["candidate"])
+            self.assertEqual(committed_candidate["modelVersion"], fresh_candidate["modelVersion"])
+            committed_classifier = ForumTextClassifier(
+                committed_candidate["pipeline"], model_version=committed_candidate["modelVersion"],
+            )
+            fresh_classifier = ForumTextClassifier(
+                fresh_candidate["pipeline"], model_version=fresh_candidate["modelVersion"],
+            )
+            for row in self.build.rows:
+                self.assertEqual(
+                    committed_classifier.predict(row.text),
+                    fresh_classifier.predict(row.text),
+                )
+
+            committed_report = json.loads(
+                (committed_reports / "forum_controlled_demo_report.json").read_text(encoding="utf-8")
+            )
+            fresh_report = json.loads(paths["report_json"].read_text(encoding="utf-8"))
+            self.assertEqual(
+                sha256(committed_candidate_path.read_bytes()).hexdigest(),
+                committed_report["artifactByteHash"],
+            )
+            self.assertEqual(
+                sha256(paths["candidate"].read_bytes()).hexdigest(),
+                fresh_report["artifactByteHash"],
+            )
+            committed_report.pop("artifactByteHash")
+            fresh_report.pop("artifactByteHash")
+            self.assertEqual(committed_report, fresh_report)
+
+            committed_manifest = json.loads(
+                (committed_generated / "forum_controlled_demo_candidate_manifest.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            fresh_manifest = json.loads(paths["candidate_manifest"].read_text(encoding="utf-8"))
+            for manifest, report_path in (
+                (committed_manifest, committed_reports / "forum_controlled_demo_report.json"),
+                (fresh_manifest, paths["report_json"]),
+            ):
+                self.assertEqual(
+                    manifest["evaluationReportSha256"],
+                    sha256(report_path.read_bytes()).hexdigest(),
+                )
+                manifest.pop("artifactSha256")
+                manifest.pop("evaluationReportSha256")
+            self.assertEqual(committed_manifest, fresh_manifest)
 
     def test_rejected_rerun_removes_stale_candidate_files_and_unsafe_operator_roles_fail(self):
         with TemporaryDirectory() as directory:

@@ -1,14 +1,14 @@
 {
-  "adaptivePolicySha256": "1b53aef77a8027b4256f915663ee894225c17efe4f876bff2e23a38ed17eef16",
+  "adaptivePolicySha256": "1c782e3ca08fb021427af2a42eda1df4350d583b301f3ff79a7df529c6cf9d4b",
   "bundleVersion": "u8-ai-runtime-v1",
-  "featureSchemaSha256": "e9eb98fb23badfcf68618af737662a7efc9dbc1b17d91dc0a32004aad26865d6",
+  "featureSchemaSha256": "ea76adf96d8d92e24e2b04c3f5ba1a33b1219da5c7f11766be8b83db34a695d0",
   "forumRuntimeBundle": {
     "bundleSchemaVersion": "forum-runtime-bundle-v1",
     "files": {
-      "__init__.py": "d9af6a77ae46aac8374e8be62841997efe15b3addab403dd410bc914c144a39e",
-      "classifier.py": "8d8d1bee018ae9adc6a6fe3ed6f828ea1693f6b6098b81d24ee4ebdf93837118"
+      "__init__.py": "4a91ba70aefb24ff8a4b0b83269d23548c1e7623e4d1f3ce0e2ac218f20c4417",
+      "classifier.py": "a16acf03d4d3621ef6112ae2477b2fd1dd4227c1541913b8112eaac88b18802f"
     }
   },
-  "packageSha256": "31a970c0e30cd361f16b9b2ca0b53a4607ac0c54437bc48155f8542444a018ef",
-  "weakTopicRankingPolicySha256": "37164e70e6bbae4b821e58bb03587acef65457f0d2800b4aa1da4e3ed5244848"
+  "packageSha256": "08d28b11c30f97e156f5fc2beb62970a2eb6e7d27c1972ea2191163973c3e694",
+  "weakTopicRankingPolicySha256": "f7bfd255956c0c99e197fc8a690eed075b6de1e2e6c7cbee76d3f28b299f1b7c"
 }

@@ -228,7 +228,7 @@ def write_controlled_demo_report(
         "", "## Limitations", "",
         "This is an implemented controlled demonstration based on fictional trajectories. It does not establish accuracy for real students, learning improvement, calibration, or superiority over Decision Tree or MLP baselines.",
     ])
-    output.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    output.write_bytes(("\n".join(lines) + "\n").encode("utf-8"))
     return output
 
 

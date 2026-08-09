@@ -302,9 +302,16 @@ class ForumRuntimeTests(unittest.TestCase):
 
         self.assertEqual("fallback", database.rows[("forumAiJobs", "a1")]["state"])
         self.assertEqual("fallback", database.rows[("forumAnswers", "a1")]["aiFeedback"]["state"])
-        self.assertEqual(1, len([
-            key for key in database.rows if key[0] == "forumAiRuns"
-        ]))
+        runs = [
+            (key, value) for key, value in database.rows.items()
+            if key[0] == "forumAiRuns"
+        ]
+        self.assertEqual(1, len(runs))
+        run_key, run = runs[0]
+        self.assertRegex(run_key[1], r"^[0-9a-f]{64}$")
+        self.assertEqual("safe-fallback-v1", run["modelVersion"])
+        self.assertEqual("safe-fallback-v1", run["artifactIdentity"])
+        self.assertEqual("safe_fallback_only", run["claimLevel"])
 
     def test_legacy_terminal_job_is_not_reprocessed_after_identity_migration(self):
         now = datetime(2026, 8, 3, tzinfo=timezone.utc)
@@ -877,6 +884,11 @@ class ForumRuntimeTests(unittest.TestCase):
         self.assertEqual("completed", state)
         self.assertEqual(1, sum(key[0] == "forumAiJobs" for key in database.rows))
         self.assertEqual(1, sum(key[0] == "forumAiRuns" for key in database.rows))
+        run = next(
+            value for key, value in database.rows.items() if key[0] == "forumAiRuns"
+        )
+        self.assertEqual("controlled_demonstration_only", run["claimLevel"])
+        self.assertEqual(release["artifactSha256"], run["artifactIdentity"])
         ai_records = {
             str(key): value for key, value in database.rows.items()
             if key[0] in {"forumAiJobs", "forumAiRuns"}

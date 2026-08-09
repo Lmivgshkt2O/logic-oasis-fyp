@@ -31,6 +31,9 @@ FORUM_AI_MAX_ATTEMPTS = 3
 FORUM_RELEASE_MANIFEST_SCHEMA = "forum-model-release-manifest-v1"
 FORUM_CONTROLLED_MODE = "controlled_demo"
 FORUM_REAL_EVALUATED_MODE = "real_evaluated_only"
+FORUM_CONTROLLED_CLAIM_LEVEL = "controlled_demonstration_only"
+FORUM_UNVALIDATED_CLAIM_LEVEL = "unvalidated_model_output"
+FORUM_FALLBACK_CLAIM_LEVEL = "safe_fallback_only"
 _SHA256_FIELDS = (
     "artifactSha256", "catalogueSha256", "datasetSha256", "datasetManifestSha256",
     "splitManifestSha256", "rubricSha256", "evaluationReportSha256",
@@ -42,7 +45,7 @@ _CONTROLLED_RELEASE_VALUES = {
     "evidenceLevel": "controlled_demonstration",
     "releaseScope": "fyp1_forum_controlled_demo",
     "deploymentScope": "controlled_demo",
-    "claimLevel": "controlled_demonstration_only",
+    "claimLevel": FORUM_CONTROLLED_CLAIM_LEVEL,
 }
 
 
@@ -58,6 +61,7 @@ class ForumAiClaim:
     fencing_generation: int
     attempt_count: int
     event_id: str
+    claim_level: str = FORUM_UNVALIDATED_CLAIM_LEVEL
 
 
 class ForumRuntimeError(ValueError):
@@ -453,6 +457,10 @@ class ForumRuntimeGateway:
             str(getattr(classifier, "artifact_sha256", model_version))
             if classifier is not None else model_version
         )
+        claim_level = (
+            str(getattr(classifier, "claim_level", FORUM_UNVALIDATED_CLAIM_LEVEL))
+            if classifier is not None else FORUM_FALLBACK_CLAIM_LEVEL
+        )
         text_hash = _forum_text_hash(text)
         if text_hash is None:
             raise ForumRuntimeError("failed-precondition", "Forum answer text is invalid.")
@@ -463,6 +471,7 @@ class ForumRuntimeGateway:
                 "textHash": text_hash,
                 "modelVersion": model_version,
                 "artifactIdentity": artifact_identity,
+                "claimLevel": claim_level,
                 "policyVersion": FORUM_AI_POLICY_VERSION,
             }, sort_keys=True, separators=(",", ":")).encode("utf-8")
         ).hexdigest()
@@ -473,6 +482,7 @@ class ForumRuntimeGateway:
             text_hash=text_hash,
             model_version=model_version,
             artifact_identity=artifact_identity,
+            claim_level=claim_level,
             event_id=audit_event_id,
             now=now,
         )
@@ -534,6 +544,7 @@ class ForumRuntimeGateway:
         artifact_identity: str,
         event_id: str,
         now: datetime,
+        claim_level: str = FORUM_UNVALIDATED_CLAIM_LEVEL,
     ) -> ForumAiClaim | str:
         answer_ref = self.database.collection("forumAnswers").document(answer_id)
         job_ref = self.database.collection("forumAiJobs").document(answer_id)
@@ -628,6 +639,7 @@ class ForumRuntimeGateway:
                 "textHash": text_hash,
                 "modelVersion": model_version,
                 "artifactIdentity": artifact_identity,
+                "claimLevel": claim_level,
                 "policyVersion": FORUM_AI_POLICY_VERSION,
                 "claimEventId": event_id,
                 "attemptCount": attempt_count,
@@ -651,6 +663,7 @@ class ForumRuntimeGateway:
                 text_hash=text_hash,
                 model_version=model_version,
                 artifact_identity=artifact_identity,
+                claim_level=claim_level,
                 policy_version=FORUM_AI_POLICY_VERSION,
                 fencing_generation=fencing_generation,
                 attempt_count=attempt_count,
@@ -698,6 +711,7 @@ class ForumRuntimeGateway:
                 "textHash": claim.text_hash,
                 "modelVersion": claim.model_version,
                 "artifactIdentity": claim.artifact_identity,
+                "claimLevel": claim.claim_level,
                 "policyVersion": claim.policy_version,
                 "fencingGeneration": claim.fencing_generation,
                 "claimEventId": claim.event_id,
@@ -818,6 +832,7 @@ def load_forum_classifier(
             _log_forum_activation_failure("classifier_version_mismatch", manifest, revision)
             return None
         classifier.artifact_sha256 = manifest["artifactSha256"]
+        classifier.claim_level = manifest["claimLevel"]
         return classifier
     except Exception:
         _log_forum_activation_failure(

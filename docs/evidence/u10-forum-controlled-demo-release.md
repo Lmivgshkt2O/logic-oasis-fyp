@@ -1,6 +1,6 @@
 # U10 Forum Controlled-Demonstration Release
 
-Release `forum-controlled-demo-nb-v1-release-1` publishes the U4-selected
+Release `forum-controlled-demo-nb-v1-release-2` publishes the U4-selected
 `MultinomialNB` TF-IDF pipeline for the bounded FYP1 forum demonstration. The
 release is active only when `FORUM_MODEL_EVIDENCE_MODE=controlled_demo` and the
 deployed `FORUM_RUNTIME_CODE_REVISION` equals the immutable release binding.
@@ -14,12 +14,21 @@ developer-authored fictional scenarios and are not silently expanded by forum
 answers submitted at runtime. The release makes no production-validity,
 learner-validity, calibration, or general Naive Bayes superiority claim.
 
-The controlled-scenario report records
-`baselineComparisonResult: naive_bayes_advantage_demonstrated`. This statement
-is limited to the fixed fictional U4 catalogue and does not establish an
-advantage on real learner responses.
+The earlier `forum-controlled-demo-nb-v1-release-1` payload remains preserved
+at U5 commit `8e93e4d3937a00d50b0680f7d6f555936bb242df`. It was withdrawn before any
+cloud registry promotion after U6 detected stale runtime bindings. Release 2
+therefore has no active registry predecessor and keeps `supersedesReleaseId`
+unset; any future replacement of release 2 must use transactional supersession.
 
-The immutable release record is [the bundled manifest](../../functions/forum_model_manifest.json).
+The controlled-scenario report records
+`baselineComparisonResult: naive_bayes_advantage_demonstrated` from the
+selection-stage validation comparison only. On the four-row untouched
+fictional final test, MultinomialNB scored accuracy `0.75` and macro F1
+`0.73333333`, while the deterministic comparison baseline scored `1.0` for
+both. Therefore no general or final-test Naive Bayes superiority claim is
+made.
+
+The immutable release payload and activation contract is [the bundled manifest](../../functions/forum_model_manifest.json).
 It binds the catalogue, generated dataset and manifests, rubric, evaluation
 report, preprocessing and vectorizer contract, abstention policy, exact Python
 dependencies, runtime fingerprint, bounded release-source revision, artifact bytes,
@@ -70,3 +79,32 @@ A compatible replacement is published with `--supersedes-release-id` and then
 promoted transactionally. Direct mode-disable or revocation is the immediate
 safe rollback; restoring automatic classification requires a new immutable
 release ID that supersedes the currently active compatible record.
+
+## U6 local activation evidence — 2026-08-09
+
+U6 republished the same candidate artifact after establishing LF checkout
+semantics for hash-bound text and reconciling the source/vendor/runtime bundle.
+The artifact SHA-256 remained
+`8307a480b5d5e61612b878653b2182d609ae594024ecae192e3677ace99a0049`;
+the bounded source revision is now
+`937204cbdd672d1350cf4a05bf3887feb50bab41e7c97c16d716932948b0957d`.
+
+An Auth + Firestore + Functions Emulator rehearsal seeded the payload as
+`modelRegistry/forum-controlled-demo-nb-v1-release-2`. A student answer and
+revision each produced an immutable completed run bound to model
+`forum-controlled-demo-nb-v1`, the artifact hash above, and
+`claimLevel: controlled_demonstration_only`. The linked parent could read the
+count-only summary and was denied seven raw forum, moderation, AI, and registry
+reads. Revoking the registry record made the next answer fail closed to
+`fallback` while the prior completed run remained unchanged.
+
+The controlled-evidence aggregate SHA-256 was
+`0d83a44bbca58b57d3545c69ba277f227317a6fdf6baf0270b8a96f786a2a44a`
+before and after both rehearsals. The retained, sanitized
+[Emulator result](u10-forum-emulator-result.json) has SHA-256
+`ea5fd2b7288a94161ede14326f0befac5390a8c138b904599a11e804f3c03152`
+and records zero matches for the submitted fictional question, answer,
+revision, report reason, or fallback text. This proves local packaged payload,
+promotion/revocation mechanics, and controlled runtime activation only. No
+cloud registry record or cloud deployment was created; cloud status remains
+`pending_cloud_deployment`.

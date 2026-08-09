@@ -1,14 +1,18 @@
 ---
 artifact_contract: firestore-schema-and-security-contract/v1
-status: u2-u3-implemented-and-production-verified
+status: u10-fyp1-controlled-demo-closure-verified
 created: 2026-07-15
-updated: 2026-07-16
-canonical_plan: docs/plans/2026-07-05-001-feat-fyp1-prototype-development-plan(2)(1).md
+updated: 2026-08-09
+canonical_plan: docs/plans/2026-08-01-001-feat-u10-forum-production-closure-plan.md
 ---
 
 # Logic Oasis Firestore Database Schema and Security Contract
 
-**Purpose:** This is the developer-facing Firestore schema for Logic Oasis. It records the implemented U2/U3 trusted-content and secure-quiz boundaries, plus the planned FYP1 database, ownership, access boundaries, document identities, and migration expectations for later units.
+**Purpose:** This is the developer-facing Firestore schema for Logic Oasis. It records the implemented trusted-content, secure-quiz, parent-link, adaptive-AI, and U10 forum boundaries plus future migration expectations.
+
+The U10 closure addendum below is authoritative for forum records. Older
+`Target FYP1` forum sketches remain historical design context only where they
+conflict with that addendum.
 
 It is a contract, not a claim that every collection already exists. `Current prototype` records are the temporary repository behaviour observed on 2026-07-15. `Target FYP1` records are the design to implement through U2-U11. Stage 3 onboarding records remain reserved only and must not be created as active FYP1 scope unless Stage 3 is formally admitted.
 
@@ -245,3 +249,46 @@ Create indexes only after the matching query is implemented and recorded in `fir
 - Stage 3 reserved database records: `docs/plans/logic-oasis-stage3-onboarding-animation-plan(2).md` and `docs/plans/logic-oasis-stage3-canonical-integration-review-plan.md`.
 
 Update this document whenever a collection, field, access rule, or ownership boundary changes. A code change that contradicts this contract must update the contract and its Firestore Emulator test in the same unit of work.
+## U10 FYP1 Forum Closure Addendum (authoritative, 2026-08-09)
+
+The implemented student forum uses these collections and identities:
+
+| Collection | Identity and implemented contract |
+|---|---|
+| `forumQuestions/{questionId}` | student-authored `title`, `text`, timestamps, and server-owned acceptance fields |
+| `forumAnswers/{answerId}` | `questionId`, author, `text`, monotonic `revision`, server-owned `aiFeedback`, and `acceptedAt` |
+| `forumHelpfulMarks/{studentId_answerId}` | idempotent helpful action |
+| `forumReports/{reporterId_targetType_targetId}` | convergent server-owned moderation report |
+| `forumBlocks/{studentId_blockedStudentId}` | student-owned block relationship |
+| `forumParticipationEvents/{eventId}` | immutable counter event |
+| `forumParticipationAggregateClaims/{claimId}` | idempotent aggregation claim |
+| `forumParticipationWeeklySummaries/{studentId_week}` | server-owned Malaysia-week materialization |
+| `forumParticipationSummaries/{studentId}` | current count-only student/linked-parent projection |
+| `forumAiJobs/{answerId}` | mutable lease/fencing job for the latest answer revision |
+| `forumAiRuns/{logicalInferenceId}` | immutable revision/text/model/artifact/policy/claim-level result |
+| `modelRegistry/{releaseId}` | forum-scoped immutable release bindings with controlled lifecycle pointer |
+
+`logicalInferenceId` is deterministic over answer ID, revision, text hash,
+model version, artifact identity, claim level, and advisory policy. Jobs record
+`state`, `attemptCount`, lease expiry, fencing generation, revision, text hash,
+artifact identity, and policy version. Runs preserve the same lineage plus
+`resultState` and never use raw answer text as identity or evidence.
+
+The observed job/result state contract is `processing -> completed|fallback`,
+with `retryable` for bounded transient recovery, terminal `failed`, and
+audit-only `superseded`. `queued` is not an implemented runtime write state.
+
+Students may read forum questions/answers and create only bounded client-owned
+fields. Callables/triggers own helpful, acceptance, moderation, counters, AI
+jobs, AI runs, and feedback. A linked parent may read only
+`forumParticipationSummaries/{studentId}`; raw forum text, identities,
+moderation, AI records, model registry, and parent-link documents remain denied.
+
+The evidence ladder is `synthetic_test`, current
+`controlled_demonstration`, and future `real_evaluated`. Controlled activation
+requires explicit `controlled_demo` mode, exactly one active compatible release,
+matching bounded code revision, dependency and hash bindings, and source/vendor
+parity before model deserialization. Revocation/supersession changes only
+lifecycle pointer fields and preserves prior release/run evidence. The
+dedicated cloud identity is declared and contract-tested; it is required only
+when an authorized cloud deployment occurs, which remains pending.

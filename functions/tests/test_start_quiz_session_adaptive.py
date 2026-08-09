@@ -9,7 +9,7 @@ FUNCTIONS_ROOT = Path(__file__).resolve().parents[1]
 if str(FUNCTIONS_ROOT) not in sys.path:
     sys.path.insert(0, str(FUNCTIONS_ROOT))
 
-from functions import main
+import main
 
 
 TOPIC_ID = "whole_numbers_y4"

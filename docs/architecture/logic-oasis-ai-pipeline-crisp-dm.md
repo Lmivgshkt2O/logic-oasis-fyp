@@ -2,7 +2,7 @@
 title: Logic Oasis AI Pipeline CRISP-DM Lifecycle - Plan
 type: docs
 date: 2026-07-16
-last_updated: 2026-07-17
+last_updated: 2026-08-09
 artifact_contract: ce-unified-plan/v1
 artifact_readiness: implementation-ready
 product_contract_source: ce-plan-bootstrap
@@ -22,6 +22,10 @@ The canonical FYP1 plan controls scope, priority, estimates, and U4-U10 sequenci
 This document controls the detailed AI evidence, model, evaluation, deployment, and claim boundaries for those units.
 
 The pipeline must only use U3 server-finalized attempt and response evidence for runtime learning decisions.
+
+For the forum model, the U10 closure addendum at the end of this document is
+authoritative. Earlier real-data export, pseudonymization, and author-grouping
+sections describe the future U10-R route, not the current FYP1 release.
 
 It must not claim that the existing developer-run `ai_pipeline/run_ai_pipeline.py` or legacy `ai_pipeline/xgboost_logic_oasis_model.pkl` is the final automatic FYP1 system.
 
@@ -936,3 +940,42 @@ Use “implemented and evaluated” only when real approved evidence, grouped ev
 - Legacy boundary: `ai_pipeline/README.md`.
 - Current feature schema and prediction contract: `ai_pipeline/configs/feature_schema.yaml` and `ai_pipeline/logic_oasis_ai/prediction_contract.py`.
 - Current candidate lifecycle and comparison implementation: `ai_pipeline/logic_oasis_ai/model_registry.py` and `ai_pipeline/training/evaluate_models.py`.
+## U10 Forum Controlled-Demonstration Closure Addendum (2026-08-09)
+
+The implemented FYP1 forum route uses a 24-row expert-authored fictional
+catalogue. It contains no learner identity, copied learner forum text, answer
+keys, or learner-distribution claims. Evaluation is grouped by 12
+scenario/question families: 8 train, 2 validation, and 2 untouched final-test
+families. It is scenario-family grouped, not author grouped.
+
+MultinomialNB was selected using training/validation evidence only. On the
+untouched fictional final test it scored accuracy `0.75` and macro F1
+`0.73333333`, with publication/fallback coverage `0.5`. The deterministic
+baseline scored `1.0`; therefore the selection-stage advantage label does not
+support a general or final-test Naive Bayes superiority claim.
+
+Release `forum-controlled-demo-nb-v1-release-2` is a locally packaged
+controlled payload. Runtime activation requires `controlled_demo`, one active
+compatible registry record, matching code revision, exact artifact/catalogue/
+dataset/split/report/rubric/bundle hashes, compatible dependencies, and
+source/vendor parity. The immutable run identity is
+`forumAiRuns/{logicalInferenceId}`, not answer ID, and records revision, text
+hash, model, artifact, policy, fencing generation, result state, and
+`claimLevel: controlled_demonstration_only`. Observed runtime states do not
+include `queued`.
+
+U6 verified promotion/revocation behavior, genuine NB automatic inference,
+revision fencing, corpus non-mutation, safe logs, linked-parent count-only
+access, and fail-closed fallback in local Emulators. Cloud deployment and live
+service-account observation remain pending. Current evidence supports only
+scenario fit, reproducibility, artifact integrity, and prototype integration
+readiness.
+
+All earlier protected learner-data export, reviewer, retention,
+pseudonymization, author-grouped split, and real-world metric requirements are
+the future U10-R route. A replacement may be labelled `real_evaluated` only
+after approved real/external provenance, de-identification and retention
+controls, reviewer evidence, author grouping where feasible, complete
+class/calibration evidence, immutable publication, and separately authorized
+cloud rollout. Runtime forum answers never silently expand the controlled
+training corpus.
