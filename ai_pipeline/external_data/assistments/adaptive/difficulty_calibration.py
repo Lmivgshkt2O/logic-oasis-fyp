@@ -413,6 +413,10 @@ def build_calibration_manifest(
     tier_ordering_tie_rule: str,
     tier_algorithm_version: str,
     tier_assignment_status: str,
+    tertile_boundary_rule: Mapping[str, object] | None = None,
+    predecessor_contract_version: str | None = None,
+    predecessor_contract_sha256: str | None = None,
+    amendment_reason: str | None = None,
     minimum_problems_per_skill: int,
     minimum_problems_per_tier: int,
     problem_counts: Mapping[str, int],
@@ -421,7 +425,7 @@ def build_calibration_manifest(
     catalog_sha256: str,
 ) -> dict[str, object]:
     """Deterministic E2 manifest (no timestamps; rerun reproduces the hash)."""
-    return {
+    manifest: dict[str, object] = {
         "manifestSchemaVersion": "assistments-e2-calibration-manifest-v1",
         "contractVersion": contract_version,
         "contractHash": contract_hash,
@@ -451,6 +455,15 @@ def build_calibration_manifest(
         "containsRawIdentifiers": False,
         "productionPromotionAllowed": False,
     }
+    if tertile_boundary_rule is not None:
+        manifest["tertileBoundaryRule"] = dict(tertile_boundary_rule)
+    if predecessor_contract_version is not None:
+        manifest["predecessorContractVersion"] = predecessor_contract_version
+    if predecessor_contract_sha256 is not None:
+        manifest["predecessorContractSha256"] = predecessor_contract_sha256
+    if amendment_reason is not None:
+        manifest["amendmentReason"] = amendment_reason
+    return manifest
 
 
 def write_manifest(manifest: Mapping[str, object], path: str | Path) -> Path:

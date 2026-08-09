@@ -1,261 +1,178 @@
-# AQC-E2 ASSISTments Proxy-Difficulty Calibration
+# AQC-E2 ASSISTments Proxy-Difficulty Calibration (amended by v1.1)
 
 Date: 2026-08-08
-Stage: **AQC-E2 (problem-difficulty calibration from pre-evaluation data)**
-Contract: `assistments-adaptive-contract-v1` (unchanged; frozen in AQC-E1)
-Status: **CALIBRATION COMPUTED; TIER ASSIGNMENT BLOCKED**
-Decision: **NOT READY FOR AQC-E3** - see section 26 for the exact blocker.
+Stage: **AQC-E2 (problem-difficulty calibration from pre-evaluation data),
+completed under assistments-adaptive-contract-v1.1**
+Status: **CALIBRATION + TIER CATALOG COMPLETE**
+Decision: **READY FOR AQC-E3**
 
-## 1. E1 verification
+## 0. Amendment history (v1 result preserved)
 
-Verified before any raw data was touched (fail closed):
+The first E2 run used `assistments-adaptive-contract-v1` and correctly stopped
+before real tier assignment because v1 did not completely define tertile
+boundaries for non-divisible calibrated problem counts. That v1 result is
+preserved (blocked status, catalog hash
+`c504741612430a4e86bc6c7b477943b24163859acd3f8e87ea14024af931e4a2`) and is
+superseded by the pre-policy amendment below. No policy result existed at any
+point during this sequence.
 
-- Contract version: `assistments-adaptive-contract-v1`; contract SHA-256
-  `46997eaf92d6c9aba0dc7d8d196080bc03bd59093ef5b2f04a1fd6fc4e424170`.
-- Provenance: `external_real` (never `runtime_callable`).
-- Calibration window `2019-02-25T00:00:00Z .. 2021-12-31T23:59:59Z` and
-  evaluation window `2022-01-01T00:00:00Z .. 2023-12-31T23:59:59Z` are
-  disjoint.
-- Minimum independent calibration learners: 20.
-- Within-skill proxy tiering: `exact_sourceSkillCode` only.
-- Skill catalog gate: >= 9 calibrated problems AND >= 3 per proxy tier.
-- Proxy values exactly `proxy_easy` / `proxy_moderate` / `proxy_hard`.
-- No native Logic Oasis bank/status fields are allowed on external records.
-- E1 contract and claim-boundary tests: **54/54 passed** before E2 ran.
+## 1. v1 predecessor hash
 
-E1 verification passed; calibration processing proceeded.
+`assistments-adaptive-contract-v1`, SHA-256
+`46997eaf92d6c9aba0dc7d8d196080bc03bd59093ef5b2f04a1fd6fc4e424170` (unchanged
+and preserved; the v1 file and its E1 tests remain intact).
 
-## 2. ASSISTments release/hash lineage
+## 2. v1.1 amendment hash
 
-- Dataset: ASSISTments EDM Cup 2023 (Kaggle), release
-  `assistments-edm-cup-2023-release-v1`.
-- Verified raw source hashes (J0, 2026-08-07):
-  `action_logs.csv`
-  `DB6B0CD4875488D0847D9D9BA2896552F4AD1015F3E2388995222DD4A178443D`;
-  `assignment_details.csv`
-  `D02D8B62DE088C896FCEB901BC986C25FA07F5D9AEEC0364BF9D351208BEC70E`;
-  `problem_details.csv`
-  `4F45DAF2E010771C6B5E523DD4D583F3AC451F6CE8F2F35270FCB86B875CEE4E`;
-  `sequence_details.csv`
-  `A1FA10E6DEBD4FD30C4B04E1554E18F2C426A981BCB10BED0B41DD083CCDB541`.
-- Usage terms: ASSISTments Data Terms of Use, effective 2020-10-30.
-- Raw files and the learner-safe calibration catalog remain outside Git in the
-  protected directory. The protected E2 outputs are
-  `processed/aqc/e2/assistments_problem_difficulty_proxy_v1.csv` and
-  `processed/aqc/e2/e2_calibration_manifest.json`.
+`assistments-adaptive-contract-v1.1`, SHA-256
+`e54085ddfe1e00e1cd12d02639f02a70681c767a2ea51697548890e8211f63de`.
 
-## 3. Primary cohort (exact Grade 6 Mathematics)
+## 3. Amendment reason
 
-Membership is exact `sequence_folder_path_level_2 == "Grade 6"`. `Grade 6
-Accelerated` is a distinct token and never enters the primary cohort; no
-Grades 4-6 pooling was used to increase catalog size.
+`deterministic_discrete_tertile_boundary_clarification`. The amendment fixes an
+underspecified implementation detail in v1 (rank boundaries when n is not
+divisible by three). Scope is `within_skill_tertile_boundaries_only`.
 
-## 4. Calibration window
+## 4. No policy results existed before the amendment
 
-`2019-02-25T00:00:00Z` through `2021-12-31T23:59:59Z`.
+Confirmed at amendment time: P1 decisions = 0, P2 decisions = 0, P3a decisions
+= 0, matched outcomes = 0, policy comparison reports = 0. The amendment is a
+pure methodology clarification, not a result-driven change
+(`motivatedByPolicyPerformance: false`, `policyResultsExistedBeforeAmendment:
+false`).
 
-Both the assignment scope (Grade 6 assignment started inside the calibration
-window) and every contributing action timestamp must fall inside this window.
-No action/response from 2022-01-01 onward influences p_correct, learner count,
-response count, difficulty_score, proxy tier, or catalog eligibility.
+## 5. Deterministic tertile rule (frozen by v1.1)
 
-## 5. Evaluation window
+Within each exact non-null `sourceSkillCode`, retain only adequately calibrated
+problems (`calibrationLearnerCount >= 20`), sort by
+`smoothedCorrectProbability` descending then `externalProblemKey` ascending,
+and assign by 1-based rank with:
 
-`2022-01-01T00:00:00Z` through `2023-12-31T23:59:59Z` (frozen; not used for any
-calibration evidence).
+```text
+n  = number of adequately calibrated problems
+b1 = floor(n / 3)
+b2 = floor(2 * n / 3)
+ranks 1..b1            -> proxy_easy
+ranks b1+1..b2         -> proxy_moderate
+ranks b2+1..n          -> proxy_hard
+```
 
-## 6. Evaluation-learner exclusion / disjointness
+Examples: n=9 -> 3/3/3; n=10 -> 3/3/4; n=11 -> 3/4/4; n=12 -> 4/4/4.
+Forbidden implementations: pandas qcut, floating quantile interpolation,
+empirical cut-point tuning, global cross-skill ranking, random tie breaking.
 
-The pseudonymous learner set belonging to the frozen 2022-2023 exact Grade 6
-evaluation cohort was identified from source metadata only (Grade 6 assignment
-started inside the evaluation window), then excluded from calibration:
+## 6-7. Calibrated problems and skills
 
-| Measure | Count |
+- Total calibrated problems (>= 20 independent learners): **1,051**.
+- Exact skills with calibrated problems: **62** (90 exact skills observed in
+  total; 1,731 exact-skill eligible problems; 680 insufficient-evidence
+  problems; 18 distinct null-skill problems excluded).
+
+## 8. Skills passing the 9 / 3+3+3 catalog gate
+
+**35** of 62 skills pass the full gate (`>= 9` calibrated problems and `>= 3`
+proxy_easy / proxy_moderate / proxy_hard). 27 skills are
+`insufficient_skill_catalog` (19 have >= 3 calibrated problems but fail the
+gate; 8 have only 1-2 calibrated problems and therefore receive no tiers).
+
+## 9-11. Proxy tier counts
+
+| Tier | Problems |
 |---|---:|
-| Possible pre-2022 Grade 6 calibration learners | 85,675 |
-| Excluded because they also appear in the evaluation cohort | 8,616 |
-| Final independent calibration learner count | 77,059 |
-| Calibration/evaluation learner overlap after exclusion | **0** |
+| proxy_easy | 329 |
+| proxy_moderate | 350 |
+| proxy_hard | 362 |
 
-`evaluationLearnersExcludedFromCalibration: true`. No policy outcome was
-inspected to construct this exclusion. The frozen disjointness rule was not
-weakened.
+1,041 of 1,051 calibrated problems received a tier; 10 calibrated problems sit
+in skills with fewer than 3 calibrated problems (no tier assignable, skill
+insufficient).
 
-## 7. Graded-response rule
+## 12. Per-skill tier-count distribution
 
-Only approved graded events contribute: `correct_response` -> 1 and
-`wrong_response` -> 0 (first valid graded response per problem instance, per
-the verified U7 semantics). `open_response`, hints, explanations, answers, and
-all other actions never determine correctness. Per (learner, problem), only the
-chronologically first graded outcome contributes; repeated encounters do not
-inflate learner or response counts.
+54 skills received tiers. Representative patterns (easy/moderate/hard per
+skill): (38,38,38) x1, (24,25,25) x1, (18,18,19) x1, (14,14,15) x2,
+(12,12,12) x2, (7,7,7) x3, (6,6,6) x3, (5,6,6) x4, (3,4,4) x4, (3,3,3) x2,
+(2,3,3) x3, (2,2,3) x2, (1,2,2) x5, (1,1,2) x4, (1,1,1) x3, and other
+larger-skill patterns. Top skills: `6.NS.A.1` 38/38/38 (114 problems),
+`6.EE.B.7` 24/25/25 (74), `6.EE.A.2a` 18/18/19 (55), `6.RP.A.3a` 17/17/17
+(51), `6.G.A.2` 14/14/15 (43).
 
-## 8. sourceSkillCode eligibility
+## 13. Deterministic catalog hash
 
-A problem enters calibration only with an exact non-null `sourceSkillCode`.
-Problems without a skill code are excluded and counted (never assigned or
-inferred a skill). Different skills are never pooled.
+Protected catalog SHA-256:
+`fe4cb2585bae9a8f15ee2802c23dea8270252384ab7e9c5a410d1ff934bd58e9`
+(`assistments_problem_difficulty_proxy_v1.csv`, 1,731 rows).
 
-## 9. Minimum learner threshold
+## 14. Rerun reproducibility
 
-20 independent calibration learners per problem (unique learners, not rows).
-Problems below the threshold:
+**REPRODUCIBLE.** The amended E2 was executed twice; catalog bytes/hash and
+manifest bytes/hash were identical on both runs. Manifest SHA-256:
+`18502d7354c30a24849e659d7b8d656587eb3b48cefd495315f90b66436f3d17`. The
+manifest contains no timestamps or local paths.
 
-```text
-calibrationStatus = insufficient_problem_evidence
-proxyDifficulty = null
-```
+## 15. Calibration/evaluation learner overlap
 
-The threshold was not lowered after inspecting coverage.
+**0.** Possible pre-2022 Grade 6 learners 85,675; excluded evaluation-cohort
+learners 8,616; final calibration learners 77,059;
+`evaluationLearnersExcludedFromCalibration: true`.
 
-## 10. Smoothing equation
+## 16. Tests/results
 
-```text
-p_correct = (correct_responses + 1) / (total_graded_responses + 2)
-difficulty_score = 1 - p_correct
-```
-
-## 11-13. Problem counts
-
-| Count | Value |
-|---|---:|
-| Total observed problems (graded calibration evidence) | 1,749 |
-| Exact-skill eligible problems | 1,731 |
-| Calibrated problems (>= 20 independent learners) | 1,051 |
-| Insufficient-evidence problems (< 20 learners) | 680 |
-
-## 14-16. Skill counts
-
-| Count | Value |
-|---|---:|
-| Exact skills observed | 90 |
-| Skills with at least one calibrated problem | 62 |
-| Skills passing the full 9 / 3+3+3 catalog gate | **not computed** (blocked) |
-
-Diagnostic (not a gate result): 35 of the 62 skills have >= 9 calibrated
-problems, covering 941 of the 1,051 calibrated problems (89.5%).
-
-## 17-19. Proxy tier counts
-
-```text
-proxy_easy     not computed (blocked)
-proxy_moderate not computed (blocked)
-proxy_hard     not computed (blocked)
-```
-
-Real-data tier assignment was deliberately NOT executed. See section 26.
-
-## 20. Calibration learners per problem (distribution)
-
-Across all 1,731 eligible problems: min 1, Q1 7, median 138, Q3 235, max 621.
-
-## 21. p_correct / difficulty_score (distribution)
-
-All eligible problems: p_correct median 0.700 (Q1 0.576, Q3 0.812, min 0.100,
-max 0.997); difficulty_score median 0.300.
-
-Calibrated problems only (n = 1,051): p_correct median 0.730 (Q1 0.609,
-Q3 0.830, min 0.159, max 0.997).
-
-## 22. Excluded null-skill problems
-
-18 distinct problems with graded calibration evidence had no exact
-`sourceSkillCode` and were excluded from proxy difficulty calibration (1,087
-action rows; counted, never assigned a skill).
-
-## 23. Deterministic hash / reproducibility record
-
-- Protected catalog SHA-256:
-  `c504741612430a4e86bc6c7b477943b24163859acd3f8e87ea14024af931e4a2`
-  (`assistments_problem_difficulty_proxy_v1.csv`, 1,731 rows).
-- E2 manifest SHA-256:
-  `d240e6b63da23b89db81c4d924aef91be984e5b7ca08f124065b631b3053a641`.
-- Rerun check: the calibration was executed twice; catalog bytes and manifest
-  bytes were identical on both runs (catalog and manifest hashes reproduced).
-  The manifest contains no timestamps or local paths.
-
-## 24. Remaining limitations
-
-1. **Tertile boundary rule gap (blocker).** `assistments-adaptive-contract-v1`
-   freezes ordering (p_correct descending, then externalProblemKey ascending)
-   and the three-tertile semantics, but does not completely define how tertile
-   boundaries are formed when a skill's calibrated problem count is not
-   divisible by three. Per the frozen E2 governance rule, real-data tier
-   assignment and the catalog gate were therefore NOT executed. See section 26.
-2. Skill-code grade-prefix audit: 161 eligible problems (82 calibrated) sit in
-   Grade 6 sequences but carry a non-grade-6 CCSS skill-code prefix (e.g.
-   `3.G.A.1`, `4.NF.A.1`); 32 distinct such skills. These remain eligible under
-   the frozen contract (sequence-level Grade 6 membership + exact non-null
-   skill code) and are tiered within their exact skill code; the mismatch is
-   recorded as audit metadata, not used to change eligibility.
-3. 8,308 Grade 6 assignment rows with unparseable `assignment_start_time` were
-   excluded (fail closed) from the assignment scan and counted.
-4. 2 action rows from calibration-window assignments had timestamps after the
-   calibration window end and were excluded.
-5. Only 18 distinct null-skill problems were excluded; all other eligible
-   problems carried exact skill codes.
-6. The calibration is Grade 6-sequence-based; the evaluation cohort is defined
-   by Grade 6 assignment start in the evaluation window (U7 convention).
-7. Aggregate-only evidence: the protected catalog contains no learner rows, no
-   raw identifiers, and no answer/question text.
-
-## 25. Readiness decision
-
-**NOT READY FOR AQC-E3.**
-
-The calibration evidence itself is healthy (1,051 calibrated problems across
-62 skills, 35 skills with >= 9 calibrated problems, zero calibration/evaluation
-learner overlap, fully reproducible hashes), but the frozen contract does not
-completely define the non-divisible tertile boundary rule, and the E2
-governance rule forbids choosing a tertile implementation after seeing data.
-
-## 26. Exact blocker and recommended amendment
-
-**Blocker:** `assistments-adaptive-contract-v1` does not completely define how
-within-skill tertile boundaries are formed when a skill's calibrated problem
-count is not divisible by three ("stable rank boundaries" is a description,
-not a complete algorithm).
-
-**Recommended next step (separately versioned, pre-policy amendment):** freeze
-one deterministic boundary rule in a versioned amendment (e.g.
-`assistments-adaptive-contract-v1.1`), for example:
-
-```text
-sort by p_correct descending, then externalProblemKey ascending;
-rank 1..n;
-proxy_easy     = ranks 1..floor(n/3)
-proxy_moderate = ranks floor(n/3)+1 .. floor(2n/3)
-proxy_hard     = remaining ranks
-```
-
-After the amendment is approved, re-run AQC-E2 (the calibration pass is
-already implemented, deterministic, and reproducible), assign tiers, apply the
-9 / 3+3+3 catalog gate, and then proceed to E3.
-
-## 27. Governance and no-policy confirmation
-
-- `provenance: external_real`; `containsRawIdentifiers: false`;
-  `productionPromotionAllowed: false`.
-- No native Logic Oasis bank/status fields appear in the catalog or manifest.
-- P1 decisions computed: **0**; P2 decisions computed: **0**; P3a decisions
-  computed: **0**; matched outcomes: **0**; policy comparison reports: **0**.
-- No policy selector is imported or called anywhere in the E2 path (enforced
-  by tests).
-- AQC-E3 was **not** executed. No 2022-2023 adaptive attempts were
-  reconstructed and no `currentProxyDifficulty` was assigned to any evaluation
-  attempt.
-
-## 28. Tests executed
-
-- New E2 suites: `tests.test_assistments_difficulty_calibration` (window
-  isolation, cohort eligibility, graded semantics, unique-learner counting,
-  20-learner boundary, smoothing, disjointness, determinism, provenance,
-  no-native-fields, no-policy boundary) and
-  `tests.test_assistments_proxy_tiers` (within-skill tiering, tie
-  determinism, no cross-skill pooling, catalog gate 9/3+3+3): **33/33 passed**.
-- E1 contract/claim-boundary suites: **54/54 passed**.
-- Copied U7 ASSISTments contract/adapter suites: **48/48 passed**.
-- Full ai_pipeline suite on the branch: 273 tests, 1 failure - the documented
-  pre-existing `test_report_records_hashes_parameters_and_safe_claim_boundary`
+- New v1.1 suite `tests.test_assistments_adaptive_contract_v1_1`: **18/18
+  passed** (n=9/10/11/12 boundaries, floor rule, sorting, ties, per-skill
+  independence, no global ranking, deterministic hash, v1 preservation,
+  unchanged non-boundary rules, tamper rejection, no policy selectors, native
+  AQC still validates).
+- E1, E2, proxy-tier, v1.1, and U7 contract/adapter suites: **154/154 passed**.
+- Full ai_pipeline suite: 292 tests, 1 failure - the documented pre-existing
+  `test_report_records_hashes_parameters_and_safe_claim_boundary`
   (line-ending-dependent report/config hash; reproduced identically on the
-  clean predecessor AQC branch). No new regressions.
+  clean predecessor AQC branch).
+
+## 17. New regressions
+
+**None.**
+
+## 18-21. No policy outputs
+
+P1 decisions = **0**; P2 decisions = **0**; P3a decisions = **0**; matched
+outcomes = **0**; policy comparison reports = **0**. No policy selector is
+imported or called in the E2/amendment path (enforced by tests).
+
+## 22. AQC-E3 NOT executed
+
+Confirmed. No 2022-2023 adaptive attempts were reconstructed, no attempt
+purity was computed, no `currentProxyDifficulty` was assigned to any
+evaluation attempt, and AQC-E3 was not started.
+
+## Background (frozen context, unchanged)
+
+- E1 verification passed before any raw data was touched (contract v1.1 now
+  also verifies the v1 predecessor binding and the amendment fields).
+- ASSISTments EDM Cup 2023 release `assistments-edm-cup-2023-release-v1`; raw
+  hashes per J0; provenance `external_real`; raw files and learner-safe
+  outputs outside Git; `containsRawIdentifiers: false`;
+  `productionPromotionAllowed: false`.
+- Cohort: exact Grade 6 Mathematics (`sequence_folder_path_level_2 == "Grade
+  6"`); `Grade 6 Accelerated` separate; no Grades 4-6 pooling.
+- Calibration window `2019-02-25T00:00:00Z .. 2021-12-31T23:59:59Z`;
+  evaluation window `2022-01-01T00:00:00Z .. 2023-12-31T23:59:59Z`; disjoint.
+- Graded-response rule: `correct_response` = 1, `wrong_response` = 0, first
+  graded response per (learner, problem); `open_response` and all other
+  actions never graded; repeated encounters never inflate learner/response
+  counts.
+- Smoothing: `p_correct = (correct + 1) / (total + 2)`,
+  `difficulty_score = 1 - p_correct`; minimum 20 independent learners.
+- p_correct distribution (all eligible): median 0.700 (Q1 0.576, Q3 0.812);
+  calibrated only: median 0.730. Learners/problem: median 138, max 621.
+- Audit: 161 eligible problems (82 calibrated) in Grade 6 sequences carry a
+  non-grade-6 CCSS skill-code prefix (32 distinct skills); retained per the
+  frozen contract and tiered within their exact skill code.
+
+## Final decision
+
+**READY FOR AQC-E3** - a non-trivial exact Grade 6 three-tier catalog exists
+under the frozen (v1.1-amended) rules: 35 skills pass the 9 / 3+3+3 gate with
+1,041 tiered calibrated problems, calibration/evaluation leakage is zero, and
+reruns reproduce the same catalog and manifest hashes. AQC-E4 remains the
+full Stage-B data-sufficiency gate.

@@ -1,19 +1,21 @@
 """AQC-E2 CLI runner: build the protected problem-difficulty calibration evidence.
 
-The runner verifies the frozen E1 contract before touching any raw data,
-streams the protected ASSISTments CSVs, excludes evaluation-cohort learners,
-aggregates first-graded (learner, problem) outcomes, and writes a protected
+The runner verifies the frozen E1 contract (amended by v1.1) before touching
+any raw data, streams the protected ASSISTments CSVs, excludes
+evaluation-cohort learners, aggregates first-graded (learner, problem)
+outcomes, assigns within-skill proxy tiers under the v1.1 floor boundary rule,
+evaluates the 9 / 3+3+3 skill catalog gate, and writes a protected
 problem-level catalog plus a deterministic manifest.  No policy selector is
-imported or called, and no within-skill tier assignment is applied to real
-data (blocked by the E1 tertile-boundary ambiguity recorded in the E2 report).
+imported or called; no P1/P2/P3a decision or matched outcome is produced.
 """
 
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 import json
 import os
-from collections import Counter
+from dataclasses import replace
 from pathlib import Path
 from statistics import median, quantiles
 
@@ -23,8 +25,6 @@ from ..adapter import (
     source_file_hashes,
 )
 from .difficulty_calibration import (
-    CALIBRATION_METHOD_VERSION,
-    CATALOG_VERSION,
     CalibrationError,
     aggregate_problem_records,
     build_calibration_manifest,
@@ -36,6 +36,7 @@ from .difficulty_calibration import (
     write_manifest,
 )
 from .external_policy_contract import (
+    EXTERNAL_ADAPTIVE_CONTRACT_V1_1_VERSION,
     load_external_adaptive_contract,
     verify_frozen_policy_hashes,
     verify_shared_aqc_constants,
@@ -43,6 +44,11 @@ from .external_policy_contract import (
 from .proxy_tiers import (
     SKILL_CATALOG_MINIMUM_PER_TIER,
     SKILL_CATALOG_MINIMUM_PROBLEMS,
+    CalibratedProblem,
+    assign_within_skill_tiers,
+    evaluate_skill_catalog,
+    summarize_skill_catalogs,
+    tier_counts_by_tier,
 )
 from .schemas import (
     CALIBRATION_WINDOW_END,
@@ -55,7 +61,7 @@ from .schemas import (
 )
 
 
-TIER_ASSIGNMENT_STATUS_BLOCKED = "blocked_contract_ambiguity_non_divisible_tertiles"
+TIER_ASSIGNMENT_STATUS_COMPLETED = "completed"
 
 
 def _distribution(values: list[float]) -> dict[str, float]:
@@ -78,6 +84,7 @@ def run_calibration(
     *,
     pseudonym_key: bytes | str,
     contract_path: str | Path,
+    predecessor_contract_path: str | Path,
     configs_dir: str | Path,
     release_id: str,
     source_hashes: dict[str, str] | None = None,
@@ -85,9 +92,21 @@ def run_calibration(
     """Execute the E2 calibration pass; returns aggregate results (no policy)."""
     raw = Path(raw_dir)
     processed = Path(processed_dir)
-    contract = load_external_adaptive_contract(contract_path)
+    contract = load_external_adaptive_contract(
+        contract_path, version=EXTERNAL_ADAPTIVE_CONTRACT_V1_1_VERSION
+    )
+    predecessor = load_external_adaptive_contract(predecessor_contract_path)
+    if (
+        contract.predecessor_contract_version != predecessor.contract_version
+        or contract.predecessor_contract_sha256 != predecessor.contract_sha256
+    ):
+        raise CalibrationError("v1.1 predecessor binding does not match the preserved v1 contract")
     verify_frozen_policy_hashes(contract, configs_dir)
     verify_shared_aqc_constants(contract)
+    if contract.amendment_reason != "deterministic_discrete_tertile_boundary_clarification":
+        raise CalibrationError("v1.1 amendment reason is not frozen")
+    if contract.tertile_boundary_rule is None:
+        raise CalibrationError("v1.1 tertile boundary rule is missing")
     if contract.provenance != EXTERNAL_PROVENANCE:
         raise CalibrationError("E1 provenance verification failed")
     if not contract.windows_are_disjoint:
@@ -139,10 +158,6 @@ def run_calibration(
         pseudonym_key=pseudonym_key,
     )
 
-    catalog_path = processed / "assistments_problem_difficulty_proxy_v1.csv"
-    write_catalog_csv(records, catalog_path)
-    catalog_hash = file_sha256(catalog_path)
-
     null_skill_excluded = aggregation_counters["problems_null_skill_excluded"]
     null_skill_distinct = action_counters["problems_null_skill_distinct"]
     with_skill = aggregation_counters["problems_observed_with_skill"]
@@ -157,10 +172,63 @@ def run_calibration(
         }
     )
 
+    calibrated_records = [record for record in records if record.calibration_status == "calibrated"]
+    assigned_tiers = assign_within_skill_tiers(
+        [
+            CalibratedProblem(
+                external_problem_key=record.external_problem_key,
+                source_skill_code=record.source_skill_code,
+                p_correct=record.smoothed_correct_probability,
+            )
+            for record in calibrated_records
+        ]
+    )
+    tiered_records = [
+        replace(
+            record,
+            proxy_difficulty=assigned_tiers.get(record.external_problem_key),
+        )
+        if record.calibration_status == "calibrated"
+        else record
+        for record in records
+    ]
+    tier_counts = tier_counts_by_tier(assigned_tiers)
+
+    per_skill_tier_counts: dict[str, dict[str, int]] = {}
+    for record in calibrated_records:
+        per_skill_tier_counts.setdefault(
+            record.source_skill_code,
+            {"proxy_easy": 0, "proxy_moderate": 0, "proxy_hard": 0},
+        )
+        tier = assigned_tiers.get(record.external_problem_key)
+        if tier is None:
+            continue
+        per_skill_tier_counts[record.source_skill_code][tier] += 1
+    catalog_results = [
+        evaluate_skill_catalog(skill, counts)
+        for skill, counts in sorted(per_skill_tier_counts.items())
+    ]
+    catalog_summary = summarize_skill_catalogs(catalog_results)
+    per_skill_distribution = Counter(
+        (
+            counts["proxy_easy"],
+            counts["proxy_moderate"],
+            counts["proxy_hard"],
+        )
+        for counts in per_skill_tier_counts.values()
+    )
+    tier_distribution = [
+        {"tierCounts": list(pattern), "skills": count}
+        for pattern, count in sorted(per_skill_distribution.items(), reverse=True)
+    ]
+
+    catalog_path = processed / "assistments_problem_difficulty_proxy_v1.csv"
+    write_catalog_csv(tiered_records, catalog_path)
+    catalog_hash = file_sha256(catalog_path)
+
     p_correct_values = [record.smoothed_correct_probability for record in records]
     difficulty_values = [record.difficulty_score for record in records]
     learner_counts = [record.calibration_learner_count for record in records]
-    calibrated_records = [record for record in records if record.calibration_status == "calibrated"]
     calibrated_p_correct = [record.smoothed_correct_probability for record in calibrated_records]
 
     manifest = build_calibration_manifest(
@@ -180,8 +248,12 @@ def run_calibration(
         minimum_calibration_learners=MINIMUM_CALIBRATION_LEARNERS,
         tiering_scope="exact_sourceSkillCode",
         tier_ordering_tie_rule="p_correct descending, then externalProblemKey ascending",
-        tier_algorithm_version=CALIBRATION_METHOD_VERSION,
-        tier_assignment_status=TIER_ASSIGNMENT_STATUS_BLOCKED,
+        tier_algorithm_version=EXTERNAL_ADAPTIVE_CONTRACT_V1_1_VERSION,
+        tier_assignment_status=TIER_ASSIGNMENT_STATUS_COMPLETED,
+        tertile_boundary_rule=contract.tertile_boundary_rule,
+        predecessor_contract_version=contract.predecessor_contract_version,
+        predecessor_contract_sha256=contract.predecessor_contract_sha256,
+        amendment_reason=contract.amendment_reason,
         minimum_problems_per_skill=SKILL_CATALOG_MINIMUM_PROBLEMS,
         minimum_problems_per_tier=SKILL_CATALOG_MINIMUM_PER_TIER,
         problem_counts={
@@ -194,14 +266,10 @@ def run_calibration(
         skill_counts={
             "skillsObserved": skills_observed,
             "skillsWithCalibratedProblems": skills_with_calibrated,
-            "skillsFullThreeTierEligible": 0,
-            "skillsInsufficientCatalog": 0,
+            "skillsFullThreeTierEligible": catalog_summary["skillsFullThreeTierEligible"],
+            "skillsInsufficientCatalog": catalog_summary["skillsInsufficientCatalog"],
         },
-        tier_counts={
-            "proxy_easy": 0,
-            "proxy_moderate": 0,
-            "proxy_hard": 0,
-        },
+        tier_counts=tier_counts,
         catalog_sha256=catalog_hash,
     )
     manifest_path = processed / "e2_calibration_manifest.json"
@@ -233,6 +301,8 @@ def run_calibration(
         "skills": {
             "observed": skills_observed,
             "withCalibratedProblems": skills_with_calibrated,
+            "fullThreeTierEligible": catalog_summary["skillsFullThreeTierEligible"],
+            "insufficientCatalog": catalog_summary["skillsInsufficientCatalog"],
         },
         "distributions": {
             "calibrationLearnersPerProblem": _distribution(learner_counts),
@@ -240,8 +310,13 @@ def run_calibration(
             "difficultyScoreAllEligible": _distribution(difficulty_values),
             "pCorrectCalibratedOnly": _distribution(calibrated_p_correct),
         },
-        "tierAssignmentStatus": TIER_ASSIGNMENT_STATUS_BLOCKED,
-        "tierCounts": {"proxy_easy": 0, "proxy_moderate": 0, "proxy_hard": 0},
+        "tierAssignmentStatus": TIER_ASSIGNMENT_STATUS_COMPLETED,
+        "tierCounts": tier_counts,
+        "perSkillTierCountDistribution": tier_distribution,
+        "predecessorContractVersion": predecessor.contract_version,
+        "predecessorContractSha256": predecessor.contract_sha256,
+        "amendmentReason": contract.amendment_reason,
+        "tertileBoundaryRule": dict(contract.tertile_boundary_rule or {}),
         "policyDecisionsComputed": {"P1": 0, "P2": 0, "P3a": 0},
         "matchedOutcomes": 0,
         "policyComparisonReports": 0,
@@ -255,6 +330,14 @@ def main() -> None:
     parser.add_argument("--processed-dir", required=True, help="Protected E2 output directory (outside Git)")
     parser.add_argument(
         "--contract-path",
+        default=str(
+            Path(__file__).resolve().parents[1]
+            / "adaptive"
+            / "assistments_adaptive_contract_v1_1.yaml"
+        ),
+    )
+    parser.add_argument(
+        "--predecessor-contract-path",
         default=str(
             Path(__file__).resolve().parents[1]
             / "adaptive"
@@ -292,6 +375,7 @@ def main() -> None:
         args.processed_dir,
         pseudonym_key=args.pseudonym_key,
         contract_path=args.contract_path,
+        predecessor_contract_path=args.predecessor_contract_path,
         configs_dir=args.configs_dir,
         release_id=args.release_id,
         source_hashes=source_hashes,

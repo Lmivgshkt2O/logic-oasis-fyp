@@ -15,7 +15,6 @@ from external_data.assistments.adaptive.proxy_tiers import (
     SKILL_CATALOG_MINIMUM_PER_TIER,
     SKILL_CATALOG_MINIMUM_PROBLEMS,
     CalibratedProblem,
-    ProxyTierError,
     assign_within_skill_tiers,
     evaluate_skill_catalog,
     summarize_skill_catalogs,
@@ -119,11 +118,16 @@ class WithinSkillTierTests(unittest.TestCase):
         self.assertEqual(assigned["a2"], "proxy_moderate")
         self.assertEqual(assigned["b1"], "proxy_easy")
 
-    def test_fewer_than_three_problems_is_rejected(self) -> None:
-        with self.assertRaises(ProxyTierError):
-            assign_within_skill_tiers(
-                [problem("p1", "skill-a", 0.9), problem("p2", "skill-a", 0.5)]
-            )
+    def test_fewer_than_three_problems_gets_no_tiers(self) -> None:
+        assigned = assign_within_skill_tiers(
+            [problem("p1", "skill-a", 0.9), problem("p2", "skill-a", 0.5)]
+        )
+        self.assertEqual(assigned, {})
+        result = evaluate_skill_catalog(
+            "skill-a",
+            {"proxy_easy": 0, "proxy_moderate": 0, "proxy_hard": 0},
+        )
+        self.assertEqual(result.skill_proxy_status, "insufficient_skill_catalog")
 
 
 class SkillCatalogGateTests(unittest.TestCase):

@@ -43,6 +43,7 @@ from .schemas import (
 
 
 EXTERNAL_ADAPTIVE_CONTRACT_VERSION = "assistments-adaptive-contract-v1"
+EXTERNAL_ADAPTIVE_CONTRACT_V1_1_VERSION = "assistments-adaptive-contract-v1.1"
 
 REQUIRED_EXTERNAL_METRICS = frozenset(
     {
@@ -103,6 +104,10 @@ class ExternalAdaptiveContract:
     policy_evaluation_content_sha256: str
     fresh_bank_limitation: Mapping[str, object]
     never_fabricate_native_fields: frozenset[str]
+    predecessor_contract_version: str | None = None
+    predecessor_contract_sha256: str | None = None
+    amendment_reason: str | None = None
+    tertile_boundary_rule: Mapping[str, object] | None = None
 
     @property
     def windows_are_disjoint(self) -> bool:
@@ -111,8 +116,12 @@ class ExternalAdaptiveContract:
 
 def load_external_adaptive_contract(
     path: str | Path,
+    *,
+    version: str = EXTERNAL_ADAPTIVE_CONTRACT_VERSION,
 ) -> ExternalAdaptiveContract:
     """Load and fail-closed validate the frozen external contract YAML."""
+    if version not in (EXTERNAL_ADAPTIVE_CONTRACT_VERSION, EXTERNAL_ADAPTIVE_CONTRACT_V1_1_VERSION):
+        raise ExternalContractError(f"unsupported external adaptive contract version: {version}")
     source = Path(path)
     try:
         raw_bytes = source.read_bytes()
@@ -124,25 +133,65 @@ def load_external_adaptive_contract(
     if not isinstance(data, dict):
         raise ExternalContractError("external adaptive contract must be a mapping")
 
-    _require_exact_keys(
-        data,
-        {
-            "contractVersion", "contractRole", "frozenAt", "status",
-            "predecessorContracts", "dataset", "evidenceMode", "sourceMode",
-            "timeContract", "attemptUnit", "proxyDifficulty", "attemptTier",
-            "tierAvailability", "problemSetFingerprint", "freshBankLimitation",
-            "replayMode", "policyBindings", "outcomeMatching",
-            "censoringVocabulary", "externalMetrics", "claimLevels",
-            "stageBQuestions", "sourceAbstraction", "governance",
-        },
-        "external adaptive contract",
-    )
-    if _string(data, "contractVersion") != EXTERNAL_ADAPTIVE_CONTRACT_VERSION:
+    base_keys = {
+        "contractVersion", "contractRole", "frozenAt", "status",
+        "predecessorContracts", "dataset", "evidenceMode", "sourceMode",
+        "timeContract", "attemptUnit", "proxyDifficulty", "attemptTier",
+        "tierAvailability", "problemSetFingerprint", "freshBankLimitation",
+        "replayMode", "policyBindings", "outcomeMatching",
+        "censoringVocabulary", "externalMetrics", "claimLevels",
+        "stageBQuestions", "sourceAbstraction", "governance",
+    }
+    if version == EXTERNAL_ADAPTIVE_CONTRACT_V1_1_VERSION:
+        expected_keys = base_keys | {
+            "predecessorContractVersion",
+            "predecessorContractSha256",
+            "amendment",
+        }
+    else:
+        expected_keys = base_keys
+    _require_exact_keys(data, expected_keys, "external adaptive contract")
+    if _string(data, "contractVersion") != version:
         raise ExternalContractError("unsupported external adaptive contract version")
     if _string(data, "contractRole") != "external_descriptive_stage_b_contract_freeze":
         raise ExternalContractError("contractRole is not the frozen Stage-B freeze")
     if _string(data, "status") != "frozen":
         raise ExternalContractError("external adaptive contract must be frozen")
+
+    predecessor_contract_version: str | None = None
+    predecessor_contract_sha256: str | None = None
+    amendment_reason: str | None = None
+    tertile_boundary_rule: Mapping[str, object] | None = None
+    if version == EXTERNAL_ADAPTIVE_CONTRACT_V1_1_VERSION:
+        predecessor_contract_version = _string(data, "predecessorContractVersion")
+        if predecessor_contract_version != EXTERNAL_ADAPTIVE_CONTRACT_VERSION:
+            raise ExternalContractError(
+                "v1.1 predecessor must be assistments-adaptive-contract-v1"
+            )
+        predecessor_contract_sha256 = _sha256(data, "predecessorContractSha256")
+        amendment = _mapping(data, "amendment")
+        _require_exact_keys(
+            amendment,
+            {
+                "reason", "scope", "fixesUnderspecifiedImplementationDetail",
+                "motivatedByPolicyPerformance", "policyResultsExistedBeforeAmendment",
+                "v1Preserved", "rationale",
+            },
+            "amendment",
+        )
+        amendment_reason = _string(amendment, "reason")
+        if amendment_reason != "deterministic_discrete_tertile_boundary_clarification":
+            raise ExternalContractError("amendment reason is not the frozen clarification")
+        if _string(amendment, "scope") != "within_skill_tertile_boundaries_only":
+            raise ExternalContractError("amendment scope is not within-skill tertile boundaries only")
+        if not _bool(amendment, "fixesUnderspecifiedImplementationDetail"):
+            raise ExternalContractError("amendment must fix an underspecified implementation detail")
+        if _bool(amendment, "motivatedByPolicyPerformance"):
+            raise ExternalContractError("amendment must not be motivated by policy performance")
+        if _bool(amendment, "policyResultsExistedBeforeAmendment"):
+            raise ExternalContractError("no policy result may have existed before the amendment")
+        if not _bool(amendment, "v1Preserved"):
+            raise ExternalContractError("v1 must remain preserved")
 
     predecessors = _mapping(data, "predecessorContracts")
     shared_aqc = _mapping(predecessors, "sharedAqcPolicyContract")
@@ -222,6 +271,46 @@ def load_external_adaptive_contract(
     tiering = _mapping(proxy, "withinSkillTiering")
     if _string(tiering, "tieringScope") != "exact_sourceSkillCode_only":
         raise ExternalContractError("proxy tiers must be constructed within exact sourceSkillCode")
+    if version == EXTERNAL_ADAPTIVE_CONTRACT_V1_1_VERSION:
+        boundary = _mapping(tiering, "tertileBoundaryRule")
+        _require_exact_keys(
+            boundary,
+            {
+                "appliesTo", "n", "b1", "b2", "assignmentBy1BasedRank",
+                "examples", "forbiddenImplementations",
+            },
+            "tertileBoundaryRule",
+        )
+        if _string(boundary, "b1") != "floor(n / 3)" or _string(boundary, "b2") != "floor(2 * n / 3)":
+            raise ExternalContractError(
+                "v1.1 tertile boundaries must be floor(n/3) and floor(2n/3)"
+            )
+        assignment = _string_list(boundary, "assignmentBy1BasedRank")
+        if assignment != [
+            "ranks 1 through b1 -> proxy_easy",
+            "ranks b1 + 1 through b2 -> proxy_moderate",
+            "ranks b2 + 1 through n -> proxy_hard",
+        ]:
+            raise ExternalContractError("v1.1 rank assignment is not the frozen partition")
+        examples = _mapping(boundary, "examples")
+        expected_examples = {
+            "n9": {"proxy_easy": 3, "proxy_moderate": 3, "proxy_hard": 3},
+            "n10": {"proxy_easy": 3, "proxy_moderate": 3, "proxy_hard": 4},
+            "n11": {"proxy_easy": 3, "proxy_moderate": 4, "proxy_hard": 4},
+            "n12": {"proxy_easy": 4, "proxy_moderate": 4, "proxy_hard": 4},
+        }
+        if dict(examples) != expected_examples:
+            raise ExternalContractError("v1.1 tertile examples are not the frozen examples")
+        forbidden = _string_list(boundary, "forbiddenImplementations")
+        for item in (
+            "pandas qcut",
+            "floating quantile interpolation",
+            "global cross-skill ranking",
+            "random tie breaking",
+        ):
+            if item not in forbidden:
+                raise ExternalContractError(f"forbidden tertile implementation missing: {item}")
+        tertile_boundary_rule = dict(boundary)
     catalog = _mapping(proxy, "skillCatalogGate")
     if _positive_int(catalog, "minimumCalibratedProblemsPerSkill") != (
         SKILL_CATALOG_MINIMUM_CALIBRATED_PROBLEMS
@@ -383,7 +472,7 @@ def load_external_adaptive_contract(
     # The frozen contract hash is defined over LF-canonical bytes so it is
     # reproducible on any checkout regardless of line-ending filters.
     return ExternalAdaptiveContract(
-        contract_version=EXTERNAL_ADAPTIVE_CONTRACT_VERSION,
+        contract_version=version,
         contract_sha256=sha256(raw_bytes.replace(b"\r\n", b"\n")).hexdigest(),
         dataset_release_id=_string(dataset, "releaseId"),
         dataset_name=_string(dataset, "datasetName"),
@@ -413,6 +502,10 @@ def load_external_adaptive_contract(
         policy_evaluation_content_sha256=evaluation_content_sha,
         fresh_bank_limitation=dict(fresh_bank),
         never_fabricate_native_fields=forbidden_fields,
+        predecessor_contract_version=predecessor_contract_version,
+        predecessor_contract_sha256=predecessor_contract_sha256,
+        amendment_reason=amendment_reason,
+        tertile_boundary_rule=tertile_boundary_rule,
     )
 
 

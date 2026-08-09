@@ -1,17 +1,17 @@
 """AQC-E2 within-skill proxy tier assignment and skill catalog gate.
 
-The frozen E1 contract defines ordering (p_correct descending, then
-externalProblemKey ascending) and the three-tertile semantics, but it does NOT
-completely define how tertile boundaries are formed when a skill's calibrated
-problem count is not divisible by three.  Per the E2 governance rule, real-data
-tier assignment must therefore NOT run until a separately versioned pre-policy
-amendment freezes the boundary rule.
+The frozen v1.1 contract (assistments-adaptive-contract-v1.1) defines the
+deterministic discrete tertile partition: within each exact sourceSkillCode,
+sort adequately calibrated problems by smoothedCorrectProbability descending
+then externalProblemKey ascending, and assign by 1-based rank with
+b1 = floor(n/3) and b2 = floor(2n/3):
 
-This module implements a documented deterministic boundary convention
-(``floor``: group sizes ``n // 3``, ``n // 3``, remainder to the lowest tier)
-so the algorithm is ready for the amended contract.  The E2 run does not apply
-it to real data; tests cover counts divisible by three (where every stable-rank
-convention agrees) and the catalog gate.
+    ranks 1..b1            -> proxy_easy
+    ranks b1+1..b2         -> proxy_moderate
+    ranks b2+1..n          -> proxy_hard
+
+The predecessor contract v1 is preserved unchanged; v1.1 only freezes this
+boundary detail.
 """
 
 from __future__ import annotations
@@ -27,6 +27,7 @@ PROXY_TIER_ORDER = (TIER_EASY, TIER_MODERATE, TIER_HARD)
 
 SKILL_CATALOG_MINIMUM_PROBLEMS = 9
 SKILL_CATALOG_MINIMUM_PER_TIER = 3
+TERTILE_BOUNDARY_RULE = {"b1": "floor(n / 3)", "b2": "floor(2 * n / 3)"}
 
 
 class ProxyTierError(ValueError):
@@ -50,21 +51,18 @@ class SkillCatalogResult:
     skill_proxy_status: str
 
 
-def _tertile_boundaries(problem_count: int) -> tuple[int, int]:
-    """Rank boundaries for the documented ``floor`` convention.
+def tertile_boundaries(problem_count: int) -> tuple[int, int]:
+    """v1.1 rank boundaries b1 = floor(n/3), b2 = floor(2n/3).
 
-    Returns (easy_end_rank, moderate_end_rank) as 1-based inclusive ranks.
-    For counts divisible by three every stable-rank convention agrees, which is
-    what the frozen E1 tests exercise.  The non-divisible split is a proposal
-    pending the versioned amendment described in the module docstring.
+    Returns (b1, b2) as 1-based inclusive rank cut points.
     """
     if problem_count < 3:
         raise ProxyTierError("at least three calibrated problems are required for tiers")
-    easy_end = problem_count // 3
-    moderate_end = (2 * problem_count) // 3
-    if easy_end < 1 or moderate_end <= easy_end or moderate_end >= problem_count:
+    b1 = problem_count // 3
+    b2 = (2 * problem_count) // 3
+    if b1 < 1 or b2 <= b1 or b2 >= problem_count:
         raise ProxyTierError("tertile boundaries are invalid for the problem count")
-    return easy_end, moderate_end
+    return b1, b2
 
 
 def assign_within_skill_tiers(
@@ -74,9 +72,8 @@ def assign_within_skill_tiers(
 ) -> dict[str, str]:
     """Assign proxy tiers within each exact sourceSkillCode (never pooled).
 
-    Ordering is frozen: p_correct descending, then externalProblemKey
-    ascending.  Only the documented ``floor`` boundary convention is supported;
-    it must not be applied to real data until the amendment freezes the rule.
+    Ordering is frozen by v1.1: p_correct descending, then externalProblemKey
+    ascending; boundaries are b1 = floor(n/3), b2 = floor(2n/3).
     """
     if boundary_rule != "floor":
         raise ProxyTierError(f"unsupported boundary rule: {boundary_rule}")
@@ -85,11 +82,16 @@ def assign_within_skill_tiers(
         by_skill.setdefault(problem.source_skill_code, []).append(problem)
     assigned: dict[str, str] = {}
     for skill, skill_problems in sorted(by_skill.items()):
+        if len(skill_problems) < 3:
+            # The v1.1 rank partition is undefined below three problems; such
+            # skills cannot form a three-tier catalog and are handled by the
+            # skill catalog gate (insufficient_skill_catalog).
+            continue
         ordered = sorted(
             skill_problems,
             key=lambda problem: (-problem.p_correct, problem.external_problem_key),
         )
-        easy_end, moderate_end = _tertile_boundaries(len(ordered))
+        easy_end, moderate_end = tertile_boundaries(len(ordered))
         for rank, problem in enumerate(ordered, start=1):
             tier = (
                 TIER_EASY
