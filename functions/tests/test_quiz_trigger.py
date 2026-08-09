@@ -7,6 +7,7 @@ sys.path.insert(0, str(ROOT / "functions"))
 
 import main
 from ai_runtime import AI_RUNTIME_SERVICE_ACCOUNT
+from ai_runtime import RuntimeBundle
 
 
 class QuizTriggerContractTests(unittest.TestCase):
@@ -30,6 +31,17 @@ class QuizTriggerContractTests(unittest.TestCase):
     def test_runtime_string_parameters_accept_legacy_callable_value(self) -> None:
         legacy_parameter = type("LegacyParameter", (), {"value": lambda self: "controlled_demo"})()
         self.assertEqual("controlled_demo", main._resolved_string_param(legacy_parameter))
+
+    def test_runtime_bundle_carries_the_policy_evaluation_contract(self) -> None:
+        bundle = RuntimeBundle.from_runtime_root(
+            ROOT / "ai_pipeline",
+            evidence_mode="real_evaluated_only",
+            model_bucket="logic-oasis-models",
+        )
+        self.assertTrue(bundle.policy_evaluation_path.exists())
+        self.assertEqual(64, len(bundle.policy_evaluation_sha256))
+        vendor_config = ROOT / "functions" / "vendor" / "configs" / "policy_evaluation_v1.yaml"
+        self.assertTrue(vendor_config.exists())
 
 
 if __name__ == "__main__":

@@ -144,6 +144,29 @@ existing controlled projections are never relabelled in place.
 
 Current seed names such as `forumPosts`, `forumReplies`, and `helperReputation` are prototype/seed-only names. Migrate only reviewed content into the target Q&A contract; do not treat seed text as training evidence.
 
+## 7A. Policy Evaluation Study Collections (AQC-4)
+
+All collections below are server-owned and require explicit terminal-deny Rules
+even though the default deny rule would also protect them. The callable
+control plane (`policyEvaluationAdmin` claim) and the Canonical U8 runtime use
+the Admin SDK and are not constrained by these rules. On export these records
+are HMAC-pseudonymized, not anonymous.
+
+| Path | Document ID | Required target fields | Writer and reader boundary |
+|---|---|---|---|
+| `policyEvaluationStudies/{studyVersion}` | `studyVersion` | `studyVersion`, `status` (`draft`, `enrolling`, `active`, `closed`, `archived`), immutable `manifestHash`, policy versions, outcome/probe protocol versions, `deltaFD`, `randomizationVersion`, `releaseRef`, lifecycle timestamps | Dedicated evaluation admin only; no client read/write. Frozen manifest and `deltaFD` are immutable once the study is active. |
+| `policyEvaluationConsents/{studentId}_{studyVersion}` | Student/study pair | `studentId`, `studyVersion`, `status` (`active`, `revoked`, `expired`), `consentRecordRef`, `expiresAt`, `recordedBy` | Dedicated evaluation admin only; no client read/write. Documented consent is separate from enrollment. |
+| `policyEvaluationEnrollments/{studentId}_y{yearLevel}_{topicId}_{subtopicId}_{studyVersion}` | Learner/context/study key | `studentId`, `yearLevel`, `topicId`, `subtopicId`, `startingDifficulty`, `contextVersion`, `studyVersion`, `assignedArm`, `allocationBlockId`, `allocationVersion`, `consentRef`, `status`, `assignedAt`, `revokedAt` | Dedicated evaluation admin only; no client read/write. Stable blocked-randomized arm; revocation is historical, not a rewrite. |
+| `policyEvaluationAllocationBlocks/{studyVersion}_{yearLevel}_{topicId}_{subtopicId}_{startingDifficulty}` | Stratum key | Immutable stratum fields, per-arm counts, `updatedAt` | Server-only enrollment transaction. Keeps allocation balanced without trusting a client random choice. |
+| `policyEvaluationDecisionAudits/{decisionId}` | Deterministic decision ID | `decisionId`, `studyVersion`, `enrollmentId`, `attemptId`, `studentId`, `sourceAttemptSequence`, `assignedArm`, `deliveredArm`, `protocolDeviation`, selector/config versions, redacted input snapshot, reason code, selected difficulty/bank, `createdAt` | Canonical U8 runtime only; no client read/write (created in AQC-5). |
+| `policyEvaluationProbes/{decisionId}` and `policyEvaluationOutcomes/{decisionId}` | Decision ID | Probe form/blueprint/target/calibration and outcome eligibility, censoring, later probe attempt, result, `computedAt`, outcome version | Canonical U8 runtime only; no client read/write (created in AQC-5). |
+| `policyEvaluationAdminAudits/{auditId}` | Deterministic action ID | `actorUid`, `action`, `subjectRef`, `releaseRef`, `rationale`, `createdAt` | Admin callable only; no client read/write. Audits study creation, consent, enrollment, revocation, and closure. |
+
+**Retention owner:** the policy-evaluation evaluation admin service account.
+Arm and audit IDs are never added to `adaptiveAssignments`, `subtopicMastery`,
+`studentAiStatuses`, `quizAttempts`, or any client-readable document, because
+Firestore Rules cannot redact fields from an otherwise readable document.
+
 ## 8. Oasis Game Economy and World State
 
 | Path | Status | Document ID | Required target fields | Writer and reader rules |
@@ -178,6 +201,7 @@ The approved Stage 3 reservation does not change FYP1 database implementation. T
 | Raw AI jobs/runs and model registry | Denied | Denied | Runtime or privileged promotion only | Raw features, SHAP values, errors, hashes, paths, release metadata, and registry state never cross the client boundary. |
 | User profile and preferences | Owner only | Restricted safe fields only | Server validates identity/role fields | Foreign UID access denied; role/link escalation denied. |
 | Parent links | Linked parties may read | Denied | Approved server/admin flow | No self-linking or cross-student access. |
+| Policy evaluation studies, consents, enrollments, allocation blocks, decision audits, probes, outcomes, admin audits | Denied | Denied | Dedicated `policyEvaluationAdmin` callables and U8 runtime only | Emulator denies direct client reads/writes; non-enrolled learners keep the unchanged production adaptive path. |
 | Q&A source text | Role/visibility-based read | Author restricted fields or validated callable | Backend/moderation derived fields | Acceptance, AI quality, rewards, and moderation are not client-controlled. |
 | Wallet, ledger, world, restoration | Owner read of projection | Denied | Backend commands only | Reconcile balances, events, level, and revision; reject duplicate source IDs. |
 | Configuration and model registry | Read only where needed | Denied | Controlled deployment/promotion only | Client cannot activate policy/model/configuration. |

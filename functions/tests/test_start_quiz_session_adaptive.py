@@ -9,7 +9,7 @@ FUNCTIONS_ROOT = Path(__file__).resolve().parents[1]
 if str(FUNCTIONS_ROOT) not in sys.path:
     sys.path.insert(0, str(FUNCTIONS_ROOT))
 
-from functions import main
+import main
 
 
 TOPIC_ID = "whole_numbers_y4"
@@ -293,6 +293,22 @@ class AdaptiveQuizStartTests(unittest.TestCase):
 
         self.assertEqual("hard-bank", session["bankId"])
         self.assertEqual("Hard", session["difficultyLevel"])
+
+    def test_non_enrolled_learner_keeps_unchanged_adaptive_path(self) -> None:
+        session = self._start()
+
+        self.assertEqual("moderate-bank", session["bankId"])
+        self.assertEqual("Moderate", session["difficultyLevel"])
+        self.assertEqual("runtime_adaptive", session["assignmentSource"])
+        # AQC-4 enrollment is a sidecar: the start boundary must not consult or
+        # create any policy-evaluation collection for a non-participant.
+        for collection in (
+            "policyEvaluationEnrollments",
+            "policyEvaluationStudies",
+            "policyEvaluationConsents",
+            "policyEvaluationAllocationBlocks",
+        ):
+            self.assertNotIn(collection, self.database.collections)
 
     def test_inactive_assignment_bank_safely_falls_back_to_easy(self) -> None:
         self.database.collections["questionBanks"]["moderate-bank"]["isActive"] = False
