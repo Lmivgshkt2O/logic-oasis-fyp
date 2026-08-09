@@ -1,0 +1,199 @@
+contractVersion: assistments-j2-attempt-label-contract-v2
+predecessor: assistments-j2-attempt-label-contract-v1
+frozenAt: "2026-08-08"
+status: approved-pre-model-methodology-amendment
+sourcePlan: 2026-08-07-001-feat-u7-assistments-edm-cup-2023-external-real-data-evaluation-plan.md
+amendment:
+  motivatedBy: source-semantic-mismatch
+  notMotivatedByModelPerformance: true
+  rationale:
+    - sequence-level in-unit assignments contain multiple skills, so the v1
+      same-sequence attempt conflates several student-subtopic units
+    - repeated same-sequence fluency rounds frequently reuse identical problem
+      sets, which v1 correctly censored and produced zero labelled rows
+    - the exact source-native sourceSkillCode maps more directly to the
+      canonical Logic Oasis student-subtopic prediction unit
+  predecessorEvidencePreserved: true
+  j3aDiagnosticCountsAreNotFinalModelData: true
+
+primaryCohort:
+  sourceGrade: "6"
+  sourceSubject: Mathematics
+  gradeSixAcceleratedMerged: false
+  broadenGradesDuringJ2: false
+  fallback:
+    declared: true
+    j3Only: false
+    pooledGrades: ["4", "5", "6"]
+    subject: Mathematics
+    reporting: "separate secondary/fallback external analysis; never silently replaces the primary Grade 6 result"
+
+attemptUnit:
+  v2Unit: "one learner-specific exact-skill episode inside one completed external assignment"
+  episodeIdentityFields:
+    - externalStudentKey
+    - externalAssignmentKey
+    - exact non-null sourceSkillCode
+  usesOnlyResponsesOfThatSkill: true
+  neverMixSkillsInOneEpisode: true
+  requiresAssignmentStarted: true
+  requiresLaterAssignmentFinished: true
+  episodeStartedAtSource: assignment_started sourceTimestamp
+  incompleteAssignmentsNotFinalU7Episodes: true
+
+compatibilityIdentity:
+  v2Rule: "same externalStudentKey AND exact non-null sourceSkillCode"
+  v1RuleSuperseded: "same externalStudentKey AND same externalSequenceKey"
+  sourceNativeField: problem_skill_code
+  crossSkillPairing: false
+  crossSequencePairingForSampleSize: false
+
+nullSkillExclusion:
+  nullSkillEpisodesCannotEnterV2BaseDataset: true
+  neverAssignOrInferSkillCode: true
+  nullSkillExclusionsRecorded: true
+
+problemCorrectness:
+  rule: problem_started -> first later valid graded response
+  gradedActions:
+    correct_response: 1
+    wrong_response: 0
+  laterResponsesIgnored: true
+  openResponseUngraded: true
+  neverInferFrom:
+    - problem_finished
+    - answer_requested
+    - hint_requested
+    - explanation_requested
+    - unit-test score files
+
+multipleOrAmbiguousStarts:
+  noProblemStarted: exclude from graded and timing evidence
+  multipleProblemStartedForSameEpisodeProblem:
+    - timing marked ambiguous and excluded from response-time evidence
+    - first valid graded response may still contribute correctness when problem identity is unambiguous
+    - no new start-selection heuristic invented
+    - count recorded
+
+responseTimeQualityRule:
+  projectDefinedRule: true
+  notAnAssistmentsDatasetProperty: true
+  validRangeMilliseconds: "0 < response_time_ms <= 1800000"
+  thresholdMinutes: 30
+  formula: first graded response timestamp - corresponding problem_started timestamp
+  treatments:
+    negative: reject
+    zero: reject
+    greaterThan30Minutes: censor/exclude from timing evidence
+    noClipOrWinsorizeTo30Minutes: true
+  forbiddenProxies:
+    - assignment duration
+    - inter-event time
+    - hint time
+    - any other proxy
+
+minimumEpisodeEvidence:
+  minimumValidGradedProblems: 3
+  minimumValidResponseTimePairs: 3
+  validityLevels:
+    outcome_valid:
+      - completed assignment
+      - exact primary/fallback cohort
+      - valid learner/assignment/skill identity
+      - at least 3 valid first-graded problem outcomes within the skill episode
+    feature_valid:
+      - outcome-valid
+      - at least 3 valid uncensored response-time pairs within the skill episode
+  evidenceAppliedIndependentlyPerSkillEpisode: true
+
+featureConstruction:
+  correct_rate: "number of valid first graded responses that are correct / number of valid first graded responses (within the skill episode)"
+  mean_response_time_ms: "mean of only valid uncensored problem response-time pairs (within the skill episode)"
+  censoredResponseTimeStillContributesCorrectness: true
+  baseSchema: quiz-attempt-features-v2
+  baseFeatures:
+    - correct_rate
+    - mean_response_time_ms
+  neverAddAsBaseFeatures:
+    - grade
+    - skill
+    - sequence
+    - hint
+    - problem count
+    - any ASSISTments-only field
+
+unresolvedProblemMetadata:
+  sourceFinding: "J1 found 819 source problem IDs absent from problem_details"
+  v2Treatment:
+    - problems with null sourceSkillCode cannot enter the v2 base U7 dataset
+    - no skill code is assigned or inferred for them
+    - their exclusion count is recorded
+  bktOnly:
+    - exclude rows with missing sourceSkillCode
+    - exclusion must not alter the base DT/XGBoost/MLP dataset
+
+episodeChronology:
+  orderWithin:
+    - externalStudentKey
+    - sourceSkillCode
+  orderBy: assignment_started sourceTimestamp of the containing assignment
+  neverResolveTiesBy: externalAssignmentKey lexical order
+  indistinguishableStartTimestamps: mark affected target pairing chronology_ambiguous and censor it
+  recordCount: true
+
+nextCompatibleEpisodeRule:
+  scope: every feature-valid current skill episode
+  next: immediate chronological later episode for same externalStudentKey + sourceSkillCode
+  noSkippingInterveningEpisode: true
+  censorWhenImmediateNext:
+    - absent
+    - not outcome-valid
+    - chronology-ambiguous
+  noSearchFartherAhead: true
+
+identicalQuestionRepeatRule:
+  problemSetSource: valid graded externalProblemKey values per episode
+  censor: complete problem-key set exactly identical between current and next episodes
+  censorReason: immediate_identical_problem_set_repeat
+  partialOverlap: keep pair and retain problem-overlap rate as audit metadata only
+  overlapRateNeverABaseFeature: true
+
+masteryCriterionAndTarget:
+  masteryCriterion: 0.6
+  tuneAfterObservingModelResults: false
+  next_attempt_support_needed:
+    trueCondition: "next compatible episode correct_rate < 0.60"
+    falseCondition: "next compatible episode correct_rate >= 0.60"
+  missingValidNextOutcome: target censored, never converted into either class
+
+futureLeakageBoundary:
+  currentFeaturesFromCurrentEpisodeOnly: true
+  neverUse:
+    - next episode features
+    - next episode response times
+    - unit-test outcome tables
+    - future actions
+    - later assignments
+    - future BKT states
+  nextEpisodeUsedOnlyForTargetLabel: true
+
+bktBoundary:
+  orderingAvailableFromJ0: true
+  finalBktAblation: false
+  eligibilityRequires:
+    - non-null sourceSkillCode
+    - deterministic response ordering
+  bktIsNamedAblationNeverFourthClassifier: true
+
+provenancePrivacy:
+  provenance: external_real
+  sourceDataset: assistments_edm_cup_2023
+  fabricateNativeLogicOasisFields: false
+  learnerLevelOutputsProtectedOutsideGit: true
+  repositoryAllowed:
+    - code
+    - schema/config
+    - tests
+    - aggregate counts
+    - non-identifying evidence reports
+

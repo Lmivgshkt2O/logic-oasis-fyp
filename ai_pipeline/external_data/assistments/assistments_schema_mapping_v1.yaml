@@ -1,0 +1,337 @@
+schemaMappingVersion: assistments-schema-mapping-v1
+detectedAt: "2026-08-07"
+detectionMethod: bounded-and-streaming-header-and-sample-inspection-of-the-physically-downloaded-kaggle-release
+source:
+  dataset: assistments_edm_cup_2023
+  provenance: external_real
+  sourcePlatform: ASSISTments
+  sourceDistribution: Kaggle EDM Cup 2023
+  selectedWindow: "2022-01-01/2023-12-31"
+  usageTerms: ASSISTments Data Terms of Use effective 2020-10-30
+
+physicalFiles:
+  action_logs.csv:
+    role: learner interaction chronology and graded response behavior
+    requiredForBaseU7: true
+    excludedFromBaseFeatures: false
+    detectedColumns:
+      - assignment_log_id
+      - timestamp
+      - problem_id
+      - max_attempts
+      - available_core_tutoring
+      - score_viewable
+      - continuous_score_viewable
+      - action
+      - hint_id
+      - explanation_id
+  assignment_details.csv:
+    role: assignment instance identity, learner identity, sequence identity, assignment chronology
+    requiredForBaseU7: true
+    excludedFromBaseFeatures: false
+    detectedColumns:
+      - assignment_log_id
+      - teacher_id
+      - class_id
+      - student_id
+      - sequence_id
+      - assignment_release_date
+      - assignment_due_date
+      - assignment_start_time
+      - assignment_end_time
+  problem_details.csv:
+    role: problem identity, Mathematics skill/content metadata
+    requiredForBaseU7: true
+    excludedFromBaseFeatures: false
+    detectedColumns:
+      - problem_id
+      - problem_multipart_id
+      - problem_multipart_position
+      - problem_type
+      - problem_skill_code
+      - problem_skill_description
+      - problem_contains_image
+      - problem_contains_equation
+      - problem_contains_video
+      - problem_text_bert_pca
+  sequence_details.csv:
+    role: sequence/unit identity and curriculum/grade hierarchy
+    requiredForBaseU7: true
+    excludedFromBaseFeatures: false
+    detectedColumns:
+      - sequence_id
+      - sequence_folder_path_level_1
+      - sequence_folder_path_level_2
+      - sequence_folder_path_level_3
+      - sequence_folder_path_level_4
+      - sequence_folder_path_level_5
+      - sequence_name
+      - sequence_problem_ids
+  assignment_relationships.csv:
+    role: unit-test assignment to in-unit assignment relationship
+    requiredForBaseU7: false
+    excludedFromBaseFeatures: true
+    detectedColumns:
+      - unit_test_assignment_log_id
+      - in_unit_assignment_log_id
+  sequence_relationships.csv:
+    role: unit-test sequence to in-unit sequence relationship
+    requiredForBaseU7: false
+    excludedFromBaseFeatures: true
+    detectedColumns:
+      - unit_test_sequence_id
+      - in_unit_sequence_id
+  training_unit_test_scores.csv:
+    role: competition unit-test scores (not physically present in downloaded release)
+    requiredForBaseU7: false
+    excludedFromBaseFeatures: true
+    detectedColumns: []
+  evaluation_unit_test_scores.csv:
+    role: competition unit-test scores (not physically present in downloaded release)
+    requiredForBaseU7: false
+    excludedFromBaseFeatures: true
+    detectedColumns: []
+  hint_details.csv:
+    role: hint content metadata (not physically present in downloaded release)
+    requiredForBaseU7: false
+    excludedFromBaseFeatures: true
+    detectedColumns: []
+  explanation_details.csv:
+    role: explanation content metadata (not physically present in downloaded release)
+    requiredForBaseU7: false
+    excludedFromBaseFeatures: true
+    detectedColumns: []
+
+semanticConcepts:
+  learner:
+    semantic: anonymized learner identifier
+    physicalTable: assignment_details.csv
+    physicalField: student_id
+    notes: Non-null on every assignment_details row; action rows join through assignment_log_id.
+  assignment:
+    semantic: assignment instance (one learner-specific in-unit assignment)
+    physicalTable: assignment_details.csv
+    physicalField: assignment_log_id
+    notes: All action_logs rows join to assignment_details on this field; 638,528 action-bearing assignment logs have exactly one assignment_started event.
+  problem:
+    semantic: problem identifier
+    physicalTable: action_logs.csv
+    physicalField: problem_id
+    resolutionTable: problem_details.csv
+    resolutionField: problem_id
+    notes: problem_id is present on problem-level action rows and is null on assignment-level rows.
+  sequence:
+    semantic: sequence/unit identifier
+    physicalTable: assignment_details.csv
+    physicalField: sequence_id
+    resolutionTable: sequence_details.csv
+    resolutionField: sequence_id
+    notes: Every assignment row carries a non-null sequence_id.
+  event_type:
+    semantic: event/action type
+    physicalTable: action_logs.csv
+    physicalField: action
+    notes: Exact lowercase snake_case values; see actionSemantics.
+  event_timestamp:
+    semantic: event timestamp
+    physicalTable: action_logs.csv
+    physicalField: timestamp
+    unit: epoch_seconds
+    timezone: UTC
+    precision: milliseconds
+    notes: Float epoch seconds such as 1599150988.995 -> 2020-09-03T16:36:28.995Z. Missing/unparseable values must be excluded.
+  grade:
+    semantic: grade
+    physicalTable: sequence_details.csv
+    physicalField: sequence_folder_path_level_2
+    representation: 'exact "Grade N" tokens (Grade 1 through Grade 8)'
+    notes: 'Grade 6 Accelerated is a distinct level_2 token and is not merged into primary Grade 6 during J0.'
+  subject:
+    semantic: Mathematics classification
+    physicalTable: problem_details.csv
+    physicalField: problem_skill_code
+    notes: Dataset is Mathematics by EDM Cup 2023 design; skill codes are CCSS-aligned (e.g. 6.RP.A.3b) and sequence folder paths name Mathematics curricula.
+  curriculum_context:
+    semantic: curriculum/unit/topic/skill context
+    physicalTable: sequence_details.csv
+    physicalFields:
+      - sequence_folder_path_level_1
+      - sequence_folder_path_level_2
+      - sequence_folder_path_level_3
+      - sequence_folder_path_level_4
+      - sequence_folder_path_level_5
+      - sequence_name
+    notes: level_1 is the curriculum family, level_2 the grade/course, level_3 the module, level_4 the topic/lesson.
+  assignment_chronology:
+    semantic: assignment start/end or ordering information
+    physicalTable: assignment_details.csv
+    physicalField: assignment_start_time
+    unit: epoch_seconds
+    timezone: UTC
+    auxiliaryFields:
+      - assignment_release_date
+      - assignment_due_date
+      - assignment_end_time
+  problem_skill_relationship:
+    semantic: problem/skill relationship
+    physicalTable: problem_details.csv
+    physicalFields:
+      - problem_id
+      - problem_skill_code
+      - problem_skill_description
+      - problem_type
+  sequence_problem_relationship:
+    semantic: sequence/problem relationship
+    physicalTable: sequence_details.csv
+    physicalField: sequence_problem_ids
+    notes: 'Bare-token list literal such as [AQ0ZKSP6D,2KTD380L98,...]; every referenced id resolves in problem_details.'
+  assignment_sequence_relationship:
+    semantic: assignment/sequence relationship
+    physicalTable: assignment_details.csv
+    physicalFields:
+      - assignment_log_id
+      - sequence_id
+  unit_test_assignment_relationship:
+    semantic: unit-test assignment to in-unit assignment
+    physicalTable: assignment_relationships.csv
+    physicalFields:
+      - unit_test_assignment_log_id
+      - in_unit_assignment_log_id
+    notes: Every action-bearing assignment id appears as an in_unit_assignment_log_id; none appear as unit-test ids.
+  unit_test_sequence_relationship:
+    semantic: unit-test sequence to in-unit sequence
+    physicalTable: sequence_relationships.csv
+    physicalFields:
+      - unit_test_sequence_id
+      - in_unit_sequence_id
+
+actionSemantics:
+  problem_started:
+    semantic: problem instance start
+    usedFor: response-time start anchor and problem eligibility
+  correct_response:
+    semantic: graded correct first response (correct = 1)
+    usedFor: correctness outcome
+  wrong_response:
+    semantic: graded incorrect first response (correct = 0)
+    usedFor: correctness outcome
+  open_response:
+    semantic: ungraded open-response submission
+    usedFor: none
+    notes: Never co-occurs with correct_response/wrong_response for the same problem key; excluded from correctness and response-time.
+  answer_requested:
+    semantic: student requested answer checking before a graded response
+    usedFor: none
+  problem_finished:
+    semantic: problem instance finished
+    usedFor: optional structural audit
+  assignment_started:
+    semantic: assignment begin
+    usedFor: assignment instance audit
+  assignment_finished:
+    semantic: assignment end
+    usedFor: assignment instance audit
+  assignment_resumed:
+    semantic: assignment resumed after interruption
+    usedFor: assignment instance audit
+  continue_selected:
+    semantic: student advanced to the next problem
+    usedFor: none
+  hint_requested:
+    semantic: hint request
+    usedFor: none
+    excluded: true
+  explanation_requested:
+    semantic: explanation request
+    usedFor: none
+    excluded: true
+  skill_related_video_requested:
+    semantic: skill video request
+    usedFor: none
+    excluded: true
+  live_tutor_requested:
+    semantic: live tutor request
+    usedFor: none
+    excluded: true
+
+correctnessContract:
+  rule: first graded response after problem start determines correctness
+  ruleSteps:
+    - problem_started
+    - first valid graded response (correct_response or wrong_response)
+    - correct = 1 if correct_response, correct = 0 if wrong_response
+  laterCorrectionsDoNotChangeLabel: true
+  denominator: problems with a defensible first graded response
+  repeatedResponses: first graded response wins
+  duplicatedEvents: none detected in the downloaded release
+  missingProblemStart: not detected for graded problems; rejected if present
+  gradedResponseWithoutStart: not detected in the bounded sample; rejected if present
+
+responseTimeContract:
+  formulaMilliseconds: "(first graded response timestamp - problem_started timestamp) * 1000"
+  unit: milliseconds
+  rejectNegative: true
+  zeroDurationPolicy: allowed-by-default; telemetry-quality capping rule frozen later, never a silent proxy
+  forbiddenProxies:
+    - assignment duration
+    - time-on-platform
+    - hint time
+    - inter-event time unrelated to the problem-response pair
+
+gradeFilterContract:
+  primary: Grade 6 Mathematics
+  primaryRepresentation: 'sequence_folder_path_level_2 == "Grade 6" (exact token)'
+  corroboration: problem_skill_code matching ^6\.
+  acceleratedVariant: "Grade 6 Accelerated (separate token; not merged during J0)"
+  doNotBroadenDuringJ0: true
+
+dateWindowContract:
+  includedStart: "2022-01-01T00:00:00Z"
+  includedEnd: "2023-12-31T23:59:59Z"
+  exclude:
+    - "2019-2021 interactions"
+    - "2024+ interactions"
+    - "missing or unparseable timestamps"
+  boundaryProofs:
+    - "2021-12-31T23:59:59Z -> excluded"
+    - "2022-01-01T00:00:00Z -> included"
+    - "2023-12-31T23:59:59Z -> included"
+    - "2024-01-01T00:00:00Z -> excluded"
+
+featureContract:
+  baseSchema: quiz-attempt-features-v2
+  baseFeatures:
+    - correct_rate
+    - mean_response_time_ms
+  noAdditionalAssistmentsFeatures: true
+  excludedSourceFiles:
+    - training_unit_test_scores.csv
+    - evaluation_unit_test_scores.csv
+    - hint_details.csv
+    - explanation_details.csv
+  excludedSourceActions:
+    - open_response
+    - hint_requested
+    - explanation_requested
+    - answer_requested
+    - skill_related_video_requested
+    - live_tutor_requested
+
+governance:
+  provenance: external_real
+  neverRelabelAs:
+    - runtime_callable
+    - logic_oasis_runtime_real
+    - native_logic_oasis_quizAttempts
+  neverFabricateNativeFields:
+    - finalizationStatus
+    - validationStatus
+    - sourceAttemptSequence
+    - contentVersionId
+    - bankId
+    - adaptivePolicyVersion
+    - runtimePolicyVersion
+    - nativeBankAssignmentMetadata
+  rawDataOutsideGit: true
+  deAnonymizationProhibited: true
+  redistributionProhibited: true
