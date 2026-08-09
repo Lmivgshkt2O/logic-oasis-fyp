@@ -2,9 +2,15 @@
 
 Closure date: 2026-08-09
 
-Branch: `codex/qa-forum-u5-activation`
+Branch: `codex/qa-forum-naive-bayes`
 
-U5 base commit: `8e93e4d3937a00d50b0680f7d6f555936bb242df`
+U5 source commit: `8e93e4d3937a00d50b0680f7d6f555936bb242df`
+
+Integrated U5 commit: `b0e3bfd2df462ad8e8d8ef78cb93dac637950f57`
+
+U6 source implementation commit: `53964c15cd4271275abb854e6a4fe156d300aed5`
+
+Integrated U6 implementation commit: `54fe28a8abd0b2de498269fbd9523225f9dcc0c4`
 
 Scope: controlled-demonstration FYP1 closure only
 
