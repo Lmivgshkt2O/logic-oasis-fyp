@@ -1,6 +1,6 @@
 # U10 Forum Controlled-Demonstration Release
 
-Release `forum-controlled-demo-nb-v1-release-3` publishes the U4-selected
+Release `forum-controlled-demo-nb-v1-release-4` publishes the U4-selected
 `MultinomialNB` TF-IDF pipeline for the bounded FYP1 forum demonstration. The
 release is active only when `FORUM_MODEL_EVIDENCE_MODE=controlled_demo` and the
 deployed `FORUM_RUNTIME_CODE_REVISION` equals the immutable release binding.
@@ -18,7 +18,7 @@ The earlier `forum-controlled-demo-nb-v1-release-1` payload remains preserved
 at U5 commit `8e93e4d3937a00d50b0680f7d6f555936bb242df`. Release 2 remains preserved at
 U6 commit `150b7d19524012df27f2f175bdf3af6005804312` with its local Emulator
 evidence. Neither historical release was promoted to the cloud registry.
-Release 3 reconciles the immutable payload with the newer `main` Functions
+Release 4 reconciles the immutable payload with the newer `main` Functions
 bundle, therefore has no active cloud predecessor, and keeps
 `supersedesReleaseId` unset. Any replacement after cloud promotion must use
 transactional supersession.
@@ -116,14 +116,17 @@ cloud registry record or cloud deployment was created; cloud status remains
 
 Merging the later policy-evaluation runtime changed the authoritative Functions
 package and bundle hashes without changing the selected forum artifact. The
-candidate was therefore republished as the new immutable release 3 instead of
-rewriting release 2. The artifact SHA-256 remains
+candidate was therefore republished instead of rewriting release 2. Release 3,
+preserved at integration commit `0b6d545`, exposed a stale policy-manifest
+source hash during the full Functions gate and was withheld before push,
+Emulator activation, or cloud deployment. Release 4 corrects that binding. The
+artifact SHA-256 remains
 `8307a480b5d5e61612b878653b2182d609ae594024ecae192e3677ace99a0049`,
 the bounded source revision is
 `01e74fe579a81a3b3f39c675297b6f4791f5fb2f2c9b7bb62d028da9e3225d1f`,
 and the bundle-manifest SHA-256 is
-`82bc19d8a82607355c14d7f4c1d6aad616bcfe3d400d7eef7ba94f940d250c78`.
+`cd1c07d23dcb472776381c7d6af43e9357922fe882cfb879ef88267edb2ed14f`.
 Focused release, bundle-parity, promotion, and runtime tests validate these
 bindings. The retained full Emulator rehearsal remains release-2 evidence; a
-fresh release-3 Emulator or authorized cloud rehearsal is required before
+fresh release-4 Emulator or authorized cloud rehearsal is required before
 claiming deployment verification for this payload.

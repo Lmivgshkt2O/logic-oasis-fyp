@@ -3,7 +3,7 @@
   "artifactSha256": "8307a480b5d5e61612b878653b2182d609ae594024ecae192e3677ace99a0049",
   "artifactSizeBytes": 17634,
   "baselineComparisonResult": "naive_bayes_advantage_demonstrated",
-  "bundleManifestSha256": "82bc19d8a82607355c14d7f4c1d6aad616bcfe3d400d7eef7ba94f940d250c78",
+  "bundleManifestSha256": "cd1c07d23dcb472776381c7d6af43e9357922fe882cfb879ef88267edb2ed14f",
   "candidateGateStatus": "passed",
   "candidateManifestSha256": "45364c713b72351801afc00c37b5692085cf43d2c1225ca1eaf962c3cf2bfea5",
   "catalogueSha256": "614aefeffe4929f9b096452a4bb5e473cf671c809231a42edf2e8358b1f01c3a",
@@ -37,10 +37,10 @@
     "explanation_sufficient": "sufficient_reasoning"
   },
   "preprocessingVersion": "forum-text-preprocessing-v1",
-  "releaseId": "forum-controlled-demo-nb-v1-release-3",
+  "releaseId": "forum-controlled-demo-nb-v1-release-4",
   "releaseRationale": "Developer-released FYP1 controlled-demonstration model. Not evaluated on real learner forum responses.",
   "releaseScope": "fyp1_forum_controlled_demo",
-  "releasedAt": "2026-08-10T16:00:00Z",
+  "releasedAt": "2026-08-10T16:30:00Z",
   "releasedBy": "zyonn",
   "rubricSha256": "678505add7d4901d49ce1636baf8289877480383e3515b38e847b114da7ba05b",
   "runtimeEnvironmentFingerprint": {

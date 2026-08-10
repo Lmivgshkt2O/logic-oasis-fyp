@@ -954,7 +954,7 @@ untouched fictional final test it scored accuracy `0.75` and macro F1
 baseline scored `1.0`; therefore the selection-stage advantage label does not
 support a general or final-test Naive Bayes superiority claim.
 
-Release `forum-controlled-demo-nb-v1-release-3` is the current locally packaged
+Release `forum-controlled-demo-nb-v1-release-4` is the current locally packaged
 controlled payload. Runtime activation requires `controlled_demo`, one active
 compatible registry record, matching code revision, exact artifact/catalogue/
 dataset/split/report/rubric/bundle hashes, compatible dependencies, and
@@ -969,7 +969,7 @@ revision fencing, corpus non-mutation, safe logs, linked-parent count-only
 access, and fail-closed fallback in local Emulators. Cloud deployment and live
 service-account observation remain pending. Current evidence supports only
 scenario fit, reproducibility, artifact integrity, and prototype integration
-readiness. Release 3 preserves the same candidate artifact while rebinding the
+readiness. Release 4 preserves the same candidate artifact while rebinding the
 later shared Functions bundle; focused integrity/runtime tests pass, while a
 fresh Emulator or authorized cloud rehearsal remains required for that payload.
 

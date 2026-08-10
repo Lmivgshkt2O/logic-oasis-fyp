@@ -77,14 +77,15 @@ U5 release 1 is preserved at commit
 `8e93e4d3937a00d50b0680f7d6f555936bb242df`; the Emulator-verified release 2
 is preserved at U6 commit `150b7d19524012df27f2f175bdf3af6005804312`.
 Neither was promoted to the cloud. Main-branch integration changed the shared
-Functions bundle, so the unchanged candidate artifact was republished as
-release 3 instead of mutating release 2.
+Functions bundle, so the unchanged candidate artifact was republished instead
+of mutating release 2. Release 3 was withheld when the full gate found a stale
+policy-manifest source hash; release 4 carries the corrected binding.
 
 ## Controlled release bindings
 
 | Binding | SHA-256 / value |
 |---|---|
-| Release ID | `forum-controlled-demo-nb-v1-release-3` |
+| Release ID | `forum-controlled-demo-nb-v1-release-4` |
 | Model | `forum-controlled-demo-nb-v1` / `MultinomialNB` |
 | Code revision | `01e74fe579a81a3b3f39c675297b6f4791f5fb2f2c9b7bb62d028da9e3225d1f` |
 | Artifact | `8307a480b5d5e61612b878653b2182d609ae594024ecae192e3677ace99a0049` |
@@ -95,7 +96,7 @@ release 3 instead of mutating release 2.
 | Evaluation report | `9bb9b4d1387ce943b88be042c6aade23594eb2aa9ea7413099ea44cf3f9ebb1a` |
 | Candidate manifest | `45364c713b72351801afc00c37b5692085cf43d2c1225ca1eaf962c3cf2bfea5` |
 | Rubric | `678505add7d4901d49ce1636baf8289877480383e3515b38e847b114da7ba05b` |
-| Bundle manifest | `82bc19d8a82607355c14d7f4c1d6aad616bcfe3d400d7eef7ba94f940d250c78` |
+| Bundle manifest | `cd1c07d23dcb472776381c7d6af43e9357922fe882cfb879ef88267edb2ed14f` |
 | Claim level | `controlled_demonstration_only` |
 
 The aggregate controlled-evidence corpus hash for the retained release-2

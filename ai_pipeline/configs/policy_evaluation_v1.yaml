@@ -44,7 +44,7 @@ scoreRules:
   p2Neutral: hold
 adaptivePolicy:
   policyVersion: adaptive-policy-v1
-  sourceSha256: 1b53aef77a8027b4256f915663ee894225c17efe4f876bff2e23a38ed17eef16
+  sourceSha256: 1c782e3ca08fb021427af2a42eda1df4350d583b301f3ff79a7df529c6cf9d4b
 commonSafetyEnvelope:
   difficultyOrder:
     - Easy

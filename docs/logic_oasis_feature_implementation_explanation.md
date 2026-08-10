@@ -725,7 +725,7 @@ baseline without rewriting Section 20's historical evidence:
 - quiz and forum AI are automatically triggered server runtimes, not merely
   manual or seeded displays; and
 - forum AI release 2 is locally Emulator-verified with
-  `controlled_demonstration_only` evidence; release 3 preserves the candidate
+  `controlled_demonstration_only` evidence; release 4 preserves the candidate
   artifact against the later shared Functions bundle and passes focused
   integrity/runtime tests, while fresh deployment verification remains pending.
 
