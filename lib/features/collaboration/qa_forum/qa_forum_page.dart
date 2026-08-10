@@ -41,6 +41,9 @@ class _QaForumPageState extends State<QaForumPage> {
   Object? _blockedError;
   bool _postingQuestion = false;
 
+  String _t(String english, String bahasaMelayu) =>
+      widget.state.t(english, bahasaMelayu);
+
   @override
   void initState() {
     super.initState();
@@ -73,17 +76,26 @@ class _QaForumPageState extends State<QaForumPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Q&A Forum')),
+    appBar: AppBar(
+      title: Text(_t('Q&A Forum', 'Forum S&J')),
+      actions: [
+        IconButton(
+          tooltip: _t('Manage blocked students', 'Urus murid yang disekat'),
+          onPressed: _manageBlockedStudents,
+          icon: const Icon(Icons.block_outlined),
+        ),
+      ],
+    ),
     floatingActionButton: FloatingActionButton.extended(
       onPressed: () => _composeQuestion(context),
       icon: const Icon(Icons.add_comment_outlined),
-      label: const Text('Ask a question'),
+      label: Text(_t('Ask a question', 'Tanya soalan')),
     ),
     body: StreamBuilder<List<ForumQuestion>>(
       stream: widget.questionsStream ?? _repo.watchQuestions(),
       builder: (context, snapshot) {
         if (_blockedError != null) {
-          return _Message(_friendlyError(_blockedError!));
+          return _Message(_friendlyError(_blockedError!, widget.state));
         }
         if (snapshot.hasError) {
           final error = snapshot.error;
@@ -91,8 +103,14 @@ class _QaForumPageState extends State<QaForumPage> {
               error is FirebaseException && error.code == 'permission-denied';
           return _Message(
             denied
-                ? 'Forum access is unavailable for this account. Sign in with a student profile, then try again.'
-                : 'The forum could not be loaded. Please check your connection and try again.',
+                ? _t(
+                    'Forum access is unavailable for this account. Sign in with a student profile, then try again.',
+                    'Akses forum tidak tersedia untuk akaun ini. Log masuk dengan profil murid dan cuba lagi.',
+                  )
+                : _t(
+                    'The forum could not be loaded. Please check your connection and try again.',
+                    'Forum tidak dapat dimuatkan. Periksa sambungan anda dan cuba lagi.',
+                  ),
           );
         }
         if (!snapshot.hasData)
@@ -114,8 +132,14 @@ class _QaForumPageState extends State<QaForumPage> {
               Expanded(
                 child: _Message(
                   query.isEmpty
-                      ? 'No questions yet. Start the conversation by asking how you solved a problem.'
-                      : 'No questions match this filter.',
+                      ? _t(
+                          'No questions yet. Start the conversation by asking how you solved a problem.',
+                          'Belum ada soalan. Mulakan perbualan dengan bertanya cara menyelesaikan masalah.',
+                        )
+                      : _t(
+                          'No questions match this filter.',
+                          'Tiada soalan sepadan dengan tapisan ini.',
+                        ),
                 ),
               ),
             ],
@@ -158,11 +182,11 @@ class _QaForumPageState extends State<QaForumPage> {
       onChanged: (_) => setState(() {}),
       decoration: InputDecoration(
         prefixIcon: const Icon(Icons.search),
-        hintText: 'Filter questions',
+        hintText: _t('Filter questions', 'Tapis soalan'),
         suffixIcon: _filter.text.isEmpty
             ? null
             : IconButton(
-                tooltip: 'Clear filter',
+                tooltip: _t('Clear filter', 'Kosongkan tapisan'),
                 onPressed: () {
                   _filter.clear();
                   setState(() {});
@@ -173,6 +197,68 @@ class _QaForumPageState extends State<QaForumPage> {
     ),
   );
 
+  Future<void> _manageBlockedStudents() async {
+    if (_blockedAuthors.isEmpty) {
+      _showMessage(
+        _t(
+          'You have not blocked any students.',
+          'Anda belum menyekat mana-mana murid.',
+        ),
+      );
+      return;
+    }
+    final blocked = _blockedAuthors.toList(growable: false)..sort();
+    final selected = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(_t('Blocked students', 'Murid yang disekat')),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: blocked.length,
+            itemBuilder: (context, index) {
+              final studentId = blocked[index];
+              final shortId = studentId.length <= 8
+                  ? studentId
+                  : '…${studentId.substring(studentId.length - 8)}';
+              return ListTile(
+                leading: const Icon(Icons.person_off_outlined),
+                title: Text(_t('Blocked student', 'Murid disekat')),
+                subtitle: Text(shortId),
+                trailing: TextButton(
+                  onPressed: () => Navigator.pop(context, studentId),
+                  child: Text(_t('Unblock', 'Buka sekatan')),
+                ),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(_t('Close', 'Tutup')),
+          ),
+        ],
+      ),
+    );
+    if (selected == null) return;
+    try {
+      await _repo.unblock(
+        studentId: widget.state.currentStudentId,
+        blockedStudentId: selected,
+      );
+      if (mounted) {
+        setState(
+          () => _blockedAuthors = {..._blockedAuthors}..remove(selected),
+        );
+      }
+      _showMessage(_t('Student unblocked.', 'Sekatan murid telah dibuka.'));
+    } catch (error) {
+      _showMessage(_friendlyError(error, widget.state));
+    }
+  }
+
   Future<void> _composeQuestion(BuildContext context) async {
     await showDialog<void>(
       context: context,
@@ -181,15 +267,15 @@ class _QaForumPageState extends State<QaForumPage> {
         builder: (context, setDialogState) => PopScope(
           canPop: !_postingQuestion,
           child: AlertDialog(
-            title: const Text('Ask for help'),
+            title: Text(_t('Ask for help', 'Minta bantuan')),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextField(
                   controller: _questionTitle,
                   maxLength: 140,
-                  decoration: const InputDecoration(
-                    labelText: 'Question title',
+                  decoration: InputDecoration(
+                    labelText: _t('Question title', 'Tajuk soalan'),
                   ),
                 ),
                 TextField(
@@ -197,8 +283,11 @@ class _QaForumPageState extends State<QaForumPage> {
                   minLines: 3,
                   maxLines: 6,
                   maxLength: 3000,
-                  decoration: const InputDecoration(
-                    labelText: 'What have you tried?',
+                  decoration: InputDecoration(
+                    labelText: _t(
+                      'What have you tried?',
+                      'Apakah yang telah anda cuba?',
+                    ),
                   ),
                 ),
               ],
@@ -208,7 +297,7 @@ class _QaForumPageState extends State<QaForumPage> {
                 onPressed: _postingQuestion
                     ? null
                     : () => Navigator.pop(dialogContext),
-                child: const Text('Cancel'),
+                child: Text(_t('Cancel', 'Batal')),
               ),
               FilledButton.icon(
                 onPressed: _postingQuestion
@@ -217,7 +306,10 @@ class _QaForumPageState extends State<QaForumPage> {
                         if (_questionTitle.text.trim().length < 8 ||
                             _questionBody.text.trim().length < 20) {
                           _showMessage(
-                            'Add a clear title and explain what you tried.',
+                            _t(
+                              'Add a clear title and explain what you tried.',
+                              'Tambah tajuk yang jelas dan terangkan perkara yang telah dicuba.',
+                            ),
                           );
                           return;
                         }
@@ -232,9 +324,11 @@ class _QaForumPageState extends State<QaForumPage> {
                           _questionBody.clear();
                           if (dialogContext.mounted)
                             Navigator.pop(dialogContext);
-                          _showMessage('Question posted.');
+                          _showMessage(
+                            _t('Question posted.', 'Soalan telah dihantar.'),
+                          );
                         } catch (error) {
-                          _showMessage(_friendlyError(error));
+                          _showMessage(_friendlyError(error, widget.state));
                           if (dialogContext.mounted) {
                             setDialogState(() => _postingQuestion = false);
                           }
@@ -246,7 +340,7 @@ class _QaForumPageState extends State<QaForumPage> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.send),
-                label: const Text('Post'),
+                label: Text(_t('Post', 'Hantar')),
               ),
             ],
           ),
@@ -308,6 +402,9 @@ class _AnswersPageState extends State<_AnswersPage> {
   CollaborationRepository get _repo =>
       _repository ??= widget.repository ?? CollaborationRepository();
 
+  String _t(String english, String bahasaMelayu) =>
+      widget.state.t(english, bahasaMelayu);
+
   @override
   void initState() {
     super.initState();
@@ -339,7 +436,7 @@ class _AnswersPageState extends State<_AnswersPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Answers')),
+    appBar: AppBar(title: Text(_t('Answers', 'Jawapan'))),
     body: Column(
       children: [
         Padding(
@@ -362,10 +459,10 @@ class _AnswersPageState extends State<_AnswersPage> {
                 widget.answersStream ?? _repo.watchAnswers(widget.question.id),
             builder: (context, snapshot) {
               if (_blockedError != null) {
-                return _Message(_friendlyError(_blockedError!));
+                return _Message(_friendlyError(_blockedError!, widget.state));
               }
               if (snapshot.hasError) {
-                return _Message(_friendlyError(snapshot.error!));
+                return _Message(_friendlyError(snapshot.error!, widget.state));
               }
               if (!snapshot.hasData)
                 return const Center(child: CircularProgressIndicator());
@@ -380,8 +477,11 @@ class _AnswersPageState extends State<_AnswersPage> {
                   .where((answer) => !_blockedAuthors.contains(answer.authorId))
                   .toList(growable: false);
               if (answers.isEmpty) {
-                return const _Message(
-                  'No answers yet. Share the steps you tried.',
+                return _Message(
+                  _t(
+                    'No answers yet. Share the steps you tried.',
+                    'Belum ada jawapan. Kongsikan langkah yang telah anda cuba.',
+                  ),
                 );
               }
               return ListView(
@@ -397,16 +497,26 @@ class _AnswersPageState extends State<_AnswersPage> {
                             if (answer.acceptedAt != null ||
                                 effectiveAcceptedAnswerId == answer.id) ...[
                               const SizedBox(height: 8),
-                              const Chip(
-                                avatar: Icon(Icons.check_circle, size: 18),
-                                label: Text('Accepted answer'),
+                              Chip(
+                                avatar: const Icon(
+                                  Icons.check_circle,
+                                  size: 18,
+                                ),
+                                label: Text(
+                                  _t('Accepted answer', 'Jawapan diterima'),
+                                ),
                               ),
                             ],
                             const SizedBox(height: 8),
-                            Text(
-                              _status.statusText(answer.feedback),
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
+                            if (answer.authorId ==
+                                widget.state.currentStudentId)
+                              Text(
+                                _status.statusText(
+                                  answer.feedback,
+                                  isBahasaMelayu: widget.state.isBahasaMelayu,
+                                ),
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
                             Row(
                               children: [
                                 TextButton.icon(
@@ -416,10 +526,13 @@ class _AnswersPageState extends State<_AnswersPage> {
                                       : () => _runAction(
                                           'helpful:${answer.id}',
                                           () => _repo.markHelpful(answer.id),
-                                          'Marked helpful.',
+                                          _t(
+                                            'Marked helpful.',
+                                            'Ditanda sebagai membantu.',
+                                          ),
                                         ),
                                   icon: const Icon(Icons.thumb_up_alt_outlined),
-                                  label: const Text('Helpful'),
+                                  label: Text(_t('Helpful', 'Membantu')),
                                 ),
                                 if (widget.question.authorId ==
                                         widget.state.currentStudentId &&
@@ -434,30 +547,37 @@ class _AnswersPageState extends State<_AnswersPage> {
                                     icon: const Icon(
                                       Icons.check_circle_outline,
                                     ),
-                                    label: const Text('Accept'),
+                                    label: Text(_t('Accept', 'Terima')),
                                   ),
                                 const Spacer(),
                                 PopupMenuButton<_AnswerAction>(
-                                  tooltip: 'Answer actions',
+                                  tooltip: _t(
+                                    'Answer actions',
+                                    'Tindakan jawapan',
+                                  ),
                                   onSelected: (action) =>
                                       _answerAction(action, answer),
                                   itemBuilder: (_) => [
                                     if (answer.authorId ==
                                             widget.state.currentStudentId &&
                                         answer.acceptedAt == null)
-                                      const PopupMenuItem(
+                                      PopupMenuItem(
                                         value: _AnswerAction.edit,
-                                        child: Text('Edit answer'),
+                                        child: Text(
+                                          _t('Edit answer', 'Edit jawapan'),
+                                        ),
                                       ),
                                     if (answer.authorId !=
                                         widget.state.currentStudentId) ...[
-                                      const PopupMenuItem(
+                                      PopupMenuItem(
                                         value: _AnswerAction.report,
-                                        child: Text('Report'),
+                                        child: Text(_t('Report', 'Laporkan')),
                                       ),
-                                      const PopupMenuItem(
+                                      PopupMenuItem(
                                         value: _AnswerAction.block,
-                                        child: Text('Block student'),
+                                        child: Text(
+                                          _t('Block student', 'Sekat murid'),
+                                        ),
                                       ),
                                     ],
                                   ],
@@ -484,14 +604,17 @@ class _AnswersPageState extends State<_AnswersPage> {
                     minLines: 2,
                     maxLines: 4,
                     maxLength: 4000,
-                    decoration: const InputDecoration(
-                      hintText: 'Explain how you worked it out…',
+                    decoration: InputDecoration(
+                      hintText: _t(
+                        'Explain how you worked it out…',
+                        'Terangkan cara anda menyelesaikannya…',
+                      ),
                     ),
                   ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.send),
-                  tooltip: 'Post answer',
+                  tooltip: _t('Post answer', 'Hantar jawapan'),
                   onPressed: _submitting ? null : _submit,
                 ),
               ],
@@ -512,9 +635,14 @@ class _AnswersPageState extends State<_AnswersPage> {
         text: submittedText,
       );
       if (_answer.text == submittedText) _answer.clear();
-      _message('Answer posted and queued for review.');
+      _message(
+        _t(
+          'Answer posted and queued for review.',
+          'Jawapan telah dihantar dan menunggu semakan.',
+        ),
+      );
     } catch (error) {
-      _message(_friendlyError(error));
+      _message(_friendlyError(error, widget.state));
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -532,7 +660,7 @@ class _AnswersPageState extends State<_AnswersPage> {
       _message(success);
       return true;
     } catch (error) {
-      _message(_friendlyError(error));
+      _message(_friendlyError(error, widget.state));
       return false;
     } finally {
       if (mounted) setState(() => _inFlight.remove(key));
@@ -543,7 +671,7 @@ class _AnswersPageState extends State<_AnswersPage> {
     final accepted = await _runAction(
       'accept',
       () => _repo.acceptAnswer(answer.id),
-      'Answer accepted.',
+      _t('Answer accepted.', 'Jawapan diterima.'),
     );
     if (accepted && mounted) setState(() => _acceptedAnswerId = answer.id);
   }
@@ -556,36 +684,27 @@ class _AnswersPageState extends State<_AnswersPage> {
           studentId: widget.state.currentStudentId,
           blockedStudentId: answer.authorId,
         ),
-        'Student blocked on your forum view.',
+        _t(
+          'Student blocked on your forum view.',
+          'Murid disekat daripada paparan forum anda.',
+        ),
       );
       if (blocked && mounted) {
         setState(() => _blockedAuthors = {..._blockedAuthors, answer.authorId});
       }
       return;
     }
-    final controller = TextEditingController(
-      text: action == _AnswerAction.edit ? answer.text : '',
-    );
     final value = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          action == _AnswerAction.edit ? 'Edit answer' : 'Report answer',
-        ),
-        content: TextField(controller: controller, minLines: 3, maxLines: 6),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, controller.text),
-            child: const Text('Submit'),
-          ),
-        ],
+      builder: (_) => _AnswerActionDialog(
+        initialText: action == _AnswerAction.edit ? answer.text : '',
+        title: action == _AnswerAction.edit
+            ? _t('Edit answer', 'Edit jawapan')
+            : _t('Report answer', 'Laporkan jawapan'),
+        cancelLabel: _t('Cancel', 'Batal'),
+        submitLabel: _t('Submit', 'Hantar'),
       ),
     );
-    controller.dispose();
     if (value == null ||
         value.trim().length < (action == _AnswerAction.edit ? 8 : 3))
       return;
@@ -603,8 +722,11 @@ class _AnswersPageState extends State<_AnswersPage> {
               reason: value,
             ),
       action == _AnswerAction.edit
-          ? 'Revision queued for review.'
-          : 'Report submitted.',
+          ? _t(
+              'Response edited successfully. Feedback review queued.',
+              'Jawapan berjaya diedit. Semakan maklum balas sedang menunggu.',
+            )
+          : _t('Report submitted.', 'Laporan telah dihantar.'),
     );
   }
 
@@ -618,23 +740,129 @@ class _AnswersPageState extends State<_AnswersPage> {
 
 enum _AnswerAction { edit, report, block }
 
-String _friendlyError(Object error) {
-  if (error is FirebaseFunctionsException &&
-      error.code == 'permission-denied') {
-    return 'This action is unavailable for your account.';
+class _AnswerActionDialog extends StatefulWidget {
+  const _AnswerActionDialog({
+    required this.initialText,
+    required this.title,
+    required this.cancelLabel,
+    required this.submitLabel,
+  });
+
+  final String initialText;
+  final String title;
+  final String cancelLabel;
+  final String submitLabel;
+
+  @override
+  State<_AnswerActionDialog> createState() => _AnswerActionDialogState();
+}
+
+class _AnswerActionDialogState extends State<_AnswerActionDialog> {
+  late final TextEditingController _controller = TextEditingController(
+    text: widget.initialText,
+  );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
-  if (error is FirebaseFunctionsException &&
-      (error.code == 'unavailable' || error.code == 'deadline-exceeded')) {
-    return 'The forum is temporarily unavailable. Your draft is safe; please retry.';
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: Text(widget.title),
+    content: TextField(controller: _controller, minLines: 3, maxLines: 6),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: Text(widget.cancelLabel),
+      ),
+      FilledButton(
+        onPressed: () => Navigator.pop(context, _controller.text),
+        child: Text(widget.submitLabel),
+      ),
+    ],
+  );
+}
+
+String _friendlyError(Object error, AppState state) {
+  String t(String english, String bahasaMelayu) =>
+      state.t(english, bahasaMelayu);
+  if (error is FirebaseFunctionsException) {
+    if ({
+      'failed-precondition',
+      'already-exists',
+      'invalid-argument',
+    }.contains(error.code)) {
+      final message = error.message?.trim();
+      if (message != null && message.isNotEmpty) {
+        return _localizedFunctionMessage(message, state);
+      }
+    }
+    if (error.code == 'permission-denied') {
+      return t(
+        'This action is not allowed for your account or this content.',
+        'Tindakan ini tidak dibenarkan untuk akaun atau kandungan ini.',
+      );
+    }
+    if (error.code == 'not-found') {
+      return t(
+        'This forum content is no longer available.',
+        'Kandungan forum ini tidak lagi tersedia.',
+      );
+    }
+    if ({
+      'unavailable',
+      'deadline-exceeded',
+      'internal',
+      'unimplemented',
+    }.contains(error.code)) {
+      return t(
+        'The forum service is temporarily unavailable. Your draft is safe; please retry.',
+        'Perkhidmatan forum tidak tersedia buat sementara waktu. Draf anda selamat; sila cuba lagi.',
+      );
+    }
   }
   if (error is FirebaseException && error.code == 'permission-denied') {
-    return 'This action is unavailable for your account.';
+    return t(
+      'This action is not allowed for your account or this content.',
+      'Tindakan ini tidak dibenarkan untuk akaun atau kandungan ini.',
+    );
   }
   if (error is FirebaseException &&
       (error.code == 'unavailable' || error.code == 'deadline-exceeded')) {
-    return 'The forum is temporarily unavailable. Your draft is safe; please retry.';
+    return t(
+      'The forum is temporarily unavailable. Your draft is safe; please retry.',
+      'Forum tidak tersedia buat sementara waktu. Draf anda selamat; sila cuba lagi.',
+    );
   }
-  return 'The action could not be completed. Please retry.';
+  if (error is StateError) {
+    final message = error.message.toString().trim();
+    if (message.isNotEmpty) return message;
+  }
+  return t(
+    'The action could not be completed. Please retry.',
+    'Tindakan tidak dapat diselesaikan. Sila cuba lagi.',
+  );
+}
+
+String _localizedFunctionMessage(String message, AppState state) {
+  final bahasaMelayu = switch (message) {
+    'You cannot mark your own answer helpful.' =>
+      'Anda tidak boleh menandakan jawapan sendiri sebagai membantu.',
+    'Only the question author may accept an answer.' =>
+      'Hanya penulis soalan boleh menerima jawapan.',
+    'You cannot accept your own answer.' =>
+      'Anda tidak boleh menerima jawapan sendiri.',
+    'This question already has an accepted answer.' =>
+      'Soalan ini sudah mempunyai jawapan yang diterima.',
+    'You cannot report your own content.' =>
+      'Anda tidak boleh melaporkan kandungan sendiri.',
+    'Report reason must be between 3 and 500 characters.' =>
+      'Sebab laporan mestilah antara 3 hingga 500 aksara.',
+    _ => message,
+  };
+  return state.t(message, bahasaMelayu);
 }
 
 class _Message extends StatelessWidget {

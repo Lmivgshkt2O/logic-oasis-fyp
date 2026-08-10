@@ -127,17 +127,20 @@ class CollaborationRepository {
   Future<void> block({
     required String studentId,
     required String blockedStudentId,
-  }) async {
-    final reference = _firestore
-        .collection('forumBlocks')
-        .doc('${studentId}_$blockedStudentId');
-    await _firestore.runTransaction((transaction) async {
-      if ((await transaction.get(reference)).exists) return;
-      transaction.set(reference, {
+  }) => _firestore
+      .collection('forumBlocks')
+      .doc('${studentId}_$blockedStudentId')
+      .set({
         'studentId': studentId,
         'blockedStudentId': blockedStudentId,
         'createdAt': FieldValue.serverTimestamp(),
       });
-    });
-  }
+
+  Future<void> unblock({
+    required String studentId,
+    required String blockedStudentId,
+  }) => _firestore
+      .collection('forumBlocks')
+      .doc('${studentId}_$blockedStudentId')
+      .delete();
 }

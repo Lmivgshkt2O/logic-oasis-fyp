@@ -8,6 +8,7 @@ const {
 } = require("@firebase/rules-unit-testing");
 const {
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -299,6 +300,7 @@ async function main() {
     }));
     await assertSucceeds(getDoc(doc(studentDb, "forumBlocks", "student_aiman_y4_student_other")));
     await assertFails(getDoc(doc(otherStudentDb, "forumBlocks", "student_aiman_y4_student_other")));
+    await assertSucceeds(deleteDoc(doc(studentDb, "forumBlocks", "student_aiman_y4_student_other")));
     await assertFails(setDoc(doc(studentDb, "forumBlocks", "student_aiman_y4_student_aiman_y4"), {
       studentId: "student_aiman_y4", blockedStudentId: "student_aiman_y4", createdAt: serverTimestamp(),
     }));
