@@ -18,6 +18,7 @@ from firebase_admin import auth
 
 
 _LOGGER = logging.getLogger(__name__)
+_MOBILE_LINK_ENDPOINT = "https://logic-oasis-fyp.firebaseapp.com/__/auth/links"
 
 
 class ParentInvitationDeliveryError(RuntimeError):
@@ -29,6 +30,13 @@ def _required(name: str) -> str:
     if not value:
         raise ParentInvitationDeliveryError("Parent invitation email delivery is not configured.")
     return value
+
+
+def mobile_email_link(action_link: str) -> str:
+    """Wrap emulator actions in the same verified App Link used in production."""
+    if os.environ.get("FUNCTIONS_EMULATOR", "").lower() != "true":
+        return action_link
+    return f"{_MOBILE_LINK_ENDPOINT}?{urlencode({'link': action_link})}"
 
 
 def deliver_parent_invitation(recipient_email: str, invitation_id: str, verifier: str) -> None:
@@ -52,7 +60,9 @@ def deliver_parent_invitation(recipient_email: str, invitation_id: str, verifier
             android_package_name=_required("PARENT_INVITATION_ANDROID_PACKAGE"),
             android_install_app=True,
         )
-        link = auth.generate_sign_in_with_email_link(recipient_email, settings)
+        link = mobile_email_link(
+            auth.generate_sign_in_with_email_link(recipient_email, settings)
+        )
     except ParentInvitationDeliveryError:
         raise
     except Exception as error:

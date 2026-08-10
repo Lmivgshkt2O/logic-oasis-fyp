@@ -18,7 +18,10 @@ class ParentInvitationLink {
     // envelope with the complete Auth action URL in its ``link`` parameter.
     // Keep the original link for FirebaseAuth.signInWithEmailLink, but unwrap
     // the inner action URL only to recover our opaque continuation state.
-    final actionUri = Uri.tryParse(uri.queryParameters['link'] ?? '') ?? uri;
+    final wrappedLink = uri.queryParameters['link'];
+    final actionUri = wrappedLink == null
+        ? uri
+        : Uri.tryParse(wrappedLink) ?? uri;
     final continuation = actionUri.queryParameters['continueUrl'];
     final embedded = continuation == null
         ? actionUri

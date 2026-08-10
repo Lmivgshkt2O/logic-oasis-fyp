@@ -23,4 +23,23 @@ void main() {
       expect(link?.emailLink, outer.toString());
     },
   );
+
+  test('parses a direct Firebase Auth emulator email action link', () {
+    final continuation = Uri.https(
+      'logic-oasis-fyp.web.app',
+      '/parent-invitation',
+      {'invitationId': 'invite-emulator', 'verifier': 'emulator-verifier'},
+    );
+    final link = Uri.http('127.0.0.1:9099', '/emulator/action', {
+      'mode': 'signIn',
+      'oobCode': 'test-code',
+      'continueUrl': continuation.toString(),
+    });
+
+    final parsed = ParentInvitationLink.parse(link);
+
+    expect(parsed?.invitationId, 'invite-emulator');
+    expect(parsed?.verifier, 'emulator-verifier');
+    expect(parsed?.emailLink, link.toString());
+  });
 }
