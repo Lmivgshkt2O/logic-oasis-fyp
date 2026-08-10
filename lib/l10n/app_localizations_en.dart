@@ -18,6 +18,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get forge => 'Forge';
 
   @override
+  String get forum => 'Q&A Forum';
+
+  @override
   String get settings => 'Settings';
 
   @override

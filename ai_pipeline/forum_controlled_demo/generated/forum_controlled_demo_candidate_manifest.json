@@ -1,0 +1,62 @@
+{
+  "abstentionPolicyVersion": "forum-advisory-policy-v1",
+  "activationStatus": "pending_u5_activation",
+  "artifactFile": "forum_controlled_demo_candidate.joblib",
+  "artifactSha256": "8307a480b5d5e61612b878653b2182d609ae594024ecae192e3677ace99a0049",
+  "artifactSizeBytes": 17634,
+  "catalogVersion": "forum-controlled-demo-catalog-v1",
+  "catalogueFile": "ai_pipeline/forum_controlled_demo/forum_scenario_catalog_v1.yaml",
+  "catalogueSha256": "614aefeffe4929f9b096452a4bb5e473cf671c809231a42edf2e8358b1f01c3a",
+  "claimLevel": "controlled_demonstration_only",
+  "controlledCandidateStatus": "eligible",
+  "datasetFile": "forum_controlled_demo_v1.jsonl",
+  "datasetManifestFile": "forum_controlled_demo_v1_manifest.json",
+  "datasetSha256": "5d096d6ab1c6ce59428c9d89b8d972d743d6d613ae249b619c1c51579b3a8399",
+  "datasetVersion": "forum-controlled-demo-dataset-v1",
+  "deploymentScope": "controlled_demo",
+  "evaluationReportFile": "forum_controlled_demo_report.json",
+  "evaluationReportSha256": "9bb9b4d1387ce943b88be042c6aade23594eb2aa9ea7413099ea44cf3f9ebb1a",
+  "evidenceLevel": "controlled_demonstration",
+  "manifestSchemaVersion": "forum-controlled-demo-candidate-manifest-v1",
+  "modelType": "MultinomialNB",
+  "modelVersion": "forum-controlled-demo-nb-v1",
+  "outputContract": {
+    "abstained": "uncertain",
+    "answer_only_or_insufficient": "needs_reasoning",
+    "explanation_sufficient": "sufficient_reasoning"
+  },
+  "releaseScope": "fyp1_forum_controlled_demo",
+  "reportSchemaVersion": "forum-controlled-demo-report-v1",
+  "rubricSha256": "678505add7d4901d49ce1636baf8289877480383e3515b38e847b114da7ba05b",
+  "rubricVersion": "forum-explanation-rubric-v1",
+  "runtimeEnvironmentFingerprint": {
+    "architecture": "AMD64",
+    "joblibVersion": "1.5.3",
+    "numpyVersion": "2.4.6",
+    "operatingSystem": "Windows",
+    "pyYamlVersion": "6.0.3",
+    "pythonImplementation": "CPython",
+    "pythonVersion": "3.12.13",
+    "scikitLearnVersion": "1.9.0",
+    "sha256": "5d4dd28a180370bd6acabd01a1b53ddacb30c6572cba994afb95018d2270ae94"
+  },
+  "semanticReproducibilityStatus": "verified_same_runtime_contract",
+  "splitManifestFile": "forum_controlled_demo_split_manifest.json",
+  "splitManifestSha256": "6c994001f0d1791030664310ba4bc3b807421b74364141ec7f82572d2945ba6d",
+  "splitSchemaVersion": "forum-controlled-demo-grouped-split-v1",
+  "trainingDataProvenance": "expert_authored_controlled_demo",
+  "vectorizerContract": {
+    "abstentionPolicyVersion": "forum-advisory-policy-v1",
+    "abstentionThreshold": 0.6,
+    "family": "TfidfVectorizer",
+    "languageNormalization": "unicode_whitespace_casefold_v1",
+    "minimumDocumentFrequency": 1,
+    "ngramRange": [
+      1,
+      2
+    ],
+    "preprocessingVersion": "forum-text-preprocessing-v1",
+    "sublinearTf": true,
+    "tokenization": "sklearn_word_unicode_v1"
+  }
+}

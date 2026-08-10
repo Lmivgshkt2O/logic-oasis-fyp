@@ -1,8 +1,15 @@
 {
-  "adaptivePolicySha256": "1b53aef77a8027b4256f915663ee894225c17efe4f876bff2e23a38ed17eef16",
+  "adaptivePolicySha256": "1c782e3ca08fb021427af2a42eda1df4350d583b301f3ff79a7df529c6cf9d4b",
   "bundleVersion": "u8-ai-runtime-v1",
-  "featureSchemaSha256": "e9eb98fb23badfcf68618af737662a7efc9dbc1b17d91dc0a32004aad26865d6",
-  "packageSha256": "0955871b3c35b0ec4eb61043f92bb8bbf6bef1a0ba544e83ec3d170d82c3fff3",
-  "policyEvaluationSha256": "0f94928f8ee69ceac92668c110c881e916e7dda8c0b5fac833bdf759bf6f5a87",
-  "weakTopicRankingPolicySha256": "37164e70e6bbae4b821e58bb03587acef65457f0d2800b4aa1da4e3ed5244848"
+  "featureSchemaSha256": "ea76adf96d8d92e24e2b04c3f5ba1a33b1219da5c7f11766be8b83db34a695d0",
+  "forumRuntimeBundle": {
+    "bundleSchemaVersion": "forum-runtime-bundle-v1",
+    "files": {
+      "__init__.py": "4a91ba70aefb24ff8a4b0b83269d23548c1e7623e4d1f3ce0e2ac218f20c4417",
+      "classifier.py": "a16acf03d4d3621ef6112ae2477b2fd1dd4227c1541913b8112eaac88b18802f"
+    }
+  },
+  "packageSha256": "24a1d0a7c3d3724a925d28a26744b8d9b67308475e3c2e25716200fc4c792432",
+  "policyEvaluationSha256": "cf5f9837303b77c7052f41fc21b322d81ff2a8b7cdfd824e5dff2c7789b22206",
+  "weakTopicRankingPolicySha256": "f7bfd255956c0c99e197fc8a690eed075b6de1e2e6c7cbee76d3f28b299f1b7c"
 }

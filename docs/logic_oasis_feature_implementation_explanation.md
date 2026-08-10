@@ -2,7 +2,7 @@
 
 This document explains how the current Logic Oasis prototype is implemented from a developer point of view. It is not a planning document. It describes the actual frontend structure, backend/Firebase structure, shared state logic, and feature workflows so a developer can understand how the app works before editing it.
 
-**U1 audit status (2026-07-13):** Sections 1-19 are a living explanation of the current implementation and should be updated as later units change the app. Section 20 is the dated pre-U2 baseline snapshot and must remain an audit record rather than being silently rewritten as gaps close. Both were checked against the live repository on this date. The canonical target is `docs/plans/2026-07-05-001-feat-fyp1-prototype-development-plan(2)(1).md`; its confirmed decisions replace the older supervisor-question assumptions that previously appeared in this document.
+**U6 closure status (2026-08-09):** Sections 1-19 are the living explanation. Section 20 remains the dated pre-U2 baseline audit record; its three-tab and missing-forum statements are historical gaps closed by U1-U5, not current behavior. The governing forum closure contract is `docs/plans/2026-08-01-001-feat-u10-forum-production-closure-plan.md`.
 
 ## 1. High-Level App Structure
 
@@ -19,13 +19,33 @@ The entry point is `lib/main.dart`. It initializes Flutter bindings, starts Fire
 - Switches between opening animation, login, plot intro, and the main shell.
 - Wraps the app in `AppStateScope`, localization delegates, theme, and accessibility text scaling.
 
-`lib/app/logic_oasis_shell.dart` is the main child-facing shell. It keeps the active prototype to three tabs:
+`lib/app/logic_oasis_shell.dart` is the main child-facing shell. It exposes four tabs:
 
 - Home
 - Formula Forge
+- Q&A Forum
 - Settings
 
-The shell reads `state.selectedTab`, builds the matching page, and uses `BottomNavBar` from `lib/shared/widgets/logic_oasis_figma_components.dart`. `AppState.changeTab()` clamps tab indexes to `0..2`, which protects the app from old or invalid tab jumps.
+The shell reads `state.selectedTab`, builds the matching page, and uses `BottomNavBar` from `lib/shared/widgets/logic_oasis_figma_components.dart`. `AppState.changeTab()` clamps tab indexes to `0..3` and migrates the legacy Settings index from 2 to 3.
+
+### Current Q&A Forum implementation
+
+`CollaborationRepository` is the authenticated Firestore boundary for forum
+questions, filters, answers and revisions, helpful marks, acceptance, reports,
+blocks, and the count-only participation summary. The main models are
+`ForumQuestion`, `ForumAnswer`, advisory feedback, and
+`ForumParticipationSummary`. Students can ask and answer, revise unaccepted
+answers, mark helpful idempotently, accept once, report convergently, and block
+peers. Loading, empty, error, clear-filter, and block-filtered states are part
+of the Flutter contract.
+
+Created/updated answers trigger server-owned advisory classification. Jobs and
+immutable runs bind revision, text hash, model, artifact, policy, and fencing
+generation; feedback is published only when those bindings still match. The
+current released model is controlled-demonstration-only and fails closed to a
+deterministic advisory fallback. Runtime answers never become training rows.
+Parents never receive forum text or identities: an active linked parent may
+read only the four count fields in `forumParticipationSummaries`.
 
 ## 2. Core Architecture Pattern
 
@@ -691,3 +711,25 @@ For a new developer, read files in this order:
 17. `lib/features/parent_dashboard/parent_dashboard_page.dart`
 
 That reading path follows the real app flow from startup to learning loop to backend persistence.
+## U10 Closure Resolution Addendum (2026-08-09)
+
+This addendum resolves living-document statements left behind by the dated
+baseline without rewriting Section 20's historical evidence:
+
+- the current shell is Home, Formula Forge, Q&A Forum, Settings;
+- Firebase Auth plus invitation/link records replaced prototype parent
+  password/fixed-OTP assumptions;
+- forum collections now include questions, answers, helpful marks, reports,
+  blocks, participation events/claims/weekly/current summaries, AI jobs/runs,
+  and forum-scoped model-registry records;
+- quiz and forum AI are automatically triggered server runtimes, not merely
+  manual or seeded displays; and
+- forum AI release 2 is locally Emulator-verified with
+  `controlled_demonstration_only` evidence; release 4 preserves the candidate
+  artifact against the later shared Functions bundle and passes focused
+  integrity/runtime tests, while fresh deployment verification remains pending.
+
+The controlled dataset is fictional and scenario-family grouped. Its final-test
+accuracy (`0.75`) and macro F1 (`0.73333333`) do not establish learner accuracy
+or Naive Bayes superiority; the deterministic comparison baseline scored
+`1.0`. U10-R remains the future approved real-data evaluation route.

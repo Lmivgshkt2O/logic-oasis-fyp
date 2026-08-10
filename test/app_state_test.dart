@@ -7,6 +7,49 @@ import 'package:logic_oasis/shared/state/app_state.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  group('four-tab navigation persistence', () {
+    test('migrates legacy Settings index 2 to index 3', () async {
+      SharedPreferences.setMockInitialValues({'logic_oasis_last_tab': 2});
+      final state = AppState();
+
+      await state.loadSavedAppPreferences();
+
+      expect(state.selectedTab, 3);
+      final preferences = await SharedPreferences.getInstance();
+      expect(preferences.getInt('logic_oasis_last_tab'), 3);
+      expect(preferences.getInt('logic_oasis_navigation_schema_version'), 2);
+    });
+
+    test('restores new-schema index 2 as Forum', () async {
+      SharedPreferences.setMockInitialValues({
+        'logic_oasis_last_tab': 2,
+        'logic_oasis_navigation_schema_version': 2,
+      });
+      final state = AppState();
+
+      await state.loadSavedAppPreferences();
+
+      expect(state.selectedTab, 2);
+    });
+
+    test('clamps invalid tab indexes to the four-tab boundaries', () async {
+      SharedPreferences.setMockInitialValues({
+        'logic_oasis_last_tab': 99,
+        'logic_oasis_navigation_schema_version': 2,
+      });
+      final state = AppState();
+
+      await state.loadSavedAppPreferences();
+      expect(state.selectedTab, 3);
+
+      state.changeTab(-1);
+      expect(state.selectedTab, 0);
+
+      state.changeTab(99);
+      expect(state.selectedTab, 3);
+    });
+  });
+
   test('recommended mission follows the weakest quiz topic', () {
     final state = AppState();
 
@@ -357,9 +400,9 @@ void main() {
         year: 4,
       );
 
-    final topic = state.topics.firstWhere(
-      (item) => item.id == 'whole_numbers_y4',
-    );
+      final topic = state.topics.firstWhere(
+        (item) => item.id == 'whole_numbers_y4',
+      );
       expect(state.attempts, isEmpty);
       expect(state.subtopicsForTopic(topic).first.isComplete, isFalse);
       expect(

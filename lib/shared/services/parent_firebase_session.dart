@@ -3,6 +3,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:logic_oasis/firebase_options.dart';
+import 'package:logic_oasis/shared/services/firebase_emulator_config.dart';
 
 /// Isolated Firebase client used only for an authenticated parent session.
 ///
@@ -22,14 +23,17 @@ class ParentFirebaseSession {
   }
 
   static Future<FirebaseApp> _loadApp() async {
+    late final FirebaseApp parentApp;
     try {
-      return Firebase.app(_appName);
+      parentApp = Firebase.app(_appName);
     } on FirebaseException {
-      return Firebase.initializeApp(
+      parentApp = await Firebase.initializeApp(
         name: _appName,
         options: DefaultFirebaseOptions.currentPlatform,
       );
     }
+    await FirebaseEmulatorConfig.connect(app: parentApp);
+    return parentApp;
   }
 
   static Future<FirebaseAuth> auth() async {

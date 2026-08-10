@@ -1,0 +1,85 @@
+catalogVersion: forum-controlled-demo-catalog-v1
+rubricVersion: forum-explanation-rubric-v1
+trainingDataProvenance: expert_authored_controlled_demo
+evidenceLevel: controlled_demonstration
+claimLevel: controlled_demonstration_only
+releaseScope: fyp1_forum_controlled_demo
+deploymentScope: controlled_demo
+authorDeclaration: developer-authored-fictional-forum-scenarios-v1
+limitations:
+  - The catalogue is fictional and contains no real learner forum text.
+  - Scenario labels encode a bounded explanation rubric, not mathematical correctness.
+  - Language coverage is limited to controlled English, Bahasa Melayu, and mixed examples.
+scenarioFamilies:
+  - scenarioFamilyId: addition-regrouping-en-v1
+    questionFamilyId: place-value-addition-v1
+    mathematicsScenarioFamily: addition_with_regrouping
+    examples:
+      - {exampleId: add-en-s, text: "First I add the ones, regroup ten ones as one ten, then add the tens and check by subtraction.", label: explanation_sufficient, language: en}
+      - {exampleId: add-en-i, text: "The answer is 73.", label: answer_only_or_insufficient, language: en}
+  - scenarioFamilyId: subtraction-borrowing-ms-v1
+    questionFamilyId: place-value-subtraction-v1
+    mathematicsScenarioFamily: subtraction_with_regrouping
+    examples:
+      - {exampleId: sub-ms-s, text: "Mula-mula saya pinjam satu puluh, tolak bahagian sa, kemudian semak dengan operasi tambah.", label: explanation_sufficient, language: ms}
+      - {exampleId: sub-ms-i, text: "Jawapannya ialah 28.", label: answer_only_or_insufficient, language: ms}
+  - scenarioFamilyId: fractions-equivalent-mixed-v1
+    questionFamilyId: equivalent-fractions-v1
+    mathematicsScenarioFamily: equivalent_fractions
+    examples:
+      - {exampleId: frac-mix-s, text: "I multiply pembilang dan penyebut by the same number, jadi nilai pecahan tidak berubah.", label: explanation_sufficient, language: mixed}
+      - {exampleId: frac-mix-i, text: "It is tiga per enam.", label: answer_only_or_insufficient, language: mixed}
+  - scenarioFamilyId: multiplication-groups-en-v1
+    questionFamilyId: multiplication-groups-v1
+    mathematicsScenarioFamily: multiplication_equal_groups
+    examples:
+      - {exampleId: mult-en-s, text: "I drew six equal groups of four, counted each group, and checked the total using repeated addition.", label: explanation_sufficient, language: en}
+      - {exampleId: mult-en-i, text: "Six times four is 24.", label: answer_only_or_insufficient, language: en}
+  - scenarioFamilyId: division-sharing-ms-v1
+    questionFamilyId: division-sharing-v1
+    mathematicsScenarioFamily: division_equal_sharing
+    examples:
+      - {exampleId: div-ms-s, text: "Saya bahagi 35 objek kepada lima kumpulan sama banyak, jadi setiap kumpulan ada tujuh objek.", label: explanation_sufficient, language: ms}
+      - {exampleId: div-ms-i, text: "Setiap kumpulan ada tujuh.", label: answer_only_or_insufficient, language: ms}
+  - scenarioFamilyId: perimeter-rectangle-mixed-v1
+    questionFamilyId: rectangle-measure-v1
+    mathematicsScenarioFamily: rectangle_perimeter
+    examples:
+      - {exampleId: peri-mix-s, text: "First tambah two lengths and two widths, kemudian saya semak semua four sides were included.", label: explanation_sufficient, language: mixed}
+      - {exampleId: peri-mix-i, text: "Perimeter is 30 cm.", label: answer_only_or_insufficient, language: mixed}
+  - scenarioFamilyId: time-duration-en-v1
+    questionFamilyId: elapsed-time-v1
+    mathematicsScenarioFamily: elapsed_time
+    examples:
+      - {exampleId: time-en-s, text: "I counted from 9:35 to 10:00, then added the remaining minutes to 10:20, for 45 minutes altogether.", label: explanation_sufficient, language: en}
+      - {exampleId: time-en-i, text: "It takes 45 minutes.", label: answer_only_or_insufficient, language: en}
+  - scenarioFamilyId: money-change-ms-v1
+    questionFamilyId: money-change-v1
+    mathematicsScenarioFamily: money_change
+    examples:
+      - {exampleId: money-ms-s, text: "Saya tolak harga daripada wang dibayar mengikut nilai tempat, kemudian tambah baki untuk menyemaknya.", label: explanation_sufficient, language: ms}
+      - {exampleId: money-ms-i, text: "Bakinya RM4.50.", label: answer_only_or_insufficient, language: ms}
+  - scenarioFamilyId: decimals-place-value-mixed-v1
+    questionFamilyId: decimal-place-value-v1
+    mathematicsScenarioFamily: decimal_place_value
+    examples:
+      - {exampleId: dec-mix-s, text: "I align the decimal points, tambah tenths dengan tenths, then check each place value.", label: explanation_sufficient, language: mixed}
+      - {exampleId: dec-mix-i, text: "The total is 6.8 sahaja.", label: answer_only_or_insufficient, language: mixed}
+  - scenarioFamilyId: area-array-en-v1
+    questionFamilyId: rectangle-area-v1
+    mathematicsScenarioFamily: rectangle_area
+    examples:
+      - {exampleId: area-en-s, text: "I arranged the squares in five rows of eight and multiplied rows by columns because each row is equal.", label: explanation_sufficient, language: en}
+      - {exampleId: area-en-i, text: "The area equals 40 square units.", label: answer_only_or_insufficient, language: en}
+  - scenarioFamilyId: ratio-sharing-ms-v1
+    questionFamilyId: ratio-sharing-v1
+    mathematicsScenarioFamily: simple_ratio
+    examples:
+      - {exampleId: ratio-ms-s, text: "Saya jumlahkan bahagian nisbah, cari nilai satu bahagian, kemudian darab untuk setiap kumpulan.", label: explanation_sufficient, language: ms}
+      - {exampleId: ratio-ms-i, text: "Nisbahnya ialah dua kepada tiga.", label: answer_only_or_insufficient, language: ms}
+  - scenarioFamilyId: rounding-estimate-mixed-v1
+    questionFamilyId: rounding-estimation-v1
+    mathematicsScenarioFamily: rounding_and_estimation
+    examples:
+      - {exampleId: round-mix-s, text: "I look at the digit sebelah kanan; because it is five, saya bundarkan digit puluh ke atas.", label: explanation_sufficient, language: mixed}
+      - {exampleId: round-mix-i, text: "Rounded answer is 350.", label: answer_only_or_insufficient, language: mixed}

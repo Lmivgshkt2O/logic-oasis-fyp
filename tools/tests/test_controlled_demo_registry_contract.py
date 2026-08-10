@@ -321,7 +321,9 @@ class ControlledDemoRegistryContractTests(unittest.TestCase):
 
     def test_deploy_preflight_rejects_source_vendor_or_manifest_drift(self):
         verify_function_bundle_parity()
-        for drift in ("vendor_source", "manifest_value", "manifest_json"):
+        for drift in (
+            "vendor_source", "manifest_value", "forum_runtime_manifest", "manifest_json",
+        ):
             with self.subTest(drift=drift), TemporaryDirectory() as temporary:
                 vendor = Path(temporary) / "vendor"
                 shutil.copytree(ROOT / "functions" / "vendor", vendor)
@@ -332,6 +334,11 @@ class ControlledDemoRegistryContractTests(unittest.TestCase):
                     manifest_path = vendor / "bundle_manifest.json"
                     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
                     manifest["packageSha256"] = "0" * 64
+                    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+                elif drift == "forum_runtime_manifest":
+                    manifest_path = vendor / "bundle_manifest.json"
+                    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                    manifest["forumRuntimeBundle"]["files"]["classifier.py"] = "0" * 64
                     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
                 else:
                     (vendor / "bundle_manifest.json").write_text("{", encoding="utf-8")

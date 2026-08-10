@@ -1,0 +1,878 @@
+import 'dart:async';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:flutter/material.dart';
+import 'package:logic_oasis/shared/models/forum_answer.dart';
+import 'package:logic_oasis/shared/models/forum_question.dart';
+import 'package:logic_oasis/shared/repositories/collaboration_repository.dart';
+import 'package:logic_oasis/shared/services/forum_ai_status_service.dart';
+import 'package:logic_oasis/shared/state/app_state.dart';
+
+class QaForumPage extends StatefulWidget {
+  const QaForumPage({
+    super.key,
+    required this.state,
+    this.repository,
+    this.questionsStream,
+    this.blockedStudentIdsStream,
+    this.answersStreamForQuestion,
+  });
+  final AppState state;
+  final CollaborationRepository? repository;
+  final Stream<List<ForumQuestion>>? questionsStream;
+  final Stream<Set<String>>? blockedStudentIdsStream;
+  final Stream<List<ForumAnswer>> Function(String questionId)?
+  answersStreamForQuestion;
+
+  @override
+  State<QaForumPage> createState() => _QaForumPageState();
+}
+
+class _QaForumPageState extends State<QaForumPage> {
+  CollaborationRepository? _repository;
+  CollaborationRepository get _repo =>
+      _repository ??= widget.repository ?? CollaborationRepository();
+  final _filter = TextEditingController();
+  final _questionTitle = TextEditingController();
+  final _questionBody = TextEditingController();
+  StreamSubscription<Set<String>>? _blockedSubscription;
+  Set<String> _blockedAuthors = const {};
+  Object? _blockedError;
+  bool _postingQuestion = false;
+
+  String _t(String english, String bahasaMelayu) =>
+      widget.state.t(english, bahasaMelayu);
+
+  @override
+  void initState() {
+    super.initState();
+    final blockedIds =
+        widget.blockedStudentIdsStream ??
+        _repo.watchBlockedStudentIds(widget.state.currentStudentId);
+    _blockedSubscription = blockedIds.listen(
+      (ids) {
+        if (mounted) {
+          setState(() {
+            _blockedAuthors = ids;
+            _blockedError = null;
+          });
+        }
+      },
+      onError: (Object error) {
+        if (mounted) setState(() => _blockedError = error);
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _filter.dispose();
+    _questionTitle.dispose();
+    _questionBody.dispose();
+    _blockedSubscription?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      title: Text(_t('Q&A Forum', 'Forum S&J')),
+      actions: [
+        IconButton(
+          tooltip: _t('Manage blocked students', 'Urus murid yang disekat'),
+          onPressed: _manageBlockedStudents,
+          icon: const Icon(Icons.block_outlined),
+        ),
+      ],
+    ),
+    floatingActionButton: FloatingActionButton.extended(
+      onPressed: () => _composeQuestion(context),
+      icon: const Icon(Icons.add_comment_outlined),
+      label: Text(_t('Ask a question', 'Tanya soalan')),
+    ),
+    body: StreamBuilder<List<ForumQuestion>>(
+      stream: widget.questionsStream ?? _repo.watchQuestions(),
+      builder: (context, snapshot) {
+        if (_blockedError != null) {
+          return _Message(_friendlyError(_blockedError!, widget.state));
+        }
+        if (snapshot.hasError) {
+          final error = snapshot.error;
+          final denied =
+              error is FirebaseException && error.code == 'permission-denied';
+          return _Message(
+            denied
+                ? _t(
+                    'Forum access is unavailable for this account. Sign in with a student profile, then try again.',
+                    'Akses forum tidak tersedia untuk akaun ini. Log masuk dengan profil murid dan cuba lagi.',
+                  )
+                : _t(
+                    'The forum could not be loaded. Please check your connection and try again.',
+                    'Forum tidak dapat dimuatkan. Periksa sambungan anda dan cuba lagi.',
+                  ),
+          );
+        }
+        if (!snapshot.hasData)
+          return const Center(child: CircularProgressIndicator());
+        final query = _filter.text.trim().toLowerCase();
+        final questions = snapshot.data!
+            .where(
+              (question) =>
+                  !_blockedAuthors.contains(question.authorId) &&
+                  (query.isEmpty ||
+                      question.title.toLowerCase().contains(query) ||
+                      question.text.toLowerCase().contains(query)),
+            )
+            .toList(growable: false);
+        if (questions.isEmpty)
+          return Column(
+            children: [
+              _filterField(),
+              Expanded(
+                child: _Message(
+                  query.isEmpty
+                      ? _t(
+                          'No questions yet. Start the conversation by asking how you solved a problem.',
+                          'Belum ada soalan. Mulakan perbualan dengan bertanya cara menyelesaikan masalah.',
+                        )
+                      : _t(
+                          'No questions match this filter.',
+                          'Tiada soalan sepadan dengan tapisan ini.',
+                        ),
+                ),
+              ),
+            ],
+          );
+        return Column(
+          children: [
+            _filterField(),
+            Expanded(
+              child: ListView.separated(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+                itemCount: questions.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 10),
+                itemBuilder: (context, index) {
+                  final question = questions[index];
+                  return Card(
+                    child: ListTile(
+                      title: Text(question.title),
+                      subtitle: Text(
+                        question.text,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => _openAnswers(context, question),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
+    ),
+  );
+
+  Widget _filterField() => Padding(
+    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+    child: TextField(
+      controller: _filter,
+      onChanged: (_) => setState(() {}),
+      decoration: InputDecoration(
+        prefixIcon: const Icon(Icons.search),
+        hintText: _t('Filter questions', 'Tapis soalan'),
+        suffixIcon: _filter.text.isEmpty
+            ? null
+            : IconButton(
+                tooltip: _t('Clear filter', 'Kosongkan tapisan'),
+                onPressed: () {
+                  _filter.clear();
+                  setState(() {});
+                },
+                icon: const Icon(Icons.clear),
+              ),
+      ),
+    ),
+  );
+
+  Future<void> _manageBlockedStudents() async {
+    if (_blockedAuthors.isEmpty) {
+      _showMessage(
+        _t(
+          'You have not blocked any students.',
+          'Anda belum menyekat mana-mana murid.',
+        ),
+      );
+      return;
+    }
+    final blocked = _blockedAuthors.toList(growable: false)..sort();
+    final selected = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(_t('Blocked students', 'Murid yang disekat')),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: blocked.length,
+            itemBuilder: (context, index) {
+              final studentId = blocked[index];
+              final shortId = studentId.length <= 8
+                  ? studentId
+                  : '…${studentId.substring(studentId.length - 8)}';
+              return ListTile(
+                leading: const Icon(Icons.person_off_outlined),
+                title: Text(_t('Blocked student', 'Murid disekat')),
+                subtitle: Text(shortId),
+                trailing: TextButton(
+                  onPressed: () => Navigator.pop(context, studentId),
+                  child: Text(_t('Unblock', 'Buka sekatan')),
+                ),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(_t('Close', 'Tutup')),
+          ),
+        ],
+      ),
+    );
+    if (selected == null) return;
+    try {
+      await _repo.unblock(
+        studentId: widget.state.currentStudentId,
+        blockedStudentId: selected,
+      );
+      if (mounted) {
+        setState(
+          () => _blockedAuthors = {..._blockedAuthors}..remove(selected),
+        );
+      }
+      _showMessage(_t('Student unblocked.', 'Sekatan murid telah dibuka.'));
+    } catch (error) {
+      _showMessage(_friendlyError(error, widget.state));
+    }
+  }
+
+  Future<void> _composeQuestion(BuildContext context) async {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => PopScope(
+          canPop: !_postingQuestion,
+          child: AlertDialog(
+            title: Text(_t('Ask for help', 'Minta bantuan')),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: _questionTitle,
+                  maxLength: 140,
+                  decoration: InputDecoration(
+                    labelText: _t('Question title', 'Tajuk soalan'),
+                  ),
+                ),
+                TextField(
+                  controller: _questionBody,
+                  minLines: 3,
+                  maxLines: 6,
+                  maxLength: 3000,
+                  decoration: InputDecoration(
+                    labelText: _t(
+                      'What have you tried?',
+                      'Apakah yang telah anda cuba?',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: _postingQuestion
+                    ? null
+                    : () => Navigator.pop(dialogContext),
+                child: Text(_t('Cancel', 'Batal')),
+              ),
+              FilledButton.icon(
+                onPressed: _postingQuestion
+                    ? null
+                    : () async {
+                        if (_questionTitle.text.trim().length < 8 ||
+                            _questionBody.text.trim().length < 20) {
+                          _showMessage(
+                            _t(
+                              'Add a clear title and explain what you tried.',
+                              'Tambah tajuk yang jelas dan terangkan perkara yang telah dicuba.',
+                            ),
+                          );
+                          return;
+                        }
+                        setDialogState(() => _postingQuestion = true);
+                        try {
+                          await _repo.createQuestion(
+                            studentId: widget.state.currentStudentId,
+                            title: _questionTitle.text,
+                            text: _questionBody.text,
+                          );
+                          _questionTitle.clear();
+                          _questionBody.clear();
+                          if (dialogContext.mounted)
+                            Navigator.pop(dialogContext);
+                          _showMessage(
+                            _t('Question posted.', 'Soalan telah dihantar.'),
+                          );
+                        } catch (error) {
+                          _showMessage(_friendlyError(error, widget.state));
+                          if (dialogContext.mounted) {
+                            setDialogState(() => _postingQuestion = false);
+                          }
+                        }
+                      },
+                icon: _postingQuestion
+                    ? const SizedBox.square(
+                        dimension: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.send),
+                label: Text(_t('Post', 'Hantar')),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    _postingQuestion = false;
+  }
+
+  void _showMessage(String message) {
+    if (mounted)
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  void _openAnswers(BuildContext context, ForumQuestion question) =>
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => _AnswersPage(
+            question: question,
+            state: widget.state,
+            repository: _repository ?? widget.repository,
+            answersStream: widget.answersStreamForQuestion?.call(question.id),
+            blockedStudentIdsStream: widget.blockedStudentIdsStream,
+          ),
+        ),
+      );
+}
+
+class _AnswersPage extends StatefulWidget {
+  const _AnswersPage({
+    required this.question,
+    required this.state,
+    this.repository,
+    this.answersStream,
+    this.blockedStudentIdsStream,
+  });
+  final ForumQuestion question;
+  final AppState state;
+  final CollaborationRepository? repository;
+  final Stream<List<ForumAnswer>>? answersStream;
+  final Stream<Set<String>>? blockedStudentIdsStream;
+  @override
+  State<_AnswersPage> createState() => _AnswersPageState();
+}
+
+class _AnswersPageState extends State<_AnswersPage> {
+  final _answer = TextEditingController();
+  final _status = const ForumAiStatusService();
+  final Set<String> _inFlight = {};
+  StreamSubscription<Set<String>>? _blockedSubscription;
+  Set<String> _blockedAuthors = const {};
+  Object? _blockedError;
+  String? _acceptedAnswerId;
+  bool _submitting = false;
+  CollaborationRepository? _repository;
+  CollaborationRepository get _repo =>
+      _repository ??= widget.repository ?? CollaborationRepository();
+
+  String _t(String english, String bahasaMelayu) =>
+      widget.state.t(english, bahasaMelayu);
+
+  @override
+  void initState() {
+    super.initState();
+    _acceptedAnswerId = widget.question.acceptedAnswerId;
+    _blockedSubscription =
+        (widget.blockedStudentIdsStream ??
+                _repo.watchBlockedStudentIds(widget.state.currentStudentId))
+            .listen(
+              (ids) {
+                if (mounted) {
+                  setState(() {
+                    _blockedAuthors = ids;
+                    _blockedError = null;
+                  });
+                }
+              },
+              onError: (Object error) {
+                if (mounted) setState(() => _blockedError = error);
+              },
+            );
+  }
+
+  @override
+  void dispose() {
+    _answer.dispose();
+    _blockedSubscription?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: Text(_t('Answers', 'Jawapan'))),
+    body: Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                widget.question.title,
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 6),
+              Text(widget.question.text),
+            ],
+          ),
+        ),
+        Expanded(
+          child: StreamBuilder<List<ForumAnswer>>(
+            stream:
+                widget.answersStream ?? _repo.watchAnswers(widget.question.id),
+            builder: (context, snapshot) {
+              if (_blockedError != null) {
+                return _Message(_friendlyError(_blockedError!, widget.state));
+              }
+              if (snapshot.hasError) {
+                return _Message(_friendlyError(snapshot.error!, widget.state));
+              }
+              if (!snapshot.hasData)
+                return const Center(child: CircularProgressIndicator());
+              var effectiveAcceptedAnswerId = _acceptedAnswerId;
+              for (final answer in snapshot.data!) {
+                if (answer.acceptedAt != null) {
+                  effectiveAcceptedAnswerId ??= answer.id;
+                  break;
+                }
+              }
+              final answers = snapshot.data!
+                  .where((answer) => !_blockedAuthors.contains(answer.authorId))
+                  .toList(growable: false);
+              if (answers.isEmpty) {
+                return _Message(
+                  _t(
+                    'No answers yet. Share the steps you tried.',
+                    'Belum ada jawapan. Kongsikan langkah yang telah anda cuba.',
+                  ),
+                );
+              }
+              return ListView(
+                children: [
+                  for (final answer in answers)
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(answer.text),
+                            if (answer.acceptedAt != null ||
+                                effectiveAcceptedAnswerId == answer.id) ...[
+                              const SizedBox(height: 8),
+                              Chip(
+                                avatar: const Icon(
+                                  Icons.check_circle,
+                                  size: 18,
+                                ),
+                                label: Text(
+                                  _t('Accepted answer', 'Jawapan diterima'),
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: 8),
+                            if (answer.authorId ==
+                                widget.state.currentStudentId)
+                              Text(
+                                _status.statusText(
+                                  answer.feedback,
+                                  isBahasaMelayu: widget.state.isBahasaMelayu,
+                                ),
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            Row(
+                              children: [
+                                TextButton.icon(
+                                  onPressed:
+                                      _inFlight.contains('helpful:${answer.id}')
+                                      ? null
+                                      : () => _runAction(
+                                          'helpful:${answer.id}',
+                                          () => _repo.markHelpful(answer.id),
+                                          _t(
+                                            'Marked helpful.',
+                                            'Ditanda sebagai membantu.',
+                                          ),
+                                        ),
+                                  icon: const Icon(Icons.thumb_up_alt_outlined),
+                                  label: Text(_t('Helpful', 'Membantu')),
+                                ),
+                                if (widget.question.authorId ==
+                                        widget.state.currentStudentId &&
+                                    answer.authorId !=
+                                        widget.state.currentStudentId &&
+                                    effectiveAcceptedAnswerId == null &&
+                                    answer.acceptedAt == null)
+                                  TextButton.icon(
+                                    onPressed: _inFlight.contains('accept')
+                                        ? null
+                                        : () => _accept(answer),
+                                    icon: const Icon(
+                                      Icons.check_circle_outline,
+                                    ),
+                                    label: Text(_t('Accept', 'Terima')),
+                                  ),
+                                const Spacer(),
+                                PopupMenuButton<_AnswerAction>(
+                                  tooltip: _t(
+                                    'Answer actions',
+                                    'Tindakan jawapan',
+                                  ),
+                                  onSelected: (action) =>
+                                      _answerAction(action, answer),
+                                  itemBuilder: (_) => [
+                                    if (answer.authorId ==
+                                            widget.state.currentStudentId &&
+                                        answer.acceptedAt == null)
+                                      PopupMenuItem(
+                                        value: _AnswerAction.edit,
+                                        child: Text(
+                                          _t('Edit answer', 'Edit jawapan'),
+                                        ),
+                                      ),
+                                    if (answer.authorId !=
+                                        widget.state.currentStudentId) ...[
+                                      PopupMenuItem(
+                                        value: _AnswerAction.report,
+                                        child: Text(_t('Report', 'Laporkan')),
+                                      ),
+                                      PopupMenuItem(
+                                        value: _AnswerAction.block,
+                                        child: Text(
+                                          _t('Block student', 'Sekat murid'),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+        ),
+        SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _answer,
+                    minLines: 2,
+                    maxLines: 4,
+                    maxLength: 4000,
+                    decoration: InputDecoration(
+                      hintText: _t(
+                        'Explain how you worked it out…',
+                        'Terangkan cara anda menyelesaikannya…',
+                      ),
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.send),
+                  tooltip: _t('Post answer', 'Hantar jawapan'),
+                  onPressed: _submitting ? null : _submit,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+  Future<void> _submit() async {
+    final submittedText = _answer.text;
+    if (submittedText.trim().length < 8) return;
+    setState(() => _submitting = true);
+    try {
+      await _repo.submitAnswer(
+        studentId: widget.state.currentStudentId,
+        questionId: widget.question.id,
+        text: submittedText,
+      );
+      if (_answer.text == submittedText) _answer.clear();
+      _message(
+        _t(
+          'Answer posted and queued for review.',
+          'Jawapan telah dihantar dan menunggu semakan.',
+        ),
+      );
+    } catch (error) {
+      _message(_friendlyError(error, widget.state));
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  Future<bool> _runAction(
+    String key,
+    Future<void> Function() action,
+    String success,
+  ) async {
+    if (_inFlight.contains(key)) return false;
+    setState(() => _inFlight.add(key));
+    try {
+      await action();
+      _message(success);
+      return true;
+    } catch (error) {
+      _message(_friendlyError(error, widget.state));
+      return false;
+    } finally {
+      if (mounted) setState(() => _inFlight.remove(key));
+    }
+  }
+
+  Future<void> _accept(ForumAnswer answer) async {
+    final accepted = await _runAction(
+      'accept',
+      () => _repo.acceptAnswer(answer.id),
+      _t('Answer accepted.', 'Jawapan diterima.'),
+    );
+    if (accepted && mounted) setState(() => _acceptedAnswerId = answer.id);
+  }
+
+  Future<void> _answerAction(_AnswerAction action, ForumAnswer answer) async {
+    if (action == _AnswerAction.block) {
+      final blocked = await _runAction(
+        'block:${answer.authorId}',
+        () => _repo.block(
+          studentId: widget.state.currentStudentId,
+          blockedStudentId: answer.authorId,
+        ),
+        _t(
+          'Student blocked on your forum view.',
+          'Murid disekat daripada paparan forum anda.',
+        ),
+      );
+      if (blocked && mounted) {
+        setState(() => _blockedAuthors = {..._blockedAuthors, answer.authorId});
+      }
+      return;
+    }
+    final value = await showDialog<String>(
+      context: context,
+      builder: (_) => _AnswerActionDialog(
+        initialText: action == _AnswerAction.edit ? answer.text : '',
+        title: action == _AnswerAction.edit
+            ? _t('Edit answer', 'Edit jawapan')
+            : _t('Report answer', 'Laporkan jawapan'),
+        cancelLabel: _t('Cancel', 'Batal'),
+        submitLabel: _t('Submit', 'Hantar'),
+      ),
+    );
+    if (value == null ||
+        value.trim().length < (action == _AnswerAction.edit ? 8 : 3))
+      return;
+    await _runAction(
+      '${action.name}:${answer.id}',
+      action == _AnswerAction.edit
+          ? () => _repo.editAnswer(
+              studentId: widget.state.currentStudentId,
+              answerId: answer.id,
+              text: value,
+            )
+          : () => _repo.report(
+              targetType: 'answer',
+              targetId: answer.id,
+              reason: value,
+            ),
+      action == _AnswerAction.edit
+          ? _t(
+              'Response edited successfully. Feedback review queued.',
+              'Jawapan berjaya diedit. Semakan maklum balas sedang menunggu.',
+            )
+          : _t('Report submitted.', 'Laporan telah dihantar.'),
+    );
+  }
+
+  void _message(String message) {
+    if (mounted)
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+  }
+}
+
+enum _AnswerAction { edit, report, block }
+
+class _AnswerActionDialog extends StatefulWidget {
+  const _AnswerActionDialog({
+    required this.initialText,
+    required this.title,
+    required this.cancelLabel,
+    required this.submitLabel,
+  });
+
+  final String initialText;
+  final String title;
+  final String cancelLabel;
+  final String submitLabel;
+
+  @override
+  State<_AnswerActionDialog> createState() => _AnswerActionDialogState();
+}
+
+class _AnswerActionDialogState extends State<_AnswerActionDialog> {
+  late final TextEditingController _controller = TextEditingController(
+    text: widget.initialText,
+  );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: Text(widget.title),
+    content: TextField(controller: _controller, minLines: 3, maxLines: 6),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: Text(widget.cancelLabel),
+      ),
+      FilledButton(
+        onPressed: () => Navigator.pop(context, _controller.text),
+        child: Text(widget.submitLabel),
+      ),
+    ],
+  );
+}
+
+String _friendlyError(Object error, AppState state) {
+  String t(String english, String bahasaMelayu) =>
+      state.t(english, bahasaMelayu);
+  if (error is FirebaseFunctionsException) {
+    if ({
+      'failed-precondition',
+      'already-exists',
+      'invalid-argument',
+    }.contains(error.code)) {
+      final message = error.message?.trim();
+      if (message != null && message.isNotEmpty) {
+        return _localizedFunctionMessage(message, state);
+      }
+    }
+    if (error.code == 'permission-denied') {
+      return t(
+        'This action is not allowed for your account or this content.',
+        'Tindakan ini tidak dibenarkan untuk akaun atau kandungan ini.',
+      );
+    }
+    if (error.code == 'not-found') {
+      return t(
+        'This forum content is no longer available.',
+        'Kandungan forum ini tidak lagi tersedia.',
+      );
+    }
+    if ({
+      'unavailable',
+      'deadline-exceeded',
+      'internal',
+      'unimplemented',
+    }.contains(error.code)) {
+      return t(
+        'The forum service is temporarily unavailable. Your draft is safe; please retry.',
+        'Perkhidmatan forum tidak tersedia buat sementara waktu. Draf anda selamat; sila cuba lagi.',
+      );
+    }
+  }
+  if (error is FirebaseException && error.code == 'permission-denied') {
+    return t(
+      'This action is not allowed for your account or this content.',
+      'Tindakan ini tidak dibenarkan untuk akaun atau kandungan ini.',
+    );
+  }
+  if (error is FirebaseException &&
+      (error.code == 'unavailable' || error.code == 'deadline-exceeded')) {
+    return t(
+      'The forum is temporarily unavailable. Your draft is safe; please retry.',
+      'Forum tidak tersedia buat sementara waktu. Draf anda selamat; sila cuba lagi.',
+    );
+  }
+  if (error is StateError) {
+    final message = error.message.toString().trim();
+    if (message.isNotEmpty) return message;
+  }
+  return t(
+    'The action could not be completed. Please retry.',
+    'Tindakan tidak dapat diselesaikan. Sila cuba lagi.',
+  );
+}
+
+String _localizedFunctionMessage(String message, AppState state) {
+  final bahasaMelayu = switch (message) {
+    'You cannot mark your own answer helpful.' =>
+      'Anda tidak boleh menandakan jawapan sendiri sebagai membantu.',
+    'Only the question author may accept an answer.' =>
+      'Hanya penulis soalan boleh menerima jawapan.',
+    'You cannot accept your own answer.' =>
+      'Anda tidak boleh menerima jawapan sendiri.',
+    'This question already has an accepted answer.' =>
+      'Soalan ini sudah mempunyai jawapan yang diterima.',
+    'You cannot report your own content.' =>
+      'Anda tidak boleh melaporkan kandungan sendiri.',
+    'Report reason must be between 3 and 500 characters.' =>
+      'Sebab laporan mestilah antara 3 hingga 500 aksara.',
+    _ => message,
+  };
+  return state.t(message, bahasaMelayu);
+}
+
+class _Message extends StatelessWidget {
+  const _Message(this.text);
+  final String text;
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(24),
+      child: Text(text, textAlign: TextAlign.center),
+    ),
+  );
+}

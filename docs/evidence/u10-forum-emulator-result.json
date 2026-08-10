@@ -1,0 +1,41 @@
+{
+  "artifactContract": "logic-oasis-u10-forum-emulator-result/v1",
+  "artifactIdentity": "8307a480b5d5e61612b878653b2182d609ae594024ecae192e3677ace99a0049",
+  "claimLevel": "controlled_demonstration_only",
+  "codeRevision": "937204cbdd672d1350cf4a05bf3887feb50bab41e7c97c16d716932948b0957d",
+  "collaboration": {
+    "acceptedAnswersCount": 1,
+    "answersSubmittedCount": 1,
+    "helpfulReceivedCount": 1,
+    "questionsPostedCount": 1,
+    "reportStatus": "active"
+  },
+  "controlledEvidenceCorpusSha256After": "0d83a44bbca58b57d3545c69ba277f227317a6fdf6baf0270b8a96f786a2a44a",
+  "controlledEvidenceCorpusSha256Before": "0d83a44bbca58b57d3545c69ba277f227317a6fdf6baf0270b8a96f786a2a44a",
+  "emulators": [
+    "auth",
+    "firestore",
+    "functions"
+  ],
+  "immutableRunCount": 2,
+  "modelVersion": "forum-controlled-demo-nb-v1",
+  "privacy": {
+    "linkedParentRawReadsDenied": 7,
+    "linkedParentSummaryRead": true,
+    "parentCallableDenied": true,
+    "submittedTextMatchesInCapturedOutput": 0
+  },
+  "releaseId": "forum-controlled-demo-nb-v1-release-2",
+  "result": "passed",
+  "rollback": {
+    "fallbackArtifactIdentity": "safe-fallback-v1",
+    "fallbackClaimLevel": "safe_fallback_only",
+    "fallbackLogicalInferenceIdPresent": true,
+    "fallbackModelVersion": "safe-fallback-v1",
+    "fallbackState": "fallback",
+    "priorControlledRunByteEquivalent": true,
+    "priorControlledRunState": "completed"
+  },
+  "scope": "local_emulator_only",
+  "verificationDate": "2026-08-09"
+}

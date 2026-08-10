@@ -1,0 +1,83 @@
+{
+  "abstentionPolicyVersion": "forum-advisory-policy-v1",
+  "artifactSha256": "8307a480b5d5e61612b878653b2182d609ae594024ecae192e3677ace99a0049",
+  "artifactSizeBytes": 17634,
+  "baselineComparisonResult": "naive_bayes_advantage_demonstrated",
+  "bundleManifestSha256": "cd1c07d23dcb472776381c7d6af43e9357922fe882cfb879ef88267edb2ed14f",
+  "candidateGateStatus": "passed",
+  "candidateManifestSha256": "45364c713b72351801afc00c37b5692085cf43d2c1225ca1eaf962c3cf2bfea5",
+  "catalogueSha256": "614aefeffe4929f9b096452a4bb5e473cf671c809231a42edf2e8358b1f01c3a",
+  "claimLevel": "controlled_demonstration_only",
+  "codeRevision": "01e74fe579a81a3b3f39c675297b6f4791f5fb2f2c9b7bb62d028da9e3225d1f",
+  "codeRevisionKind": "sha256_bounded_release_sources_v1",
+  "datasetManifestSha256": "ce31bd081ea5e3f72d09171bfe7829d110a8fc5045fd202d3fe88255941c8d03",
+  "datasetSha256": "5d096d6ab1c6ce59428c9d89b8d972d743d6d613ae249b619c1c51579b3a8399",
+  "dependencies": {
+    "joblib": "1.5.3",
+    "numpy": "2.4.6",
+    "scikit-learn": "1.9.0"
+  },
+  "deploymentRuntimeHashes": {
+    "forum_runtime.py": "1c3dd55a395cc7949a77384558a40d2da5b8c92dc11bce74cebb28cc7f5005fe",
+    "main.py": "6c70eba02716f81271248ae09a043397d33c21675c0afaf735e852a293abb617"
+  },
+  "deploymentScope": "controlled_demo",
+  "deploymentState": "pending_cloud_deployment",
+  "evaluationReportSha256": "9bb9b4d1387ce943b88be042c6aade23594eb2aa9ea7413099ea44cf3f9ebb1a",
+  "evidenceLevel": "controlled_demonstration",
+  "failedGates": [],
+  "isActive": true,
+  "lifecycleStatus": "released",
+  "manifestSchemaVersion": "forum-model-release-manifest-v1",
+  "modelType": "MultinomialNB",
+  "modelVersion": "forum-controlled-demo-nb-v1",
+  "outputContract": {
+    "abstained": "uncertain",
+    "answer_only_or_insufficient": "needs_reasoning",
+    "explanation_sufficient": "sufficient_reasoning"
+  },
+  "preprocessingVersion": "forum-text-preprocessing-v1",
+  "releaseId": "forum-controlled-demo-nb-v1-release-4",
+  "releaseRationale": "Developer-released FYP1 controlled-demonstration model. Not evaluated on real learner forum responses.",
+  "releaseScope": "fyp1_forum_controlled_demo",
+  "releasedAt": "2026-08-10T16:30:00Z",
+  "releasedBy": "zyonn",
+  "rubricSha256": "678505add7d4901d49ce1636baf8289877480383e3515b38e847b114da7ba05b",
+  "runtimeEnvironmentFingerprint": {
+    "architecture": "AMD64",
+    "joblibVersion": "1.5.3",
+    "numpyVersion": "2.4.6",
+    "operatingSystem": "Windows",
+    "pyYamlVersion": "6.0.3",
+    "pythonImplementation": "CPython",
+    "pythonVersion": "3.12.13",
+    "scikitLearnVersion": "1.9.0",
+    "sha256": "5d4dd28a180370bd6acabd01a1b53ddacb30c6572cba994afb95018d2270ae94"
+  },
+  "semanticReproducibilityStatus": "verified_same_runtime_contract",
+  "sourceRuntimeHashes": {
+    "__init__.py": "4a91ba70aefb24ff8a4b0b83269d23548c1e7623e4d1f3ce0e2ac218f20c4417",
+    "classifier.py": "a16acf03d4d3621ef6112ae2477b2fd1dd4227c1541913b8112eaac88b18802f"
+  },
+  "splitManifestSha256": "6c994001f0d1791030664310ba4bc3b807421b74364141ec7f82572d2945ba6d",
+  "supersedesReleaseId": null,
+  "trainingDataProvenance": "expert_authored_controlled_demo",
+  "vectorizerContract": {
+    "abstentionPolicyVersion": "forum-advisory-policy-v1",
+    "abstentionThreshold": 0.6,
+    "family": "TfidfVectorizer",
+    "languageNormalization": "unicode_whitespace_casefold_v1",
+    "minimumDocumentFrequency": 1,
+    "ngramRange": [
+      1,
+      2
+    ],
+    "preprocessingVersion": "forum-text-preprocessing-v1",
+    "sublinearTf": true,
+    "tokenization": "sklearn_word_unicode_v1"
+  },
+  "vendorRuntimeHashes": {
+    "__init__.py": "4a91ba70aefb24ff8a4b0b83269d23548c1e7623e4d1f3ce0e2ac218f20c4417",
+    "classifier.py": "a16acf03d4d3621ef6112ae2477b2fd1dd4227c1541913b8112eaac88b18802f"
+  }
+}

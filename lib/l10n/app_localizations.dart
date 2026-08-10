@@ -116,6 +116,12 @@ abstract class AppLocalizations {
   /// **'Forge'**
   String get forge;
 
+  /// No description provided for @forum.
+  ///
+  /// In en, this message translates to:
+  /// **'Q&A Forum'**
+  String get forum;
+
   /// No description provided for @settings.
   ///
   /// In en, this message translates to:

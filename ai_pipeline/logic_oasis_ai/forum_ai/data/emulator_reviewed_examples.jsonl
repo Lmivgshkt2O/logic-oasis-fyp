@@ -1,0 +1,6 @@
+{"text":"I added the tens first and then added the ones. I checked by subtracting the answer.","label":"sufficient_reasoning","provenance":"synthetic_test","reviewer":"development-fixture-review","authorGroup":"fixture-a"}
+{"text":"I drew equal groups of four and counted three groups, so I know why it is twelve.","label":"sufficient_reasoning","provenance":"synthetic_test","reviewer":"development-fixture-review","authorGroup":"fixture-b"}
+{"text":"The answer is twelve.","label":"needs_reasoning","provenance":"synthetic_test","reviewer":"development-fixture-review","authorGroup":"fixture-c"}
+{"text":"It is 40 because that is the answer.","label":"needs_reasoning","provenance":"synthetic_test","reviewer":"development-fixture-review","authorGroup":"fixture-d"}
+{"text":"I split 18 into 10 and 8, then added 22 to get 40 and checked it backwards.","label":"sufficient_reasoning","provenance":"synthetic_test","reviewer":"development-fixture-review","authorGroup":"fixture-e"}
+{"text":"The answer is 40.","label":"needs_reasoning","provenance":"synthetic_test","reviewer":"development-fixture-review","authorGroup":"fixture-f"}

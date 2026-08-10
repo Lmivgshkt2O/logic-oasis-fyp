@@ -26,6 +26,7 @@ from build_function_bundle import (
     PACKAGE,
     SOURCE,
     VENDOR,
+    expected_bundle_manifest,
     file_sha256,
     tree_sha256,
 )
@@ -159,14 +160,13 @@ def verify_function_bundle_parity() -> Mapping[str, str]:
         for filename in CONFIGS
     ):
         raise ValueError("function bundle parity preflight failed")
-    expected_manifest = {
-        "bundleVersion": BUNDLE_VERSION,
-        **source_hashes,
-    }
     try:
         stored_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
         raise ValueError("function bundle parity preflight failed") from error
+    expected_manifest = expected_bundle_manifest(
+        include_forum_runtime="forumRuntimeBundle" in stored_manifest,
+    )
     if stored_manifest != expected_manifest:
         raise ValueError("function bundle parity preflight failed")
     return MappingProxyType(source_hashes)

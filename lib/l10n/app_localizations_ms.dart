@@ -18,6 +18,9 @@ class AppLocalizationsMs extends AppLocalizations {
   String get forge => 'Latihan';
 
   @override
+  String get forum => 'Forum S&J';
+
+  @override
   String get settings => 'Tetapan';
 
   @override

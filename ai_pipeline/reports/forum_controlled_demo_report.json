@@ -1,0 +1,282 @@
+{
+  "abstentionCoverage": 0.5,
+  "accuracy": 0.75,
+  "activationStatus": "pending_u5_activation",
+  "applicableFinalTestStatus": "final_test",
+  "artifactByteHash": "8307a480b5d5e61612b878653b2182d609ae594024ecae192e3677ace99a0049",
+  "balancedAccuracy": 0.75,
+  "baselineComparisonResult": "naive_bayes_advantage_demonstrated",
+  "calibrationStatus": "not_established_on_real_learners",
+  "candidateSelectionDecision": "selected_MultinomialNB_using_training_and_validation_only",
+  "catalogueSha256": "614aefeffe4929f9b096452a4bb5e473cf671c809231a42edf2e8358b1f01c3a",
+  "catalogueVersion": "forum-controlled-demo-catalog-v1",
+  "claimLevel": "controlled_demonstration_only",
+  "comparators": {
+    "ComplementNB": {
+      "evidenceContract": {
+        "abstentionPolicyVersion": "forum-advisory-policy-v1",
+        "datasetSha256": "5d096d6ab1c6ce59428c9d89b8d972d743d6d613ae249b619c1c51579b3a8399",
+        "evaluationGroupKey": "scenarioFamilyId",
+        "minimumDocumentFrequency": 1,
+        "ngramRange": [
+          1,
+          2
+        ],
+        "preprocessingVersion": "forum-text-preprocessing-v1",
+        "relatedQuestionGroupKey": "questionFamilyId",
+        "vectorizerFamily": "TfidfVectorizer"
+      },
+      "fitRows": 20,
+      "heldOutRows": 4,
+      "metrics": {
+        "accuracy": 0.75,
+        "balancedAccuracy": 0.75,
+        "confusionMatrix": {
+          "labels": [
+            "answer_only_or_insufficient",
+            "explanation_sufficient"
+          ],
+          "values": [
+            [
+              2,
+              0
+            ],
+            [
+              1,
+              1
+            ]
+          ]
+        },
+        "macroF1": 0.73333333,
+        "perClass": {
+          "answer_only_or_insufficient": {
+            "f1": 0.8,
+            "precision": 0.66666667,
+            "recall": 1.0,
+            "support": 2
+          },
+          "explanation_sufficient": {
+            "f1": 0.66666667,
+            "precision": 1.0,
+            "recall": 0.5,
+            "support": 2
+          }
+        }
+      }
+    },
+    "MultinomialNB": {
+      "evidenceContract": {
+        "abstentionPolicyVersion": "forum-advisory-policy-v1",
+        "datasetSha256": "5d096d6ab1c6ce59428c9d89b8d972d743d6d613ae249b619c1c51579b3a8399",
+        "evaluationGroupKey": "scenarioFamilyId",
+        "minimumDocumentFrequency": 1,
+        "ngramRange": [
+          1,
+          2
+        ],
+        "preprocessingVersion": "forum-text-preprocessing-v1",
+        "relatedQuestionGroupKey": "questionFamilyId",
+        "vectorizerFamily": "TfidfVectorizer"
+      },
+      "fitRows": 20,
+      "heldOutRows": 4,
+      "metrics": {
+        "accuracy": 0.75,
+        "balancedAccuracy": 0.75,
+        "confusionMatrix": {
+          "labels": [
+            "answer_only_or_insufficient",
+            "explanation_sufficient"
+          ],
+          "values": [
+            [
+              2,
+              0
+            ],
+            [
+              1,
+              1
+            ]
+          ]
+        },
+        "macroF1": 0.73333333,
+        "perClass": {
+          "answer_only_or_insufficient": {
+            "f1": 0.8,
+            "precision": 0.66666667,
+            "recall": 1.0,
+            "support": 2
+          },
+          "explanation_sufficient": {
+            "f1": 0.66666667,
+            "precision": 1.0,
+            "recall": 0.5,
+            "support": 2
+          }
+        }
+      }
+    },
+    "deterministic_answer_only_baseline": {
+      "evidenceContract": {
+        "abstentionPolicyVersion": "forum-advisory-policy-v1",
+        "datasetSha256": "5d096d6ab1c6ce59428c9d89b8d972d743d6d613ae249b619c1c51579b3a8399",
+        "evaluationGroupKey": "scenarioFamilyId",
+        "minimumDocumentFrequency": 1,
+        "ngramRange": [
+          1,
+          2
+        ],
+        "preprocessingVersion": "forum-text-preprocessing-v1",
+        "relatedQuestionGroupKey": "questionFamilyId",
+        "vectorizerFamily": "TfidfVectorizer"
+      },
+      "fitRows": 20,
+      "heldOutRows": 4,
+      "metrics": {
+        "accuracy": 1.0,
+        "balancedAccuracy": 1.0,
+        "confusionMatrix": {
+          "labels": [
+            "answer_only_or_insufficient",
+            "explanation_sufficient"
+          ],
+          "values": [
+            [
+              2,
+              0
+            ],
+            [
+              0,
+              2
+            ]
+          ]
+        },
+        "macroF1": 1.0,
+        "perClass": {
+          "answer_only_or_insufficient": {
+            "f1": 1.0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "support": 2
+          },
+          "explanation_sufficient": {
+            "f1": 1.0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "support": 2
+          }
+        }
+      },
+      "vectorizerVocabularySize": 298
+    }
+  },
+  "confusionMatrix": {
+    "labels": [
+      "answer_only_or_insufficient",
+      "explanation_sufficient"
+    ],
+    "values": [
+      [
+        2,
+        0
+      ],
+      [
+        1,
+        1
+      ]
+    ]
+  },
+  "controlledCandidateStatus": "eligible",
+  "controlledDemoActivationDecision": "eligible_for_u5_release_review",
+  "datasetCounts": {
+    "classes": {
+      "answer_only_or_insufficient": 12,
+      "explanation_sufficient": 12
+    },
+    "languages": {
+      "en": 8,
+      "mixed": 8,
+      "ms": 8
+    },
+    "questionFamilies": 12,
+    "rows": 24,
+    "scenarioFamilies": 12
+  },
+  "datasetSha256": "5d096d6ab1c6ce59428c9d89b8d972d743d6d613ae249b619c1c51579b3a8399",
+  "deploymentScope": "controlled_demo",
+  "evaluationMode": "grouped_three_way",
+  "evaluationStatus": "evaluated",
+  "evidenceLevel": "controlled_demonstration",
+  "failedGates": [],
+  "fallbackCoverage": 0.5,
+  "latencyMs": {
+    "canonicalStatus": "execution_observation_excluded_from_canonical_report",
+    "protocol": "single-row predict after warm load"
+  },
+  "limitations": [
+    "The metrics demonstrate reproducible classifier behaviour, scenario-fit, artifact integrity, and prototype integration readiness. They do not establish predictive accuracy, generalisability, educational effectiveness, or performance for real primary-school learners.",
+    "The deterministic baseline is comparison-only and cannot be released or activated.",
+    "A baseline win permits no Naive Bayes superiority claim."
+  ],
+  "macroF1": 0.73333333,
+  "outputContract": {
+    "abstained": "uncertain",
+    "answer_only_or_insufficient": "needs_reasoning",
+    "explanation_sufficient": "sufficient_reasoning"
+  },
+  "perClass": {
+    "answer_only_or_insufficient": {
+      "f1": 0.8,
+      "precision": 0.66666667,
+      "recall": 1.0,
+      "support": 2
+    },
+    "explanation_sufficient": {
+      "f1": 0.66666667,
+      "precision": 1.0,
+      "recall": 0.5,
+      "support": 2
+    }
+  },
+  "preprocessingSha256": "6cf3042edd5df9a054ea9b8f5348dd1d4c9a989fdebb43d9b8ca56e6cf8481e3",
+  "preprocessingVersion": "forum-text-preprocessing-v1",
+  "publicationCoverage": 0.5,
+  "releaseScope": "fyp1_forum_controlled_demo",
+  "reportSchemaVersion": "forum-controlled-demo-report-v1",
+  "rubricSha256": "678505add7d4901d49ce1636baf8289877480383e3515b38e847b114da7ba05b",
+  "rubricVersion": "forum-explanation-rubric-v1",
+  "runtimeEnvironmentFingerprint": {
+    "architecture": "AMD64",
+    "joblibVersion": "1.5.3",
+    "numpyVersion": "2.4.6",
+    "operatingSystem": "Windows",
+    "pyYamlVersion": "6.0.3",
+    "pythonImplementation": "CPython",
+    "pythonVersion": "3.12.13",
+    "scikitLearnVersion": "1.9.0",
+    "sha256": "5d4dd28a180370bd6acabd01a1b53ddacb30c6572cba994afb95018d2270ae94"
+  },
+  "selectedNaiveBayesVariant": "MultinomialNB",
+  "selectionEvidenceSha256": "470954337b266e7be2c212879aa07857b02ace5a6d8b26f1ccfde051651d7c92",
+  "selectionMetric": "macroF1",
+  "semanticReproducibilityStatus": "verified_same_runtime_contract",
+  "serializedSizeBytes": 17634,
+  "splitManifestSha256": "6c994001f0d1791030664310ba4bc3b807421b74364141ec7f82572d2945ba6d",
+  "splitSeed": 20260803,
+  "trainingDataProvenance": "expert_authored_controlled_demo",
+  "untouchedTestEvaluationCount": 1,
+  "vectorizerContract": {
+    "abstentionPolicyVersion": "forum-advisory-policy-v1",
+    "abstentionThreshold": 0.6,
+    "family": "TfidfVectorizer",
+    "languageNormalization": "unicode_whitespace_casefold_v1",
+    "minimumDocumentFrequency": 1,
+    "ngramRange": [
+      1,
+      2
+    ],
+    "preprocessingVersion": "forum-text-preprocessing-v1",
+    "sublinearTf": true,
+    "tokenization": "sklearn_word_unicode_v1"
+  }
+}

@@ -34,7 +34,34 @@ def tree_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def expected_bundle_manifest(*, include_forum_runtime: bool) -> dict[str, object]:
+    """Build the authoritative source-bound Functions bundle manifest."""
+    manifest: dict[str, object] = {
+        "bundleVersion": BUNDLE_VERSION,
+        "packageSha256": tree_sha256(PACKAGE),
+        **{
+            manifest_key: file_sha256(SOURCE / "configs" / filename)
+            for manifest_key, filename in CONFIG_HASH_FILES.items()
+        },
+    }
+    if include_forum_runtime:
+        manifest["forumRuntimeBundle"] = {
+            "bundleSchemaVersion": "forum-runtime-bundle-v1",
+            "files": {
+                name: file_sha256(PACKAGE / "forum_ai" / name)
+                for name in ("__init__.py", "classifier.py")
+            },
+        }
+    return manifest
+
+
 def build_bundle() -> dict[str, object]:
+    manifest_path = VENDOR / "bundle_manifest.json"
+    existing = (
+        json.loads(manifest_path.read_text(encoding="utf-8"))
+        if manifest_path.is_file()
+        else {}
+    )
     target_package = VENDOR / "logic_oasis_ai"
     target_configs = VENDOR / "configs"
     if target_package.exists():
@@ -45,15 +72,12 @@ def build_bundle() -> dict[str, object]:
     target_configs.mkdir(parents=True, exist_ok=True)
     for filename in CONFIGS:
         shutil.copy2(SOURCE / "configs" / filename, target_configs / filename)
-    manifest = {
-        "bundleVersion": BUNDLE_VERSION,
-        "packageSha256": tree_sha256(PACKAGE),
-        **{
-            manifest_key: file_sha256(SOURCE / "configs" / filename)
-            for manifest_key, filename in CONFIG_HASH_FILES.items()
-        },
-    }
-    (VENDOR / "bundle_manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    manifest = expected_bundle_manifest(
+        include_forum_runtime="forumRuntimeBundle" in existing,
+    )
+    manifest_path.write_bytes(
+        (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    )
     return manifest
 
 

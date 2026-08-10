@@ -52,10 +52,7 @@ class HomePage extends StatelessWidget {
               onTap: () => _toggleMissionReminders(context),
             ),
             const SizedBox(width: 10),
-            SoftIconButton(
-              icon: 'settings',
-              onTap: () => state.changeTab(2),
-            ),
+            SoftIconButton(icon: 'settings', onTap: () => state.changeTab(3)),
           ],
         ),
         const SizedBox(height: 14),
@@ -166,12 +163,14 @@ class _HomeMissionCard extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final topic = isBahasaMelayu ? mission.topicTitleBm : mission.topicTitle;
     final required = mission.requiredCompletions;
-    final progress = required == 0 ? 0.0 : mission.visibleCompletions / required;
+    final progress = required == 0
+        ? 0.0
+        : mission.visibleCompletions / required;
     final rewardLabel = mission.rewardClaimed
         ? l10n.rewardClaimedKeepPractising(topic)
         : mission.isReadyToClaim
-            ? l10n.missionCompleteClaimReward
-            : '+${mission.rewardCrystals} Crystals on completion';
+        ? l10n.missionCompleteClaimReward
+        : '+${mission.rewardCrystals} Crystals on completion';
 
     return MissionCard(
       topicLabel: topic,

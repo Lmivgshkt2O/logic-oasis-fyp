@@ -3,10 +3,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:logic_oasis/app/logic_oasis_design.dart';
 import 'package:logic_oasis/app/theme.dart';
+import 'package:logic_oasis/features/collaboration/qa_forum/qa_forum_page.dart';
 import 'package:logic_oasis/features/formula_forge/formula_forge_page.dart';
 import 'package:logic_oasis/features/home/home_page.dart';
 import 'package:logic_oasis/features/settings/settings_page.dart';
 import 'package:logic_oasis/l10n/app_localizations.dart';
+import 'package:logic_oasis/shared/state/app_state.dart';
 import 'package:logic_oasis/shared/state/app_state_scope.dart';
 import 'package:logic_oasis/shared/widgets/logic_oasis_figma_components.dart';
 
@@ -15,10 +17,12 @@ class LogicOasisShell extends StatefulWidget {
     super.key,
     required this.onLogout,
     this.welcomeStudentName,
+    this.forumPageBuilder,
   });
 
   final VoidCallback onLogout;
   final String? welcomeStudentName;
+  final Widget Function(AppState state)? forumPageBuilder;
 
   @override
   State<LogicOasisShell> createState() => _LogicOasisShellState();
@@ -84,6 +88,7 @@ class _LogicOasisShellState extends State<LogicOasisShell> {
     final pages = [
       HomePage(state: state),
       FormulaForgePage(state: state),
+      widget.forumPageBuilder?.call(state) ?? QaForumPage(state: state),
       SettingsPage(state: state, onLogout: widget.onLogout),
     ];
 
@@ -114,18 +119,10 @@ class _LogicOasisShellState extends State<LogicOasisShell> {
             selectedIndex: state.selectedTab,
             onSelected: state.changeTab,
             items: [
-              BottomNavItemData(
-                icon: 'nav_home',
-                label: l10n.home,
-              ),
-              BottomNavItemData(
-                icon: 'nav_forge',
-                label: l10n.forge,
-              ),
-              BottomNavItemData(
-                icon: 'nav_settings',
-                label: l10n.settings,
-              ),
+              BottomNavItemData(icon: 'nav_home', label: l10n.home),
+              BottomNavItemData(icon: 'nav_forge', label: l10n.forge),
+              BottomNavItemData(icon: 'nav_forum', label: l10n.forum),
+              BottomNavItemData(icon: 'nav_settings', label: l10n.settings),
             ],
           ),
         ),

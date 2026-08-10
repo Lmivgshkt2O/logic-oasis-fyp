@@ -5,11 +5,15 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 from hashlib import sha256
+import json
+import logging
 import os
 from pathlib import Path
 import sys
 from typing import Any, Callable
 from uuid import uuid4
+
+LOGGER = logging.getLogger(__name__)
 
 import firebase_admin
 from firebase_admin import auth as admin_auth
@@ -29,6 +33,12 @@ if str(_PACKAGE_ROOT) not in sys.path:
     sys.path.insert(0, str(_PACKAGE_ROOT))
 
 from ai_runtime import AI_RUNTIME_SERVICE_ACCOUNT, FirestoreRuntimeGateway, RuntimeBundle, process_finalized_attempt
+from forum_runtime import (
+    FORUM_RUNTIME_SERVICE_ACCOUNT,
+    ForumRuntimeError,
+    ForumRuntimeGateway,
+    load_forum_classifier,
+)
 from logic_oasis_ai.sinks.firestore_sink import adaptive_assignment_id, subtopic_mastery_id
 from parent_link_admin import (
     PARENT_LINK_ADMIN_SERVICE_ACCOUNT,
@@ -101,6 +111,12 @@ PARENT_INVITATION_CONTINUE_URL = params.StringParam(
 )
 AI_MODEL_EVIDENCE_MODE = params.StringParam(
     "AI_MODEL_EVIDENCE_MODE", default="real_evaluated_only"
+)
+FORUM_MODEL_EVIDENCE_MODE = params.StringParam(
+    "FORUM_MODEL_EVIDENCE_MODE", default="real_evaluated_only"
+)
+FORUM_RUNTIME_CODE_REVISION = params.StringParam(
+    "FORUM_RUNTIME_CODE_REVISION", default=""
 )
 AI_MODEL_BUCKET = params.StringParam("AI_MODEL_BUCKET", default="")
 PARENT_INVITATION_ANDROID_PACKAGE = params.StringParam(
@@ -1071,6 +1087,53 @@ def _call(handler: Callable[[dict[str, Any], str], dict[str, Any]], request: htt
         raise https_fn.HttpsError(_ERROR_CODES.get(error.code, https_fn.FunctionsErrorCode.INTERNAL), str(error))
 
 
+def _forum_call(
+    handler: Callable[[str], dict[str, Any]], request: https_fn.CallableRequest,
+) -> dict[str, Any]:
+    try:
+        return handler(_student_auth_uid(request))
+    except (ForumRuntimeError, QuizSessionError) as error:
+        raise https_fn.HttpsError(
+            _ERROR_CODES.get(error.code, https_fn.FunctionsErrorCode.INTERNAL), str(error)
+        )
+
+
+@https_fn.on_call(region=FUNCTION_REGION, service_account=FORUM_RUNTIME_SERVICE_ACCOUNT)
+def markForumAnswerHelpful(request: https_fn.CallableRequest) -> dict[str, Any]:
+    return _forum_call(
+        lambda student_id: ForumRuntimeGateway(firestore_db()).mark_helpful(
+            answer_id=_string(_data(request), "answerId"),
+            actor_id=student_id,
+            now=datetime.now(timezone.utc),
+        ), request,
+    )
+
+
+@https_fn.on_call(region=FUNCTION_REGION, service_account=FORUM_RUNTIME_SERVICE_ACCOUNT)
+def acceptForumAnswer(request: https_fn.CallableRequest) -> dict[str, Any]:
+    return _forum_call(
+        lambda student_id: ForumRuntimeGateway(firestore_db()).accept_answer(
+            answer_id=_string(_data(request), "answerId"),
+            actor_id=student_id,
+            now=datetime.now(timezone.utc),
+        ), request,
+    )
+
+
+@https_fn.on_call(region=FUNCTION_REGION, service_account=FORUM_RUNTIME_SERVICE_ACCOUNT)
+def reportForumContent(request: https_fn.CallableRequest) -> dict[str, Any]:
+    return _forum_call(
+        lambda student_id: ForumRuntimeGateway(firestore_db()).report_content(
+            target_type=_string(_data(request), "targetType"),
+            target_id=_string(_data(request), "targetId"),
+            reason=_string(_data(request), "reason"),
+            actor_id=student_id,
+            now=datetime.now(timezone.utc),
+        ),
+        request,
+    )
+
+
 @https_fn.on_call(region=FUNCTION_REGION)
 def startQuizSession(request: https_fn.CallableRequest) -> dict[str, Any]:
     return _call(start_quiz_session, request)
@@ -1319,3 +1382,118 @@ def processFinalizedQuizAttempt(event: firestore_fn.Event[Any]) -> None:
 # flag explicitly so deployed Eventarc delivery retries the same handler; the
 # runtime still caps its own server claims at three.
 getattr(processFinalizedQuizAttempt, "__firebase_endpoint__").eventTrigger["retry"] = True
+
+
+class _ForumClassifierUnavailable(RuntimeError):
+    pass
+
+
+def _active_forum_registry_documents() -> list[dict[str, Any]]:
+    snapshots = list(
+        firestore_db().collection("modelRegistry")
+        .where("isActive", "==", True)
+        .stream()
+    )
+    documents = [dict(snapshot.to_dict() or {}) for snapshot in snapshots]
+    return [
+        document for document in documents
+        if document.get("releaseScope") == "fyp1_forum_controlled_demo"
+    ]
+
+
+@lru_cache(maxsize=2)
+def _cached_verified_forum_classifier(
+    evidence_mode: str, code_revision: str, registry_payload: str,
+) -> Any:
+    registry_documents = json.loads(registry_payload)
+    classifier = load_forum_classifier(
+        evidence_mode=evidence_mode, code_revision=code_revision,
+        registry_documents=registry_documents,
+    )
+    if classifier is None:
+        # Do not pin a failed/missing verification for the life of a warm
+        # instance. A repaired deployment may be retried on the next event.
+        raise _ForumClassifierUnavailable
+    return classifier
+
+
+def _forum_classifier() -> Any:
+    try:
+        registry_documents = _active_forum_registry_documents()
+        registry_payload = json.dumps(
+            registry_documents, sort_keys=True, separators=(",", ":"), default=str,
+        )
+        return _cached_verified_forum_classifier(
+            _resolved_string_param(FORUM_MODEL_EVIDENCE_MODE),
+            _resolved_string_param(FORUM_RUNTIME_CODE_REVISION),
+            registry_payload,
+        )
+    except Exception:
+        LOGGER.warning("forum_model_registry_lookup_failed code=registry_unavailable")
+        return None
+
+
+def _forum_answer_needs_reprocessing(
+    before: dict[str, Any], after: dict[str, Any],
+) -> bool:
+    return (
+        before.get("revision") != after.get("revision")
+        or before.get("text") != after.get("text")
+    )
+
+
+@firestore_fn.on_document_created(
+    document="forumQuestions/{questionId}",
+    region=FUNCTION_REGION,
+    service_account=FORUM_RUNTIME_SERVICE_ACCOUNT,
+)
+def processForumQuestion(event: firestore_fn.Event[Any]) -> None:
+    snapshot = event.data
+    if snapshot is None or not snapshot.exists:
+        return
+    ForumRuntimeGateway(firestore_db()).record_question(snapshot.id, snapshot.to_dict())
+
+
+@firestore_fn.on_document_created(
+    document="forumAnswers/{answerId}",
+    region=FUNCTION_REGION,
+    service_account=FORUM_RUNTIME_SERVICE_ACCOUNT,
+)
+def processForumAnswer(event: firestore_fn.Event[Any]) -> None:
+    snapshot = event.data
+    if snapshot is None or not snapshot.exists:
+        return
+    gateway = ForumRuntimeGateway(firestore_db())
+    data = snapshot.to_dict()
+    gateway.record_answer(snapshot.id, data)
+    gateway.process_answer(
+        snapshot.id, data, _forum_classifier(), event_id=getattr(event, "id", None),
+    )
+
+
+@firestore_fn.on_document_updated(
+    document="forumAnswers/{answerId}",
+    region=FUNCTION_REGION,
+    service_account=FORUM_RUNTIME_SERVICE_ACCOUNT,
+)
+def reprocessForumAnswer(event: firestore_fn.Event[Any]) -> None:
+    change = event.data
+    if change is None:
+        return
+    before, after = change.before, change.after
+    if not before.exists or not after.exists:
+        return
+    before_data, after_data = before.to_dict(), after.to_dict()
+    if not _forum_answer_needs_reprocessing(before_data, after_data):
+        return
+    ForumRuntimeGateway(firestore_db()).process_answer(
+        after.id,
+        after_data,
+        _forum_classifier(),
+        event_id=getattr(event, "id", None),
+    )
+
+
+getattr(processForumQuestion, "__firebase_endpoint__").eventTrigger["retry"] = True
+getattr(processForumAnswer, "__firebase_endpoint__").eventTrigger["retry"] = True
+getattr(reprocessForumAnswer, "__firebase_endpoint__").eventTrigger["retry"] = True
