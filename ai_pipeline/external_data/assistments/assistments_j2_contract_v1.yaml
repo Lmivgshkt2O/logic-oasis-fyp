@@ -1,0 +1,187 @@
+contractVersion: assistments-j2-attempt-label-contract-v1
+frozenAt: "2026-08-08"
+status: frozen-before-j2-data-build
+sourcePlan: 2026-08-07-001-feat-u7-assistments-edm-cup-2023-external-real-data-evaluation-plan.md
+upstreamGate: "J0 GO; J1 adapter + manifest verified (hash and counts match)"
+
+primaryCohort:
+  sourceGrade: "6"
+  sourceSubject: Mathematics
+  gradeSixAcceleratedMerged: false
+  broadenGradesDuringJ2: false
+  fallback:
+    declared: true
+    j3Only: true
+    pooledGrades: ["4", "5", "6"]
+    subject: Mathematics
+    reporting: "separate secondary/fallback external analysis; never silently replaces the primary Grade 6 result"
+
+attemptUnit:
+  identityFields:
+    - externalStudentKey
+    - externalAssignmentKey
+    - externalSequenceKey
+  requiresAssignmentStarted: true
+  requiresLaterAssignmentFinished: true
+  attemptStartedAtSource: assignment_started sourceTimestamp
+  incompleteAttemptsNotFinalU7Attempts: true
+
+compatibilityIdentity:
+  rule: same externalStudentKey AND same externalSequenceKey
+  note: externalSequenceKey is the external-domain analogue of the frozen same-learner/same-learning-context sequence required by U7
+  crossSequencePairingForSampleSize: false
+
+problemCorrectness:
+  rule: problem_started -> first later valid graded response
+  gradedActions:
+    correct_response: 1
+    wrong_response: 0
+  laterResponsesIgnored: true
+  openResponseUngraded: true
+  neverInferFrom:
+    - problem_finished
+    - answer_requested
+    - hint_requested
+    - explanation_requested
+    - unit-test score files
+
+multipleOrAmbiguousStarts:
+  noProblemStarted: exclude from graded and timing evidence
+  multipleProblemStartedForSameAssignmentProblem:
+    - timing marked ambiguous and excluded from response-time evidence
+    - first valid graded response may still contribute correctness when problem identity is unambiguous
+    - no new start-selection heuristic invented
+    - count recorded
+
+responseTimeQualityRule:
+  projectDefinedRule: true
+  notAnAssistmentsDatasetProperty: true
+  validRangeMilliseconds: "0 < response_time_ms <= 1800000"
+  thresholdMinutes: 30
+  formula: first graded response timestamp - corresponding problem_started timestamp
+  treatments:
+    negative: reject
+    zero: reject
+    greaterThan30Minutes: censor/exclude from timing evidence
+    noClipOrWinsorizeTo30Minutes: true
+  forbiddenProxies:
+    - assignment duration
+    - inter-event time
+    - hint time
+    - any other proxy
+  recordCountsAndPercentages:
+    - valid_le_30min
+    - censored_gt_30min
+    - zero
+    - negative
+    - missing_or_ambiguous_pairing
+
+minimumAssignmentEvidence:
+  minimumValidGradedProblems: 3
+  minimumValidResponseTimePairs: 3
+  validityLevels:
+    outcome_valid:
+      - completed attempt
+      - exact Grade 6 Mathematics primary cohort
+      - valid student/assignment/sequence identity
+      - at least 3 valid first-graded problem outcomes
+    feature_valid:
+      - outcome-valid
+      - at least 3 valid uncensored response-time pairs
+  doNotForceFiveProblemsPerAssignment: true
+
+featureConstruction:
+  correct_rate: "number of valid first graded responses that are correct / number of valid first graded responses"
+  mean_response_time_ms: "mean of only valid uncensored problem response-time pairs"
+  censoredResponseTimeStillContributesCorrectness: true
+  baseSchema: quiz-attempt-features-v2
+  baseFeatures:
+    - correct_rate
+    - mean_response_time_ms
+  neverAddAsBaseFeatures:
+    - grade
+    - skill
+    - sequence
+    - hint
+    - problem count
+    - any ASSISTments-only field
+
+unresolvedProblemMetadata:
+  sourceFinding: "J1 found 819 source problem IDs absent from problem_details"
+  baseU7:
+    - retain events when externalProblemKey, assignment identity, sequence identity, and graded action semantics are valid
+    - allow correctness and response-time contribution
+    - do not fabricate sourceSkillCode or externalContentKey
+    - continue auditing their count
+  bktOnly:
+    - exclude rows with missing sourceSkillCode
+    - exclusion must not alter the base DT/XGBoost/MLP dataset
+
+attemptChronology:
+  orderWithin:
+    - externalStudentKey
+    - externalSequenceKey
+  orderBy: assignment_started sourceTimestamp
+  neverResolveTiesBy: externalAssignmentKey lexical order
+  indistinguishableStartTimestamps: mark affected target pairing chronology_ambiguous and censor it
+  recordCount: true
+
+nextCompatibleAttemptRule:
+  scope: every feature-valid current attempt
+  next: immediate chronological next assignment for same externalStudentKey + externalSequenceKey
+  noSkippingInterveningAssignment: true
+  censorWhenImmediateNext:
+    - missing
+    - incomplete
+    - not outcome-valid
+    - chronology-ambiguous
+  noSearchFartherAhead: true
+
+identicalQuestionRepeatRule:
+  problemSetSource: valid graded externalProblemKey values per attempt
+  censor: complete problem-key set exactly identical between current and next
+  censorReason: immediate_identical_problem_set_repeat
+  partialOverlap: keep pair and retain problem-overlap rate as audit metadata only
+  overlapRateNeverABaseFeature: true
+
+masteryCriterionAndTarget:
+  masteryCriterion: 0.6
+  tuneAfterObservingModelResults: false
+  next_attempt_support_needed:
+    trueCondition: "next_correct_rate < 0.60"
+    falseCondition: "next_correct_rate >= 0.60"
+  missingValidNextOutcome: target censored, never converted into either class
+
+futureLeakageBoundary:
+  currentFeaturesFromCurrentAssignmentOnly: true
+  neverUse:
+    - next assignment features
+    - next assignment response times
+    - unit-test outcome tables
+    - future actions
+    - later assignments
+    - future BKT states
+  nextAttemptUsedOnlyForTargetLabel: true
+
+bktBoundary:
+  orderingAvailableFromJ0: true
+  j2PreservesEventLineage: true
+  finalBktAblationInJ2: false
+  eligibilityRequires:
+    - non-null sourceSkillCode
+    - deterministic response ordering
+  rowsMissingSkillExcludedFromBktOnly: true
+  bktIsNamedAblationNeverFourthClassifier: true
+
+provenancePrivacy:
+  provenance: external_real
+  sourceDataset: assistments_edm_cup_2023
+  fabricateNativeLogicOasisFields: false
+  learnerLevelOutputsProtectedOutsideGit: true
+  repositoryAllowed:
+    - code
+    - schema/config
+    - tests
+    - aggregate counts
+    - non-identifying evidence reports
+

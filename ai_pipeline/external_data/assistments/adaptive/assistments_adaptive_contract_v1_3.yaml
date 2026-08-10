@@ -1,0 +1,486 @@
+# AQC-E6A pre-outcome statistical contract clarification (ASSISTments EDM Cup 2023).
+#
+# This file is a CONTRACT / GOVERNANCE / SCHEMA freeze only. It is a separate,
+# versioned clarification of assistments-adaptive-contract-v1.2 whose ONLY
+# methodological change is to freeze the student-clustered descriptive
+# bootstrap configuration and BKT calibration reporting needed for AQC-E6
+# outcome analysis. Every other frozen parameter (dataset, cohort, tiers,
+# calibration, purity, population, decisions, policies, matching, censoring,
+# masteryCriterion, BKT state, claim boundary) is unchanged, and the v1, v1.1
+# and v1.2 contracts and their hashes remain preserved.
+#
+# Companion evidence: docs/evidence/aqc-assistments-matched-historical-outcomes.md
+contractVersion: assistments-adaptive-contract-v1.3
+contractRole: external_descriptive_stage_b_contract_freeze
+predecessorContractVersion: assistments-adaptive-contract-v1.2
+predecessorContractSha256: d82b50432157f9321808dfced5ad7cb55960ce2dbc3501987ab17a23de725955
+frozenAt: "2026-08-09"
+status: frozen
+
+amendment:
+  reason: external_stage_b_descriptive_cluster_bootstrap_and_calibration_reporting_freeze
+  scope: statistical_reporting_configuration_only
+  fixesUnderspecifiedImplementationDetail: true
+  motivatedByPolicyPerformance: false
+  policyResultsExistedBeforeAmendment: false
+  outcomeValuesInspectedBeforeAmendment: false
+  policyOutcomeRatesExistedBeforeAmendment: false
+  v1Preserved: true
+  v1_1Preserved: true
+  v1_2Preserved: true
+  rationale: >-
+    The companion plan requires student-clustered descriptive confidence
+    intervals and BKT calibration reporting for E6, but the statistical and
+    reporting parameters were not numerically specified before E6. v1.3 freezes
+    the student-clustered bootstrap (unit externalStudentKey, 2000 resamples,
+    seed 20260716, 95% percentile intervals, learner-cluster resampling with
+    replacement), the conservative sparse-CI guard (10 independent learners),
+    and BKT calibration reporting (reusing the authoritative AQC-3 BKT
+    reliability bands and Brier score). Only structural matched/censor counts
+    existed before this amendment; no outcome value was inspected, no policy
+    outcome rate existed, and the amendment is not motivated by policy
+    performance.
+
+predecessorContracts:
+  sharedAqcPolicyContract:
+    policyEvaluationVersion: policy-evaluation-v1
+    policyEvaluationSha256: a12d251e5910a034c081950a8bede8dc7753329db0e9c540af108143e9a43a61
+    adaptivePolicyVersion: adaptive-policy-v1
+    adaptivePolicySha256: 1b53aef77a8027b4256f915663ee894225c17efe4f876bff2e23a38ed17eef16
+    bktVersion: bkt-v1
+    bktParameters:
+      priorKnowledge: 0.35
+      learnRate: 0.18
+      guessRate: 0.20
+      slipRate: 0.10
+  u7ExternalRealData:
+    attemptLabelContract: assistments-j2-attempt-label-contract-v2
+    attemptLabelContractSha256: 07f76247d154e72a5db542a777543d7f78d04dcbe673199726e9fc796d12561e
+  externalAdaptiveContracts:
+    v1:
+      contractVersion: assistments-adaptive-contract-v1
+      contractSha256: 46997eaf92d6c9aba0dc7d8d196080bc03bd59093ef5b2f04a1fd6fc4e424170
+    v1_1:
+      contractVersion: assistments-adaptive-contract-v1.1
+      contractSha256: e54085ddfe1e00e1cd12d02639f02a70681c767a2ea51697548890e8211f63de
+    v1_2:
+      contractVersion: assistments-adaptive-contract-v1.2
+      contractSha256: d82b50432157f9321808dfced5ad7cb55960ce2dbc3501987ab17a23de725955
+
+dataset:
+  datasetName: assistments_edm_cup_2023
+  releaseId: assistments-edm-cup-2023-release-v1
+  provenance: external_real
+  usageTerms: ASSISTments Data Terms of Use effective 2020-10-30
+  rawSourceFilesSha256:
+    action_logs.csv: DB6B0CD4875488D0847D9D9BA2896552F4AD1015F3E2388995222DD4A178443D
+    assignment_details.csv: D02D8B62DE088C896FCEB901BC986C25FA07F5D9AEEC0364BF9D351208BEC70E
+    problem_details.csv: 4F45DAF2E010771C6B5E523DD4D583F3AC451F6CE8F2F35270FCB86B875CEE4E
+    sequence_details.csv: A1FA10E6DEBD4FD30C4B04E1554E18F2C426A981BCB10BED0B41DD083CCDB541
+  normalizedReleaseSha256:
+    external_action_rows_v1.csv: 20d9514cabb4b23de0b2a0a4afdc36661ba30d5936aeb1a7950682d6af1ea378
+  primaryCohort:
+    sourceGrade: "6"
+    sourceSubject: Mathematics
+    gradeSixAcceleratedMerged: false
+    gradeSixAcceleratedKeptSeparate: true
+    secondaryGradesNeverSilentlyReplacePrimary: true
+
+evidenceMode:
+  mode: external_real_proxy_difficulty
+  description: >-
+    Real external learner data, externally reconstructed learner-skill
+    histories, analytically calibrated proxy difficulty, and non-causal
+    descriptive Stage-B replay.
+  distinctFrom:
+    - native_runtime
+    - pipeline_demo_only
+    - controlled_demo
+    - stage_c_live_pilot
+  neverPretendsToSatisfyNativeRuntimeContract: true
+
+sourceMode:
+  supported:
+    - native_runtime
+    - assistments_external
+  nativeRuntimeContractUnchanged: true
+  externalSourceEntersThroughSeparateValidatedAdapter: true
+
+timeContract:
+  calibrationWindow:
+    start: "2019-02-25T00:00:00Z"
+    end: "2021-12-31T23:59:59Z"
+  evaluationWindow:
+    start: "2022-01-01T00:00:00Z"
+    end: "2023-12-31T23:59:59Z"
+  windowsOverlap: false
+  guarantee: >-
+    No 2022-2023 policy-evaluation correctness outcome may be used to
+    determine the frozen problem-difficulty mapping.
+  calibrationIndependencePreference: >-
+    Prefer estimating problem difficulty from pre-2022 learners who do not
+    contribute to the 2022-2023 Grade 6 evaluation cohort. If this causes
+    unacceptable coverage, stop at the AQC-E2 gate and record a versioned
+    amendment before running P1/P2/P3a results.
+
+attemptUnit:
+  unit: one externalStudentKey + one completed externalAssignmentKey + one exact non-null sourceSkillCode
+  reuseSource: u7_v2_semantic_unit
+  skillsNeverMixedInsideOneAttempt: true
+  attemptSequenceUsesSourceTimestampsOnly: true
+
+proxyDifficulty:
+  methodVersion: proxy-difficulty-v1
+  smoothingRule: "p_correct = (correct_responses + 1) / (total_graded_responses + 2)"
+  difficultyScoreRule: "difficulty_score = 1 - p_correct"
+  correctnessSource: >-
+    First valid graded response per problem (correct_response = 1,
+    wrong_response = 0), following the verified U7 ASSISTments semantics.
+  minimumIndependentCalibrationLearnersPerProblem: 20
+  insufficientEvidenceStatus: insufficient_problem_evidence
+  proxyDifficultyValues:
+    - proxy_easy
+    - proxy_moderate
+    - proxy_hard
+  neverLabelAsNativeDifficulty:
+    - ASSISTments Easy
+    - ASSISTments Moderate
+    - ASSISTments Hard
+  withinSkillTiering:
+    rule: >-
+      Among adequately calibrated problems in one exact sourceSkillCode:
+      highest p_correct third -> proxy_easy; middle third -> proxy_moderate;
+      lowest p_correct third -> proxy_hard.
+    tieringScope: exact_sourceSkillCode_only
+    deterministicTieBehavior: >-
+      Problems are ordered by p_correct descending, then by externalProblemKey
+      ascending; tertiles are assigned by stable rank boundaries so identical
+      inputs reproduce identical tier hashes.
+    tertileBoundaryRule:
+      appliesTo: adequately calibrated problems within one exact sourceSkillCode
+      n: number of adequately calibrated problems in the skill
+      b1: "floor(n / 3)"
+      b2: "floor(2 * n / 3)"
+      assignmentBy1BasedRank:
+        - "ranks 1 through b1 -> proxy_easy"
+        - "ranks b1 + 1 through b2 -> proxy_moderate"
+        - "ranks b2 + 1 through n -> proxy_hard"
+      examples:
+        n9: {proxy_easy: 3, proxy_moderate: 3, proxy_hard: 3}
+        n10: {proxy_easy: 3, proxy_moderate: 3, proxy_hard: 4}
+        n11: {proxy_easy: 3, proxy_moderate: 4, proxy_hard: 4}
+        n12: {proxy_easy: 4, proxy_moderate: 4, proxy_hard: 4}
+      forbiddenImplementations:
+        - pandas qcut
+        - floating quantile interpolation
+        - empirical cut-point tuning
+        - global cross-skill ranking
+        - random tie breaking
+  skillCatalogGate:
+    minimumCalibratedProblemsPerSkill: 9
+    minimumProxyEasy: 3
+    minimumProxyModerate: 3
+    minimumProxyHard: 3
+    insufficientStatus: insufficient_skill_catalog
+    noSilentPoolingOfUnrelatedSkills: true
+
+attemptTier:
+  purityRule: dominant proxy tier fraction >= 2/3
+  purityThresholdNumerator: 2
+  purityThresholdDenominator: 3
+  mixedCensorReason: mixed_proxy_difficulty
+  mixedAttemptRemainsAvailableForScoreBktAuditOnly: true
+  purityDenominatorRule:
+    validProblemCount: number of valid graded problem outcomes belonging to the attempt
+    easyCount: number of valid problems with frozen proxyDifficulty = proxy_easy
+    moderateCount: number of valid problems with frozen proxyDifficulty = proxy_moderate
+    hardCount: number of valid problems with frozen proxyDifficulty = proxy_hard
+    dominantTierCount: "max(easyCount, moderateCount, hardCount)"
+    proxyDifficultyPurity: "dominantTierCount / validProblemCount"
+    untieredProblems:
+      remainInValidProblemCount: true
+      contributeToNoTierCount: true
+      neverInventedTier: true
+      neverDroppedToIncreasePurity: true
+      purityIsNeverDominantOverTieredOnlyCount: true
+    assignment:
+      - "validProblemCount > 0 AND proxyDifficultyPurity >= 2/3 AND unique dominant tier -> currentProxyDifficulty = dominant frozen proxy tier"
+      - "otherwise -> currentProxyDifficulty = null"
+      - "zero tiered problems -> dominantTierCount = 0, proxyDifficultyPurity = 0, no current tier"
+    dominantTierTies:
+      rule: "no unique dominant tier -> currentProxyDifficulty = null (fail closed, no arbitrary selection)"
+      censorOrAuditReason: mixed_proxy_difficulty
+    examples:
+      e1: "4 Easy / 0 untiered -> purity 4/4 -> proxy_easy"
+      e2: "4 Easy / 1 Moderate -> purity 4/5 -> proxy_easy"
+      e3: "4 Easy / 1 Moderate / 2 untiered -> purity 4/7 -> below 2/3 -> null"
+      e4: "5 Easy / 2 untiered -> purity 5/7 -> proxy_easy"
+      e5: "1 Easy / 6 untiered -> purity 1/7 -> null"
+      e6: "0 tiered / 3 untiered -> purity 0/3 -> null"
+      e7: "equal dominant tier counts -> no arbitrary tier selection -> null"
+
+tierAvailability:
+  semantics: proxy_tier_catalog_availability
+  definition: >-
+    An adjacent proxy tier is analytically available only when the exact skill
+    has a valid frozen calibrated catalog for that tier.
+  notHistoricalBankAvailability: true
+  unavailableHoldReason: external_proxy_tier_unavailable
+  neverFabricateIsActiveOrBankVersion: true
+
+problemSetFingerprint:
+  method: "SHA256(sourceSkillCode + sorted(valid problem keys))"
+  purpose:
+    - identical-repeat detection
+    - exposure auditing
+    - same/different problem-set context
+  neverExposedAsNativeBankId: true
+
+freshBankLimitation:
+  productionRule: preserved
+  exactExternalObservability: unavailable
+  externalSubstitute: fresh_problem_exposure_audit_only
+  includedInFullPolicyEquivalenceClaim: false
+  mayAudit:
+    - previously seen problem IDs
+    - newly seen problem IDs
+    - freshProblemFraction
+  mayNotClaim:
+    - exact fresh-bank selection reproduced
+    - historical Logic Oasis bank exposure reconstructed
+
+replayMode:
+  mode: one_step_non_propagating
+  semantics:
+    - reconstruct evidence available at time t
+    - ask P1 what it would propose
+    - ask P2 what it would propose
+    - ask P3a what it would propose
+    - record each proposed decision/reason
+    - do not alter the learner's later observed history based on counterfactual decisions
+  nextDecisionStateSource: actual_historical_assistments_history
+  reversalHistorySource: observed_proxy_difficulty_history
+  neverFeedCounterfactualOutputsRecursively: true
+
+policyBindings:
+  note: >-
+    Policy/evaluation versions and hashes are ANALYSIS metadata bound to the
+    shared AQC contract. They are never presented as historical ASSISTments
+    source metadata.
+  sourceMetadata: false
+  P1:
+    policyVersion: score-threshold-v1
+    evidenceMode: score_only
+    frozenRule: "correctCount / totalQuestions >= 0.80 -> UP one level; otherwise HOLD; never automatic DOWN; highest available difficulty -> HOLD"
+    scoreDenominator: totalQuestions
+    promotionAtLeast: 0.80
+    promotionInclusive: true
+    automaticDemotion: false
+  P2:
+    policyVersion: bkt-score-agreement-v1
+    evidenceMode: bkt_score_agreement
+    scoreDirection:
+      upAtLeast: 0.80
+      downAtMost: 0.40
+      otherwiseNeutral: true
+    deliveryRule: "BKT UP + score UP -> UP; BKT DOWN + score DOWN -> DOWN; otherwise HOLD"
+    preserves:
+      - evidence limits
+      - one-level movement
+      - reversal protection
+      - Hard-level evidence guard
+  P3a:
+    policyVersion: guarded-bkt-study-v1
+    evidenceMode: bkt_only_study
+    bktOnly: true
+    bypassSupportRiskXgboostInference: true
+    selectionEvidenceMode: bkt_only_study
+    usedBktFallback: true
+    preserves:
+      - BKT mastery
+      - evidence count
+      - one-level movement
+      - reversal protection
+      - Hard-level evidence rule
+      - unavailable-tier safety
+  P3b:
+    separate: true
+    notInPrimaryExternalComparison: true
+  configHashes:
+    hashConvention: >-
+      ContentSha256 values are computed over LF-normalized bytes so clean
+      checkouts reproduce them; Sha256 values are the raw-bytes hashes already
+      recorded by the shared AQC-1..AQC-7 contract and its release evidence.
+    adaptivePolicySha256: 1b53aef77a8027b4256f915663ee894225c17efe4f876bff2e23a38ed17eef16
+    adaptivePolicyContentSha256: 1c782e3ca08fb021427af2a42eda1df4350d583b301f3ff79a7df529c6cf9d4b
+    policyEvaluationSha256: a12d251e5910a034c081950a8bede8dc7753329db0e9c540af108143e9a43a61
+    policyEvaluationContentSha256: effe57fb072cd3632ff227400db0ae6052749001ec9489a3abf5c6b555fa58e8
+
+outcomeMatching:
+  rule: >-
+    A later observed historical outcome may be attached to a candidate policy
+    only when the candidate proposed target proxy tier equals the next observed
+    eligible proxy tier.
+  mismatchCensorReason: counterfactual_proxy_tier_mismatch
+  compatibilityRequires:
+    - same externalStudentKey
+    - same exact sourceSkillCode
+    - direct next eligible chronological episode
+    - valid next correctness outcome
+    - no chronology ambiguity
+    - no identical complete problem-set repeat
+  noNextAttempt: censored
+  neverAssumeSuccess: true
+  neverAssumeFailure: true
+
+censoringVocabulary:
+  reasons:
+    - insufficient_problem_evidence
+    - insufficient_skill_catalog
+    - mixed_proxy_difficulty
+    - external_proxy_tier_unavailable
+    - counterfactual_proxy_tier_mismatch
+    - no_next_eligible_attempt
+    - identical_problem_set_repeat
+    - chronology_ambiguous
+    - invalid_next_outcome
+  neverTranslateIntoNativeBankErrors: true
+
+externalMetrics:
+  note: >-
+    Descriptive external names. observed_proxy_matched_support_after_up_rate
+    must never be renamed to the Stage-C confirmatory falsePromotionBurden.
+  names:
+    - policy_up_rate
+    - policy_hold_rate
+    - policy_down_rate
+    - p1_p2_agreement_rate
+    - p1_p3a_agreement_rate
+    - p2_p3a_agreement_rate
+    - three_way_agreement_rate
+    - guardrail_activation_rate
+    - descriptive_challenge_opportunity
+    - proxy_tier_matched_outcome_rate
+    - observed_proxy_matched_support_after_up_rate
+    - observed_proxy_matched_success_after_up_rate
+    - matched_hold_support_rate
+    - matched_down_support_rate
+    - counterfactual_proxy_tier_mismatch_rate
+    - no_next_censor_rate
+    - repeat_censor_rate
+    - mixed_proxy_difficulty_rate
+    - bkt_calibration_by_band
+  reservedForStageCOnly:
+    - falsePromotionBurden
+
+claimLevels:
+  source: external_real
+  allowed:
+    - pipeline_demo_only
+    - external_descriptive_replay
+    - external_descriptive_replay_limited
+    - external_replay_inconclusive
+  forbidden:
+    - superiority
+    - causal_effect
+    - KSSR_validated
+    - production_validated
+  sampleSizeNeverUpgradesToCausalOrSuperiority: true
+
+stageBQuestions:
+  note: >-
+    EB1-EB6 are the frozen external descriptive questions. H1-H6 remain
+    reserved for the future Stage-C confirmatory analysis and are not part of
+    this external contract.
+  EB1: How often do P1, P2, and P3a propose UP/HOLD/DOWN on identical observed learner-skill states?
+  EB2: How often does P3a hold where P1 would promote?
+  EB3: How often does P2 hold because BKT and score direction disagree?
+  EB4: Among proxy-tier-matched historical observations, what proportion of proposed UP decisions are followed by support_needed versus later success?
+  EB5: How well is the frozen BKT mastery estimate calibrated against later eligible exact-skill outcomes?
+  EB6: How much external evidence is censored because proxy difficulty, tier availability, next history, or matched historical delivery is unavailable?
+
+sourceAbstraction:
+  reuseEngine: existing_aqc2_replay_engine
+  noSecondFullComparisonPipeline: true
+  evaluationDifficultyOption:
+    fields:
+      - difficulty
+      - candidateKind
+      - nativeBankId
+      - externalCandidateKey
+      - available
+    candidateKinds:
+      - native_bank
+      - external_proxy_tier
+    externalRule: "candidateKind = external_proxy_tier; nativeBankId = null"
+    externalCandidateKeyNamespace: "external_proxy_"
+    nativeRule: "candidateKind = native_bank; externalCandidateKey = null"
+    availableMeaningExternal: >-
+      The exact source skill has a valid frozen calibrated catalog for that
+      proxy tier (proxy-tier catalog availability).
+
+statisticalReporting:
+  studentClusteredBootstrap:
+    bootstrapUnit: externalStudentKey
+    bootstrapResamples: 2000
+    bootstrapSeed: 20260716
+    confidenceLevel: 0.95
+    intervalMethod: percentile
+    resamplingMethod: learner_cluster_with_replacement
+    sameConfigurationForAllPolicies: true
+    neverResampleRowsIndependently: true
+    neverSplitLearnerRowsAcrossBootstrapUnits: true
+    neverRetrySeeds: true
+    noPolicyDifferenceSuperiorityInterval: true
+    description: >-
+      For each replicate: sample the same number of learner clusters WITH
+      replacement from the unique learners in the analysis subset; include all
+      eligible rows of each sampled learner (duplicated when sampled multiple
+      times); compute the same row-level descriptive rate on the resampled
+      clustered data.
+  ciSparsityGuard:
+    minimumIndependentLearnersForCI: 10
+    sparseFlag: sparse_independent_learner_evidence
+    projectDefinedConservativeDescriptiveGuard: true
+    notAUniversalStatisticalTheorem: true
+    zeroIndependentLearners: not estimable
+    oneIndependentLearner: raw count/rate allowed; CI suppressed
+    repeatedRowsFromOneLearnerNeverIndependentClusters: true
+    neverMergeOrWidenMatchingForCI: true
+  bktCalibration:
+    bandSource: aqc3_reliability_curve
+    bandSourceVersion: aqc3-bkt-reliability-bands-v1
+    minimumCalibrationObservations: 5
+    bands:
+      - {lower: 0.00, upper: 0.20, upperInclusive: false}
+      - {lower: 0.20, upper: 0.40, upperInclusive: false}
+      - {lower: 0.40, upper: 0.60, upperInclusive: false}
+      - {lower: 0.60, upper: 0.80, upperInclusive: false}
+      - {lower: 0.80, upper: 1.00, upperInclusive: true}
+    onePointZeroBelongsToHighestBand: true
+    bandsAreDescriptiveNotDecisionThresholds: true
+    policyThresholdsUnchanged: true
+    brierScoreDeclared: true
+    calibrationErrorFormulaDeclared: false
+    brierSemantics: "mean((p - later_success)^2) with later_success=1 / support_needed=0"
+  outcomeContractUnchanged:
+    target: next_attempt_support_needed
+    masteryCriterion: 0.60
+    adaptiveScoreThresholdNotOutcomeCriterion: true
+
+governance:
+  productionPromotionAllowed: false
+  containsRawIdentifiers: false
+  redistributionAllowed: false
+  learnerLevelOutputsProtectedOutsideGit: true
+  neverFabricateNativeFields:
+    - finalizationStatus
+    - validationStatus
+    - "dataSource: runtime_callable"
+    - native sourceAttemptSequence
+    - Logic Oasis bankId
+    - questionBanks.version
+    - questionBanks.isActive
+    - Logic Oasis contentVersionId
+    - native adaptiveAssignment ID
+    - native historical policyVersion as source metadata

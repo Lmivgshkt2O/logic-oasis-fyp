@@ -391,10 +391,10 @@ final-claim gates.
 
 BKT state is keyed by `(studentId, subtopicId, skillId)`, not merely student/skill. This makes the per-student/subtopic sequence authoritative for replay while keeping a skill that appears in another subtopic as a distinct state. Pre-amendment attempts without `sourceAttemptSequence` are `legacy_no_sequence` and cannot enter final BKT replay, training, or runtime projection logic.
 
-Before real training, the supervisor must approve `0.60` with a curriculum
-rationale or approve a new criterion and label version. Record approver, date,
-and rationale with the dataset/evaluation report; do not tune after final-test
-results are seen. `contentVersion` is retained on each U3/U6 row. U7 currently
+Before real training, the developer records the declared `0.60` criterion with
+a curriculum rationale or declares a new criterion and label version. Record
+release owner, date, and rationale with the dataset/evaluation report; do not
+tune after final-test results are seen. `contentVersion` is retained on each U3/U6 row. U7 currently
 groups labels by student/subtopic, so real-data training must first resolve
 content transitions. Recommended initial policy: label only same-version pairs
 and censor cross-version pairs until an approved equivalence policy exists.
@@ -954,7 +954,7 @@ untouched fictional final test it scored accuracy `0.75` and macro F1
 baseline scored `1.0`; therefore the selection-stage advantage label does not
 support a general or final-test Naive Bayes superiority claim.
 
-Release `forum-controlled-demo-nb-v1-release-2` is a locally packaged
+Release `forum-controlled-demo-nb-v1-release-3` is the current locally packaged
 controlled payload. Runtime activation requires `controlled_demo`, one active
 compatible registry record, matching code revision, exact artifact/catalogue/
 dataset/split/report/rubric/bundle hashes, compatible dependencies, and
@@ -964,12 +964,14 @@ hash, model, artifact, policy, fencing generation, result state, and
 `claimLevel: controlled_demonstration_only`. Observed runtime states do not
 include `queued`.
 
-U6 verified promotion/revocation behavior, genuine NB automatic inference,
+U6 verified release-2 promotion/revocation behavior, genuine NB automatic inference,
 revision fencing, corpus non-mutation, safe logs, linked-parent count-only
 access, and fail-closed fallback in local Emulators. Cloud deployment and live
 service-account observation remain pending. Current evidence supports only
 scenario fit, reproducibility, artifact integrity, and prototype integration
-readiness.
+readiness. Release 3 preserves the same candidate artifact while rebinding the
+later shared Functions bundle; focused integrity/runtime tests pass, while a
+fresh Emulator or authorized cloud rehearsal remains required for that payload.
 
 All earlier protected learner-data export, reviewer, retention,
 pseudonymization, author-grouped split, and real-world metric requirements are

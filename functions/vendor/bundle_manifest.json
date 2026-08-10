@@ -9,6 +9,7 @@
       "classifier.py": "a16acf03d4d3621ef6112ae2477b2fd1dd4227c1541913b8112eaac88b18802f"
     }
   },
-  "packageSha256": "08d28b11c30f97e156f5fc2beb62970a2eb6e7d27c1972ea2191163973c3e694",
+  "packageSha256": "24a1d0a7c3d3724a925d28a26744b8d9b67308475e3c2e25716200fc4c792432",
+  "policyEvaluationSha256": "effe57fb072cd3632ff227400db0ae6052749001ec9489a3abf5c6b555fa58e8",
   "weakTopicRankingPolicySha256": "f7bfd255956c0c99e197fc8a690eed075b6de1e2e6c7cbee76d3f28b299f1b7c"
 }

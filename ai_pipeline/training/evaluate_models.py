@@ -357,3 +357,278 @@ def _serialized_size(model: object) -> int:
     writer = _CountingWriter()
     pickle.dump(model, writer)
     return writer.size
+
+
+# ---------------------------------------------------------------------------
+# External (ASSISTments) real-data comparison path.
+#
+# These helpers implement the approved v2 external evaluation on top of the
+# existing frozen trainers and metric definitions.  Native Logic Oasis
+# validation is not weakened: the external path requires provenance
+# external_real, the frozen split supplied by the protected manifest, and the
+# exact quiz-attempt-features-v2 columns.  No artifact is promoted.
+# ---------------------------------------------------------------------------
+
+EXTERNAL_PROVENANCE = "external_real"
+EXTERNAL_ARTIFACT_STATUS = "evidence_only_external"
+EXTERNAL_FEATURE_COLUMNS = ("correct_rate", "mean_response_time_ms")
+
+
+@dataclass(frozen=True)
+class ExternalComparisonReport:
+    contract_version: str
+    dataset_version: str
+    random_seed: int
+    feature_names: tuple[str, ...]
+    train_learner_count: int
+    train_row_count: int
+    train_class_counts: Mapping[str, int]
+    test_learner_count: int
+    test_row_count: int
+    test_class_counts: Mapping[str, int]
+    row_identity_sha256: str
+    train_identity_sha256: str
+    test_identity_sha256: str
+    results: tuple[ModelResult, ...]
+    training_time_seconds: Mapping[str, float]
+    baseline: Mapping[str, float]
+    artifact_status: str = EXTERNAL_ARTIFACT_STATUS
+
+
+@dataclass(frozen=True)
+class GroupedFoldResult:
+    fold_index: int
+    train_learner_count: int
+    validation_learner_count: int
+    validation_learner_keys: tuple[str, ...]
+    train_class_counts: Mapping[str, int]
+    validation_class_counts: Mapping[str, int]
+    results: tuple[ModelResult, ...]
+
+
+@dataclass(frozen=True)
+class GroupedStabilityReport:
+    n_folds: int
+    random_seed: int
+    feature_names: tuple[str, ...]
+    folds: tuple[GroupedFoldResult, ...]
+    per_model_metrics: Mapping[str, Mapping[str, Mapping[str, float]]]
+
+
+def evaluate_external_fair_comparison(
+    examples: Iterable[SupervisedExample],
+    *,
+    random_seed: int,
+    train_learner_keys: Iterable[str],
+    test_learner_keys: Iterable[str],
+    contract_version: str,
+    dataset_version: str,
+    extra_feature: str | None = None,
+) -> ExternalComparisonReport:
+    """Fit and evaluate DT/XGBoost/MLP once on the frozen external split."""
+    rows = tuple(examples)
+    if not rows:
+        raise ValueError("external examples are required")
+    if any(row.provenance != EXTERNAL_PROVENANCE for row in rows):
+        raise ValueError("external evaluation requires provenance external_real")
+    if random_seed != RANDOM_SEED:
+        raise ValueError(f"U7 requires deterministic random seed {RANDOM_SEED}")
+    columns = feature_names(rows)
+    expected_columns = EXTERNAL_FEATURE_COLUMNS
+    if extra_feature is not None:
+        expected_columns = EXTERNAL_FEATURE_COLUMNS + (extra_feature,)
+    if columns != expected_columns:
+        raise ValueError(f"external evaluation requires exactly {expected_columns}")
+
+    train_keys = frozenset(train_learner_keys)
+    test_keys = frozenset(test_learner_keys)
+    if train_keys & test_keys:
+        raise ValueError("frozen split learner groups must not overlap")
+    train = tuple(row for row in rows if row.student_key in train_keys)
+    test = tuple(row for row in rows if row.student_key in test_keys)
+    if len(train) + len(test) != len(rows):
+        raise ValueError("every external example must belong to exactly one frozen partition")
+    for name, partition in (("training", train), ("held-out", test)):
+        targets = {row.target for row in partition}
+        if len(targets) != 2:
+            raise ValueError(f"{name} partition must contain both target classes")
+
+    trainers: tuple[tuple[str, Callable[..., tuple[object, tuple[str, ...]]]], ...] = (
+        ("decision_tree", train_decision_tree),
+        ("xgboost", train_xgboost),
+        ("mlp", train_mlp),
+    )
+    results: list[ModelResult] = []
+    training_time: dict[str, float] = {}
+    for name, trainer in trainers:
+        result, fit_seconds = _fit_and_evaluate(name, trainer, train, test, columns, random_seed)
+        results.append(result)
+        training_time[name] = fit_seconds
+
+    true_count = sum(row.target for row in rows)
+    prevalence = true_count / len(rows)
+    baseline = {
+        "positive_prevalence": round(prevalence, 6),
+        "majority_class_accuracy": round(max(prevalence, 1 - prevalence), 6),
+    }
+    return ExternalComparisonReport(
+        contract_version=contract_version,
+        dataset_version=dataset_version,
+        random_seed=random_seed,
+        feature_names=columns,
+        train_learner_count=len({row.student_key for row in train}),
+        train_row_count=len(train),
+        train_class_counts=_class_counts(train),
+        test_learner_count=len({row.student_key for row in test}),
+        test_row_count=len(test),
+        test_class_counts=_class_counts(test),
+        row_identity_sha256=row_identity_sha256(rows, partition="all"),
+        train_identity_sha256=row_identity_sha256(train, partition="train"),
+        test_identity_sha256=row_identity_sha256(test, partition="test"),
+        results=tuple(results),
+        training_time_seconds=training_time,
+        baseline=baseline,
+    )
+
+
+def _fit_and_evaluate(
+    name: str,
+    trainer: Callable[..., tuple[object, tuple[str, ...]]],
+    train: tuple[SupervisedExample, ...],
+    test: tuple[SupervisedExample, ...],
+    columns: tuple[str, ...],
+    random_seed: int,
+) -> tuple[ModelResult, float]:
+    started = perf_counter()
+    model, trained_columns = trainer(train, random_seed=random_seed)
+    fit_seconds = perf_counter() - started
+    if trained_columns != columns:
+        raise ValueError("all models must train with the same feature columns")
+    matrix, targets, _ = matrix_and_target(test, columns)
+    prediction_started = perf_counter()
+    probabilities = [float(row[1]) for row in model.predict_proba(matrix)]
+    predictions = [int(value) for value in model.predict(matrix)]
+    latency_ms = (perf_counter() - prediction_started) * 1000
+    return ModelResult(name, columns, _metrics(targets, predictions, probabilities, latency_ms, model), model), fit_seconds
+
+
+def row_identity_sha256(
+    examples: Iterable[SupervisedExample],
+    *,
+    partition: str,
+) -> str:
+    """Deterministic identity hash over rows, features, labels, and partition."""
+    lines = sorted(
+        (
+            f"{row.attempt_id}|{row.student_key}|{row.features['correct_rate']}|"
+            f"{row.features['mean_response_time_ms']}|{int(row.target)}|{partition}"
+        )
+        for row in examples
+    )
+    return sha256("\n".join(lines).encode("utf-8")).hexdigest()
+
+
+def repeated_grouped_validation(
+    examples: Iterable[SupervisedExample],
+    *,
+    random_seed: int,
+    n_folds: int = 5,
+    extra_feature: str | None = None,
+) -> GroupedStabilityReport:
+    """Training-only deterministic student-grouped stability evaluation.
+
+    Learners are grouped and never split across fold boundaries; preprocessing
+    is refit inside each fold (the MLP pipeline scales on fold-training data
+    only); the frozen held-out learners are not present in ``examples``.
+    """
+    from random import Random
+
+    rows = tuple(examples)
+    if not rows:
+        raise ValueError("grouped validation examples are required")
+    if any(row.provenance != EXTERNAL_PROVENANCE for row in rows):
+        raise ValueError("grouped external validation requires provenance external_real")
+    if random_seed != RANDOM_SEED:
+        raise ValueError(f"U7 requires deterministic random seed {RANDOM_SEED}")
+    columns = feature_names(rows)
+    expected_columns = EXTERNAL_FEATURE_COLUMNS
+    if extra_feature is not None:
+        expected_columns = EXTERNAL_FEATURE_COLUMNS + (extra_feature,)
+    if columns != expected_columns:
+        raise ValueError(f"external grouped validation requires exactly {expected_columns}")
+    groups = sorted({row.student_key for row in rows})
+    if len(groups) < n_folds:
+        raise ValueError("grouped validation requires at least n_folds learners")
+
+    shuffled = list(groups)
+    Random(random_seed).shuffle(shuffled)
+    folds = [set(shuffled[index::n_folds]) for index in range(n_folds)]
+
+    trainers: tuple[tuple[str, Callable[..., tuple[object, tuple[str, ...]]]], ...] = (
+        ("decision_tree", train_decision_tree),
+        ("xgboost", train_xgboost),
+        ("mlp", train_mlp),
+    )
+    fold_results: list[GroupedFoldResult] = []
+    for index, validation_groups in enumerate(folds):
+        validation = tuple(row for row in rows if row.student_key in validation_groups)
+        training = tuple(row for row in rows if row.student_key not in validation_groups)
+        if len({row.target for row in training}) != 2:
+            raise ValueError("grouped fold training partition must contain both target classes")
+        per_model: list[ModelResult] = []
+        for name, trainer in trainers:
+            model, trained_columns = trainer(training, random_seed=random_seed)
+            if trained_columns != columns:
+                raise ValueError("all models must train with the same feature columns")
+            matrix, targets, _ = matrix_and_target(validation, columns)
+            probabilities = [float(row[1]) for row in model.predict_proba(matrix)]
+            predictions = [int(value) for value in model.predict(matrix)]
+            per_model.append(
+                ModelResult(name, columns, _metrics(targets, predictions, probabilities, 0.0, model), model)
+            )
+        fold_results.append(
+            GroupedFoldResult(
+                fold_index=index,
+                train_learner_count=len({row.student_key for row in training}),
+                validation_learner_count=len(validation_groups),
+                validation_learner_keys=tuple(sorted(validation_groups)),
+                train_class_counts=_class_counts(training),
+                validation_class_counts=_class_counts(validation),
+                results=tuple(per_model),
+            )
+        )
+    return GroupedStabilityReport(
+        n_folds=n_folds,
+        random_seed=random_seed,
+        feature_names=columns,
+        folds=tuple(fold_results),
+        per_model_metrics=_stability_summary(fold_results, columns),
+    )
+
+
+def _class_counts(rows: tuple[SupervisedExample, ...]) -> Mapping[str, int]:
+    return {"true": sum(row.target for row in rows), "false": sum(not row.target for row in rows)}
+
+
+def _stability_summary(
+    folds: list[GroupedFoldResult],
+    columns: tuple[str, ...],
+) -> Mapping[str, Mapping[str, Mapping[str, float]]]:
+    metric_keys = ("accuracy", "precision", "recall", "f1", "roc_auc", "pr_auc", "log_loss", "brier_score")
+    algorithms = [result.algorithm for result in folds[0].results]
+    summary: dict[str, dict[str, dict[str, float]]] = {}
+    for algorithm in algorithms:
+        summary[algorithm] = {}
+        for metric in metric_keys:
+            values = [
+                float(fold_result.results[index].metrics[metric])
+                for fold_result in folds
+                for index, result in enumerate(fold_result.results)
+                if result.algorithm == algorithm and fold_result.results[index].metrics.get(metric) is not None
+            ]
+            if not values:
+                continue
+            mean = sum(values) / len(values)
+            variance = sum((value - mean) ** 2 for value in values) / len(values)
+            summary[algorithm][metric] = {"mean": round(mean, 6), "std": round(variance**0.5, 6), "n": len(values)}
+    return summary

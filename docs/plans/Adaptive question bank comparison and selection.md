@@ -62,7 +62,7 @@ P3 is not “BKT without rules.” Its guardrails are deliberate rules applied t
 P3 results must be separated, never silently pooled:
 
 - **P3a: BKT-only guarded policy.** It forcibly bypasses support-risk inference even when a compatible promoted XGBoost artifact exists. Its protected audit records `selectionEvidenceMode: bkt_only_study` and `usedBktFallback: true`.
-- **P3b: model-assisted guarded policy.** A compatible, approved XGBoost support-risk artifact was active.
+- **P3b: model-assisted guarded policy.** A compatible, released XGBoost support-risk artifact was active.
 
 The primary FYP policy claim is P3a versus P1 and P2. P3b is an additional model-assisted analysis only after the Canonical U7 promotion gates are met. This prevents a later model artifact from being mistaken for evidence that BKT alone caused an improvement.
 
@@ -77,7 +77,7 @@ The primary FYP policy claim is P3a versus P1 and P2. P3b is an additional model
 | H5 | Does the BKT mastery probability remain calibrated against later eligible outcomes? | Explainability and estimation-quality outcome, not a classifier-superiority claim. |
 | H6 | When a promoted model is available, does P3b improve P3a without harming safety? | Separate, exploratory or confirmatory only after its sample-size gate is met. |
 
-Before the first real-data analysis, record the approved false-demotion tolerance (`deltaFD`), confidence level, power target, outcome window, and minimum sample size in an immutable evaluation manifest. Do not choose them after inspecting results.
+Before the first real-data analysis, record the declared false-demotion tolerance (`deltaFD`), confidence level, power target, outcome window, and minimum sample size in an immutable evaluation manifest. Do not choose them after inspecting results.
 
 ## Trusted data and eligibility
 
@@ -88,7 +88,7 @@ Include a decision only when its evidence derives from:
 - `quizAttempts` with `finalizationStatus: finalized`, `validationStatus: finalized`, and `dataSource: runtime_callable`;
 - matching `questionResponses` with `validationStatus: validated`;
 - immutable `sourceAttemptSequence`, with response order replayed by `(sourceAttemptSequence, sequenceIndex)`;
-- approved real-data provenance and the declared consent/retention status.
+- declared real-data provenance and the recorded consent/retention status.
 
 Export only HMAC-keyed pseudonymous student identifiers. The HMAC-keyed export is pseudonymized, not anonymous.
 
@@ -165,7 +165,7 @@ Run only after Stage B passes the data-readiness and safety review.
 - Mark every probe session/attempt `evaluationOnly`. It must never update normal BKT, mastery, adaptive assignments, XGBoost training, model promotion, or parent/student projections.
 - Persist server-owned enrollment, decision audit, and probe/outcome records. Clients cannot write or read them.
 - Analyse participants by assigned policy (intention-to-treat), including safe holds and withdrawals in the stated censoring report.
-- Introduce P3b only in a separately approved phase after a compatible promoted model, model governance, and sufficient data are available.
+- Introduce P3b only in a separately released phase after a compatible promoted model, model governance, and sufficient data are available.
 
 Stage C is the evidence needed to make a causal statement about learning outcomes. If the pilot is too small, report it as feasibility/safety evidence rather than superiority.
 
@@ -187,7 +187,7 @@ P3a must also satisfy the pre-declared false-demotion non-inferiority bound:
 
 `falseDemotionRate(P3a) - falseDemotionRate(comparator) <= deltaFD`
 
-The value of `deltaFD` must be approved before any result is viewed. A lower false-promotion rate cannot justify an undisclosed or material increase in unnecessary holds/demotions.
+The value of `deltaFD` must be declared and frozen in the evaluation manifest before any result is viewed. A lower false-promotion rate cannot justify an undisclosed or material increase in unnecessary holds/demotions.
 
 ### Secondary outcomes
 
@@ -215,7 +215,7 @@ The final report must publish aggregate/pseudonymized outputs only.
 | BKT reliability diagram | Compares predicted BKT mastery bands with observed later success rates. |
 | Pseudonymized learner timelines | Shows response sequence, BKT posterior, policy reason, assigned level, and later outcome for representative pre-declared cases. |
 | Policy transition matrix | Shows Easy/Moderate/Hard movements and identifies excessive back-and-forth changes. |
-| Fairness and censoring table | Shows counts, outcome rates, confidence intervals, and censored rows by approved strata. |
+| Fairness and censoring table | Shows counts, outcome rates, confidence intervals, and censored rows by declared strata. |
 | Limitations panel | States sample size, missingness, policy/model fallback rate, content-version coverage, and whether the result is demonstration, preliminary, held-out, or causal-pilot evidence. |
 
 Student and parent interfaces should receive only safe explanatory projections such as “fresh practice is recommended while the system gathers more evidence.” They must not receive counterfactual policy tables, raw probabilities, SHAP values, artifacts, or individual error traces.
@@ -273,7 +273,7 @@ All new collections are server-owned. They require explicit terminal-deny Rules 
 | `policyEvaluationAllocationBlocks/{studyVersion}_{yearLevel}_{topicId}_{subtopicId}_{startingDifficulty}` | immutable stratum fields, per-arm counts, `updatedAt` | Server-only enrollment transaction | Makes allocation balanced without exposing or trusting a client-side random choice. |
 | `policyEvaluationDecisionAudits/{decisionId}` | `decisionId`, `studyVersion`, `enrollmentId`, `attemptId`, `studentId`, `sourceAttemptSequence`, `assignedArm`, `deliveredArm`, `protocolDeviation`, selector/config versions, redacted input snapshot, reason code, selected difficulty/bank, `createdAt` | Canonical U8 runtime only; no client read/write | Create-only evidence for replay and intention-to-treat/per-protocol reporting. |
 | `policyEvaluationProbes/{decisionId}` and `policyEvaluationOutcomes/{decisionId}` | probe form/blueprint/target/calibration and separate outcome eligibility, censoring, later probe attempt, result, `computedAt`, outcome version | Canonical U8 runtime only; no client read/write | Policy-independent outcome measurement; retried computation is idempotent. |
-| `policyEvaluationAdminAudits/{auditId}` | actor UID, action, study/enrollment reference, supervisor approval reference, rationale, timestamp | Admin callable only; no client read/write | Audits study creation, enrollment, revocation, and closure. |
+| `policyEvaluationAdminAudits/{auditId}` | actor UID, action, study/enrollment reference, developer release-decision reference, rationale, timestamp | Admin callable only; no client read/write | Audits study creation, enrollment, revocation, and closure. |
 
 Do not add the arm or audit ID to `adaptiveAssignments`, `subtopicMastery`, `studentAiStatuses`, `quizAttempts`, or any client-readable document. Firestore Rules cannot redact fields from an otherwise readable document. Server-side export joins audit records to trusted attempts by `attemptId`.
 
@@ -289,7 +289,7 @@ Update `docs/architecture/logic-oasis-firestore-database-schema.md` during imple
 | Functions bundle parity | `tools/build_function_bundle.py`, `functions/vendor/`, `functions/vendor/bundle_manifest.json` | Copies the authoritative evaluation package/configuration into the deployed Functions boundary and hashes it with the existing feature, ranking, and adaptive-policy contracts. |
 | Study administration | `functions/policy_evaluation_admin.py`, `tools/bootstrap_policy_evaluation_admin.py` | A dedicated `policyEvaluationAdmin` Firebase custom claim manages study, consent, enrollment, revocation, and closure. The bootstrap identity grants/revokes that claim, revokes refresh tokens, and writes append-only admin audits; it never reuses parent-link administration. |
 | Function configuration | `functions/main.py` and deployment manifest tests | `managePolicyEvaluationEnrollment` runs as `logic-oasis-policy-evaluation-admin@logic-oasis-fyp.iam.gserviceaccount.com` and alone receives `POLICY_EVALUATION_ALLOCATION_KEY`; it allocates at enrollment. `startQuizSession`, submit/finalize callables, and the U8 trigger only read immutable enrollment and receive no allocation secret. An inactive study leaves normal quiz starts operational. |
-| Export identity and retention | `tools/export_policy_evaluation_release.py`, dedicated release bucket/prefix | `logic-oasis-policy-evaluation-export@logic-oasis-fyp.iam.gserviceaccount.com` uses short-lived impersonation, may read Firestore and only the export HMAC secret, and may write only the dedicated release prefix under an IAM condition. Lifecycle retention deletes releases; a server/admin cleanup writes a non-sensitive deletion audit. |
+| Export identity and retention | `ai_pipeline/training/export_policy_evaluation_release.py`, dedicated release bucket/prefix | `logic-oasis-policy-evaluation-export@logic-oasis-fyp.iam.gserviceaccount.com` uses short-lived impersonation, may read Firestore and only the export HMAC secret, and may write only the dedicated release prefix under an IAM condition. Lifecycle retention deletes releases; a server/admin cleanup writes a non-sensitive deletion audit. |
 
 The active model-registry compatibility check remains unchanged. P3a must explicitly record the BKT/rule fallback when no valid promoted risk model exists. P3b may run only when the existing artifact, feature-schema, ranking-policy, and adaptive-policy compatibility checks pass.
 
@@ -391,9 +391,9 @@ The replay must join policy decision audits by server attempt ID, create a compl
 
 ### AQC-4. Add study control, consented enrollment, and server-side allocation
 
-**Goal:** Enrol only approved students, allocate a stable balanced policy arm per learner/subtopic, and keep allocation hidden from clients.
+**Goal:** Enrol only students with recorded consent, allocate a stable balanced policy arm per learner/subtopic, and keep allocation hidden from clients.
 
-**Dependencies:** AQC-1 to AQC-3; a recorded Stage-B go/no-go decision; the existing Firebase Auth custom-claim pattern in `functions/parent_link_admin.py`; existing server-owned quiz start flow in `functions/main.py`.
+**Dependencies:** AQC-1 to AQC-3; a recorded developer-released Stage-B go/no-go decision; the existing Firebase Auth custom-claim pattern in `functions/parent_link_admin.py`; existing server-owned quiz start flow in `functions/main.py`.
 
 **Files:**
 
@@ -407,7 +407,7 @@ The replay must join policy decision audits by server attempt ID, create a compl
 - Create `functions/tests/test_policy_evaluation_rules.py`.
 - Modify `functions/tests/test_start_quiz_session_adaptive.py`.
 
-**Approach:** Add audited `managePolicyEvaluationStudy`, `recordPolicyEvaluationConsent`, and `managePolicyEvaluationEnrollment` callables protected by a new dedicated `policyEvaluationAdmin` Firebase custom claim. The control plane owns draft/enrolling/active/closed/archived study lifecycle, freezes the manifest when active, requires supervisor approval reference and rationale, records only documented active/revoked/expired consent, and creates/revokes only the declared enrollment. A separate bootstrap identity grants/revokes the claim, revokes refresh tokens, and writes append-only admin audits. Do not reuse the parent-link administrator claim.
+**Approach:** Add audited `managePolicyEvaluationStudy`, `recordPolicyEvaluationConsent`, and `managePolicyEvaluationEnrollment` callables protected by a new dedicated `policyEvaluationAdmin` Firebase custom claim. The control plane owns draft/enrolling/active/closed/archived study lifecycle, freezes the manifest when active, requires a recorded developer release reference and rationale, records only documented active/revoked/expired consent, and creates/revokes only the declared enrollment. A separate bootstrap identity grants/revokes the claim, revokes refresh tokens, and writes append-only admin audits. Do not reuse the parent-link administrator claim.
 
 At protected enrollment, an Admin SDK transaction captures year level, topic, subtopic, starting difficulty, and context version; writes the deterministic enrollment; updates the appropriate allocation-block counter; and selects the lowest-count arm, using the dedicated HMAC allocation key only to break ties. `startQuizSession` only reads the immutable enrollment. A learner who is not enrolled follows the unchanged production adaptive path.
 
@@ -416,7 +416,7 @@ The allocation must be server-owned and immutable after the learner starts that 
 **Test scenarios:**
 
 - An unauthenticated, student, parent, or token without `policyEvaluationAdmin` cannot enroll, revoke, inspect, or alter a study allocation.
-- Active consent plus valid approval creates one stable enrollment; duplicate calls return the original enrollment and do not increment an allocation block twice.
+- Active consent plus a valid developer release record creates one stable enrollment; duplicate calls return the original enrollment and do not increment an allocation block twice.
 - Revoked/expired consent, closed study, missing allocation secret, and invalid policy version fail safely without changing the active adaptive assignment.
 - Concurrent enrollments keep allocation-block counts consistent and never assign two arms to one learner/subtopic/study key.
 - A non-enrolled learner receives the exact pre-existing cold-start/runtime-adaptive behaviour.
@@ -459,7 +459,7 @@ The audit records the source attempt, arm, selector/configuration versions, reda
 
 ### AQC-6. Secure real-data export, probe outcomes, and controlled-pilot reporting
 
-**Goal:** Export only approved evaluation evidence and make live-pilot outcomes available to the offline evaluator without exposing raw operational records.
+**Goal:** Export only declared evaluation evidence and make live-pilot outcomes available to the offline evaluator without exposing raw operational records.
 
 **Dependencies:** AQC-2 to AQC-5, existing `ai_pipeline/training/export_real_attempts.py`.
 
@@ -473,14 +473,14 @@ The audit records the source attempt, arm, selector/configuration versions, reda
 - Create `tools/tests/test_verify_policy_evaluation_live_contract.py`.
 - Create `tools/deploy_policy_evaluation_export_iam.py` and a release-retention cleanup contract/test.
 
-**Approach:** Require an approved closed or bounded study manifest, a dedicated export HMAC key, and server-only joins between trusted attempts, create-only policy-audit records, and separate probe/outcome documents. The dedicated export identity runs only through short-lived impersonation, accesses only its export HMAC secret, and writes only a dedicated release bucket/prefix protected by an IAM condition and lifecycle retention. Export only pseudonymous assigned/delivered arm, policy version, decision/probe/outcome/censoring fields, protocol-deviation flags, and aggregate-compatible bank metadata. Exclude raw user IDs, email, raw response/answer text, answer keys, AI job errors, SHAP arrays, and model artifact paths. Produce a release manifest with hashes for every CSV/report source and append-only deletion/retention evidence.
+**Approach:** Require a declared closed or bounded study manifest with a recorded release decision, a dedicated export HMAC key, and server-only joins between trusted attempts, create-only policy-audit records, and separate probe/outcome documents. The dedicated export identity runs only through short-lived impersonation, accesses only its export HMAC secret, and writes only a dedicated release bucket/prefix protected by an IAM condition and lifecycle retention. Export only pseudonymous assigned/delivered arm, policy version, decision/probe/outcome/censoring fields, protocol-deviation flags, and aggregate-compatible bank metadata. Exclude raw user IDs, email, raw response/answer text, answer keys, AI job errors, SHAP arrays, and model artifact paths. Produce a release manifest with hashes for every CSV/report source and append-only deletion/retention evidence.
 
 **Test scenarios:**
 
 - An export fails if consent, provenance, decision audit, attempt lineage, policy version, or HMAC key is missing or inconsistent.
 - A synthetic, emulator, seed, legacy, or manually inserted audit cannot enter a final release.
 - The export contains no prohibited personal, answer, model-artifact, or internal-error fields.
-- Re-running an approved export is deterministic for the same immutable data cut and manifest.
+- Re-running a declared export is deterministic for the same immutable data cut and manifest.
 - A revoked enrollment remains represented only as historical pseudonymous audit evidence and cannot receive new study decisions.
 - A disposable export identity may create only its dedicated release prefix; lifecycle/cleanup deletion produces a non-sensitive audit and no Functions/client identity can read the release artifact.
 
@@ -490,14 +490,14 @@ The audit records the source attempt, arm, selector/configuration versions, reda
 
 **Goal:** Release the policy-comparison system without disrupting the normal adaptive-learning path.
 
-**Dependencies:** AQC-1 through AQC-6 and explicit supervisor approval of the study manifest, consent process, probe/form feasibility, sample-size calculation, secrets, IAM, retention configuration, and deployment window.
+**Dependencies:** AQC-1 through AQC-6 and a recorded developer release decision covering the study manifest, consent process, probe/form feasibility, sample-size calculation, secrets, IAM, retention configuration, and deployment window.
 
 **Files:**
 
 - Modify `firebase.json` only if emulator/deployment configuration needs the new callable discovery or deployment hook.
 - Create `tools/deploy_policy_evaluation_iam.py` and `tools/tests/test_policy_evaluation_iam_contract.py`.
 - Create `tools/tests/test_policy_evaluation_deployment_contract.py`.
-- Create `docs/reports/` output only after a real approved run; do not commit participant-level exports.
+- Create `docs/reports/` output only after a real declared release run; do not commit participant-level exports.
 
 **Approach:** Build and verify the Functions vendor bundle before deployment. Apply the allocation-secret accessor only to the dedicated evaluation-admin runtime; retain existing Canonical U8 runtime identity for finalization without that secret. Apply separate impersonation/export-HMAC/release-prefix IAM only to the export identity. Deploy Functions and Firestore Rules together, then run a disposable-account verification before enrolling a real participant. Deploy no model artifact merely to start P1/P2/P3a; P3b remains blocked by the existing Canonical U7/U8 model promotion contract.
 
@@ -523,10 +523,10 @@ The audit records the source attempt, arm, selector/configuration versions, reda
 
 1. AQC-1 establishes the immutable policy and package contract.
 2. AQC-2 and AQC-3 make offline reconstruction and descriptive evidence reporting reproducible before any live allocation exists.
-3. Before AQC-4, record a supervisor-approved go/no-go finding that confirms: trusted-source/compatibility readiness; frozen P1/P2/P3a and outcome/probe protocol; adequate calibrated/balanced probe-form feasibility; a feasible clustered power calculation; approved study/consent/retention procedure; and deployment authorization.
+3. Before AQC-4, record a developer-released go/no-go decision that confirms: trusted-source/compatibility readiness; frozen P1/P2/P3a and outcome/probe protocol; adequate calibrated/balanced probe-form feasibility; a feasible clustered power calculation; a declared study/consent/retention procedure; and a deployment release record.
 4. If that gate fails, stop cleanly after AQC-1 to AQC-3 and publish only a pipeline demonstration or preliminary descriptive report. Do not create live enrollments or make a superiority claim.
 5. AQC-4 and AQC-5 add the consented, server-owned pilot as a sidecar: only the Canonical U8 finalization branch changes for enrolled learners; all non-participant U3–U12 behaviour stays unchanged.
-6. AQC-6 controls approved real-data release and AQC-7 deploys/verifies the pilot boundary. Only then can Stage C collect evidence.
+6. AQC-6 controls declared real-data release and AQC-7 deploys/verifies the pilot boundary. Only then can Stage C collect evidence.
 
 ## Acceptance gates
 
@@ -542,7 +542,7 @@ The audit records the source attempt, arm, selector/configuration versions, reda
 
 ### Real-data evaluation gate
 
-- Data is consented, approved, HMAC-pseudonymized, trusted, and passes the declared source/lineage audit.
+- Data is consented, declared, HMAC-pseudonymized, trusted, and passes the declared source/lineage audit.
 - All policy versions, data cut, content compatibility, censoring rules, outcome window, and statistical settings are frozen before analysis.
 - Both outcome classes and enough independent learners exist for the pre-calculated sample-size requirement.
 - The report includes all primary, secondary, fairness, calibration, censoring, and limitation outputs.
@@ -550,7 +550,7 @@ The audit records the source attempt, arm, selector/configuration versions, reda
 
 ### Superiority-claim gate
 
-The final report may state that P3a outperformed both comparators only if both multiplicity-adjusted false-promotion-burden superiority criteria pass, both false-demotion and challenge-opportunity non-inferiority guards pass, and the result comes from the approved controlled live pilot. Stage B may only make an explicitly descriptive observed-assignment-matched decision-quality statement.
+The final report may state that P3a outperformed both comparators only if both multiplicity-adjusted false-promotion-burden superiority criteria pass, both false-demotion and challenge-opportunity non-inferiority guards pass, and the result comes from the declared controlled live pilot. Stage B may only make an explicitly descriptive observed-assignment-matched decision-quality statement.
 
 If a gate fails, the correct conclusion is a feasibility, calibration, or preliminary comparison finding. It is not evidence that the candidate policy is superior.
 

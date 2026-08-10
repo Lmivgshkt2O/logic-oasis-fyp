@@ -7,7 +7,11 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from .firestore_source import SourceDataset, load_firestore_dataset
+from .firestore_source import (
+    POLICY_EVALUATION_AUDIT_FIELDS,
+    SourceDataset,
+    load_firestore_dataset,
+)
 from ..time_utils import parse_timestamp
 
 
@@ -89,6 +93,9 @@ def _parse_attempt_row(row: Mapping[str, str]) -> tuple[str, dict[str, Any]]:
         "assignmentSource": _string(row, "assignmentSource"),
         "adaptivePolicyVersion": _string(row, "adaptivePolicyVersion"),
     }
+    for field in POLICY_EVALUATION_AUDIT_FIELDS:
+        if row.get(field):
+            attempt[field] = row[field]
     sequence = _optional_integer(row, "sourceAttemptSequence")
     if sequence is not None:
         attempt["sourceAttemptSequence"] = sequence

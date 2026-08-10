@@ -18,6 +18,7 @@ from build_function_bundle import (
     BUNDLE_VERSION,
     CONFIGS,
     expected_bundle_manifest,
+    file_sha256,
     PACKAGE,
     VENDOR,
 )
@@ -92,6 +93,9 @@ class FunctionBundleParityTests(unittest.TestCase):
     def test_release_evidence_binds_the_selected_bundle_and_safe_claim_boundary(self) -> None:
         evidence = RELEASE_EVIDENCE.read_text(encoding="utf-8")
         metadata = yaml.safe_load(evidence.split("---", 2)[1])
+        manifest = json.loads(
+            (VENDOR / "bundle_manifest.json").read_text(encoding="utf-8")
+        )
         self.assertEqual(metadata["artifact_contract"], "logic-oasis-controlled-demo-release-evidence/v1")
         self.assertEqual(metadata["release_status"], "developer_released")
         self.assertEqual(metadata["live_activation_status"], "verified")
@@ -118,6 +122,13 @@ class FunctionBundleParityTests(unittest.TestCase):
             for key, value in metadata["bindings"].items()
             if key.endswith("Sha256")
         ))
+        # The controlled-demo release evidence records a historical bundle
+        # snapshot. Current bundle values may change after an immutable release,
+        # so validate their shape above instead of rebinding that release in place.
+        self.assertEqual(
+            manifest["policyEvaluationSha256"],
+            file_sha256(ROOT / "ai_pipeline" / "configs" / "policy_evaluation_v1.yaml"),
+        )
         self.assertEqual(metadata["runtime"]["evidence_mode"], "controlled_demo")
         self.assertEqual(metadata["runtime"]["model_bucket"], "logic-oasis-models")
         self.assertEqual(metadata["claim_level"], "controlled_demonstration_only")

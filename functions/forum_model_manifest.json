@@ -3,12 +3,12 @@
   "artifactSha256": "8307a480b5d5e61612b878653b2182d609ae594024ecae192e3677ace99a0049",
   "artifactSizeBytes": 17634,
   "baselineComparisonResult": "naive_bayes_advantage_demonstrated",
-  "bundleManifestSha256": "a27202515ceb34b51443899ec8f3cd8442158c65ba093a33d22c128717dfa32c",
+  "bundleManifestSha256": "82bc19d8a82607355c14d7f4c1d6aad616bcfe3d400d7eef7ba94f940d250c78",
   "candidateGateStatus": "passed",
   "candidateManifestSha256": "45364c713b72351801afc00c37b5692085cf43d2c1225ca1eaf962c3cf2bfea5",
   "catalogueSha256": "614aefeffe4929f9b096452a4bb5e473cf671c809231a42edf2e8358b1f01c3a",
   "claimLevel": "controlled_demonstration_only",
-  "codeRevision": "937204cbdd672d1350cf4a05bf3887feb50bab41e7c97c16d716932948b0957d",
+  "codeRevision": "01e74fe579a81a3b3f39c675297b6f4791f5fb2f2c9b7bb62d028da9e3225d1f",
   "codeRevisionKind": "sha256_bounded_release_sources_v1",
   "datasetManifestSha256": "ce31bd081ea5e3f72d09171bfe7829d110a8fc5045fd202d3fe88255941c8d03",
   "datasetSha256": "5d096d6ab1c6ce59428c9d89b8d972d743d6d613ae249b619c1c51579b3a8399",
@@ -19,7 +19,7 @@
   },
   "deploymentRuntimeHashes": {
     "forum_runtime.py": "1c3dd55a395cc7949a77384558a40d2da5b8c92dc11bce74cebb28cc7f5005fe",
-    "main.py": "cfac302e8e07202329aa7b1960e81274b0fcb7e17122536ff14aeaeac1fe51b1"
+    "main.py": "6c70eba02716f81271248ae09a043397d33c21675c0afaf735e852a293abb617"
   },
   "deploymentScope": "controlled_demo",
   "deploymentState": "pending_cloud_deployment",
@@ -37,11 +37,11 @@
     "explanation_sufficient": "sufficient_reasoning"
   },
   "preprocessingVersion": "forum-text-preprocessing-v1",
-  "releaseId": "forum-controlled-demo-nb-v1-release-2",
+  "releaseId": "forum-controlled-demo-nb-v1-release-3",
   "releaseRationale": "Developer-released FYP1 controlled-demonstration model. Not evaluated on real learner forum responses.",
   "releaseScope": "fyp1_forum_controlled_demo",
-  "releasedAt": "2026-08-09T00:00:00Z",
-  "releasedBy": "developer",
+  "releasedAt": "2026-08-10T16:00:00Z",
+  "releasedBy": "zyonn",
   "rubricSha256": "678505add7d4901d49ce1636baf8289877480383e3515b38e847b114da7ba05b",
   "runtimeEnvironmentFingerprint": {
     "architecture": "AMD64",

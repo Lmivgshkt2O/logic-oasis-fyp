@@ -104,6 +104,7 @@ def _source_runtime_hash_bindings() -> dict[str, str]:
         "weakTopicRankingPolicySha256": file_sha256(AI_ROOT / "configs" / "weak_topic_ranking_v1.yaml"),
         "adaptivePolicySha256": file_sha256(AI_ROOT / "configs" / "adaptive_policy_v1.yaml"),
         "featureSchemaSha256": file_sha256(AI_ROOT / "configs" / "feature_schema.yaml"),
+        "policyEvaluationSha256": file_sha256(AI_ROOT / "configs" / "policy_evaluation_v1.yaml"),
     }
 
 

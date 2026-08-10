@@ -20,11 +20,16 @@ from tempfile import mkdtemp
 from typing import Iterable
 
 from logic_oasis_ai.features import FEATURE_SCHEMA_VERSION
-from logic_oasis_ai.sources.firestore_source import SourceDataset
+from logic_oasis_ai.sources.firestore_source import (
+    POLICY_EVALUATION_AUDIT_FIELDS,
+    PolicyEvaluationAuditJoin,
+    SourceDataset,
+)
 
 
 EXPORT_SCHEMA_VERSION = "pseudonymized-attempt-export-v2"
 PROTECTED_RELEASE_PREFIX = "gs://logic-oasis-fyp-protected-data/real-data-releases/"
+POLICY_EVALUATION_EXPORT_KEY_PREFIX = "logic-oasis-policy-evaluation-export-key-v"
 
 ATTEMPT_FIELDS = (
     "attemptId", "sessionId", "studentKey", "totalQuestions", "correctCount", "score",
@@ -32,6 +37,7 @@ ATTEMPT_FIELDS = (
     "sourceAttemptSequence", "topicId", "subtopicId", "bankId", "difficultyLevel",
     "contentVersion", "yearLevel", "assignmentId", "assignmentSource",
     "adaptivePolicyVersion", "provenance",
+    *POLICY_EVALUATION_AUDIT_FIELDS,
 )
 RESPONSE_FIELDS = (
     "responseId", "sessionId", "attemptId", "studentKey", "questionId", "skillId",
@@ -96,6 +102,7 @@ def export_real_attempts(
     *,
     release: RealDataRelease,
     pseudonymization_key: bytes | str,
+    policy_evaluation_audits: Mapping[str, PolicyEvaluationAuditJoin] | None = None,
 ) -> dict[str, Path]:
     """Write approved, pseudonymized files and a safe, reproducible manifest.
 
@@ -105,6 +112,12 @@ def export_real_attempts(
     """
     if dataset.provenance != "real":
         raise ValueError("only approved real records may be exported for final evaluation")
+    if release.export_key_version.startswith(POLICY_EVALUATION_EXPORT_KEY_PREFIX):
+        raise ValueError(
+            "real-data export must not reuse the dedicated policy-evaluation export key"
+        )
+    audits = dict(policy_evaluation_audits or {})
+    _validate_audit_joins(dataset, audits)
     output = Path(output_directory)
     output.mkdir(parents=True, exist_ok=True)
     attempts_path = output / "attempts.csv"
@@ -129,9 +142,22 @@ def export_real_attempts(
     try:
         staged_attempts = staging / "attempts.csv"
         staged_responses = staging / "responses.csv"
-        _write_csv(staged_attempts, ATTEMPT_FIELDS, _attempt_rows(dataset, attempt_keys, session_keys, response_keys, pseudonymization_key))
+        _write_csv(
+            staged_attempts,
+            ATTEMPT_FIELDS,
+            _attempt_rows(
+                dataset,
+                attempt_keys,
+                session_keys,
+                response_keys,
+                pseudonymization_key,
+                audits,
+            ),
+        )
         _write_csv(staged_responses, RESPONSE_FIELDS, _response_rows(dataset, attempt_keys, session_keys, response_keys, pseudonymization_key))
-        manifest = _manifest(release, dataset, staged_attempts, staged_responses)
+        manifest = _manifest(
+            release, dataset, staged_attempts, staged_responses, audit_count=len(audits)
+        )
         _assert_safe_manifest(manifest, pseudonymization_key)
         staged_manifest = staging / "manifest.json"
         staged_manifest.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -151,10 +177,10 @@ def export_anonymized_attempts(*args, **kwargs):
     return export_real_attempts(*args, **kwargs)
 
 
-def _attempt_rows(dataset, attempt_keys, session_keys, response_keys, key) -> Iterable[dict[str, object]]:
+def _attempt_rows(dataset, attempt_keys, session_keys, response_keys, key, audits) -> Iterable[dict[str, object]]:
     for attempt in dataset.attempts:
         context = dataset.attempt_context_by_id[attempt.attempt_id]
-        yield {
+        row = {
             "attemptId": attempt_keys[attempt.attempt_id], "sessionId": session_keys[attempt.session_id],
             "studentKey": hmac_pseudonym("student", attempt.student_id, key),
             "totalQuestions": attempt.total_questions, "correctCount": attempt.correct_count, "score": attempt.score,
@@ -168,6 +194,13 @@ def _attempt_rows(dataset, attempt_keys, session_keys, response_keys, key) -> It
             "assignmentSource": context.assignment_source, "adaptivePolicyVersion": context.adaptive_policy_version,
             "provenance": dataset.provenance,
         }
+        audit = audits.get(attempt.attempt_id)
+        if audit is not None:
+            row.update(audit.to_document())
+        else:
+            for field in POLICY_EVALUATION_AUDIT_FIELDS:
+                row[field] = ""
+        yield row
 
 
 def _response_rows(dataset, attempt_keys, session_keys, response_keys, key) -> Iterable[dict[str, object]]:
@@ -187,8 +220,15 @@ def _response_rows(dataset, attempt_keys, session_keys, response_keys, key) -> I
             }
 
 
-def _manifest(release: RealDataRelease, dataset: SourceDataset, attempts_path: Path, responses_path: Path) -> dict[str, object]:
-    return {
+def _manifest(
+    release: RealDataRelease,
+    dataset: SourceDataset,
+    attempts_path: Path,
+    responses_path: Path,
+    *,
+    audit_count: int,
+) -> dict[str, object]:
+    manifest = {
         "releaseId": release.release_id,
         "datasetVersion": release.dataset_version,
         "exportSchemaVersion": EXPORT_SCHEMA_VERSION,
@@ -209,7 +249,22 @@ def _manifest(release: RealDataRelease, dataset: SourceDataset, attempts_path: P
         "fileSha256": {"attempts.csv": _file_sha256(attempts_path), "responses.csv": _file_sha256(responses_path)},
         "containsRawIdentifiers": False,
         "containsSecretMaterial": False,
+        "policyEvaluationAuditCount": audit_count,
+        "policyEvaluationJoinFields": list(POLICY_EVALUATION_AUDIT_FIELDS),
     }
+    return manifest
+
+
+def _validate_audit_joins(
+    dataset: SourceDataset,
+    audits: Mapping[str, PolicyEvaluationAuditJoin],
+) -> None:
+    known_attempt_ids = {attempt.attempt_id for attempt in dataset.attempts}
+    unknown = sorted(set(audits) - known_attempt_ids)
+    if unknown:
+        raise ValueError(
+            f"policy evaluation audit references unknown attempt: {unknown[0]}"
+        )
 
 
 def _assert_safe_manifest(manifest: dict[str, object], key: bytes | str) -> None:

@@ -62,6 +62,16 @@ from parent_link_invitation import (
     decline_parent_link_invitation,
     unlink_own_parent_link,
 )
+from policy_evaluation import (
+    POLICY_EVALUATION_ADMIN_SERVICE_ACCOUNT,
+    PolicyEvaluationError,
+)
+from policy_evaluation_admin import (
+    manage_policy_evaluation_enrollment,
+    manage_policy_evaluation_study,
+    record_policy_evaluation_consent,
+    verify_policy_evaluation_admin,
+)
 
 from quiz_session import (
     CLIENT_REPORTED_UNVERIFIED,
@@ -120,6 +130,9 @@ PARENT_INVITATION_SMTP_USERNAME = params.StringParam(
     "PARENT_INVITATION_SMTP_USERNAME"
 )
 PARENT_INVITATION_SMTP_FROM = params.StringParam("PARENT_INVITATION_SMTP_FROM")
+POLICY_EVALUATION_ALLOCATION_KEY = params.SecretParam(
+    "POLICY_EVALUATION_ALLOCATION_KEY"
+)
 
 
 def _resolved_string_param(parameter: Any) -> str:
@@ -1285,6 +1298,58 @@ def unlinkOwnParentLink(request: https_fn.CallableRequest) -> dict[str, Any]:
         raise https_fn.HttpsError(
             _ERROR_CODES.get(error.code, https_fn.FunctionsErrorCode.INTERNAL), str(error)
         )
+
+
+def _policy_evaluation_call(
+    handler: Callable[..., dict[str, str]],
+    request: https_fn.CallableRequest,
+    *,
+    allocation_key: str | None = None,
+) -> dict[str, str]:
+    try:
+        admin = verify_policy_evaluation_admin(request)
+        return handler(
+            _data(request),
+            admin,
+            firestore_db(),
+            allocation_key=allocation_key,
+        )
+    except PolicyEvaluationError as error:
+        raise https_fn.HttpsError(
+            _ERROR_CODES.get(error.code, https_fn.FunctionsErrorCode.INTERNAL),
+            str(error),
+        )
+
+
+@https_fn.on_call(
+    region=FUNCTION_REGION,
+    service_account=POLICY_EVALUATION_ADMIN_SERVICE_ACCOUNT,
+)
+def managePolicyEvaluationStudy(request: https_fn.CallableRequest) -> dict[str, str]:
+    return _policy_evaluation_call(manage_policy_evaluation_study, request)
+
+
+@https_fn.on_call(
+    region=FUNCTION_REGION,
+    service_account=POLICY_EVALUATION_ADMIN_SERVICE_ACCOUNT,
+)
+def recordPolicyEvaluationConsent(request: https_fn.CallableRequest) -> dict[str, str]:
+    return _policy_evaluation_call(record_policy_evaluation_consent, request)
+
+
+@https_fn.on_call(
+    region=FUNCTION_REGION,
+    service_account=POLICY_EVALUATION_ADMIN_SERVICE_ACCOUNT,
+    secrets=[POLICY_EVALUATION_ALLOCATION_KEY],
+)
+def managePolicyEvaluationEnrollment(
+    request: https_fn.CallableRequest,
+) -> dict[str, str]:
+    return _policy_evaluation_call(
+        manage_policy_evaluation_enrollment,
+        request,
+        allocation_key=_resolved_string_param(POLICY_EVALUATION_ALLOCATION_KEY),
+    )
 
 
 @firestore_fn.on_document_created(

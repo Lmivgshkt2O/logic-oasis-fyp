@@ -64,3 +64,8 @@ outputs/
 # AI notebook/generated model artifacts
 ai_pipeline/.ipynb_checkpoints/
 ai_pipeline/xgboost_logic_oasis_model.pkl
+
+# Protected ASSISTments external-data working extracts must never enter Git
+ai_pipeline/external_data/assistments/raw/
+ai_pipeline/external_data/assistments/processed/
+ai_pipeline/external_data/assistments/j0/

@@ -724,9 +724,10 @@ baseline without rewriting Section 20's historical evidence:
   and forum-scoped model-registry records;
 - quiz and forum AI are automatically triggered server runtimes, not merely
   manual or seeded displays; and
-- forum AI release `forum-controlled-demo-nb-v1-release-2` is locally verified
-  with `controlled_demonstration_only` evidence, while cloud deployment remains
-  pending.
+- forum AI release 2 is locally Emulator-verified with
+  `controlled_demonstration_only` evidence; release 3 preserves the candidate
+  artifact against the later shared Functions bundle and passes focused
+  integrity/runtime tests, while fresh deployment verification remains pending.
 
 The controlled dataset is fictional and scenario-family grouped. Its final-test
 accuracy (`0.75`) and macro F1 (`0.73333333`) do not establish learner accuracy
