@@ -210,7 +210,10 @@ class ContractFreezeTests(unittest.TestCase):
         manifest = load_policy_evaluation_manifest(
             POLICY_EVALUATION_PATH, adaptive_policy=adaptive
         )
-        self.assertEqual(manifest.adaptive_policy_sha256, self.contract.adaptive_policy_sha256)
+        self.assertEqual(
+            manifest.adaptive_policy_sha256,
+            self.contract.adaptive_policy_content_sha256,
+        )
         self.assertEqual(P1_PROMOTION_THRESHOLD, 0.80)
         self.assertEqual(P2_DEMOTION_THRESHOLD, 0.40)
         self.assertEqual(
