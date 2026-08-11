@@ -54,7 +54,7 @@ void main() {
     final state = AppState();
 
     expect(state.recommendedMission.topicId, 'whole_numbers_y4');
-    expect(state.recommendedMission.topicTitle, 'Whole Numbers up to 100 000');
+    expect(state.recommendedMission.topicTitle, 'Numbers and Operations');
     expect(state.recommendedMission.visibleCompletions, 0);
     expect(state.recommendedMission.isReadyToClaim, isFalse);
   });
@@ -113,7 +113,7 @@ void main() {
     expect(subtopics, hasLength(5));
     final adaptiveSubtopic = subtopics.first;
     expect(adaptiveSubtopic.id, 'read_write_numbers');
-    expect(adaptiveSubtopic.questions, hasLength(24));
+    expect(adaptiveSubtopic.questions, hasLength(15));
     expect(
       adaptiveSubtopic.questions.map((question) => question.bankId).toSet(),
       containsAll(<String>[

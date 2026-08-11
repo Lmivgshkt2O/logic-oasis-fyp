@@ -13,7 +13,7 @@ void main() {
     final allQuestionIds = <String>{};
     for (final bank in year4ReadWriteNumberBanks) {
       expect(bank.validate(), isEmpty, reason: bank.id);
-      expect(bank.questions, hasLength(8));
+      expect(bank.questions, hasLength(5));
       for (final question in bank.questions) {
         expect(allQuestionIds.add(question.id), isTrue);
       }
@@ -21,24 +21,21 @@ void main() {
 
     final adaptiveSubtopic = year4Chapter1Topics.single.subtopics.first;
     expect(adaptiveSubtopic.skillIds, <String>['y4_whole_numbers_read_write']);
-    expect(adaptiveSubtopic.contentVersion, '2026.07.15');
+    expect(adaptiveSubtopic.contentVersion, '2026.08.12');
     expect(adaptiveSubtopic.activeBankCount, 3);
   });
 
-  test('a form has five unique valid prompts and avoids recent prompts', () {
+  test('a form has five unique valid prompts from a five-question bank', () {
     final bank = year4ReadWriteNumberBanks.first;
-    final recentIds = bank.questions.take(3).map((question) => question.id);
+    final recentIds = bank.questions.take(2).map((question) => question.id);
 
     final form = bank.sampleFive(recentlySeenQuestionIds: recentIds);
 
     expect(form, hasLength(5));
     expect(form.map((question) => question.id).toSet(), hasLength(5));
     expect(
-      form
-          .map((question) => question.id)
-          .toSet()
-          .intersection(recentIds.toSet()),
-      isEmpty,
+      form.map((question) => question.id).toSet(),
+      bank.questions.map((question) => question.id).toSet(),
     );
   });
 

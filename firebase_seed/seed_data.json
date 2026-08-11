@@ -40,92 +40,301 @@
   },
   "topics": {
     "whole_numbers_y4": {
-      "title": "Whole Numbers up to 100 000",
-      "titleBm": "Nombor Bulat hingga 100 000",
+      "title": "Numbers and Operations",
+      "titleBm": "Nombor dan Operasi",
       "yearLevel": 4,
       "syllabus": "KSSR Semakan 2017",
       "order": 1,
       "isActive": true,
-      "description": "Read, write, compare, classify, and continue number patterns",
-      "descriptionBm": "Baca, tulis, banding, kelaskan dan sambung pola nombor",
+      "description": "Whole numbers up to 100 000: read, write, compare, classify, and continue patterns.",
+      "descriptionBm": "Nombor bulat hingga 100 000: kenal, tulis, banding, kelaskan dan sambung pola.",
       "contentStatus": "complete_chapter_seed"
     },
-    "fractions_y4": {
-      "title": "Fractions",
-      "titleBm": "Pecahan",
-      "yearLevel": 4,
+    "fractions_decimals_percentages_y4": {
+      "title": "Fractions, Decimals, and Percentages",
+      "titleBm": "Pecahan, Perpuluhan dan Peratus",
       "syllabus": "KSSR Semakan 2017",
-      "order": 2,
       "isActive": true,
-      "description": "Understand and compare fractions.",
-      "descriptionBm": "Fahami dan bandingkan pecahan.",
-      "contentStatus": "placeholder_locked_until_previous_topic_complete"
-    },
-    "decimals_y4": {
-      "title": "Decimals",
-      "titleBm": "Perpuluhan",
+      "description": "Understand and compare fractions, decimals, and percentages.",
+      "descriptionBm": "Fahami dan bandingkan pecahan, perpuluhan dan peratus.",
+      "contentStatus": "placeholder_locked_until_previous_topic_complete",
       "yearLevel": 4,
-      "syllabus": "KSSR Semakan 2017",
-      "order": 3,
-      "isActive": true,
-      "description": "Read, compare, and calculate with decimal values.",
-      "descriptionBm": "Baca, banding dan kira nilai perpuluhan.",
-      "contentStatus": "placeholder_locked_until_previous_topic_complete"
-    },
-    "percentages_y4": {
-      "title": "Percentages",
-      "titleBm": "Peratus",
-      "yearLevel": 4,
-      "syllabus": "KSSR Semakan 2017",
-      "order": 4,
-      "isActive": true,
-      "description": "Connect percentages with parts of one hundred.",
-      "descriptionBm": "Hubungkan peratus dengan bahagian daripada seratus.",
-      "contentStatus": "placeholder_locked_until_previous_topic_complete"
+      "order": 2
     },
     "money_y4": {
       "title": "Money",
       "titleBm": "Wang",
-      "yearLevel": 4,
       "syllabus": "KSSR Semakan 2017",
-      "order": 5,
       "isActive": true,
-      "description": "Solve daily spending problems using ringgit and sen.",
-      "descriptionBm": "Selesaikan masalah perbelanjaan harian menggunakan ringgit dan sen.",
+      "description": "Manage money and solve daily financial problems.",
+      "descriptionBm": "Urus wang dan selesaikan masalah kewangan harian.",
+      "contentStatus": "placeholder_locked_until_previous_topic_complete",
+      "yearLevel": 4,
+      "order": 3
+    },
+    "time_y4": {
+      "title": "Time",
+      "titleBm": "Masa dan Waktu",
+      "syllabus": "KSSR Semakan 2017",
+      "isActive": true,
+      "description": "Read time and solve duration problems.",
+      "descriptionBm": "Baca masa dan selesaikan masalah tempoh.",
+      "contentStatus": "placeholder_locked_until_previous_topic_complete",
+      "yearLevel": 4,
+      "order": 4
+    },
+    "length_mass_volume_y4": {
+      "title": "Length, Mass, and Volume of Liquid",
+      "titleBm": "Panjang, Jisim dan Isi Padu Cecair",
+      "syllabus": "KSSR Semakan 2017",
+      "isActive": true,
+      "description": "Measure length, mass, and volume of liquid.",
+      "descriptionBm": "Ukur panjang, jisim dan isi padu cecair.",
+      "contentStatus": "placeholder_locked_until_previous_topic_complete",
+      "yearLevel": 4,
+      "order": 5
+    },
+    "space_y4": {
+      "title": "Space",
+      "titleBm": "Ruang",
+      "syllabus": "KSSR Semakan 2017",
+      "isActive": true,
+      "description": "Explore angles, shapes, perimeter, area, and volume.",
+      "descriptionBm": "Teroka sudut, bentuk, perimeter, luas dan isi padu.",
+      "contentStatus": "placeholder_locked_until_previous_topic_complete",
+      "yearLevel": 4,
+      "order": 6
+    },
+    "coordinates_ratio_proportion_y4": {
+      "title": "Coordinates, Ratio, and Proportion",
+      "titleBm": "Koordinat, Nisbah dan Kadaran",
+      "syllabus": "KSSR Semakan 2017",
+      "isActive": true,
+      "description": "Locate points, compare ratios, and solve proportions.",
+      "descriptionBm": "Tentukan titik, banding nisbah dan selesaikan kadaran.",
+      "contentStatus": "placeholder_locked_until_previous_topic_complete",
+      "yearLevel": 4,
+      "order": 7
+    },
+    "data_handling_y4": {
+      "title": "Data Handling",
+      "titleBm": "Pengurusan Data",
+      "syllabus": "KSSR Semakan 2017",
+      "isActive": true,
+      "description": "Read, interpret, and construct data displays.",
+      "descriptionBm": "Baca, tafsir dan bina paparan data.",
+      "contentStatus": "placeholder_locked_until_previous_topic_complete",
+      "yearLevel": 4,
+      "order": 8
+    },
+    "whole_numbers_y5": {
+      "title": "Whole Numbers and Operations",
+      "titleBm": "Nombor Bulat dan Operasi",
+      "yearLevel": 5,
+      "syllabus": "KSSR Semakan 2017",
+      "order": 1,
+      "isActive": true,
+      "description": "Whole numbers up to 1 000 000: read, write, compare, round, and operate.",
+      "descriptionBm": "Nombor bulat hingga 1 000 000: kenal, tulis, banding, bundar dan operasi.",
       "contentStatus": "placeholder_locked_until_previous_topic_complete"
+    },
+    "fractions_decimals_percentages_y5": {
+      "title": "Fractions, Decimals, and Percentages",
+      "titleBm": "Pecahan, Perpuluhan dan Peratus",
+      "syllabus": "KSSR Semakan 2017",
+      "isActive": true,
+      "description": "Understand and compare fractions, decimals, and percentages.",
+      "descriptionBm": "Fahami dan bandingkan pecahan, perpuluhan dan peratus.",
+      "contentStatus": "placeholder_locked_until_previous_topic_complete",
+      "yearLevel": 5,
+      "order": 2
+    },
+    "money_y5": {
+      "title": "Money",
+      "titleBm": "Wang",
+      "syllabus": "KSSR Semakan 2017",
+      "isActive": true,
+      "description": "Manage money and solve daily financial problems.",
+      "descriptionBm": "Urus wang dan selesaikan masalah kewangan harian.",
+      "contentStatus": "placeholder_locked_until_previous_topic_complete",
+      "yearLevel": 5,
+      "order": 3
+    },
+    "time_y5": {
+      "title": "Time",
+      "titleBm": "Masa dan Waktu",
+      "syllabus": "KSSR Semakan 2017",
+      "isActive": true,
+      "description": "Read time and solve duration problems.",
+      "descriptionBm": "Baca masa dan selesaikan masalah tempoh.",
+      "contentStatus": "placeholder_locked_until_previous_topic_complete",
+      "yearLevel": 5,
+      "order": 4
+    },
+    "length_mass_volume_y5": {
+      "title": "Length, Mass, and Volume of Liquid",
+      "titleBm": "Panjang, Jisim dan Isi Padu Cecair",
+      "syllabus": "KSSR Semakan 2017",
+      "isActive": true,
+      "description": "Measure length, mass, and volume of liquid.",
+      "descriptionBm": "Ukur panjang, jisim dan isi padu cecair.",
+      "contentStatus": "placeholder_locked_until_previous_topic_complete",
+      "yearLevel": 5,
+      "order": 5
+    },
+    "space_y5": {
+      "title": "Space",
+      "titleBm": "Ruang",
+      "syllabus": "KSSR Semakan 2017",
+      "isActive": true,
+      "description": "Explore angles, shapes, perimeter, area, and volume.",
+      "descriptionBm": "Teroka sudut, bentuk, perimeter, luas dan isi padu.",
+      "contentStatus": "placeholder_locked_until_previous_topic_complete",
+      "yearLevel": 5,
+      "order": 6
+    },
+    "coordinates_ratio_proportion_y5": {
+      "title": "Coordinates, Ratio, and Proportion",
+      "titleBm": "Koordinat, Nisbah dan Kadaran",
+      "syllabus": "KSSR Semakan 2017",
+      "isActive": true,
+      "description": "Locate points, compare ratios, and solve proportions.",
+      "descriptionBm": "Tentukan titik, banding nisbah dan selesaikan kadaran.",
+      "contentStatus": "placeholder_locked_until_previous_topic_complete",
+      "yearLevel": 5,
+      "order": 7
+    },
+    "data_handling_y5": {
+      "title": "Data Handling",
+      "titleBm": "Pengurusan Data",
+      "syllabus": "KSSR Semakan 2017",
+      "isActive": true,
+      "description": "Read, interpret, and construct data displays.",
+      "descriptionBm": "Baca, tafsir dan bina paparan data.",
+      "contentStatus": "placeholder_locked_until_previous_topic_complete",
+      "yearLevel": 5,
+      "order": 8
+    },
+    "whole_numbers_y6": {
+      "title": "Whole Numbers and Operations",
+      "titleBm": "Nombor Bulat dan Operasi",
+      "yearLevel": 6,
+      "syllabus": "KSSR Semakan 2017",
+      "order": 1,
+      "isActive": true,
+      "description": "Whole numbers up to 10 000 000: read, write, compare, and operate.",
+      "descriptionBm": "Nombor bulat hingga 10 000 000: kenal, tulis, banding dan operasi.",
+      "contentStatus": "placeholder_locked_until_previous_topic_complete"
+    },
+    "fractions_decimals_percentages_y6": {
+      "title": "Fractions, Decimals, and Percentages",
+      "titleBm": "Pecahan, Perpuluhan dan Peratus",
+      "syllabus": "KSSR Semakan 2017",
+      "isActive": true,
+      "description": "Understand and compare fractions, decimals, and percentages.",
+      "descriptionBm": "Fahami dan bandingkan pecahan, perpuluhan dan peratus.",
+      "contentStatus": "placeholder_locked_until_previous_topic_complete",
+      "yearLevel": 6,
+      "order": 2
+    },
+    "money_y6": {
+      "title": "Money",
+      "titleBm": "Wang",
+      "syllabus": "KSSR Semakan 2017",
+      "isActive": true,
+      "description": "Manage money and solve daily financial problems.",
+      "descriptionBm": "Urus wang dan selesaikan masalah kewangan harian.",
+      "contentStatus": "placeholder_locked_until_previous_topic_complete",
+      "yearLevel": 6,
+      "order": 3
+    },
+    "time_y6": {
+      "title": "Time",
+      "titleBm": "Masa dan Waktu",
+      "syllabus": "KSSR Semakan 2017",
+      "isActive": true,
+      "description": "Read time and solve duration problems.",
+      "descriptionBm": "Baca masa dan selesaikan masalah tempoh.",
+      "contentStatus": "placeholder_locked_until_previous_topic_complete",
+      "yearLevel": 6,
+      "order": 4
+    },
+    "measurement_y6": {
+      "title": "Measurement",
+      "titleBm": "Ukuran dan Sukatan",
+      "syllabus": "KSSR Semakan 2017",
+      "isActive": true,
+      "description": "Measure length, mass, and volume of liquid.",
+      "descriptionBm": "Ukur panjang, jisim dan isi padu cecair.",
+      "contentStatus": "placeholder_locked_until_previous_topic_complete",
+      "yearLevel": 6,
+      "order": 5
+    },
+    "space_y6": {
+      "title": "Space",
+      "titleBm": "Ruang",
+      "syllabus": "KSSR Semakan 2017",
+      "isActive": true,
+      "description": "Explore angles, polygons, and circles.",
+      "descriptionBm": "Teroka sudut, poligon dan bulatan.",
+      "contentStatus": "placeholder_locked_until_previous_topic_complete",
+      "yearLevel": 6,
+      "order": 6
+    },
+    "coordinates_ratio_proportion_y6": {
+      "title": "Coordinates, Ratio, and Proportion",
+      "titleBm": "Koordinat, Nisbah dan Kadaran",
+      "syllabus": "KSSR Semakan 2017",
+      "isActive": true,
+      "description": "Locate points, compare ratios, and solve proportions.",
+      "descriptionBm": "Tentukan titik, banding nisbah dan selesaikan kadaran.",
+      "contentStatus": "placeholder_locked_until_previous_topic_complete",
+      "yearLevel": 6,
+      "order": 7
+    },
+    "data_handling_likelihood_y6": {
+      "title": "Data Handling and Likelihood",
+      "titleBm": "Pengurusan Data dan Kebolehjadian",
+      "syllabus": "KSSR Semakan 2017",
+      "isActive": true,
+      "description": "Interpret data and describe likelihood.",
+      "descriptionBm": "Tafsir data dan huraikan kebolehjadian.",
+      "contentStatus": "placeholder_locked_until_previous_topic_complete",
+      "yearLevel": 6,
+      "order": 8
     }
   },
   "subtopics": {
     "whole_numbers_y4_read_write_numbers": {
       "topicId": "whole_numbers_y4",
       "subtopicId": "read_write_numbers",
-      "title": "Read and Write Numbers",
-      "titleBm": "Baca dan Tulis Nombor",
+      "title": "Recognise and Write Numbers",
+      "titleBm": "Kenal dan Tulis Nombor",
       "yearLevel": 4,
       "order": 1,
       "isActive": true,
-      "description": "Read and write numbers in numerals and words.",
-      "descriptionBm": "Baca dan tulis nombor dalam angka dan perkataan.",
+      "description": "Recognise and write numbers in numerals and words.",
+      "descriptionBm": "Kenal dan tulis nombor dalam angka dan perkataan.",
       "standardCode": "KSSR Year 4: Whole Numbers 1.1.1",
-      "sourcePages": "Buku Teks Matematik Tahun 4, pp. 2-3"
+      "sourcePages": "Buku Teks Matematik Tahun 4, hlm. 3-4; Mathematics Year 4 SK (DLP), pp. 3-4"
     },
     "whole_numbers_y4_place_digit_value": {
       "topicId": "whole_numbers_y4",
       "subtopicId": "place_digit_value",
-      "title": "Place Value and Digit Value",
-      "titleBm": "Nilai Tempat dan Nilai Digit",
+      "title": "Explore Numbers",
+      "titleBm": "Teroka Nombor",
       "yearLevel": 4,
       "order": 2,
       "isActive": true,
       "description": "Identify place value, digit value, and expanded form.",
-      "descriptionBm": "Kenal nilai tempat, nilai digit dan cerakinan.",
+      "descriptionBm": "Kenal nilai tempat, nilai digit dan bentuk cerakin.",
       "standardCode": "KSSR Year 4: Whole Numbers 1.1.2",
-      "sourcePages": "Buku Teks Matematik Tahun 4, pp. 4-5"
+      "sourcePages": "Buku Teks Matematik Tahun 4, hlm. 5; Mathematics Year 4 SK (DLP), p. 5"
     },
     "whole_numbers_y4_compare_order_numbers": {
       "topicId": "whole_numbers_y4",
       "subtopicId": "compare_order_numbers",
-      "title": "Compare and Order Numbers",
+      "title": "Compare and Arrange Numbers",
       "titleBm": "Banding dan Susun Nombor",
       "yearLevel": 4,
       "order": 3,
@@ -133,20 +342,20 @@
       "description": "Compare numbers and arrange them in order.",
       "descriptionBm": "Banding nombor dan susun mengikut tertib.",
       "standardCode": "KSSR Year 4: Whole Numbers 1.1.2",
-      "sourcePages": "Buku Teks Matematik Tahun 4, pp. 6-8"
+      "sourcePages": "Buku Teks Matematik Tahun 4, hlm. 6-8; Mathematics Year 4 SK (DLP), pp. 6-8"
     },
     "whole_numbers_y4_odd_even_numbers": {
       "topicId": "whole_numbers_y4",
       "subtopicId": "odd_even_numbers",
-      "title": "Odd and Even Numbers",
-      "titleBm": "Nombor Ganjil dan Nombor Genap",
+      "title": "Even Numbers and Odd Numbers",
+      "titleBm": "Nombor Genap dan Nombor Ganjil",
       "yearLevel": 4,
       "order": 4,
       "isActive": true,
-      "description": "Classify numbers as odd or even.",
-      "descriptionBm": "Kelaskan nombor sebagai ganjil atau genap.",
-      "standardCode": "KSSR Year 4: Whole Numbers 1.2.1",
-      "sourcePages": "Buku Teks Matematik Tahun 4, pp. 9-10"
+      "description": "Classify numbers as even or odd.",
+      "descriptionBm": "Kelaskan nombor sebagai genap atau ganjil.",
+      "standardCode": "KSSR Year 4: Whole Numbers 1.2.1-1.2.2",
+      "sourcePages": "Buku Teks Matematik Tahun 4, hlm. 9-10; Mathematics Year 4 SK (DLP), pp. 9-10"
     },
     "whole_numbers_y4_number_patterns": {
       "topicId": "whole_numbers_y4",
@@ -158,8 +367,8 @@
       "isActive": true,
       "description": "Recognise and continue ascending or descending patterns.",
       "descriptionBm": "Kenal dan sambung pola menaik atau menurun.",
-      "standardCode": "KSSR Year 4: Whole Numbers 1.5.1",
-      "sourcePages": "Buku Teks Matematik Tahun 4, p. 11"
+      "standardCode": "KSSR Year 4: Whole Numbers 1.5.1-1.5.2",
+      "sourcePages": "Buku Teks Matematik Tahun 4, hlm. 11-12; Mathematics Year 4 SK (DLP), pp. 11-12"
     }
   },
   "questions": {
