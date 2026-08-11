@@ -7,7 +7,7 @@ title: Logic Oasis FYP1 Prototype Development - Plan
 type: feat
 date: 2026-07-05
 created: 2026-07-05
-updated: 2026-07-30
+updated: 2026-08-11
 stage3_decision_state: reservation_approved
 document_authority: canonical-final
 supersedes: docs/plans/2026-07-05-001-feat-fyp1-prototype-development-plan.md
@@ -17,7 +17,7 @@ supersedes: docs/plans/2026-07-05-001-feat-fyp1-prototype-development-plan.md
 
 **Original plan:** 2026-07-05
 
-**Revised:** 2026-07-30 after the approved parent Progress Map and guided quiz-feedback refinements
+**Revised:** 2026-08-11 after the approved parent Progress Map and guided quiz-feedback refinements
 
 **Document authority:** This is the canonical final executable plan. It supersedes `docs/plans/2026-07-05-001-feat-fyp1-prototype-development-plan.md`; the oldest file remains historical and must not be merged into this plan.
 
@@ -877,6 +877,52 @@ The following are intentionally deferred from FYP1: Cloud Tasks dispatch, Cloud 
 **Test scenarios:** An active linked parent sees only their selected child's named safe subtopic focus, parent language, evidence, and one action; focus eligibility rejects malformed, non-established, zero-observation, stale, and tied records deterministically; missing, stale, or insufficient mastery does not rank a weakest topic or draw a trend; action priority prefers Understanding, then valid Practice Effort, then neutral Mutual Aid, with a no-recommendation fallback; a newly finalized attempt updates the parent-safe weekly practice aggregate once, even under duplicate finalization; week rollover uses Malaysia-local week boundaries and carries only the prior aggregate; parents cannot query raw attempts/responses or use client-written practice summaries; a current-week zero summary initialized by a new active link is distinct from missing/unavailable data; practice rhythm does not reuse a mastery score visual; Mutual Aid renders questions/replies/helpful marks only from windowed count-only fields, gives neutral encouragement for no activity, and exposes no text, peers, moderation, or classifier output; loading, no-active-child, unavailable/read-failure/retry, or child switching never shows a previous child's progress; raw technical/model phrases are absent from the parent UI; guidance and all three dashboard cards expose ordered/descriptive semantics, logical focus order, non-colour cues, descriptive Next/Finish labels, and text scaling without clipping.
 
 **Verification:** A linked-parent emulator demo shows three visibly distinct cards sourced only from allowed projections, including a safe no-data state and one evidence-backed parent action.
+
+#### U14 Detailed Implementation Sub-Plan
+
+**Implementation order:** Complete the five work packets below in order. They refine U14; they do not create separate U-IDs or broaden FYP1 scope.
+
+```mermaid
+flowchart TB
+  A[Safe projection contracts and fixtures] --> B[Server summaries and parent read rules]
+  B --> C[Repository parsing and dashboard view state]
+  C --> D[Understanding, Practice, and Mutual Aid UI]
+  D --> E[Rules, widget, emulator, and demo evidence]
+  U10[U10 weekly Mutual Aid projection] -. populated card .-> C
+  U12[U12 active parent link] --> B
+```
+
+1. **Data contract and deterministic derivation**
+   - **Files:** `lib/shared/models/trusted_subtopic_progress.dart`, `lib/shared/models/parent_practice_summary.dart` (new), `lib/shared/models/parent_dashboard_snapshot.dart`, `lib/shared/models/forum_participation_summary.dart`, `lib/features/parent_dashboard/parent_dashboard_view_models.dart` (new), `test/parent_dashboard_view_models_test.dart` (new), `test/forum_participation_summary_test.dart`.
+   - **Approach:** Create parsed, parent-safe models only; do not pass raw Firestore maps, attempt identifiers, question identifiers, private explanations, model output, or forum content to the page. Keep the existing student `TrustedSubtopicProgress` contract strict and derive a narrowly scoped parent-facing mapper/view model from the same safe record. Represent card data as explicit `available`, `zero`, `insufficientEvidence`, and `unavailable` states instead of nullable values. Implement the approved Understanding eligibility rule, deterministic tie-breakers, current Malaysia-week validation, bounded seven-day practice counts, and the single parent-action priority.
+   - **Test scenarios:** Reject malformed, cross-child, wrong-year, unknown-label, preliminary, zero-observation, missing-time, and stale mastery records; select lowest mastery then newest timestamp then stable subtopic ID; distinguish an initialized current-week zero summary from missing, stale, negative, or malformed practice and Mutual Aid summaries; verify positive notes remain factual and card-local.
+   - **Verification:** View-model tests can derive every displayed state from safe fixtures without reading raw attempts or model diagnostics.
+
+2. **Trusted weekly summaries and parent read boundary**
+   - **Files:** `functions/main.py`, `functions/quiz_session.py`, `functions/parent_link_invitation.py`, `firestore.rules`, `docs/architecture/logic-oasis-firestore-database-schema.md`, `functions/tests/test_quiz_session.py`, `functions/tests/test_parent_link_rules.py`.
+   - **Approach:** Update `parentPracticeSummaries/{studentId}` once inside the trusted finalization/idempotency boundary, using the server-stamped event time to derive the Asia/Kuala_Lumpur week. U12 creates a current-week zero projection when an active parent link is created; a missing or stale projection remains unavailable. Permit only an active linked parent to read the exact child’s safe mastery, assignment/status, practice, and count-only Mutual Aid projections; retain server-only writes and deny every raw source. Reconcile the older database-schema document to this canonical contract rather than copying its obsolete parent-access wording.
+   - **Test scenarios:** Duplicate finalization increments one daily/weekly aggregate only once; Malaysia week rollover preserves only the permitted prior aggregate; a new active link creates zero-safe summaries; linked, unrelated, revoked, and cross-child parents receive exactly the intended reads; client summary writes and reads of attempts/responses, answer keys, AI runs, SHAP, forum text, peer data, and moderation data fail.
+   - **Verification:** Emulator Rules tests prove the safe projection allowlist and trusted summary lifecycle.
+
+3. **Repository assembly and child-scoped view state**
+   - **Files:** `lib/shared/repositories/learning_repository.dart`, `lib/shared/models/parent_dashboard_snapshot.dart`, `lib/features/parent_dashboard/parent_dashboard_page.dart`, `test/learning_repository_test.dart`, `test/parent_dashboard_linked_child_test.dart`, `test/parent_dashboard_time_test.dart`, `test/parent_dashboard_state_test.dart` (new).
+   - **Approach:** Fetch only declared parent-safe projections and assemble parsed models into one snapshot. Replace the current diagnosis/story-detail dependence with derived Progress Map card view models. Model entry, linked-child loading, no-active-child, child-scoped loading, ready, unavailable/read failure, and retry states explicitly. On every child selection or linked-child refresh, clear the previous snapshot and derived action immediately; accept a response only when its monotonic request generation and selected child still match.
+   - **Test scenarios:** First load, empty link list, revoked/read failure, retry, and child removal are distinct; A-to-B selection never briefly displays A’s card values; late A success or failure cannot overwrite B; a retry targets the current child only; unavailable data never becomes a false zero or insufficient-mastery claim.
+   - **Verification:** Repository and widget tests demonstrate that no parent state can expose another child’s data or unsupported raw fields.
+
+4. **Differentiated parent Progress Map UI**
+   - **Files:** `lib/features/parent_dashboard/parent_dashboard_page.dart`, `lib/l10n/app_en.arb`, `lib/l10n/app_ms.arb`, `test/parent_dashboard_linked_child_test.dart`, `test/parent_dashboard_accessibility_test.dart` (new).
+   - **Approach:** Render Understanding first as a full-width focus/evidence/action surface; render Practice Effort as a labelled seven-day rhythm, never a mastery bar; render Mutual Aid as descriptive count-only community moments. Show a single gentle action using the approved priority order, while retaining positive Practice and Mutual Aid notes independently. Use parent language only: no model, server, SHAP, evidence-level, controlled-demonstration, private reason, or confidence-deficit wording. Provide visible and semantic loading, unavailable, zero, insufficient-evidence, and retry states.
+   - **Test scenarios:** Each card has a distinct heading, visual treatment, and semantic summary; current zero has neutral copy; unavailable does not look like zero; Mutual Aid never infers shyness or willingness; English and Bahasa Melayu fit large text without clipping; screen readers receive ordered headings, day/count labels, one action, and a correctly scoped retry control; icon and text—not colour alone—communicate status.
+   - **Verification:** A parent can identify the child’s focus, weekly effort, contribution, positive progress, and next supportive action in one scan without needing to understand AI internals.
+
+5. **Integrated evidence and regression closure**
+   - **Files:** `functions/tests/test_parent_link_rules.py`, `test/learning_repository_test.dart`, `test/parent_dashboard_linked_child_test.dart`, `test/parent_dashboard_time_test.dart`, `test/parent_dashboard_view_models_test.dart`, `test/parent_dashboard_state_test.dart`, `test/parent_dashboard_accessibility_test.dart`, `docs/architecture/logic-oasis-firestore-database-schema.md`, `docs/logic_oasis_feature_implementation_explanation.md`.
+   - **Approach:** Combine safe-projection, timezone, selected-child, UI semantics, and forbidden-data checks into the U11 evidence run. Use U10 data only when a current-window summary exists; otherwise retain the neutral unavailable Mutual Aid state so U14 can be demonstrated before forum activity is populated.
+   - **Test scenarios:** Run the complete linked-parent path from active link to all three card states; verify valid Understanding, insufficient evidence, practice zero/nonzero, Mutual Aid zero/nonzero/unavailable, read failure/retry, child switch, and denial paths. Confirm no screenshot, localization string, semantics label, or snapshot field exposes technical model language or private child/forum data.
+   - **Verification:** The final emulator/demo evidence shows an evidence-backed parent recommendation and positive progress signals while preserving the exact parent privacy boundary.
+
+**FYP1 boundary:** Do not add parent chat, forum-content previews, peer ranking, confidence scoring, client-side attempt aggregation, model explanation exposure, or a new scheduled analytics system. Future richer trend comparisons remain FYP2 work after real longitudinal evidence exists.
 
 ### U11. Security, QA, and Supervisor Evidence
 
