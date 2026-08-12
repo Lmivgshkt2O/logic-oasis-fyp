@@ -981,3 +981,54 @@ controls, reviewer evidence, author grouping where feasible, complete
 class/calibration evidence, immutable publication, and separately authorized
 cloud rollout. Runtime forum answers never silently expand the controlled
 training corpus.
+
+## Supervisor Quiz Learning Loop Refinements Addendum (U15-U20, authoritative 2026-08-12)
+
+The supervisor refinements update the modelling and deployment boundaries of
+this lifecycle without changing the frozen external AQC/Assistments contract.
+They are owned by `docs/plans/2026-08-11-001-feat-supervisor-quiz-learning-loop-refinements-plan.md`.
+
+### Business and evaluation boundary
+
+- **Mastery and progression are BKT-owned.** `subtopic-completion-v1` (BKT
+  `masteryProbability >= 0.72` with at least five validated observations)
+  decides subtopic completion and the `advance` recommendation. It is versioned
+  independently from the adaptive difficulty policy (`adaptive-policy-v1`),
+  which is unchanged and remains frozen for the external Assistments
+  governance chain.
+- **Access is not mastery.** A valid finalized attempt (including 0%) unlocks
+  the next subtopic; completion is a separate, monotonic BKT outcome.
+- **Next action is server-derived.** `repeat_subtopic` uses the learner's
+  freshly assigned bank; `advance` targets the next ordered curriculum item
+  through its Easy cold start. When BKT processing terminates in fallback or
+  failed state, the trusted correct rate produces the recommendation, labelled
+  `correct_rate_fallback`, and never claims a BKT result.
+- **Evaluation claims stay honest.** No XGBoost-alone progression decision, no
+  score-gated completion, and no claim that the controlled-demonstration model
+  is real-world validated. The completion and recommendation outputs are
+  covered by deterministic contract tests, not by model performance claims.
+
+### Data and modelling boundary
+
+- **No generative quiz content.** Active questions, distractors, types, review
+  focuses, and hints must come from the uploaded KSSR Year 4-6 textbooks and
+  pass human review. The content approval manifest records material filename
+  and SHA-256, bilingual locators, exact content digests, and reviewer identity;
+  any change invalidates approval and blocks activation.
+- **Difficulty is an authored contract.** Easy/Moderate/Hard banks differ in
+  declared cognitive demand (direct recall vs linked step/misconception check
+  vs transfer/multi-step) and are validated against the labelled band. Labels
+  never appear on subtopic cards or inside an active quiz.
+- **Evidence inputs are unchanged.** The BKT materialization consumes the same
+  trusted U3 attempt/response lineage; review items and option feedback are
+  answer-free presentation data and are never model features.
+
+### Deployment boundary
+
+- The runtime writes `attempted`/`accessUnlocked`/`completed`/recommendation
+  projections only through the trusted callable + AI runtime; clients read safe
+  projections and cannot choose banks, set completion, or see answer keys,
+  feedback maps, raw AI/model data, or the content approval manifest.
+- Source and vendored bundles stay parity-tested; the completion criterion is a
+  versioned runtime constant so the frozen external policy configuration is not
+  mutated by the supervisor refinements.

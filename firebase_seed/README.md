@@ -101,3 +101,20 @@ After editing seed data, run:
 node -e "const fs=require('fs'); JSON.parse(fs.readFileSync('firebase_seed/seed_data.json','utf8')); console.log('seed json ok')"
 flutter analyze --no-pub
 ```
+
+## Supervisor Refinements Verification
+
+The supervisor quiz-learning-loop evidence is recorded in
+`docs/evidence/2026-08-11-supervisor-quiz-refinements-verification.md`.
+The automated seed gates are:
+
+```powershell
+# Content provenance, difficulty rubric, per-option feedback, no answer reveal
+firebase emulators:exec "npm test"
+node validate_question_banks.js
+```
+
+Expected output: the pedagogy contract passes for the 35 source-grounded
+bilingual questions (70 approved entries across the two Year 4 materials), and
+the rules test proves students cannot read `questionAnswerKeys` or
+`contentSourceManifest`.

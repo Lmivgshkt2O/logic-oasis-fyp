@@ -369,6 +369,13 @@ Crystal reward is calculated inside `_calculateCrystals()`.
 
 `buildSubtopicMasteryData()` calculates best correct rate and whether the subtopic is completed.
 
+> **Authoritative update (U15-U19, 2026-08-12):** the signed-in production path
+> no longer lets the client write mastery. The callable finalization writes the
+> immediate safe projection, and the AI runtime owns completion and the next
+> action. The legacy client save above remains only for offline/prototype
+> sessions (`persistQuizResults == false`). See the supervisor refinements
+> section at the end of this document.
+
 ## 10. Result Feature
 
 ### Frontend
@@ -392,6 +399,60 @@ It displays:
 - mistake count
 - mastery change explanation
 - next recommended action
+
+> **Authoritative update (U15-U19, 2026-08-12):** the result page now receives
+> the server `QuizCompletion` (with answer-free `reviewItems`), renders one
+> review card per missed question (prompt, type, review focus, both languages),
+> shows a server-backed next-practice panel (repeat/advance with the assigned
+> difficulty shown only there), disables the primary CTA while analysis is
+> processing, and pops a typed `NextLearningAction` that `SubtopicPage`
+> resolves into repeat/advance navigation.
+
+## Supervisor Quiz Learning Loop Refinements (U15-U19, authoritative)
+
+The trusted quiz loop now follows the supervisor refinements:
+
+1. **Source-grounded content.** Every active question is authored from the
+   uploaded Year 4-6 KSSR textbooks with a bilingual locator, question type,
+   per-option misconception feedback, and reviewed difficulty metadata. The
+   server-only `contentSourceManifest` records material SHA-256, locators,
+   content digests, and reviewer state; any content change blocks activation.
+2. **Option-specific help.** Wrong answers return the selected option's authored
+   bilingual hint, an optional different-number worked example, and the review
+   focus. No fixed step list and no answer reveal.
+3. **Exact review information.** Results list every missed question by prompt,
+   type, and focus in quiz order, or show a success message on a perfect score.
+4. **Meaningful difficulty.** Easy/Moderate/Hard banks are validated by
+   cognitive-demand metadata; difficulty labels never appear on subtopic cards
+   or inside a quiz.
+5. **Zero-percent unlocking.** Any valid finalized attempt sets
+   `attempted`/`accessUnlocked`; the next subtopic unlocks even at 0%, while
+   `completed` stays a separate BKT outcome.
+6. **BKT mastery and next level.** Subtopic cards show the server BKT mastery
+   percentage with `Still learning`/`Ready to move on` wording, an honest
+   `Preparing mastery…` pending state, or labelled quiz-progress fallback.
+   Topic progress remains completed-subtopic coverage.
+7. **Material-grounded governance.** Active questions carry material IDs,
+   locators, digests, and human approval; no generative content is introduced.
+
+The end-to-end loop:
+
+```text
+SubtopicPage
+  -> callable startQuizSession (server-assigned bank, never client-chosen)
+  -> QuizPage: secure submit per question; wrong answers show option feedback
+  -> callable finalizeQuizSession -> quizAttempts + reviewItems
+  -> ResultPage: review cards + next-practice panel
+  -> typed NextLearningAction (repeat/advance/back)
+  -> SubtopicPage resolves repeat/advance through the callable again
+AI runtime (Firestore trigger)
+  -> BKT mastery + subtopic-completion-v1 + repeat/advance recommendation
+  -> subtopicMastery safe projection drives the subtopic cards and result CTA
+```
+
+Access and completion are deliberately separate server state: a 0% attempt
+unlocks the next step without claiming mastery, and a completed subtopic is
+never reset by a weaker retry.
 
 The back button label can be customized. In the subtopic flow it is `Back to Subtopics`.
 
