@@ -114,7 +114,8 @@ firebase emulators:exec "npm test"
 node validate_question_banks.js
 ```
 
-Expected output: the pedagogy contract passes for the 35 source-grounded
-bilingual questions (70 approved entries across the two Year 4 materials), and
-the rules test proves students cannot read `questionAnswerKeys` or
+Expected output: the pedagogy contract passes for the 65 source-grounded
+bilingual questions across Year 4, 5, and 6 (130 approved entries across the
+six textbook materials), and the rules test proves students cannot read
+`questionAnswerKeys` or
 `contentSourceManifest`.
