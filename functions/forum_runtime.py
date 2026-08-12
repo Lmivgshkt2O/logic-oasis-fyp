@@ -10,13 +10,13 @@ import logging
 import os
 from pathlib import Path
 import re
-from typing import Any, Mapping
+from typing import TYPE_CHECKING, Any, Mapping
 from zoneinfo import ZoneInfo
 
 from firebase_admin import firestore
-from logic_oasis_ai.forum_ai.classifier import (
-    ForumTextClassifier, NAIVE_BAYES_VARIANTS, REVISION, SUFFICIENT, UNCERTAIN,
-)
+
+if TYPE_CHECKING:
+    from logic_oasis_ai.forum_ai.classifier import ForumTextClassifier
 LOGGER = logging.getLogger(__name__)
 SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
 
@@ -100,6 +100,8 @@ def _latest_timestamp(existing: Any, candidate: Any) -> Any:
 
 
 def feedback_for(label: str) -> str:
+    from logic_oasis_ai.forum_ai.classifier import REVISION, SUFFICIENT
+
     if label == SUFFICIENT:
         return "Thanks for explaining your method. Your peer can now follow the reasoning."
     if label == REVISION:
@@ -116,6 +118,8 @@ def _forum_text_hash(value: Any) -> str | None:
 def _feedback_payload(
     *, state: str, prediction: Any, revision: int, logical_inference_id: str,
 ) -> dict[str, Any]:
+    from logic_oasis_ai.forum_ai.classifier import UNCERTAIN
+
     if isinstance(prediction, Mapping):
         label = prediction.get("label", UNCERTAIN)
         probability = prediction.get("probability")
@@ -793,6 +797,8 @@ def load_forum_classifier(
     *, registry_documents: list[Mapping[str, Any]] | None = None,
     evidence_mode: str | None = None, code_revision: str | None = None,
 ) -> ForumTextClassifier | None:
+    from logic_oasis_ai.forum_ai.classifier import ForumTextClassifier
+
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         if not isinstance(manifest, dict):
@@ -858,6 +864,8 @@ def _log_forum_activation_failure(
 def _controlled_forum_release_valid(
     manifest: Mapping[str, Any], artifact_path: Path, manifest_path: Path, code_revision: str,
 ) -> bool:
+    from logic_oasis_ai.forum_ai.classifier import NAIVE_BAYES_VARIANTS
+
     if manifest.get("manifestSchemaVersion") != FORUM_RELEASE_MANIFEST_SCHEMA:
         return False
     if any(manifest.get(key) != value for key, value in _CONTROLLED_RELEASE_VALUES.items()):
