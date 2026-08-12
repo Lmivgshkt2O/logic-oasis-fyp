@@ -234,7 +234,8 @@ class _QuizPageState extends State<QuizPage> {
                     ? 'Langkah panduan untuk soalan ini'
                     : 'Guidance steps for this question',
                 child: _GuidanceSteps(
-                  steps: feedback.localizedGuidedSteps(widget.isBahasaMelayu),
+                  steps:
+                      feedback.localizedFeedbackLines(widget.isBahasaMelayu),
                 ),
               ),
             ] else
