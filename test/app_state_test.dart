@@ -340,10 +340,14 @@ void main() {
       );
       final subtopics = state.subtopicsForTopic(topic);
       expect(state.attempts, isEmpty);
-      expect(subtopics.first.isComplete, isTrue);
+      // U18: completion is a server BKT outcome; the immediate projection only
+      // records the attempt and unlocks the next step.
+      expect(subtopics.first.isComplete, isFalse);
+      expect(subtopics.first.accessUnlocked, isTrue);
+      expect(subtopics.first.isAnalysisPending, isTrue);
       expect(state.isSubtopicUnlocked(topic, subtopics[1]), isTrue);
       expect(subtopics[1].activeBankCount, 0);
-      expect(topic.progress, .2);
+      expect(topic.progress, 0);
     },
   );
 

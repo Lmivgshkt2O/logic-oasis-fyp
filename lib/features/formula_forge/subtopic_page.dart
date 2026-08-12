@@ -206,7 +206,11 @@ class _SubtopicCard extends StatelessWidget {
     final hasActiveServerBank = subtopic.activeBankCount > 0;
     final canStart =
         unlocked && hasActiveServerBank && subtopic.questions.isNotEmpty;
-    final masteryLabel = unlocked ? subtopic.mastery : 'Lock';
+    final status = _SubtopicStatus.forSubtopic(
+      subtopic,
+      unlocked: unlocked,
+      isBahasaMelayu: state.isBahasaMelayu,
+    );
     final description =
         lockedReason ??
         (!hasActiveServerBank || subtopic.questions.isEmpty
@@ -266,31 +270,38 @@ class _SubtopicCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ProgressBar(
-                          value: subtopic.progress,
-                          color: LogicOasisDesign.leaf,
-                          height: 6,
+                  Semantics(
+                    container: true,
+                    label: status.progressSemanticsLabel,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: ProgressBar(
+                            value: status.progress,
+                            color: status.progressColor,
+                            height: 6,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      StatusChip(
-                        label: masteryLabel,
-                        icon: unlocked ? null : 'lock_outline',
-                        color: !unlocked
-                            ? const Color(0xFF8C7A61)
-                            : subtopic.isComplete
-                            ? LogicOasisDesign.forest
-                            : const Color(0xFFB96E00),
-                        background: !unlocked
-                            ? const Color(0xFFF1E8D7)
-                            : subtopic.isComplete
-                            ? const Color(0xFFE3F5DB)
-                            : const Color(0xFFFFF0CC),
-                      ),
-                    ],
+                        if (status.percentageLabel != null) ...[
+                          const SizedBox(width: 8),
+                          Text(
+                            status.percentageLabel!,
+                            style: const TextStyle(
+                              color: LogicOasisDesign.body,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(width: 10),
+                        StatusChip(
+                          label: status.label,
+                          icon: status.icon,
+                          color: status.color,
+                          background: status.background,
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -298,6 +309,111 @@ class _SubtopicCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Child-facing mastery/status shown on a subtopic card. It renders only
+/// server-derived values: BKT mastery when available, a clearly labelled
+/// quiz-progress rate on fallback, and no invented percentage while pending.
+class _SubtopicStatus {
+  const _SubtopicStatus({
+    required this.label,
+    required this.color,
+    required this.background,
+    this.icon,
+    this.progress = 0,
+    this.percentageLabel,
+    this.progressSemanticsLabel = '',
+  });
+
+  final String label;
+  final Color color;
+  final Color background;
+  final String? icon;
+  final double progress;
+  final Color progressColor = LogicOasisDesign.leaf;
+  final String? percentageLabel;
+  final String progressSemanticsLabel;
+
+  factory _SubtopicStatus.forSubtopic(
+    Subtopic subtopic, {
+    required bool unlocked,
+    required bool isBahasaMelayu,
+  }) {
+    if (!unlocked) {
+      return const _SubtopicStatus(
+        label: 'Lock',
+        color: Color(0xFF8C7A61),
+        background: Color(0xFFF1E8D7),
+        icon: 'lock_outline',
+        progressSemanticsLabel: 'Locked',
+      );
+    }
+    if (!subtopic.isAttempted) {
+      final label =
+          subtopic.mastery == 'New'
+              ? (isBahasaMelayu ? 'Baru' : 'New')
+              : subtopic.mastery;
+      return _SubtopicStatus(
+        label: label,
+        color: const Color(0xFFB96E00),
+        background: const Color(0xFFFFF0CC),
+        progressSemanticsLabel: label,
+      );
+    }
+    if (subtopic.isAnalysisPending) {
+      final label = isBahasaMelayu
+          ? 'Menyediakan penguasaan…'
+          : 'Preparing mastery…';
+      return _SubtopicStatus(
+        label: label,
+        color: const Color(0xFFB96E00),
+        background: const Color(0xFFFFF0CC),
+        progressSemanticsLabel: label,
+      );
+    }
+    if (subtopic.usesCorrectRateFallback) {
+      final percent = ((subtopic.bestCorrectRate ?? 0) * 100).round();
+      final label = isBahasaMelayu
+          ? 'Kemajuan kuiz $percent%'
+          : 'Quiz progress $percent%';
+      return _SubtopicStatus(
+        label: label,
+        color: const Color(0xFFB96E00),
+        background: const Color(0xFFFFF0CC),
+        progress: subtopic.bestCorrectRate ?? 0,
+        progressSemanticsLabel: label,
+      );
+    }
+    final masteryProbability = subtopic.masteryProbability;
+    if (masteryProbability != null) {
+      final percent = (masteryProbability * 100).round();
+      final ready = subtopic.isComplete;
+      final statusLabel = ready
+          ? (isBahasaMelayu ? 'Bersedia untuk teruskan' : 'Ready to move on')
+          : (isBahasaMelayu ? 'Masih belajar' : 'Still learning');
+      final percentageLabel = isBahasaMelayu
+          ? 'Penguasaan $percent%'
+          : 'Mastery $percent%';
+      return _SubtopicStatus(
+        label: statusLabel,
+        color: ready
+            ? LogicOasisDesign.forest
+            : const Color(0xFFB96E00),
+        background: ready
+            ? const Color(0xFFE3F5DB)
+            : const Color(0xFFFFF0CC),
+        progress: masteryProbability,
+        percentageLabel: percentageLabel,
+        progressSemanticsLabel: '$percentageLabel, $statusLabel',
+      );
+    }
+    return _SubtopicStatus(
+      label: subtopic.mastery,
+      color: const Color(0xFFB96E00),
+      background: const Color(0xFFFFF0CC),
+      progressSemanticsLabel: subtopic.mastery,
     );
   }
 }

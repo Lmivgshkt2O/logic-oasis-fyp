@@ -335,7 +335,8 @@ class AppState extends ChangeNotifier {
     if (_unlockedSubtopicIds.contains(_subtopicUnlockKey(topic, subtopic))) {
       return true;
     }
-    return subtopics[subtopicIndex - 1].isComplete;
+    // U18: one trusted attempt unlocks the next step; completion is mastery.
+    return subtopics[subtopicIndex - 1].accessUnlocked;
   }
 
   String? lockedReasonForSubtopic(Topic topic, Subtopic subtopic) {
@@ -347,8 +348,8 @@ class AppState extends ChangeNotifier {
     if (subtopicIndex <= 0) return null;
     final previousSubtopic = subtopics[subtopicIndex - 1];
     return t(
-      'Complete ${previousSubtopic.title} with more than 50%.',
-      'Lengkapkan ${previousSubtopic.titleBm} dengan lebih daripada 50%.',
+      'Complete ${previousSubtopic.title} first.',
+      'Lengkapkan ${previousSubtopic.titleBm} dahulu.',
     );
   }
 
@@ -692,9 +693,18 @@ class AppState extends ChangeNotifier {
         topicId: topicId,
         subtopicId: subtopicId,
         yearLevel: yearLevel,
-        completed: rate > .5 || mastery == 'Moderate' || mastery == 'Strong',
+        // U18: completion is a server-side BKT outcome, never a client score.
+        // The callable's immediate projection unlocks the next subtopic while
+        // the runtime computes mastery and the next action.
+        attempted: true,
+        accessUnlocked: true,
+        completed: false,
         masteryLevel: mastery,
         bestCorrectRate: rate,
+        evidenceLevel: 'pending',
+        recommendedLearningAction: 'repeat_subtopic',
+        recommendationBasis: 'provisional_pending_ai',
+        projectionStatus: 'finalized_pending_ai',
       ),
     ], replaceAll: false);
   }
@@ -738,23 +748,76 @@ class AppState extends ChangeNotifier {
           .map((subtopic) {
             final record = bySubtopic['${topic.id}::${subtopic.id}'];
             if (record == null && replaceAll) {
-              if (subtopic.progress != 0 || subtopic.mastery != 'New') {
+              if (subtopic.progress != 0 ||
+                  subtopic.mastery != 'New' ||
+                  subtopic.completed ||
+                  subtopic.accessUnlocked ||
+                  subtopic.masteryProbability != null) {
                 topicChanged = true;
-                return subtopic.copyWith(progress: 0, mastery: 'New');
+                return subtopic.copyWith(
+                  progress: 0,
+                  mastery: 'New',
+                  completed: false,
+                  accessUnlocked: false,
+                  masteryProbability: null,
+                  evidenceLevel: null,
+                  recommendedLearningAction: null,
+                  recommendationBasis: null,
+                  recommendationTargetTopicId: null,
+                  recommendationTargetSubtopicId: null,
+                  projectionStatus: null,
+                  bestCorrectRate: null,
+                  lastCorrectRate: null,
+                );
               }
               return subtopic;
             }
             if (record == null) return subtopic;
-            final trustedProgress = record.completed
-                ? record.bestCorrectRate.clamp(.6, 1.0).toDouble()
-                : record.bestCorrectRate;
+            final masteryProbability = record.masteryProbability;
+            final double trustedProgress;
+            if (masteryProbability != null) {
+              trustedProgress = masteryProbability;
+            } else if (record.recommendationBasis == 'correct_rate_fallback') {
+              trustedProgress = record.bestCorrectRate;
+            } else {
+              // Pending or unattempted: never invent a mastery percentage.
+              trustedProgress = 0;
+            }
             if (subtopic.progress != trustedProgress ||
-                subtopic.mastery != record.masteryLevel) {
+                subtopic.mastery != record.masteryLevel ||
+                subtopic.completed != record.completed ||
+                subtopic.accessUnlocked !=
+                    (record.accessUnlocked || record.completed) ||
+                subtopic.masteryProbability != masteryProbability ||
+                subtopic.evidenceLevel != record.evidenceLevel ||
+                subtopic.recommendedLearningAction !=
+                    record.recommendedLearningAction ||
+                subtopic.recommendationBasis != record.recommendationBasis ||
+                subtopic.recommendationTargetTopicId !=
+                    record.recommendationTargetTopicId ||
+                subtopic.recommendationTargetSubtopicId !=
+                    record.recommendationTargetSubtopicId ||
+                subtopic.projectionStatus != record.projectionStatus ||
+                subtopic.bestCorrectRate != record.bestCorrectRate ||
+                subtopic.lastCorrectRate != record.lastCorrectRate) {
               topicChanged = true;
             }
             return subtopic.copyWith(
               progress: trustedProgress,
               mastery: record.masteryLevel,
+              completed: record.completed,
+              accessUnlocked: record.accessUnlocked || record.completed,
+              masteryProbability: masteryProbability,
+              evidenceLevel: record.evidenceLevel,
+              recommendedLearningAction: record.recommendedLearningAction,
+              recommendationBasis: record.recommendationBasis,
+              recommendationTargetTopicId:
+                  record.recommendationTargetTopicId,
+              recommendationTargetSubtopicId:
+                  record.recommendationTargetSubtopicId,
+              projectionStatus: record.projectionStatus,
+              bestCorrectRate: record.bestCorrectRate,
+              lastCorrectRate: record.lastCorrectRate,
             );
           })
           .toList(growable: false);
@@ -922,6 +985,9 @@ class AppState extends ChangeNotifier {
     final updated = selected.copyWith(
       progress: mathMax(selected.progress, score / 100),
       mastery: mastery,
+      // Legacy offline demo path: a passing score still counts as complete.
+      completed: score >= 50,
+      accessUnlocked: true,
     );
     subtopics[subtopicIndex] = updated;
     return (subtopics, updated);
@@ -1246,6 +1312,11 @@ class AppState extends ChangeNotifier {
               return subtopic.copyWith(
                 progress: mathMax(subtopic.progress, bestAttempt.score / 100),
                 mastery: bestAttempt.mastery,
+                // Legacy offline demo path mirrors the server rule used by the
+                // callable finalization: a passing score unlocks and counts as
+                // complete for offline/prototype sessions.
+                completed: bestAttempt.score >= 50,
+                accessUnlocked: true,
               );
             })
             .toList(growable: false);
@@ -1385,7 +1456,7 @@ class AppState extends ChangeNotifier {
     for (final topic in topics) {
       final subtopics = subtopicsForTopic(topic);
       for (var index = 1; index < subtopics.length; index += 1) {
-        if (subtopics[index - 1].isComplete) {
+        if (subtopics[index - 1].accessUnlocked) {
           changed =
               _unlockedSubtopicIds.add(
                 _subtopicUnlockKey(topic, subtopics[index]),
