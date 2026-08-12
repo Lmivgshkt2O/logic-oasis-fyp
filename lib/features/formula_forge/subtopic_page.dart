@@ -298,9 +298,12 @@ class _SubtopicCard extends StatelessWidget {
     // callable workflow: the selected bank must also be active on the server.
     // This avoids offering a playable card that would fail at quiz start while
     // its Firestore bank deployment is still pending.
-    final hasActiveServerBank = subtopic.activeBankCount > 0;
-    final canStart =
-        unlocked && hasActiveServerBank && subtopic.questions.isNotEmpty;
+    // The server callable is the bank authority: the card stays tappable as
+    // long as client-safe questions are present, so a stale or missing
+    // `activeBankCount` never locks the first subtopic. If the server bank is
+    // genuinely unavailable, the start attempt returns a clear localized error.
+    final hasClientQuestions = subtopic.questions.isNotEmpty;
+    final canStart = unlocked && hasClientQuestions;
     final status = _SubtopicStatus.forSubtopic(
       subtopic,
       unlocked: unlocked,
@@ -308,7 +311,7 @@ class _SubtopicCard extends StatelessWidget {
     );
     final description =
         lockedReason ??
-        (!hasActiveServerBank || subtopic.questions.isEmpty
+        (!hasClientQuestions
             ? state.t(
                 'Question bank is not ready yet.',
                 'Bank soalan belum tersedia.',
