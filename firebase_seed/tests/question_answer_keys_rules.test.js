@@ -241,6 +241,7 @@ async function main() {
     await assertSucceeds(getDoc(doc(linkedParentDb, "studentAiStatuses", "attempt_safe")));
     await assertSucceeds(getDoc(doc(linkedParentDb, "adaptiveAssignments", "student_aiman_y4_read_write_numbers")));
     await assertSucceeds(getDoc(doc(linkedParentDb, "subtopicMastery", "student_aiman_y4_y4_whole_numbers_read_write_numbers")));
+    await assertFails(getDoc(doc(otherStudentDb, "subtopicMastery", "student_aiman_y4_y4_whole_numbers_read_write_numbers")));
     await assertSucceeds(getDoc(doc(linkedParentDb, "forumParticipationSummaries", "student_aiman_y4")));
     await assertFails(getDoc(doc(revokedParentDb, "studentAiStatuses", "attempt_safe")));
     await assertFails(getDoc(doc(otherParentDb, "forumParticipationSummaries", "student_aiman_y4")));

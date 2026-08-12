@@ -193,6 +193,48 @@ class QuizFinalizeReviewTests(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "review focus"):
             self._finalize()
 
+    def test_zero_percent_attempt_soft_unlocks_without_completing(self) -> None:
+        for index in range(5):
+            self._mark_wrong(index)
+        completion = self._finalize()
+        self.assertEqual(0, completion["correctCount"])
+        mastery_id = f"{STUDENT_ID}_y{YEAR_LEVEL}_{TOPIC_ID}_{SUBTOPIC_ID}"
+        mastery = self.database.collections["subtopicMastery"][mastery_id]
+        self.assertTrue(mastery["attempted"])
+        self.assertTrue(mastery["accessUnlocked"])
+        self.assertFalse(mastery["completed"])
+        self.assertEqual("repeat_subtopic", mastery["recommendedLearningAction"])
+        self.assertEqual("provisional_pending_ai", mastery["recommendationBasis"])
+        self.assertEqual(SUBTOPIC_ID, mastery["recommendationTargetSubtopicId"])
+        self.assertEqual("New", mastery["masteryLevel"])
+        self.assertEqual(0.0, mastery["bestCorrectRate"])
+
+    def test_reattempting_a_completed_subtopic_preserves_completion(self) -> None:
+        mastery_id = f"{STUDENT_ID}_y{YEAR_LEVEL}_{TOPIC_ID}_{SUBTOPIC_ID}"
+        self.database.collections["subtopicMastery"][mastery_id] = {
+            "studentId": STUDENT_ID,
+            "yearLevel": YEAR_LEVEL,
+            "topicId": TOPIC_ID,
+            "subtopicId": SUBTOPIC_ID,
+            "completed": True,
+            "bestCorrectRate": 0.8,
+        }
+        for index in range(5):
+            self._mark_wrong(index)
+        self._finalize()
+        mastery = self.database.collections["subtopicMastery"][mastery_id]
+        self.assertTrue(mastery["completed"])
+        self.assertTrue(mastery["accessUnlocked"])
+        self.assertEqual(0.8, mastery["bestCorrectRate"])
+
+    def _mark_wrong(self, index: int) -> None:
+        wrong = self.database.collections["questionResponses"][
+            response_document_id(SESSION_ID, index)
+        ]
+        wrong["serverIsCorrect"] = False
+        wrong.setdefault("reviewFocus", f"Focus on option {index % 4}.")
+        wrong.setdefault("reviewFocusBm", f"Fokus pada pilihan {index % 4}.")
+
 
 if __name__ == "__main__":
     unittest.main()

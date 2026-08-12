@@ -33,6 +33,7 @@ class MemoryGateway:
         self.previous_assignment_doc: dict | None = None
         self.policy_audits: dict[str, dict] = {}
         self.policy_probes: dict[str, dict] = {}
+        self.curriculum: list[dict] = []
 
     def attempt(self, attempt_id):
         return self.attempt_doc if attempt_id == self.attempt_doc["attemptId"] else None
@@ -53,6 +54,15 @@ class MemoryGateway:
 
     def banks(self, attempt):
         return [{"bankId": "bank_easy_2", "difficultyLevel": "Easy", "isActive": True}]
+
+    def next_curriculum_item(self, topic_id, subtopic_id, year_level):
+        items = [dict(item) for item in self.curriculum]
+        ids = [str(item.get("subtopicId")) for item in items]
+        if subtopic_id in ids:
+            index = ids.index(subtopic_id)
+            if index + 1 < len(ids):
+                return dict(items[index + 1])
+        return None
 
     def enrollment(self, attempt):
         return self.enrollment_doc
@@ -187,8 +197,15 @@ class AiRuntimeTests(unittest.TestCase):
         self.assertEqual(0.6, mastery["lastCorrectRate"])
         projected = ai_runtime._merged_subtopic_mastery(None, mastery)
         self.assertEqual(0.6, projected["bestCorrectRate"])
-        self.assertTrue(projected["completed"])
+        self.assertFalse(projected["completed"])
         self.assertEqual("Moderate", projected["masteryLevel"])
+        self.assertTrue(projected["attempted"])
+        self.assertTrue(projected["accessUnlocked"])
+        # The XGBoost model fell back, but BKT itself succeeded, so the BKT
+        # posterior remains the primary recommendation basis.
+        self.assertEqual("bkt_mastery", projected["recommendationBasis"])
+        self.assertEqual("repeat_subtopic", projected["recommendedLearningAction"])
+        self.assertAlmostEqual(0.71490906, projected["masteryProbability"], places=6)
         assignment = self.gateway.finalized[0]["assignment"]
         self.assertEqual("runtime_callable", assignment["dataSource"])
         self.assertEqual(1, assignment["sourceAttemptSequence"])
@@ -847,6 +864,131 @@ class PolicyEvaluationRuntimeTests(unittest.TestCase):
         self.assertEqual("selector_failed", audit["protocolDeviation"])
         self.assertEqual("selector_failed", audit["reasonCode"])
         self.assertEqual({}, self.gateway.policy_probes)
+
+    def _patched_materialization(self, mastery_probability: float, evidence_count: int):
+        snapshot = SimpleNamespace(
+            student_id="student-1",
+            subtopic_id="subtopic-1",
+            source_attempt_sequence=1,
+            mastery_probability=mastery_probability,
+            evidence_count=evidence_count,
+            skill_id="skill-1",
+            to_firestore_document=lambda: {
+                "masteryProbability": mastery_probability,
+                "evidenceCount": evidence_count,
+                "studentId": "student-1",
+                "subtopicId": "subtopic-1",
+                "skillId": "skill-1",
+                "sourceAttemptSequence": 1,
+            },
+        )
+
+        class FakeMaterialization:
+            snapshots = [snapshot]
+
+        return FakeMaterialization()
+
+    @staticmethod
+    def _completed_run() -> dict:
+        return {
+            "status": "completed",
+            "statusCode": "model_completed",
+            "featureValues": {"correct_rate": 0.8},
+            "shapValues": {"correct_rate": 0.1},
+            "supportRisk": 0.2,
+        }
+
+    def test_bkt_below_threshold_keeps_incomplete_and_recommends_repeat(self) -> None:
+        with patch.object(
+            ai_runtime,
+            "build_bkt_materialization",
+            return_value=self._patched_materialization(0.5, 5),
+        ), patch.object(
+            ai_runtime, "_supervised_or_fallback", return_value=(0.4, self._completed_run())
+        ):
+            self.assertEqual(
+                "completed",
+                process_finalized_attempt(
+                    "attempt-1", gateway=self.gateway, bundle=self.bundle
+                ),
+            )
+        mastery = self.gateway.finalized[-1]["mastery"]
+        self.assertFalse(mastery["completed"])
+        self.assertEqual("repeat_subtopic", mastery["recommendedLearningAction"])
+        self.assertEqual("bkt_mastery", mastery["recommendationBasis"])
+        self.assertEqual("subtopic-completion-v1", mastery["completionCriterionVersion"])
+        self.assertEqual("subtopic-1", mastery["recommendationTargetSubtopicId"])
+        self.assertTrue(mastery["attempted"])
+        self.assertTrue(mastery["accessUnlocked"])
+
+    def test_bkt_at_threshold_with_enough_evidence_advances_to_next_subtopic(self) -> None:
+        self.gateway.curriculum = [
+            {"topicId": "topic-1", "subtopicId": "subtopic-1"},
+            {"topicId": "topic-1", "subtopicId": "subtopic-2"},
+        ]
+        with patch.object(
+            ai_runtime,
+            "build_bkt_materialization",
+            return_value=self._patched_materialization(0.72, 5),
+        ), patch.object(
+            ai_runtime, "_supervised_or_fallback", return_value=(0.4, self._completed_run())
+        ):
+            self.assertEqual(
+                "completed",
+                process_finalized_attempt(
+                    "attempt-1", gateway=self.gateway, bundle=self.bundle
+                ),
+            )
+        mastery = self.gateway.finalized[-1]["mastery"]
+        self.assertTrue(mastery["completed"])
+        self.assertEqual("advance", mastery["recommendedLearningAction"])
+        self.assertEqual("bkt_mastery", mastery["recommendationBasis"])
+        self.assertEqual("subtopic-2", mastery["recommendationTargetSubtopicId"])
+        self.assertEqual("topic-1", mastery["recommendationTargetTopicId"])
+
+    def test_high_mastery_without_minimum_evidence_stays_incomplete_and_repeats(self) -> None:
+        with patch.object(
+            ai_runtime,
+            "build_bkt_materialization",
+            return_value=self._patched_materialization(0.9, 3),
+        ), patch.object(
+            ai_runtime, "_supervised_or_fallback", return_value=(0.4, self._completed_run())
+        ):
+            self.assertEqual(
+                "completed",
+                process_finalized_attempt(
+                    "attempt-1", gateway=self.gateway, bundle=self.bundle
+                ),
+            )
+        mastery = self.gateway.finalized[-1]["mastery"]
+        self.assertFalse(mastery["completed"])
+        self.assertEqual("repeat_subtopic", mastery["recommendedLearningAction"])
+
+    def test_fallback_recommendation_is_deterministic_and_labelled(self) -> None:
+        first = ai_runtime._fallback_mastery(self.gateway.attempt_doc, self.gateway)
+        second = ai_runtime._fallback_mastery(self.gateway.attempt_doc, self.gateway)
+        self.assertEqual(first, second)
+        self.assertEqual("correct_rate_fallback", first["recommendationBasis"])
+        self.assertEqual("advance", first["recommendedLearningAction"])
+        self.assertTrue(first["attempted"])
+        self.assertTrue(first["accessUnlocked"])
+        self.assertIsNone(first["masteryProbability"])
+
+    def test_weaker_retry_cannot_reset_a_completed_subtopic(self) -> None:
+        existing = {"completed": True, "bestCorrectRate": 0.8}
+        weaker = {"lastCorrectRate": 0.2, "completed": False}
+        merged = ai_runtime._merged_subtopic_mastery(existing, weaker)
+        self.assertTrue(merged["completed"])
+        self.assertEqual(0.8, merged["bestCorrectRate"])
+        self.assertEqual("Strong", merged["masteryLevel"])
+
+    def test_older_ai_event_cannot_overwrite_a_newer_projection(self) -> None:
+        from logic_oasis_ai.sinks.firestore_sink import is_newer_projection
+
+        newer = {"sourceAttemptSequence": 5, "recommendedLearningAction": "advance"}
+        self.assertFalse(is_newer_projection(4, newer))
+        self.assertTrue(is_newer_projection(6, newer))
+        self.assertTrue(is_newer_projection(4, None))
 
 
 if __name__ == "__main__":

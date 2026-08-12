@@ -477,6 +477,23 @@ def _compatible_adaptive_assignment(
     ):
         return None
 
+    # U17: a repeat cannot start until the runtime has finished analysing the
+    # assignment's source attempt. Respond with a retryable pending signal
+    # instead of silently reusing a stale or not-yet-ready projection.
+    status_snapshot = (
+        database.collection("studentAiStatuses").document(source_attempt_id).get()
+    )
+    analysis_state = (
+        dict(status_snapshot.to_dict() or {}).get("analysisState")
+        if status_snapshot.exists
+        else None
+    )
+    if analysis_state not in {"completed", "fallback", "failed"}:
+        raise QuizSessionError(
+            "analysis-pending",
+            "Your next practice plan is still being prepared. Please try again in a moment.",
+        )
+
     return {
         "assignmentId": assignment_id,
         "assignmentSource": "runtime_adaptive",
@@ -1102,8 +1119,20 @@ def finalize_quiz_session(data: dict[str, Any], student_id: str) -> dict[str, An
                 "topicId": session["topicId"],
                 "subtopicId": session["subtopicId"],
                 "bestCorrectRate": best_correct_rate,
-                "completed": best_correct_rate > 0.5,
+                # U17: completion is a separate monotonic BKT outcome. A 0%
+                # attempt must never set it, and a completed subtopic is never
+                # reset by a weaker retry.
+                "completed": existing_mastery.get("completed") is True,
                 "masteryLevel": mastery_level,
+                # Every valid finalized attempt unlocks the next subtopic,
+                # including 0%. The runtime replaces this provisional repeat
+                # with the BKT-derived recommendation when analysis finishes.
+                "attempted": True,
+                "accessUnlocked": True,
+                "recommendedLearningAction": "repeat_subtopic",
+                "recommendationBasis": "provisional_pending_ai",
+                "recommendationTargetTopicId": session["topicId"],
+                "recommendationTargetSubtopicId": session["subtopicId"],
                 "lastSourceAttemptId": session["attemptId"],
                 "sourceAttemptSequence": source_attempt_sequence,
                 "projectionStatus": "finalized_pending_ai",
@@ -1136,6 +1165,7 @@ _ERROR_CODES: dict[str, https_fn.FunctionsErrorCode] = {
     "deadline-exceeded": https_fn.FunctionsErrorCode.DEADLINE_EXCEEDED,
     "resource-exhausted": https_fn.FunctionsErrorCode.RESOURCE_EXHAUSTED,
     "unavailable": https_fn.FunctionsErrorCode.UNAVAILABLE,
+    "analysis-pending": https_fn.FunctionsErrorCode.UNAVAILABLE,
 }
 
 

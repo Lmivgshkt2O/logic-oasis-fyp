@@ -11,6 +11,7 @@ if str(FUNCTIONS_ROOT) not in sys.path:
     sys.path.insert(0, str(FUNCTIONS_ROOT))
 
 import main
+from quiz_session import QuizSessionError
 
 
 TOPIC_ID = "whole_numbers_y4"
@@ -214,6 +215,16 @@ class AdaptiveQuizStartTests(unittest.TestCase):
                     "dataSource": "runtime_callable",
                 },
             },
+            "studentAiStatuses": {
+                "attempt-1": {
+                    "analysisState": "completed",
+                    "displayCode": "analysis_completed",
+                },
+                "attempt-2": {
+                    "analysisState": "completed",
+                    "displayCode": "analysis_completed",
+                },
+            },
             "subtopicMastery": {
                 f"{STUDENT_ID}_y{YEAR_LEVEL}_{TOPIC_ID}_{SUBTOPIC_ID}": {
                     "studentId": STUDENT_ID,
@@ -337,6 +348,21 @@ class AdaptiveQuizStartTests(unittest.TestCase):
 
         self.assertEqual("easy-bank", session["bankId"])
         self.assertEqual("cold_start_easy", session["assignmentSource"])
+
+    def test_pending_assignment_analysis_returns_retryable_pending_error(self) -> None:
+        self.database.collections["studentAiStatuses"]["attempt-1"]["analysisState"] = (
+            "processing"
+        )
+        with self.assertRaisesRegex(QuizSessionError, "still being prepared"):
+            self._start()
+
+    def test_failed_assignment_analysis_still_allows_repeat_with_fallback(self) -> None:
+        self.database.collections["studentAiStatuses"]["attempt-1"]["analysisState"] = (
+            "fallback"
+        )
+        session = self._start()
+        self.assertEqual("moderate-bank", session["bankId"])
+        self.assertEqual("runtime_adaptive", session["assignmentSource"])
 
     def test_missing_assignment_answer_key_safely_falls_back_to_easy(self) -> None:
         self.database.collections["questionAnswerKeys"].pop("moderate-bank_q0")

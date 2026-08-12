@@ -22,7 +22,11 @@ from typing import Any, Mapping, Protocol
 import yaml
 
 from logic_oasis_ai.adaptive_policy import (
-    AssignmentContext, Difficulty, EligibleBank, load_adaptive_policy_config, select_next_bank,
+    AssignmentContext,
+    Difficulty,
+    EligibleBank,
+    load_adaptive_policy_config,
+    select_next_bank,
 )
 from logic_oasis_ai.bkt import build_bkt_materialization
 from logic_oasis_ai.explain import explain_prediction
@@ -58,6 +62,12 @@ from logic_oasis_ai.sources.firestore_source import load_firestore_dataset
 
 AI_RUNTIME_VERSION = "u8-ai-runtime-v1"
 AI_RUNTIME_SERVICE_ACCOUNT = "logic-oasis-ai-runtime@logic-oasis-fyp.iam.gserviceaccount.com"
+# U17 completion criterion. It is deliberately versioned independently of the
+# adaptive difficulty policy (`adaptive-policy-v1`) and is not part of that
+# frozen external-evaluation configuration.
+SUBTOPIC_COMPLETION_CRITERION_VERSION = "subtopic-completion-v1"
+SUBTOPIC_COMPLETION_MASTERY_AT_LEAST = 0.72
+SUBTOPIC_COMPLETION_MINIMUM_OBSERVATIONS = 5
 TERMINAL_STATES = frozenset({"completed", "fallback", "failed"})
 MAX_RUNTIME_ATTEMPTS = 3
 FALLBACK_CODES = frozenset({
@@ -179,6 +189,9 @@ class RuntimeGateway(Protocol):
     def attempt(self, attempt_id: str) -> Mapping[str, Any] | None: ...
     def history(self, attempt: Mapping[str, Any]) -> tuple[list[Mapping[str, Any]], list[Mapping[str, Any]]]: ...
     def banks(self, attempt: Mapping[str, Any]) -> list[Mapping[str, Any]]: ...
+    def next_curriculum_item(
+        self, topic_id: str, subtopic_id: str, year_level: int
+    ) -> Mapping[str, Any] | None: ...
     def enrollment(self, attempt: Mapping[str, Any]) -> Mapping[str, Any] | None: ...
     def previous_assignment(self, attempt: Mapping[str, Any]) -> Mapping[str, Any] | None: ...
     def active_registry(self) -> Mapping[str, Any] | None: ...
@@ -249,7 +262,21 @@ def process_finalized_attempt(attempt_id: str, *, gateway: RuntimeGateway, bundl
                     else None
                 ),
             )
-        mastery = _subtopic_mastery(attempt, primary, support_risk, bundle)
+        completed, learning_action = _bkt_completion_decision(
+            primary.mastery_probability, primary.evidence_count
+        )
+        mastery = _subtopic_mastery(
+            attempt,
+            primary,
+            support_risk,
+            bundle,
+            completed=completed,
+            learning_action=learning_action,
+            recommendation_basis="bkt_mastery",
+            recommendation_target=_recommendation_target(
+                gateway, attempt, learning_action
+            ),
+        )
         return gateway.finalize(attempt, state=state, code=model_run["statusCode"], raw_run=model_run,
                                 snapshots=snapshots, assignment=assignment, mastery=mastery,
                                 policy_audit=policy_audit, policy_probe=policy_probe)
@@ -259,12 +286,14 @@ def process_finalized_attempt(attempt_id: str, *, gateway: RuntimeGateway, bundl
             raise
         state = "fallback" if error.fallback_available else "failed"
         return gateway.finalize(attempt, state=state, code=error.code,
-                                raw_run=_fallback_run(attempt, error.code), snapshots=[], assignment=None, mastery=None)
+                                raw_run=_fallback_run(attempt, error.code), snapshots=[], assignment=None,
+                                mastery=_fallback_mastery(attempt, gateway))
     except Exception:
         if claim.attempt_count < MAX_RUNTIME_ATTEMPTS:
             raise RuntimeFailure("runtime_transient", retryable=True)
         return gateway.finalize(attempt, state="failed", code="runtime_exhausted",
-                                raw_run=_fallback_run(attempt, "runtime_exhausted"), snapshots=[], assignment=None, mastery=None)
+                                raw_run=_fallback_run(attempt, "runtime_exhausted"), snapshots=[], assignment=None,
+                                mastery=_fallback_mastery(attempt, gateway))
 
 
 def _validate_trusted_attempt(attempt: Mapping[str, Any]) -> None:
@@ -865,21 +894,50 @@ def _mastery_band(mastery: float) -> str:
     return "high"
 
 
-def _subtopic_mastery(attempt: Mapping[str, Any], snapshot: Any, risk: float | None, bundle: RuntimeBundle) -> dict[str, Any]:
+def _subtopic_mastery(
+    attempt: Mapping[str, Any],
+    snapshot: Any,
+    risk: float | None,
+    bundle: RuntimeBundle,
+    *,
+    completed: bool,
+    learning_action: str,
+    recommendation_basis: str,
+    recommendation_target: Mapping[str, Any] | None,
+) -> dict[str, Any]:
     ranking_version, minimum_evidence = _ranking_policy(bundle)
     reliability = min(snapshot.evidence_count / minimum_evidence, 1.0)
     correct_rate = _attempt_correct_rate(attempt)
-    return {"studentId": attempt["studentId"], "yearLevel": attempt["yearLevel"], "topicId": attempt["topicId"],
-            "subtopicId": attempt["subtopicId"], "masteryProbability": snapshot.mastery_probability,
-            "observationCount": snapshot.evidence_count, "evidenceLevel": "preliminary" if reliability < 1 else "established",
-            "weakTopicPriorityScore": round((1.0 - snapshot.mastery_probability) * reliability, 8),
-            "rankingVersion": ranking_version, "lastSourceAttemptId": attempt["attemptId"],
-            "sourceAttemptSequence": attempt["sourceAttemptSequence"],
-            # These bounded progression fields are deliberately separate from
-            # the BKT posterior. They let the student UI reflect only a
-            # server-confirmed quiz completion without exposing raw responses
-            # or AI/model evidence.
-            "lastCorrectRate": correct_rate}
+    return {
+        "studentId": attempt["studentId"], "yearLevel": attempt["yearLevel"],
+        "topicId": attempt["topicId"], "subtopicId": attempt["subtopicId"],
+        "masteryProbability": snapshot.mastery_probability,
+        "observationCount": snapshot.evidence_count,
+        "evidenceLevel": "preliminary" if reliability < 1 else "established",
+        "weakTopicPriorityScore": round((1.0 - snapshot.mastery_probability) * reliability, 8),
+        "rankingVersion": ranking_version, "lastSourceAttemptId": attempt["attemptId"],
+        "sourceAttemptSequence": attempt["sourceAttemptSequence"],
+        # U17 progression state: access and mastery are separate. Every valid
+        # finalized attempt unlocks the next subtopic; `completed` is a
+        # monotonic BKT-mastery outcome, never a score gate.
+        "attempted": True,
+        "accessUnlocked": True,
+        "completed": completed,
+        "completionCriterionVersion": SUBTOPIC_COMPLETION_CRITERION_VERSION,
+        "recommendedLearningAction": learning_action,
+        "recommendationBasis": recommendation_basis,
+        "recommendationTargetTopicId": (
+            recommendation_target.get("topicId") if recommendation_target else None
+        ),
+        "recommendationTargetSubtopicId": (
+            recommendation_target.get("subtopicId") if recommendation_target else None
+        ),
+        # These bounded progression fields are deliberately separate from
+        # the BKT posterior. They let the student UI reflect only a
+        # server-confirmed quiz completion without exposing raw responses
+        # or AI/model evidence.
+        "lastCorrectRate": correct_rate,
+    }
 
 
 def _attempt_correct_rate(attempt: Mapping[str, Any]) -> float:
@@ -908,8 +966,103 @@ def _merged_subtopic_mastery(existing: Mapping[str, Any] | None, mastery: Mappin
     if not isinstance(previous_rate, (int, float)) or isinstance(previous_rate, bool):
         previous_rate = 0.0
     best_rate = max(float(previous_rate), float(current_rate))
-    return {**mastery, "bestCorrectRate": best_rate, "completed": best_rate > 0.5,
-            "masteryLevel": _mastery_level_for_rate(best_rate)}
+    # Completion is monotonic within a content/policy version: a subtopic that
+    # reached the BKT criterion is never reset by a weaker retry, and a 0%
+    # attempt never marks it complete. Only an explicit migration can reset it.
+    previous_completed = (existing or {}).get("completed") is True
+    completed = previous_completed or mastery.get("completed") is True
+    return {
+        **mastery,
+        "bestCorrectRate": best_rate,
+        "completed": completed,
+        "masteryLevel": _mastery_level_for_rate(best_rate),
+    }
+
+
+def _bkt_completion_decision(
+    mastery_probability: float,
+    observation_count: int,
+) -> tuple[bool, str]:
+    """Apply ``subtopic-completion-v1`` to trusted BKT evidence.
+
+    A subtopic is complete only when the BKT posterior clears the mastery
+    threshold with enough validated observations; the action is ``advance``
+    when the criterion passes and ``repeat_subtopic`` otherwise.
+    """
+    if (
+        isinstance(mastery_probability, bool)
+        or not isinstance(mastery_probability, (float, int))
+        or not 0.0 <= mastery_probability <= 1.0
+    ):
+        raise RuntimeFailure("trusted_source_invalid")
+    if (
+        isinstance(observation_count, bool)
+        or not isinstance(observation_count, int)
+        or observation_count < 0
+    ):
+        raise RuntimeFailure("trusted_source_invalid")
+    completed = (
+        mastery_probability >= SUBTOPIC_COMPLETION_MASTERY_AT_LEAST
+        and observation_count >= SUBTOPIC_COMPLETION_MINIMUM_OBSERVATIONS
+    )
+    return completed, ("advance" if completed else "repeat_subtopic")
+
+
+def _recommendation_target(
+    gateway: RuntimeGateway,
+    attempt: Mapping[str, Any],
+    learning_action: str,
+) -> Mapping[str, Any] | None:
+    """Return the learner's next destination for a repeat or advance action."""
+    if learning_action != "advance":
+        return {"topicId": attempt["topicId"], "subtopicId": attempt["subtopicId"]}
+    target = gateway.next_curriculum_item(
+        topic_id=str(attempt["topicId"]),
+        subtopic_id=str(attempt["subtopicId"]),
+        year_level=int(attempt["yearLevel"]),
+    )
+    if target is None:
+        return None
+    return {
+        "topicId": target.get("topicId"),
+        "subtopicId": target.get("subtopicId"),
+    }
+
+
+def _fallback_mastery(
+    attempt: Mapping[str, Any],
+    gateway: RuntimeGateway,
+) -> Mapping[str, Any]:
+    """Correct-rate fallback projection written when BKT cannot finish.
+
+    The recommendation is deliberately labelled ``correct_rate_fallback`` and
+    never claims a BKT mastery result. Completion itself stays untouched: only
+    the server-side monotonic BKT criterion may promote it.
+    """
+    rate = _attempt_correct_rate(attempt)
+    learning_action = "advance" if rate > 0.5 else "repeat_subtopic"
+    target = _recommendation_target(gateway, attempt, learning_action)
+    return {
+        "studentId": attempt["studentId"],
+        "yearLevel": attempt["yearLevel"],
+        "topicId": attempt["topicId"],
+        "subtopicId": attempt["subtopicId"],
+        "masteryProbability": None,
+        "observationCount": None,
+        "evidenceLevel": "unavailable",
+        "attempted": True,
+        "accessUnlocked": True,
+        "lastCorrectRate": rate,
+        "completionCriterionVersion": "unavailable",
+        "recommendedLearningAction": learning_action,
+        "recommendationBasis": "correct_rate_fallback",
+        "recommendationTargetTopicId": (
+            target.get("topicId") if target else None
+        ),
+        "recommendationTargetSubtopicId": (
+            target.get("subtopicId") if target else None
+        ),
+    }
 
 
 def _ranking_policy(bundle: RuntimeBundle) -> tuple[str, int]:
@@ -1048,6 +1201,48 @@ class FirestoreRuntimeGateway:
                 bank["exposureCount"] = exposure_by_bank.get(bank_id, 0)
             banks.append(bank)
         return banks
+
+    def next_curriculum_item(
+        self, topic_id: str, subtopic_id: str, year_level: int
+    ) -> Mapping[str, Any] | None:
+        """Return the next ordered curriculum destination, or None."""
+        ordered = self._ordered_subtopics(topic_id, year_level)
+        if subtopic_id in ordered:
+            index = ordered.index(subtopic_id)
+            if index + 1 < len(ordered):
+                return {"topicId": topic_id, "subtopicId": ordered[index + 1]}
+        topics = sorted(
+            (
+                dict(snapshot.to_dict() or {})
+                for snapshot in self.db.collection("topics")
+                .where("yearLevel", "==", year_level)
+                .stream()
+            ),
+            key=lambda item: (int(item.get("order") or 0), str(item.get("topicId") or "")),
+        )
+        topic_ids = [str(item["topicId"]) for item in topics if item.get("topicId")]
+        if topic_id in topic_ids:
+            for next_topic_id in topic_ids[topic_ids.index(topic_id) + 1:]:
+                first = self._ordered_subtopics(next_topic_id, year_level)
+                if first:
+                    return {"topicId": next_topic_id, "subtopicId": first[0]}
+        return None
+
+    def _ordered_subtopics(self, topic_id: str, year_level: int) -> list[str]:
+        subtopics = sorted(
+            (
+                dict(snapshot.to_dict() or {})
+                for snapshot in self.db.collection("subtopics")
+                .where("topicId", "==", topic_id)
+                .stream()
+            ),
+            key=lambda item: (int(item.get("order") or 0), str(item.get("subtopicId") or "")),
+        )
+        return [
+            str(item["subtopicId"])
+            for item in subtopics
+            if item.get("subtopicId") and item.get("yearLevel") == year_level
+        ]
 
     def enrollment(self, attempt: Mapping[str, Any]) -> Mapping[str, Any] | None:
         rows = list(
