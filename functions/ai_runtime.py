@@ -68,6 +68,7 @@ AI_RUNTIME_SERVICE_ACCOUNT = "logic-oasis-ai-runtime@logic-oasis-fyp.iam.gservic
 SUBTOPIC_COMPLETION_CRITERION_VERSION = "subtopic-completion-v1"
 SUBTOPIC_COMPLETION_MASTERY_AT_LEAST = 0.72
 SUBTOPIC_COMPLETION_MINIMUM_OBSERVATIONS = 5
+_DIFFICULTY_ORDER = {"Easy": 0, "Moderate": 1, "Hard": 2}
 TERMINAL_STATES = frozenset({"completed", "fallback", "failed"})
 MAX_RUNTIME_ATTEMPTS = 3
 FALLBACK_CODES = frozenset({
@@ -265,6 +266,16 @@ def process_finalized_attempt(attempt_id: str, *, gateway: RuntimeGateway, bundl
         completed, learning_action = _bkt_completion_decision(
             primary.mastery_probability, primary.evidence_count
         )
+        # Difficulty-gated progression: a high BKT result at Easy or Moderate
+        # keeps the learner on the same subtopic and repeats with the
+        # server-assigned harder bank. The subtopic is complete (and advance
+        # fires) only after the hardest available bank passes.
+        if (
+            learning_action == "advance"
+            and _has_harder_bank(attempt.get("difficultyLevel"), banks)
+        ):
+            completed = False
+            learning_action = "repeat_subtopic"
         mastery = _subtopic_mastery(
             attempt,
             primary,
@@ -1008,6 +1019,22 @@ def _bkt_completion_decision(
     return completed, ("advance" if completed else "repeat_subtopic")
 
 
+def _has_harder_bank(
+    current_difficulty: Any,
+    banks: list[Mapping[str, Any]],
+) -> bool:
+    """True when an active bank with a harder difficulty exists."""
+    current = _DIFFICULTY_ORDER.get(str(current_difficulty))
+    if current is None:
+        return False
+    return any(
+        isinstance(bank.get("difficultyLevel"), str)
+        and _DIFFICULTY_ORDER.get(bank.get("difficultyLevel"), -1) > current
+        and bank.get("isActive") is True
+        for bank in banks
+    )
+
+
 def _recommendation_target(
     gateway: RuntimeGateway,
     attempt: Mapping[str, Any],
@@ -1040,7 +1067,12 @@ def _fallback_mastery(
     the server-side monotonic BKT criterion may promote it.
     """
     rate = _attempt_correct_rate(attempt)
-    learning_action = "advance" if rate > 0.5 else "repeat_subtopic"
+    banks = gateway.banks(attempt)
+    learning_action = (
+        "advance"
+        if rate > 0.5 and not _has_harder_bank(attempt.get("difficultyLevel"), banks)
+        else "repeat_subtopic"
+    )
     target = _recommendation_target(gateway, attempt, learning_action)
     return {
         "studentId": attempt["studentId"],

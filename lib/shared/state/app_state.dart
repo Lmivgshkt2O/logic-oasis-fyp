@@ -297,6 +297,7 @@ class AppState extends ChangeNotifier {
   final Set<String> _unlockedSubtopicIds = <String>{};
   final Map<String, List<String>> _recentQuestionIdsBySubtopic =
       <String, List<String>>{};
+  StreamSubscription<List<TrustedSubtopicProgress>>? _trustedProgressSubscription;
   final List<AiDiagnosis> aiDiagnoses = <AiDiagnosis>[];
   final List<OasisArea> oasisAreas = [
     const OasisArea(
@@ -832,6 +833,7 @@ class AppState extends ChangeNotifier {
   }
 
   void _clearSignedInStudentRuntimeState() {
+    _cancelTrustedProgressWatch();
     attempts.clear();
     aiDiagnoses.clear();
     _recentQuestionIdsBySubtopic.clear();
@@ -893,6 +895,39 @@ class AppState extends ChangeNotifier {
       // The immediate callable result remains visible while an offline refresh
       // is retried on the next authenticated app load.
     }
+  }
+
+  /// Subscribes to the student's safe mastery projection so a subtopic card
+  /// can move from "Preparing mastery..." to the calculated BKT mastery as
+  /// soon as the runtime finishes, without waiting for the next navigation.
+  void watchTrustedProgress() {
+    if (!persistQuizResults || currentStudentId == demoStudentId) return;
+    _cancelTrustedProgressWatch();
+    final repository = _learningRepository ?? LearningRepository();
+    final requestedStudentId = currentStudentId;
+    final requestedYearLevel = yearLevel;
+    _trustedProgressSubscription = repository
+        .streamTrustedSubtopicProgress(
+          studentId: requestedStudentId,
+          yearLevel: requestedYearLevel,
+        )
+        .listen(
+          (records) {
+            if (currentStudentId != requestedStudentId ||
+                yearLevel != requestedYearLevel) {
+              return;
+            }
+            applyTrustedSubtopicProgress(records, replaceAll: false);
+          },
+          onError: (_) {
+            // Keep the last applied projection; the next refresh retries.
+          },
+        );
+  }
+
+  void _cancelTrustedProgressWatch() {
+    _trustedProgressSubscription?.cancel();
+    _trustedProgressSubscription = null;
   }
 
   void applyTrustedSubtopicProgress(

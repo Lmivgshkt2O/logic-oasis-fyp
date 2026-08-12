@@ -107,6 +107,10 @@ class SubtopicPage extends StatelessWidget {
                 totalQuestions:
                     completion.totalQuestions ?? session.questions.length,
               );
+              // Live-update the mastery projection so the card leaves
+              // "Preparing mastery..." as soon as the runtime writes the BKT
+              // result, without waiting for the next quiz or navigation.
+              state.watchTrustedProgress();
               // The callable completion has already been confirmed. Reconcile
               // with its projection without holding the result page hostage to
               // a separate Firestore read.

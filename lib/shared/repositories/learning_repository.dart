@@ -65,6 +65,32 @@ class LearningRepository {
         .toList(growable: false);
   }
 
+  /// Live projection stream so a subtopic card can transition from
+  /// "Preparing mastery..." to the calculated BKT mastery without waiting for
+  /// the next navigation or quiz.
+  Stream<List<TrustedSubtopicProgress>> streamTrustedSubtopicProgress({
+    required String studentId,
+    required int yearLevel,
+  }) {
+    return _firestore
+        .collection('subtopicMastery')
+        .where('studentId', isEqualTo: studentId)
+        .where('yearLevel', isEqualTo: yearLevel.clamp(4, 6))
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map((document) {
+                try {
+                  return TrustedSubtopicProgress.fromFirestore(document.data());
+                } on FormatException {
+                  return null;
+                }
+              })
+              .whereType<TrustedSubtopicProgress>()
+              .toList(growable: false),
+        );
+  }
+
   Future<void> saveQuizAttemptAndMastery({
     required String studentId,
     required QuizAttempt attempt,

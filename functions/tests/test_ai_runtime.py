@@ -34,6 +34,9 @@ class MemoryGateway:
         self.policy_audits: dict[str, dict] = {}
         self.policy_probes: dict[str, dict] = {}
         self.curriculum: list[dict] = []
+        self.banks_docs: list[dict] = [
+            {"bankId": "bank_easy_2", "difficultyLevel": "Easy", "isActive": True},
+        ]
 
     def attempt(self, attempt_id):
         return self.attempt_doc if attempt_id == self.attempt_doc["attemptId"] else None
@@ -53,7 +56,7 @@ class MemoryGateway:
         ]
 
     def banks(self, attempt):
-        return [{"bankId": "bank_easy_2", "difficultyLevel": "Easy", "isActive": True}]
+        return [dict(bank) for bank in self.banks_docs]
 
     def next_curriculum_item(self, topic_id, subtopic_id, year_level):
         items = [dict(item) for item in self.curriculum]
@@ -945,6 +948,63 @@ class PolicyEvaluationRuntimeTests(unittest.TestCase):
         self.assertEqual("bkt_mastery", mastery["recommendationBasis"])
         self.assertEqual("subtopic-2", mastery["recommendationTargetSubtopicId"])
         self.assertEqual("topic-1", mastery["recommendationTargetTopicId"])
+
+    def test_high_mastery_with_a_harder_bank_repeats_for_the_next_level(self) -> None:
+        self.gateway.banks_docs = [
+            {"bankId": "bank_easy", "difficultyLevel": "Easy", "isActive": True},
+            {"bankId": "bank_moderate", "difficultyLevel": "Moderate", "isActive": True},
+        ]
+        with patch.object(
+            ai_runtime,
+            "build_bkt_materialization",
+            return_value=self._patched_materialization(0.8, 5),
+        ), patch.object(
+            ai_runtime, "_supervised_or_fallback", return_value=(0.2, self._completed_run())
+        ):
+            self.assertEqual(
+                "completed",
+                process_finalized_attempt(
+                    "attempt-1", gateway=self.gateway, bundle=self.bundle
+                ),
+            )
+        mastery = self.gateway.finalized[-1]["mastery"]
+        self.assertFalse(mastery["completed"])
+        self.assertEqual("repeat_subtopic", mastery["recommendedLearningAction"])
+        assignment = self.gateway.finalized[-1]["assignment"]
+        self.assertEqual("Moderate", assignment["difficultyLevel"])
+
+    def test_hard_mastery_with_no_harder_bank_advances_to_next_subtopic(self) -> None:
+        self.gateway.banks_docs = [
+            {"bankId": "bank_easy", "difficultyLevel": "Easy", "isActive": True},
+            {"bankId": "bank_moderate", "difficultyLevel": "Moderate", "isActive": True},
+            {"bankId": "bank_hard", "difficultyLevel": "Hard", "isActive": True},
+        ]
+        self.gateway.attempt_doc["difficultyLevel"] = "Hard"
+        with patch.object(
+            ai_runtime,
+            "build_bkt_materialization",
+            return_value=self._patched_materialization(0.9, 6),
+        ), patch.object(
+            ai_runtime, "_supervised_or_fallback", return_value=(0.4, self._completed_run())
+        ):
+            self.assertEqual(
+                "completed",
+                process_finalized_attempt(
+                    "attempt-1", gateway=self.gateway, bundle=self.bundle
+                ),
+            )
+        mastery = self.gateway.finalized[-1]["mastery"]
+        self.assertTrue(mastery["completed"])
+        self.assertEqual("advance", mastery["recommendedLearningAction"])
+
+    def test_fallback_repeats_when_a_harder_bank_exists(self) -> None:
+        self.gateway.banks_docs = [
+            {"bankId": "bank_easy", "difficultyLevel": "Easy", "isActive": True},
+            {"bankId": "bank_moderate", "difficultyLevel": "Moderate", "isActive": True},
+        ]
+        fallback = ai_runtime._fallback_mastery(self.gateway.attempt_doc, self.gateway)
+        self.assertEqual("repeat_subtopic", fallback["recommendedLearningAction"])
+        self.assertEqual("correct_rate_fallback", fallback["recommendationBasis"])
 
     def test_high_mastery_without_minimum_evidence_stays_incomplete_and_repeats(self) -> None:
         with patch.object(
