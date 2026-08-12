@@ -12,13 +12,33 @@ const {
   validateAdditionalQuestionBanks,
 } = require("./year4_whole_numbers_additional_banks");
 const {
+  questionBanks: year5ReadWriteQuestionBanks,
+  questions: year5BankQuestions,
+  validateQuestionBankSeed: validateYear5QuestionBankSeed,
+} = require("./year5_read_write_question_banks");
+const {
+  questionBanks: year6ReadWriteQuestionBanks,
+  questions: year6BankQuestions,
+  validateQuestionBankSeed: validateYear6QuestionBankSeed,
+} = require("./year6_read_write_question_banks");
+const {
   DIFFICULTY_BANDS,
   buildContentSourceManifest,
   verifyApprovedContent,
 } = require("./content_source_manifest");
 
-const questionBanks = { ...readWriteQuestionBanks, ...additionalQuestionBanks };
-const allBankQuestions = [...bankQuestions, ...additionalBankQuestions];
+const questionBanks = {
+  ...readWriteQuestionBanks,
+  ...additionalQuestionBanks,
+  ...year5ReadWriteQuestionBanks,
+  ...year6ReadWriteQuestionBanks,
+};
+const allBankQuestions = [
+  ...bankQuestions,
+  ...additionalBankQuestions,
+  ...year5BankQuestions,
+  ...year6BankQuestions,
+];
 
 const seedPath = path.join(__dirname, "seed_data.json");
 const credentialCandidates = [
@@ -183,8 +203,10 @@ function clientSafeLegacyQuestion(documentData) {
 
 function validateSecureQuestionSeed(secure) {
   const banks = Object.values(secure.questionBanks);
-  if (banks.length !== 7) {
-    throw new Error('Expected the three read/write banks and four follow-on Easy banks.');
+  if (banks.length !== 13) {
+    throw new Error(
+      'Expected seven Year 4 banks, three Year 5 banks, and three Year 6 banks.',
+    );
   }
   for (const bank of banks) {
     if (bank.questionIds.length !== 5) {
@@ -276,6 +298,8 @@ function validateSecureQuestionSeed(secure) {
 function buildSecureQuestionSeed(seedData) {
   validateQuestionBankSeed();
   validateAdditionalQuestionBanks();
+  validateYear5QuestionBankSeed();
+  validateYear6QuestionBankSeed();
   const legacyQuestions = Object.fromEntries(
     Object.entries(seedData.questions ?? {}).map(([id, data]) => [
       id,

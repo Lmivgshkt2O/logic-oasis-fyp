@@ -24,8 +24,19 @@ const {
 const {
   questions: additionalQuestions,
 } = require("../year4_whole_numbers_additional_banks");
+const {
+  questions: year5Questions,
+} = require("../year5_read_write_question_banks");
+const {
+  questions: year6Questions,
+} = require("../year6_read_write_question_banks");
 
-const allQuestions = [...readWriteQuestions, ...additionalQuestions];
+const allQuestions = [
+  ...readWriteQuestions,
+  ...additionalQuestions,
+  ...year5Questions,
+  ...year6Questions,
+];
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -61,6 +72,22 @@ async function main() {
   assert.ok(
     Object.keys(manifest.bm_y4.questions).length >= 15,
     "Malay Year 4 material must cover the read/write banks",
+  );
+  assert.ok(
+    Object.keys(manifest.en_y5_1.questions).length >= 15,
+    "English Year 5 material must cover the read/write banks",
+  );
+  assert.ok(
+    Object.keys(manifest.bm_y5_1.questions).length >= 15,
+    "Malay Year 5 material must cover the read/write banks",
+  );
+  assert.ok(
+    Object.keys(manifest.en_y6.questions).length >= 15,
+    "English Year 6 material must cover the read/write banks",
+  );
+  assert.ok(
+    Object.keys(manifest.bm_y6_1.questions).length >= 15,
+    "Malay Year 6 material must cover the read/write banks",
   );
 
   // Scenario 2: missing option feedback fails.

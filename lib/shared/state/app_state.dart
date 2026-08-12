@@ -822,6 +822,26 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  /// Session-level year switch for the Formula Forge: lets a Year 6 student
+  /// revise an earlier year, or a lower-year student prepare ahead, without
+  /// changing the registered profile year. Each year keeps its own topic and
+  /// mastery progression.
+  Future<void> switchYear(int year) async {
+    final nextYearLevel = year.clamp(4, 6);
+    if (nextYearLevel == yearLevel) return;
+    yearLevel = nextYearLevel;
+    _cancelTrustedProgressWatch();
+    _resetTopicsForCurrentYear();
+    notifyListeners();
+    unawaited(saveAppSession().catchError((_) {}));
+    if (persistQuizResults) {
+      unawaited(loadTopicsFromFirebase());
+      if (currentStudentId != demoStudentId) {
+        unawaited(refreshTrustedProgress());
+      }
+    }
+  }
+
   /// Prevents a prior Firebase identity's in-memory prototype state from ever
   /// appearing for the next signed-in learner. Trusted projections reload
   /// after [updateSignedInStudent] assigns the replacement identity.
