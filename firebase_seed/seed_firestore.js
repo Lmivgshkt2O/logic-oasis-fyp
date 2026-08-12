@@ -210,6 +210,17 @@ function validateSecureQuestionSeed(secure) {
     ) {
       throw new Error('Client-readable questions must not contain answer keys.');
     }
+    if (question.isActive === true) {
+      if (
+        !('sourceReference' in question) ||
+        typeof question.sourceReference !== 'string' ||
+        question.sourceReference.trim() === ''
+      ) {
+        throw new Error(
+          `Client-readable question ${question.questionId} is missing sourceReference.`,
+        );
+      }
+    }
   }
   if (Object.keys(secure.questionAnswerKeys).length !== activeQuestions.length) {
     throw new Error('Every active question must have exactly one answer key.');
@@ -272,7 +283,13 @@ function buildSecureQuestionSeed(seedData) {
     ]),
   );
   const activeQuestions = Object.fromEntries(
-    allBankQuestions.map((item) => [item.id, item.client]),
+    allBankQuestions.map((item) => [
+      item.id,
+      // The Flutter client projection keeps the legacy `sourceReference`
+      // display field; the server-side contract stores the richer bilingual
+      // locators separately on `sourceLocator`/`sourceLocatorBm`.
+      { ...item.client, sourceReference: item.client.sourceLocator },
+    ]),
   );
   const answerKeys = Object.fromEntries(
     allBankQuestions.map((item) => [item.id, item.answerKey]),
