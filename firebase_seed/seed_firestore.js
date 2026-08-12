@@ -118,6 +118,48 @@ async function reconcileCurrentQuestionAnswerKeys(db, answerKeys) {
   }
 }
 
+/// Removes curriculum documents that no longer belong to the current seed.
+/// The supervisor refinements renamed Year 4 topics and merged Fractions,
+/// Decimals, and Percentages into one textbook topic; without this step, old
+/// topic documents would keep appearing beside the new ones after a merge seed.
+async function reconcileCurrentTopicsAndSubtopics(db, topics, subtopics) {
+  const expectedTopicIds = new Set(Object.keys(topics));
+  const topicSnapshot = await db.collection('topics').get();
+  const obsoleteTopics = topicSnapshot.docs.filter(
+    (doc) => !expectedTopicIds.has(doc.id),
+  );
+  for (let start = 0; start < obsoleteTopics.length; start += 450) {
+    const batch = db.batch();
+    for (const document of obsoleteTopics.slice(start, start + 450)) {
+      batch.delete(document.ref);
+    }
+    await batch.commit();
+  }
+  if (obsoleteTopics.length > 0) {
+    console.log(
+      `Removed ${obsoleteTopics.length} obsolete topic document(s).`,
+    );
+  }
+
+  const expectedSubtopicIds = new Set(Object.keys(subtopics));
+  const subtopicSnapshot = await db.collection('subtopics').get();
+  const obsoleteSubtopics = subtopicSnapshot.docs.filter(
+    (doc) => !expectedSubtopicIds.has(doc.id),
+  );
+  for (let start = 0; start < obsoleteSubtopics.length; start += 450) {
+    const batch = db.batch();
+    for (const document of obsoleteSubtopics.slice(start, start + 450)) {
+      batch.delete(document.ref);
+    }
+    await batch.commit();
+  }
+  if (obsoleteSubtopics.length > 0) {
+    console.log(
+      `Removed ${obsoleteSubtopics.length} obsolete subtopic document(s).`,
+    );
+  }
+}
+
 function clientSafeLegacyQuestion(documentData) {
   const {
     answerIndex,
@@ -298,6 +340,11 @@ async function main() {
   for (const [collectionName, documents] of Object.entries(secureSeedData)) {
     await seedCollection(db, collectionName, documents);
   }
+  await reconcileCurrentTopicsAndSubtopics(
+    db,
+    secureSeedData.topics,
+    secureSeedData.subtopics,
+  );
   await reconcileCurrentQuestionAnswerKeys(
     db,
     secureSeedData.questionAnswerKeys,
