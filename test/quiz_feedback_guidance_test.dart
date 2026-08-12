@@ -102,20 +102,20 @@ void main() {
       await tester.tap(find.text('2 004'));
       await tester.pumpAndSettle();
 
-    expect(find.text("Let's review the steps"), findsOneWidget);
+      expect(find.text('Hint'), findsOneWidget);
       expect(
         find.text(
-          '1. Twenty thousand has 20 groups of one thousand.',
+          'Twenty thousand has 20 groups of one thousand.',
         ),
         findsOneWidget,
       );
       expect(
-        find.text('2. Example: In 43 007, the 43 shows 43 thousands.'),
+        find.text('Example: In 43 007, the 43 shows 43 thousands.'),
         findsOneWidget,
       );
       expect(
         find.text(
-          '3. Check how many thousands are named before the ones.',
+          'Check how many thousands are named before the ones.',
         ),
         findsOneWidget,
       );

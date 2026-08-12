@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:logic_oasis/app/logic_oasis_design.dart';
+import 'package:logic_oasis/features/quiz/result_page.dart';
 import 'package:logic_oasis/features/quiz/quiz_page.dart';
+import 'package:logic_oasis/shared/models/next_learning_action.dart';
 import 'package:logic_oasis/shared/models/subtopic.dart';
 import 'package:logic_oasis/shared/models/topic.dart';
 import 'package:logic_oasis/shared/services/quiz_session_service.dart';
@@ -10,10 +12,18 @@ import 'package:logic_oasis/shared/state/app_state.dart';
 import 'package:logic_oasis/shared/widgets/logic_oasis_figma_components.dart';
 
 class SubtopicPage extends StatelessWidget {
-  const SubtopicPage({super.key, required this.state, required this.topic});
+  const SubtopicPage({
+    super.key,
+    required this.state,
+    required this.topic,
+    this.sessionService,
+    this.aiDiagnosisStreamFactory,
+  });
 
   final AppState state;
   final Topic topic;
+  final QuizSessionGateway? sessionService;
+  final AiDiagnosisStreamFactory? aiDiagnosisStreamFactory;
 
   @override
   Widget build(BuildContext context) {
@@ -74,19 +84,21 @@ class SubtopicPage extends StatelessWidget {
 
     _showStartingQuiz(context);
     try {
-      final session = await QuizSessionService().startSession(
+      final session = await (sessionService ?? QuizSessionService()).startSession(
         topicId: topic.id,
         subtopicId: subtopic.id,
         yearLevel: topic.yearLevel,
       );
       if (!context.mounted) return;
       Navigator.of(context).pop();
-      await Navigator.of(context).push<void>(
+      final action = await Navigator.of(context).push<NextLearningAction>(
         MaterialPageRoute(
           builder: (_) => QuizPage(
             session: session,
             title: topic.localizedTitle(state.isBahasaMelayu),
             isBahasaMelayu: state.isBahasaMelayu,
+            sessionService: sessionService,
+            aiDiagnosisStreamFactory: aiDiagnosisStreamFactory,
             onFinalized: (completion) {
               state.applyTrustedQuizCompletion(
                 topicId: topic.id,
@@ -103,6 +115,13 @@ class SubtopicPage extends StatelessWidget {
             },
           ),
         ),
+      );
+      if (!context.mounted) return;
+      await _resolveNextLearningAction(
+        context,
+        topic,
+        subtopic,
+        action,
       );
     } on QuizSessionException catch (error) {
       if (!context.mounted) return;
@@ -131,6 +150,82 @@ class SubtopicPage extends StatelessWidget {
       context: context,
       barrierDismissible: false,
       builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+  }
+
+  Future<void> _resolveNextLearningAction(
+    BuildContext context,
+    Topic topic,
+    Subtopic subtopic,
+    NextLearningAction? action,
+  ) async {
+    if (action == null || action.isBack) return;
+    if (action.isRepeat) {
+      await _startSubtopicQuiz(context, topic, subtopic);
+      return;
+    }
+    if (action.isAdvance) {
+      await _handleAdvance(context, topic, action);
+    }
+  }
+
+  Future<void> _handleAdvance(
+    BuildContext context,
+    Topic topic,
+    NextLearningAction action,
+  ) async {
+    final targetTopicId = action.targetTopicId;
+    final targetSubtopicId = action.targetSubtopicId;
+    if (targetSubtopicId != null &&
+        (targetTopicId == null || targetTopicId == topic.id)) {
+      final matches = state
+          .subtopicsForTopic(topic)
+          .where((item) => item.id == targetSubtopicId)
+          .toList();
+      if (matches.isNotEmpty) {
+        await _startSubtopicQuiz(context, topic, matches.first);
+        return;
+      }
+    }
+
+    final topics = state.topics;
+    if (targetTopicId != null && targetTopicId != topic.id) {
+      final nextTopic = topics.where((item) => item.id == targetTopicId).toList();
+      if (nextTopic.isNotEmpty) {
+        _openSubtopicPage(context, nextTopic.first);
+        return;
+      }
+    }
+
+    final topicIndex = topics.indexWhere((item) => item.id == topic.id);
+    if (topicIndex >= 0 && topicIndex + 1 < topics.length) {
+      _openSubtopicPage(context, topics[topicIndex + 1]);
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          state.t(
+            'You completed all available topics!',
+            'Anda telah melengkapkan semua topik yang tersedia!',
+          ),
+        ),
+      ),
+    );
+    Navigator.of(context).popUntil((route) => route.isFirst);
+  }
+
+  void _openSubtopicPage(BuildContext context, Topic nextTopic) {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(
+        builder: (_) => SubtopicPage(
+          state: state,
+          topic: nextTopic,
+          sessionService: sessionService,
+          aiDiagnosisStreamFactory: aiDiagnosisStreamFactory,
+        ),
+      ),
     );
   }
 }

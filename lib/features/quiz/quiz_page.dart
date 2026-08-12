@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/features/quiz/widgets/answer_tile.dart';
 import 'package:logic_oasis/features/quiz/result_page.dart';
 import 'package:logic_oasis/l10n/app_localizations.dart';
+import 'package:logic_oasis/shared/models/next_learning_action.dart';
 import 'package:logic_oasis/shared/models/question_response.dart';
 import 'package:logic_oasis/shared/models/quiz_completion.dart';
 import 'package:logic_oasis/shared/models/quiz_question.dart';
@@ -18,6 +20,7 @@ class QuizPage extends StatefulWidget {
     required this.isBahasaMelayu,
     this.sessionService,
     this.onFinalized,
+    this.aiDiagnosisStreamFactory,
   });
 
   final QuizSession session;
@@ -25,6 +28,7 @@ class QuizPage extends StatefulWidget {
   final bool isBahasaMelayu;
   final QuizSessionGateway? sessionService;
   final Future<void> Function(QuizCompletion completion)? onFinalized;
+  final AiDiagnosisStreamFactory? aiDiagnosisStreamFactory;
 
   @override
   State<QuizPage> createState() => _QuizPageState();
@@ -134,19 +138,22 @@ class _QuizPageState extends State<QuizPage> {
       if (!mounted) return;
       await widget.onFinalized?.call(completion);
       if (!mounted) return;
-      await Navigator.of(context).pushReplacement<void, void>(
+      final action = await Navigator.of(context).push<NextLearningAction>(
         MaterialPageRoute(
-          builder: (resultContext) => ResultPage(
-            correctCount: completion.correctCount,
-            totalQuestions:
-                completion.totalQuestions ?? widget.session.questions.length,
+          builder: (_) => ResultPage(
+            completion: completion,
             topicArea: widget.title,
             isBahasaMelayu: widget.isBahasaMelayu,
+            topicId: widget.session.topicId,
+            subtopicId: widget.session.subtopicId,
+            yearLevel: widget.session.yearLevel,
             attemptId: completion.attemptId,
-            onBackToForge: () => Navigator.of(resultContext).pop(),
+            aiDiagnosisStreamFactory: widget.aiDiagnosisStreamFactory,
           ),
         ),
       );
+      if (!mounted) return;
+      Navigator.of(context).pop(action ?? const NextLearningAction.back());
     } on QuizSessionException catch (error) {
       if (!mounted) return;
       setState(() => _finalizing = false);
@@ -231,11 +238,18 @@ class _QuizPageState extends State<QuizPage> {
               Semantics(
                 container: true,
                 label: widget.isBahasaMelayu
-                    ? 'Langkah panduan untuk soalan ini'
-                    : 'Guidance steps for this question',
-                child: _GuidanceSteps(
-                  steps:
-                      feedback.localizedFeedbackLines(widget.isBahasaMelayu),
+                    ? 'Petunjuk untuk soalan ini'
+                    : 'Hint for this question',
+                child: _OptionFeedback(
+                  hint: feedback.localizedFeedbackHint(
+                    widget.isBahasaMelayu,
+                  ),
+                  example: feedback.localizedFeedbackExample(
+                    widget.isBahasaMelayu,
+                  ),
+                  reviewFocus: feedback.localizedReviewFocus(
+                    widget.isBahasaMelayu,
+                  ),
                 ),
               ),
             ] else
@@ -269,10 +283,16 @@ class _QuizPageState extends State<QuizPage> {
   }
 }
 
-class _GuidanceSteps extends StatelessWidget {
-  const _GuidanceSteps({required this.steps});
+class _OptionFeedback extends StatelessWidget {
+  const _OptionFeedback({
+    required this.hint,
+    this.example,
+    this.reviewFocus,
+  });
 
-  final List<String> steps;
+  final String? hint;
+  final String? example;
+  final String? reviewFocus;
 
   @override
   Widget build(BuildContext context) {
@@ -283,13 +303,30 @@ class _GuidanceSteps extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(l10n.guidedStepsTitle, style: theme.textTheme.titleMedium),
+          Text(l10n.hintTitle, style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
-          for (var index = 0; index < steps.length; index++)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Text('${index + 1}. ${steps[index]}'),
+          Text(
+            hint ?? '',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w700,
             ),
+          ),
+          if (example != null && example!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              l10n.examplePrefix(example!),
+              style: theme.textTheme.bodyMedium,
+            ),
+          ],
+          if (reviewFocus != null && reviewFocus!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              reviewFocus!,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: LogicOasisTheme.clay,
+              ),
+            ),
+          ],
         ],
       ),
     );

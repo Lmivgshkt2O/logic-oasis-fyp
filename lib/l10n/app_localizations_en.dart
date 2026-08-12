@@ -300,7 +300,44 @@ class AppLocalizationsEn extends AppLocalizations {
   String get guidedStepsTitle => 'Let\'s review the steps';
 
   @override
+  String get hintTitle => 'Hint';
+
+  @override
+  String examplePrefix(Object example) {
+    return 'Example: $example';
+  }
+
+  @override
   String get secureAnswerChecked => 'Your choice has been securely checked.';
+
+  @override
+  String get reviewTheseFirst => 'Review these first';
+
+  @override
+  String get perfectScore => 'Perfect score! Nothing to review.';
+
+  @override
+  String get nextPractice => 'Next practice';
+
+  @override
+  String nextPracticeLevel(Object difficulty) {
+    return 'Next: $difficulty practice';
+  }
+
+  @override
+  String get practiseAgain => 'Practise Again';
+
+  @override
+  String get moveOn => 'Move On';
+
+  @override
+  String get basedOnQuizProgress => 'Based on your quiz progress';
+
+  @override
+  String get preparingNextPractice => 'Preparing your next practice…';
+
+  @override
+  String get allTopicsComplete => 'You completed all available topics!';
 
   @override
   String parentDashboardSummary(Object name) {

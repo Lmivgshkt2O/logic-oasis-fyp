@@ -301,8 +301,46 @@ class AppLocalizationsMs extends AppLocalizations {
   String get guidedStepsTitle => 'Mari semak langkahnya';
 
   @override
+  String get hintTitle => 'Petunjuk';
+
+  @override
+  String examplePrefix(Object example) {
+    return 'Contoh: $example';
+  }
+
+  @override
   String get secureAnswerChecked =>
       'Pilihan anda telah disemak dengan selamat.';
+
+  @override
+  String get reviewTheseFirst => 'Semak dahulu';
+
+  @override
+  String get perfectScore => 'Markah penuh! Tiada apa yang perlu disemak.';
+
+  @override
+  String get nextPractice => 'Latihan seterusnya';
+
+  @override
+  String nextPracticeLevel(Object difficulty) {
+    return 'Seterusnya: Latihan $difficulty';
+  }
+
+  @override
+  String get practiseAgain => 'Ulang Latihan';
+
+  @override
+  String get moveOn => 'Teruskan';
+
+  @override
+  String get basedOnQuizProgress => 'Berdasarkan kemajuan kuiz anda';
+
+  @override
+  String get preparingNextPractice => 'Menyediakan latihan seterusnya…';
+
+  @override
+  String get allTopicsComplete =>
+      'Anda telah melengkapkan semua topik yang tersedia!';
 
   @override
   String parentDashboardSummary(Object name) {
