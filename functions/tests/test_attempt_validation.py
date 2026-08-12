@@ -6,7 +6,7 @@ from ai_pipeline.logic_oasis_ai.schemas import (
     ValidatedResponseRecord,
 )
 from ai_pipeline.logic_oasis_ai.validators import validate_response_lineage
-from functions.tests.test_quiz_session import NOW, service
+from functions.tests.test_quiz_session import NOW, feedback_for, service
 from functions.quiz_session import QuizSessionError
 
 
@@ -96,8 +96,7 @@ class AttemptValidationTests(unittest.TestCase):
                 "correctOptionIndex": index % 4,
                 "explanation": "Server feedback",
                 "explanationBm": "Maklum balas pelayan",
-                "guidedSteps": ["Read the place values.", "Check each option."],
-                "guidedStepsBm": ["Baca nilai tempat.", "Semak setiap pilihan."],
+                "feedbackByOption": feedback_for(index % 4),
             }
 
         self._submit_all()

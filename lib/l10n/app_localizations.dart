@@ -606,11 +606,77 @@ abstract class AppLocalizations {
   /// **'Let\'s review the steps'**
   String get guidedStepsTitle;
 
+  /// No description provided for @hintTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Hint'**
+  String get hintTitle;
+
+  /// No description provided for @examplePrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'Example: {example}'**
+  String examplePrefix(Object example);
+
   /// No description provided for @secureAnswerChecked.
   ///
   /// In en, this message translates to:
   /// **'Your choice has been securely checked.'**
   String get secureAnswerChecked;
+
+  /// No description provided for @reviewTheseFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Review these first'**
+  String get reviewTheseFirst;
+
+  /// No description provided for @perfectScore.
+  ///
+  /// In en, this message translates to:
+  /// **'Perfect score! Nothing to review.'**
+  String get perfectScore;
+
+  /// No description provided for @nextPractice.
+  ///
+  /// In en, this message translates to:
+  /// **'Next practice'**
+  String get nextPractice;
+
+  /// No description provided for @nextPracticeLevel.
+  ///
+  /// In en, this message translates to:
+  /// **'Next: {difficulty} practice'**
+  String nextPracticeLevel(Object difficulty);
+
+  /// No description provided for @practiseAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Practise Again'**
+  String get practiseAgain;
+
+  /// No description provided for @moveOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Move On'**
+  String get moveOn;
+
+  /// No description provided for @basedOnQuizProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Based on your quiz progress'**
+  String get basedOnQuizProgress;
+
+  /// No description provided for @preparingNextPractice.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing your next practice…'**
+  String get preparingNextPractice;
+
+  /// No description provided for @allTopicsComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'You completed all available topics!'**
+  String get allTopicsComplete;
 
   /// No description provided for @parentDashboardSummary.
   ///

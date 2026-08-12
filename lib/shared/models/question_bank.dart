@@ -79,9 +79,8 @@ class QuestionBank {
       errors.add('content version is required');
 
     final activeQuestions = questions.where((question) => question.isActive);
-    if (isActive &&
-        (activeQuestions.length < 8 || activeQuestions.length > 10)) {
-      errors.add('active bank must contain 8-10 active questions');
+    if (isActive && activeQuestions.length != 5) {
+      errors.add('active bank must contain exactly 5 active questions');
     }
 
     final questionIds = <String>{};

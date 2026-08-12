@@ -1,4 +1,4 @@
-"""Server-authoritative quiz-session domain logic.
+﻿"""Server-authoritative quiz-session domain logic.
 
 The callable handlers use this module for the rules that must be identical in
 production and in focused tests: a student can submit each expected question
@@ -92,7 +92,9 @@ def client_response(response: dict[str, Any]) -> dict[str, Any]:
         for key in (
             "responseId", "sessionId", "attemptId", "questionId", "selectedIndex",
             "serverIsCorrect", "positiveConfirmation", "positiveConfirmationBm",
-            "guidedSteps", "guidedStepsBm", "validationStatus",
+            "feedbackHint", "feedbackHintBm", "feedbackExample",
+            "feedbackExampleBm", "reviewFocus", "reviewFocusBm",
+            "validationStatus",
             "sequenceIndex",
         )
         if key in response
@@ -105,8 +107,9 @@ def client_completion(attempt: dict[str, Any]) -> dict[str, Any]:
         key: attempt[key]
         for key in (
             "attemptId", "sessionId", "correctCount", "totalQuestions", "score",
-            "finalizationStatus",
+            "finalizationStatus", "reviewItems",
         )
+        if key in attempt
     }
 
 
@@ -154,7 +157,9 @@ class InMemoryQuizSessionService:
             answer_key = self._answer_keys.get(question["questionId"])
             if answer_key is None:
                 raise QuizSessionError("failed-precondition", "The answer key is unavailable.")
-            validated_guided_steps(answer_key, question.get("options"), question.get("optionsBm"))
+            validate_answer_key_feedback(
+                answer_key, question.get("options"), question.get("optionsBm")
+            )
         skill_ids = {question.get("skillId") for question in selected}
         if None in skill_ids or len(skill_ids) != 1:
             raise QuizSessionError(
@@ -279,8 +284,18 @@ class InMemoryQuizSessionService:
                 "positiveConfirmationBm": POSITIVE_CONFIRMATION_BM,
             })
         else:
-            guided_steps, guided_steps_bm = validated_guided_steps(answer_key, options, question.get("optionsBm"))
-            response.update({"guidedSteps": guided_steps, "guidedStepsBm": guided_steps_bm})
+            feedback = validated_option_feedback(
+                answer_key, selected_index, options, question.get("optionsBm")
+            )
+            response.update({
+                "misconceptionCode": feedback["misconceptionCode"],
+                "feedbackHint": feedback["hint"],
+                "feedbackHintBm": feedback["hintBm"],
+                "feedbackExample": feedback["example"],
+                "feedbackExampleBm": feedback["exampleBm"],
+                "reviewFocus": feedback["reviewFocus"],
+                "reviewFocusBm": feedback["reviewFocusBm"],
+            })
         self.responses[response_id] = response
         session["validatedResponseCount"] += 1
         return self._client_response(response)
@@ -311,6 +326,33 @@ class InMemoryQuizSessionService:
             raise QuizSessionError("failed-precondition", "Every response must be validated.")
         correct_count = sum(1 for item in ordered if item["serverIsCorrect"])
         total = len(ordered)
+        review_items: list[dict[str, Any]] = []
+        for item in ordered:
+            if item["serverIsCorrect"]:
+                continue
+            question = self._questions[item["questionId"]]
+            review_focus = item.get("reviewFocus")
+            review_focus_bm = item.get("reviewFocusBm")
+            if (
+                not isinstance(review_focus, str)
+                or not review_focus.strip()
+                or not isinstance(review_focus_bm, str)
+                or not review_focus_bm.strip()
+            ):
+                raise QuizSessionError(
+                    "failed-precondition",
+                    "A missed question is missing its review focus.",
+                )
+            review_items.append({
+                "questionId": item["questionId"],
+                "sequenceIndex": item["sequenceIndex"],
+                "questionText": question.get("questionText", ""),
+                "questionTextBm": question.get("questionTextBm", ""),
+                "questionType": question.get("questionType", ""),
+                "questionTypeBm": question.get("questionTypeBm", ""),
+                "reviewFocus": review_focus,
+                "reviewFocusBm": review_focus_bm,
+            })
         sequence_key = (student_id, session["subtopicId"])
         source_attempt_sequence = self.sequence_states.get(sequence_key, 0) + 1
         attempt = {
@@ -333,6 +375,7 @@ class InMemoryQuizSessionService:
             "trustedScore": round((correct_count / total) * 100),
             "responseCount": total,
             "responseIds": [item["responseId"] for item in ordered],
+            "reviewItems": review_items,
             "validationStatus": "finalized",
             "finalizationStatus": "finalized",
             "processingStatus": "pending",
@@ -394,31 +437,106 @@ def _answer_index(answer_key: dict[str, Any]) -> int:
     return value
 
 
-def validated_guided_steps(
+def validate_answer_key_feedback(
     answer_key: dict[str, Any],
     options: Any,
     options_bm: Any,
-) -> tuple[list[str], list[str]]:
-    """Validate authored guidance without exposing a final answer.
-
-    Guidance is deliberately held beside the server-only answer key.  It is
-    checked before use and projected only after an incorrect answer has been
-    securely sealed.
-    """
-    steps = answer_key.get("guidedSteps")
-    steps_bm = answer_key.get("guidedStepsBm")
-    if (
-        not isinstance(steps, list)
-        or not isinstance(steps_bm, list)
-        or not 2 <= len(steps) <= 5
-        or len(steps) != len(steps_bm)
-        or any(not isinstance(step, str) or not step.strip() for step in [*steps, *steps_bm])
-    ):
-        raise QuizSessionError("failed-precondition", "The quiz guidance is invalid.")
-
-    correct_index = _answer_index(answer_key)
+) -> None:
+    """Validate every wrong option has complete, safe authored feedback."""
     if not isinstance(options, list) or not isinstance(options_bm, list):
-        raise QuizSessionError("failed-precondition", "The quiz guidance is invalid.")
+        raise QuizSessionError("failed-precondition", "The quiz feedback is invalid.")
+    if len(options) != len(options_bm):
+        raise QuizSessionError("failed-precondition", "The quiz feedback is invalid.")
+    correct_index = _answer_index(answer_key)
+    if correct_index < 0 or correct_index >= len(options):
+        raise QuizSessionError("failed-precondition", "The quiz answer key is invalid.")
+    feedback = answer_key.get("feedbackByOption")
+    if not isinstance(feedback, dict):
+        raise QuizSessionError("failed-precondition", "The quiz feedback is invalid.")
+    for index in range(len(options)):
+        if index == correct_index:
+            continue
+        validated_option_feedback(answer_key, index, options, options_bm)
+
+
+def validated_option_feedback(
+    answer_key: dict[str, Any],
+    selected_index: int,
+    options: Any,
+    options_bm: Any,
+) -> dict[str, Any]:
+    """Return the authored, sealed feedback for one wrong option.
+
+    The entry is held beside the server-only answer key and is projected only
+    after an incorrect answer has been securely validated. Malformed or
+    incomplete entries fail closed before any response is written.
+    """
+    feedback = answer_key.get("feedbackByOption")
+    if not isinstance(feedback, dict):
+        raise QuizSessionError("failed-precondition", "The quiz feedback is invalid.")
+    entry = feedback.get(str(selected_index))
+    if not isinstance(entry, dict):
+        raise QuizSessionError("failed-precondition", "The quiz feedback is invalid.")
+    hint = entry.get("hint")
+    hint_bm = entry.get("hintBm")
+    example = entry.get("example")
+    example_bm = entry.get("exampleBm")
+    review_focus = entry.get("reviewFocus")
+    review_focus_bm = entry.get("reviewFocusBm")
+    misconception_code = entry.get("misconceptionCode")
+    if (
+        not isinstance(hint, str)
+        or not hint.strip()
+        or not isinstance(hint_bm, str)
+        or not hint_bm.strip()
+        or not isinstance(review_focus, str)
+        or not review_focus.strip()
+        or not isinstance(review_focus_bm, str)
+        or not review_focus_bm.strip()
+        or not isinstance(misconception_code, str)
+        or not misconception_code.strip()
+        or (example is None) != (example_bm is None)
+        or (
+            example is not None
+            and (
+                not isinstance(example, str)
+                or not example.strip()
+                or not isinstance(example_bm, str)
+                or not example_bm.strip()
+            )
+        )
+    ):
+        raise QuizSessionError("failed-precondition", "The quiz feedback is invalid.")
+
+    _validate_feedback_safety(
+        hint, hint_bm, example, example_bm, answer_key, options, options_bm
+    )
+    return {
+        "misconceptionCode": misconception_code,
+        "hint": hint,
+        "hintBm": hint_bm,
+        "example": example,
+        "exampleBm": example_bm,
+        "reviewFocus": review_focus,
+        "reviewFocusBm": review_focus_bm,
+    }
+
+
+def _validate_feedback_safety(
+    hint: str,
+    hint_bm: str,
+    example: str | None,
+    example_bm: str | None,
+    answer_key: dict[str, Any],
+    options: Any,
+    options_bm: Any,
+) -> None:
+    """Fail closed when feedback names the live answer or reuses live values."""
+    if not isinstance(options, list) or not isinstance(options_bm, list):
+        raise QuizSessionError("failed-precondition", "The quiz feedback is invalid.")
+    correct_index = _answer_index(answer_key)
+    if correct_index < 0 or correct_index >= len(options):
+        raise QuizSessionError("failed-precondition", "The quiz answer key is invalid.")
     correct_options = tuple(
         option.strip().casefold()
         for option in (options[correct_index], options_bm[correct_index])
@@ -428,10 +546,11 @@ def validated_guided_steps(
         "the answer is", "correct answer", "answer:", "choose option",
         "jawapan ialah", "jawapan yang betul", "jawapan:", "pilih pilihan",
     )
-    for step in [*steps, *steps_bm]:
-        normalized = re.sub(r"[^\w]+", " ", step.casefold()).strip()
+
+    def check(text: str) -> None:
+        normalized = re.sub(r"[^\w]+", " ", text.casefold()).strip()
         if any(phrase in normalized for phrase in revealing_phrases):
-            raise QuizSessionError("failed-precondition", "The quiz guidance reveals an answer.")
+            raise QuizSessionError("failed-precondition", "The quiz feedback reveals an answer.")
         if any(
             normalized.strip() == option
             or f"{option} is correct" in normalized
@@ -443,5 +562,35 @@ def validated_guided_steps(
             )
             for option in correct_options
         ):
-            raise QuizSessionError("failed-precondition", "The quiz guidance reveals an answer.")
-    return list(steps), list(steps_bm)
+            raise QuizSessionError("failed-precondition", "The quiz feedback reveals an answer.")
+
+    for text in (hint, hint_bm):
+        check(text)
+
+    live_values = {
+        token
+        for value in [*options, *options_bm]
+        if isinstance(value, str)
+        for token in _numeric_tokens(value)
+    }
+    for example_text in (example, example_bm):
+        if example_text is None:
+            continue
+        check(example_text)
+        reused = [token for token in _numeric_tokens(example_text) if token in live_values]
+        if reused:
+            raise QuizSessionError(
+                "failed-precondition",
+                "The quiz example reuses live question values.",
+            )
+
+
+def _numeric_tokens(value: str) -> list[str]:
+    """Return distinctive five-digit (or larger) values inside a string."""
+    return [
+        token.replace(" ", "")
+        for token in re.findall(r"\d[\d\s,]*\d|\d", value)
+        if len(token.replace(" ", "")) >= 5
+    ]
+
+

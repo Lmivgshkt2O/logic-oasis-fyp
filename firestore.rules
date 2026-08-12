@@ -84,6 +84,13 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // U15 material provenance, content digests, locators, and reviewer
+    // identities are server-only approval records. Clients may read only the
+    // approved active projection in `questions`.
+    match /contentSourceManifest/{materialId} {
+      allow read, write: if false;
+    }
+
     // U3 session and response documents are created and finalized only by
     // callable Functions through the Admin SDK. The app receives safe return
     // payloads, not direct document access.

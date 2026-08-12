@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:logic_oasis/shared/models/adaptive_assignment.dart';
 import 'package:logic_oasis/shared/models/ai_diagnosis.dart';
 import 'package:logic_oasis/shared/models/question_bank.dart';
+import 'package:logic_oasis/shared/models/topic.dart';
 import 'package:logic_oasis/shared/models/trusted_subtopic_progress.dart';
 import 'package:logic_oasis/shared/state/app_state.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -54,7 +55,7 @@ void main() {
     final state = AppState();
 
     expect(state.recommendedMission.topicId, 'whole_numbers_y4');
-    expect(state.recommendedMission.topicTitle, 'Whole Numbers up to 100 000');
+    expect(state.recommendedMission.topicTitle, 'Numbers and Operations');
     expect(state.recommendedMission.visibleCompletions, 0);
     expect(state.recommendedMission.isReadyToClaim, isFalse);
   });
@@ -75,7 +76,7 @@ void main() {
         sourceAttemptSequence: 1,
         analysisState: 'completed',
         displayCode: 'analysis_complete',
-        topicId: 'fractions_y4',
+        topicId: 'fractions_decimals_percentages_y4',
         yearLevel: 4,
         masteryProbability: 0.34,
         weakTopicPriorityScore: 0.82,
@@ -97,10 +98,19 @@ void main() {
       ),
     );
 
-    expect(state.recommendedAiDiagnosis!.topicId, 'fractions_y4');
-    expect(state.weakTopicInsight.topicId, 'fractions_y4');
+    expect(
+      state.recommendedAiDiagnosis!.topicId,
+      'fractions_decimals_percentages_y4',
+    );
+    expect(
+      state.weakTopicInsight.topicId,
+      'fractions_decimals_percentages_y4',
+    );
     expect(state.weakTopicInsight.reason, contains('Grey Box AI'));
-    expect(state.recommendedMission.topicId, 'fractions_y4');
+    expect(
+      state.recommendedMission.topicId,
+      'fractions_decimals_percentages_y4',
+    );
   });
 
   test('year 4 FYP1 content exposes one secure adaptive-bank subtopic', () {
@@ -113,7 +123,7 @@ void main() {
     expect(subtopics, hasLength(5));
     final adaptiveSubtopic = subtopics.first;
     expect(adaptiveSubtopic.id, 'read_write_numbers');
-    expect(adaptiveSubtopic.questions, hasLength(24));
+    expect(adaptiveSubtopic.questions, hasLength(15));
     expect(
       adaptiveSubtopic.questions.map((question) => question.bankId).toSet(),
       containsAll(<String>[
@@ -340,10 +350,14 @@ void main() {
       );
       final subtopics = state.subtopicsForTopic(topic);
       expect(state.attempts, isEmpty);
-      expect(subtopics.first.isComplete, isTrue);
+      // U18: completion is a server BKT outcome; the immediate projection only
+      // records the attempt and unlocks the next step.
+      expect(subtopics.first.isComplete, isFalse);
+      expect(subtopics.first.accessUnlocked, isTrue);
+      expect(subtopics.first.isAnalysisPending, isTrue);
       expect(state.isSubtopicUnlocked(topic, subtopics[1]), isTrue);
       expect(subtopics[1].activeBankCount, 0);
-      expect(topic.progress, .2);
+      expect(topic.progress, 0);
     },
   );
 
@@ -445,7 +459,7 @@ void main() {
     );
 
     final fractions = state.topics.firstWhere(
-      (topic) => topic.id == 'fractions_y4',
+      (topic) => topic.id == 'fractions_decimals_percentages_y4',
     );
     final wholeNumbers = state.topics.firstWhere(
       (topic) => topic.id == 'whole_numbers_y4',
@@ -494,7 +508,9 @@ void main() {
     'saved unlocks remain open even before current progress qualifies',
     () async {
       SharedPreferences.setMockInitialValues({
-        'logic_oasis_unlocked_topics': <String>['fractions_y4'],
+        'logic_oasis_unlocked_topics': <String>[
+          'fractions_decimals_percentages_y4',
+        ],
         'logic_oasis_unlocked_subtopics': <String>[
           'whole_numbers_y4::place_digit_value',
         ],
@@ -508,7 +524,7 @@ void main() {
       );
       final subtopics = state.subtopicsForTopic(wholeNumbers);
       final fractions = state.topics.firstWhere(
-        (topic) => topic.id == 'fractions_y4',
+        (topic) => topic.id == 'fractions_decimals_percentages_y4',
       );
 
       expect(subtopics.first.progress, 0);
@@ -521,7 +537,7 @@ void main() {
   test('main topics unlock only after previous topic completion', () {
     final state = AppState();
     final fractions = state.topics.firstWhere(
-      (topic) => topic.id == 'fractions_y4',
+      (topic) => topic.id == 'fractions_decimals_percentages_y4',
     );
 
     expect(state.isTopicUnlocked(fractions), isFalse);
@@ -603,19 +619,24 @@ void main() {
       totalQuestions: 10,
     );
     state.saveQuizResult(
-      topicId: 'fractions_y4',
+      topicId: 'fractions_decimals_percentages_y4',
       correctCount: 3,
       totalQuestions: 10,
     );
 
-    expect(state.latestAttempt!.topicId, 'fractions_y4');
+    expect(
+      state.latestAttempt!.topicId,
+      'fractions_decimals_percentages_y4',
+    );
     expect(state.latestAttempt!.score, 30);
     expect(
       state.attempts.where((attempt) => attempt.topicId == 'whole_numbers_y4'),
       hasLength(1),
     );
     expect(
-      state.attempts.where((attempt) => attempt.topicId == 'fractions_y4'),
+      state.attempts.where(
+        (attempt) => attempt.topicId == 'fractions_decimals_percentages_y4',
+      ),
       hasLength(1),
     );
   });
@@ -678,5 +699,65 @@ void main() {
     expect(state.repairOasisArea('market_corner'), isFalse);
     expect(state.mutualAidEnergy, energyBefore - marketBefore.repairCost);
     expect(state.repairOasisArea('missing_area'), isFalse);
+  });
+
+  test('Year 4 local topics follow the textbook structure without duplicates',
+      () {
+    final state = AppState();
+    final year4 = state.topics
+        .where((topic) => topic.yearLevel == 4)
+        .toList();
+    expect(year4, hasLength(8));
+    expect(
+      year4.map((topic) => topic.id),
+      containsAll(<String>[
+        'whole_numbers_y4',
+        'fractions_decimals_percentages_y4',
+        'money_y4',
+        'time_y4',
+        'length_mass_volume_y4',
+        'space_y4',
+        'coordinates_ratio_proportion_y4',
+        'data_handling_y4',
+      ]),
+    );
+    expect(year4.map((topic) => topic.id), isNot(contains('fractions_y4')));
+    expect(year4.map((topic) => topic.id), isNot(contains('decimals_y4')));
+    expect(year4.map((topic) => topic.id), isNot(contains('percentages_y4')));
+  });
+
+  test('first topic of each year unlocks independently', () {
+    final state = AppState();
+    final year4First = state.topics.first;
+    final year5First = const Topic(
+      id: 'whole_numbers_y5',
+      title: 'Whole Numbers and Operations',
+      titleBm: 'Nombor Bulat dan Operasi',
+      area: 'a',
+      yearLevel: 5,
+      progress: 0,
+      mastery: 'Locked',
+    );
+    final year5Second = const Topic(
+      id: 'fractions_decimals_percentages_y5',
+      title: 'Fractions, Decimals, and Percentages',
+      titleBm: 'Pecahan, Perpuluhan dan Peratus',
+      area: 'a',
+      yearLevel: 5,
+      progress: 0,
+      mastery: 'Locked',
+    );
+    state.topics
+      ..clear()
+      ..addAll(<Topic>[year4First, year5First, year5Second]);
+
+    expect(state.isTopicUnlocked(year4First), isTrue);
+    // Year 5 does not wait for Year 4 completion.
+    expect(state.isTopicUnlocked(year5First), isTrue);
+    expect(state.isTopicUnlocked(year5Second), isFalse);
+
+    final completedYear5First = year5First.copyWith(progress: 0.6);
+    state.topics[1] = completedYear5First;
+    expect(state.isTopicUnlocked(year5Second), isTrue);
   });
 }

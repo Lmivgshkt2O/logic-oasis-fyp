@@ -15,6 +15,17 @@ class Subtopic {
     this.activeBankCount = 0,
     this.progress = 0,
     this.mastery = 'New',
+    this.completed = false,
+    this.accessUnlocked = false,
+    this.masteryProbability,
+    this.evidenceLevel,
+    this.recommendedLearningAction,
+    this.recommendationBasis,
+    this.recommendationTargetTopicId,
+    this.recommendationTargetSubtopicId,
+    this.projectionStatus,
+    this.bestCorrectRate,
+    this.lastCorrectRate,
     this.questions = const [],
   });
 
@@ -31,10 +42,42 @@ class Subtopic {
   final int activeBankCount;
   final double progress;
   final String mastery;
+  /// Server-derived mastery outcome (BKT completion), never a client score.
+  final bool completed;
+  /// Unlocks after any valid finalized attempt, independent of completion.
+  final bool accessUnlocked;
+  /// Safe BKT posterior from the server; null while pending or on fallback.
+  final double? masteryProbability;
+  final String? evidenceLevel;
+  final String? recommendedLearningAction;
+  final String? recommendationBasis;
+  final String? recommendationTargetTopicId;
+  final String? recommendationTargetSubtopicId;
+  final String? projectionStatus;
+  final double? bestCorrectRate;
+  final double? lastCorrectRate;
   final List<QuizQuestion> questions;
 
-  bool get isComplete =>
-      progress > 0.5 || mastery == 'Moderate' || mastery == 'Strong';
+  bool get isComplete => completed;
+
+  bool get isAttempted => accessUnlocked || completed;
+
+  bool get isAnalysisPending =>
+      isAttempted &&
+      (projectionStatus == 'finalized_pending_ai' ||
+          recommendationBasis == 'provisional_pending_ai');
+
+  bool get usesCorrectRateFallback =>
+      recommendationBasis == 'correct_rate_fallback';
+
+  /// The fraction shown on the subtopic card: BKT mastery when available,
+  /// the trusted quiz-progress rate only for the labelled fallback, and no
+  /// invented value while analysis is pending or before the first attempt.
+  double? get displayedMasteryFraction {
+    if (masteryProbability != null) return masteryProbability;
+    if (usesCorrectRateFallback) return bestCorrectRate;
+    return null;
+  }
 
   Subtopic copyWith({
     String? id,
@@ -50,6 +93,17 @@ class Subtopic {
     int? activeBankCount,
     double? progress,
     String? mastery,
+    bool? completed,
+    bool? accessUnlocked,
+    double? masteryProbability,
+    String? evidenceLevel,
+    String? recommendedLearningAction,
+    String? recommendationBasis,
+    String? recommendationTargetTopicId,
+    String? recommendationTargetSubtopicId,
+    String? projectionStatus,
+    double? bestCorrectRate,
+    double? lastCorrectRate,
     List<QuizQuestion>? questions,
   }) {
     return Subtopic(
@@ -66,6 +120,20 @@ class Subtopic {
       activeBankCount: activeBankCount ?? this.activeBankCount,
       progress: progress ?? this.progress,
       mastery: mastery ?? this.mastery,
+      completed: completed ?? this.completed,
+      accessUnlocked: accessUnlocked ?? this.accessUnlocked,
+      masteryProbability: masteryProbability ?? this.masteryProbability,
+      evidenceLevel: evidenceLevel ?? this.evidenceLevel,
+      recommendedLearningAction:
+          recommendedLearningAction ?? this.recommendedLearningAction,
+      recommendationBasis: recommendationBasis ?? this.recommendationBasis,
+      recommendationTargetTopicId:
+          recommendationTargetTopicId ?? this.recommendationTargetTopicId,
+      recommendationTargetSubtopicId:
+          recommendationTargetSubtopicId ?? this.recommendationTargetSubtopicId,
+      projectionStatus: projectionStatus ?? this.projectionStatus,
+      bestCorrectRate: bestCorrectRate ?? this.bestCorrectRate,
+      lastCorrectRate: lastCorrectRate ?? this.lastCorrectRate,
       questions: questions ?? this.questions,
     );
   }

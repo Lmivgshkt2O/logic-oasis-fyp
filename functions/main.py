@@ -84,13 +84,13 @@ from quiz_session import (
     client_response,
     client_session,
     response_document_id,
-    validated_guided_steps,
+    validate_answer_key_feedback,
+    validated_option_feedback,
 )
 
 
 QUESTION_COUNT = 5
-MIN_BANK_QUESTION_COUNT = 8
-MAX_BANK_QUESTION_COUNT = 10
+BANK_QUESTION_COUNT = 5
 SESSION_TTL_MINUTES = 30
 FUNCTION_REGION = "asia-southeast1"
 _TELEMETRY_FIELDS = frozenset({
@@ -279,8 +279,7 @@ def _bank_questions(
     question_ids = bank.get("questionIds")
     if (
         not isinstance(question_ids, list)
-        or len(question_ids) < MIN_BANK_QUESTION_COUNT
-        or len(question_ids) > MAX_BANK_QUESTION_COUNT
+        or len(question_ids) != BANK_QUESTION_COUNT
         or any(not isinstance(item, str) or not item for item in question_ids)
         or len(set(question_ids)) != len(question_ids)
     ):
@@ -348,7 +347,7 @@ def _bank_questions(
             or answer_index >= len(options)
         ):
             raise QuizSessionError("failed-precondition", "The active question bank has invalid answer content.")
-        validated_guided_steps(key, options, options_bm)
+        validate_answer_key_feedback(key, options, options_bm)
     return questions
 
 
@@ -477,6 +476,23 @@ def _compatible_adaptive_assignment(
         or mastery.get("sourceAttemptSequence") != source_sequence
     ):
         return None
+
+    # U17: a repeat cannot start until the runtime has finished analysing the
+    # assignment's source attempt. Respond with a retryable pending signal
+    # instead of silently reusing a stale or not-yet-ready projection.
+    status_snapshot = (
+        database.collection("studentAiStatuses").document(source_attempt_id).get()
+    )
+    analysis_state = (
+        dict(status_snapshot.to_dict() or {}).get("analysisState")
+        if status_snapshot.exists
+        else None
+    )
+    if analysis_state not in {"completed", "fallback", "failed"}:
+        raise QuizSessionError(
+            "analysis-pending",
+            "Your next practice plan is still being prepared. Please try again in a moment.",
+        )
 
     return {
         "assignmentId": assignment_id,
@@ -909,10 +925,18 @@ def submit_quiz_response(data: dict[str, Any], student_id: str) -> dict[str, Any
                 "positiveConfirmationBm": POSITIVE_CONFIRMATION_BM,
             })
         else:
-            guided_steps, guided_steps_bm = validated_guided_steps(
-                answer_key, options, question.get("optionsBm")
+            feedback = validated_option_feedback(
+                answer_key, selected_index, options, question.get("optionsBm")
             )
-            response.update({"guidedSteps": guided_steps, "guidedStepsBm": guided_steps_bm})
+            response.update({
+                "misconceptionCode": feedback["misconceptionCode"],
+                "feedbackHint": feedback["hint"],
+                "feedbackHintBm": feedback["hintBm"],
+                "feedbackExample": feedback["example"],
+                "feedbackExampleBm": feedback["exampleBm"],
+                "reviewFocus": feedback["reviewFocus"],
+                "reviewFocusBm": feedback["reviewFocusBm"],
+            })
         transaction.create(response_ref, response)
         transaction.update(session_ref, {"validatedResponseCount": firestore.Increment(1)})
         return response
@@ -974,6 +998,57 @@ def finalize_quiz_session(data: dict[str, Any], student_id: str) -> dict[str, An
             if response.get("validationStatus") != "validated" or response.get("questionId") != question_ids[index]:
                 raise QuizSessionError("failed-precondition", "Response lineage is invalid.")
             responses.append(response)
+        missed_question_ids = [
+            response["questionId"]
+            for response in responses
+            if response.get("serverIsCorrect") is not True
+        ]
+        question_refs = [
+            database.collection("questions").document(question_id)
+            for question_id in dict.fromkeys(missed_question_ids)
+        ]
+        question_snapshots = (
+            {
+                snapshot.reference.path: snapshot
+                for snapshot in transaction.get_all(question_refs)
+            }
+            if question_refs
+            else {}
+        )
+        review_items: list[dict[str, Any]] = []
+        for response in responses:
+            if response.get("serverIsCorrect") is True:
+                continue
+            review_focus = response.get("reviewFocus")
+            review_focus_bm = response.get("reviewFocusBm")
+            question_snapshot = question_snapshots.get(
+                database.collection("questions").document(
+                    response["questionId"]
+                ).path
+            )
+            if (
+                not question_snapshot
+                or not question_snapshot.exists
+                or not isinstance(review_focus, str)
+                or not review_focus.strip()
+                or not isinstance(review_focus_bm, str)
+                or not review_focus_bm.strip()
+            ):
+                raise QuizSessionError(
+                    "failed-precondition",
+                    "A missed question is missing its review focus.",
+                )
+            question = dict(question_snapshot.to_dict() or {})
+            review_items.append({
+                "questionId": response["questionId"],
+                "sequenceIndex": response["sequenceIndex"],
+                "questionText": question.get("questionText", ""),
+                "questionTextBm": question.get("questionTextBm", ""),
+                "questionType": question.get("questionType", ""),
+                "questionTypeBm": question.get("questionTypeBm", ""),
+                "reviewFocus": review_focus,
+                "reviewFocusBm": review_focus_bm,
+            })
         correct_count = sum(1 for response in responses if response.get("serverIsCorrect") is True)
         total = len(responses)
         sequence_ref = (
@@ -1020,6 +1095,7 @@ def finalize_quiz_session(data: dict[str, Any], student_id: str) -> dict[str, An
             "trustedScore": round(correct_count * 100 / total),
             "responseCount": total,
             "responseIds": [response["responseId"] for response in responses],
+            "reviewItems": review_items,
             "validationStatus": "finalized",
             "finalizationStatus": "finalized",
             "processingStatus": "pending",
@@ -1043,8 +1119,20 @@ def finalize_quiz_session(data: dict[str, Any], student_id: str) -> dict[str, An
                 "topicId": session["topicId"],
                 "subtopicId": session["subtopicId"],
                 "bestCorrectRate": best_correct_rate,
-                "completed": best_correct_rate > 0.5,
+                # U17: completion is a separate monotonic BKT outcome. A 0%
+                # attempt must never set it, and a completed subtopic is never
+                # reset by a weaker retry.
+                "completed": existing_mastery.get("completed") is True,
                 "masteryLevel": mastery_level,
+                # Every valid finalized attempt unlocks the next subtopic,
+                # including 0%. The runtime replaces this provisional repeat
+                # with the BKT-derived recommendation when analysis finishes.
+                "attempted": True,
+                "accessUnlocked": True,
+                "recommendedLearningAction": "repeat_subtopic",
+                "recommendationBasis": "provisional_pending_ai",
+                "recommendationTargetTopicId": session["topicId"],
+                "recommendationTargetSubtopicId": session["subtopicId"],
                 "lastSourceAttemptId": session["attemptId"],
                 "sourceAttemptSequence": source_attempt_sequence,
                 "projectionStatus": "finalized_pending_ai",
@@ -1077,6 +1165,7 @@ _ERROR_CODES: dict[str, https_fn.FunctionsErrorCode] = {
     "deadline-exceeded": https_fn.FunctionsErrorCode.DEADLINE_EXCEEDED,
     "resource-exhausted": https_fn.FunctionsErrorCode.RESOURCE_EXHAUSTED,
     "unavailable": https_fn.FunctionsErrorCode.UNAVAILABLE,
+    "analysis-pending": https_fn.FunctionsErrorCode.UNAVAILABLE,
 }
 
 

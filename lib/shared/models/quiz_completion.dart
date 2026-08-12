@@ -1,3 +1,5 @@
+import 'package:logic_oasis/shared/models/quiz_review_item.dart';
+
 class QuizCompletion {
   const QuizCompletion({
     required this.correctCount,
@@ -7,6 +9,7 @@ class QuizCompletion {
     this.totalQuestions,
     this.score,
     this.finalizationStatus = 'finalized',
+    this.reviewItems = const <QuizReviewItem>[],
   });
 
   final int correctCount;
@@ -16,6 +19,7 @@ class QuizCompletion {
   final int? totalQuestions;
   final int? score;
   final String finalizationStatus;
+  final List<QuizReviewItem> reviewItems;
 
   factory QuizCompletion.fromCallableData(Map<Object?, Object?> data) {
     int readInt(String key) {
@@ -31,6 +35,20 @@ class QuizCompletion {
       throw FormatException('Missing callable completion field: $key');
     }
 
+    final rawReviewItems = data['reviewItems'];
+    final reviewItems = <QuizReviewItem>[];
+    if (rawReviewItems != null) {
+      if (rawReviewItems is! List) {
+        throw const FormatException('Invalid callable reviewItems field.');
+      }
+      for (final item in rawReviewItems) {
+        if (item is! Map<Object?, Object?>) {
+          throw const FormatException('Invalid callable review item.');
+        }
+        reviewItems.add(QuizReviewItem.fromCallableData(item));
+      }
+    }
+
     return QuizCompletion(
       correctCount: readInt('correctCount'),
       totalQuestions: readInt('totalQuestions'),
@@ -39,6 +57,7 @@ class QuizCompletion {
       attemptId: readString('attemptId'),
       sessionId: readString('sessionId'),
       finalizationStatus: readString('finalizationStatus'),
+      reviewItems: reviewItems,
     );
   }
 }

@@ -66,14 +66,12 @@ class _WrongAnswerService implements QuizSessionGateway {
       sequenceIndex: pendingResponse.sequenceIndex,
       idempotencyKey: pendingResponse.idempotencyKey,
       isCorrect: false,
-      guidedSteps: const <String>[
-        'Read the place values from left to right.',
-        'Check every option against the same pattern.',
-      ],
-      guidedStepsBm: const <String>[
-        'Baca nilai tempat dari kiri ke kanan.',
-        'Semak setiap pilihan dengan pola yang sama.',
-      ],
+      feedbackHint: 'Twenty thousand has 20 groups of one thousand.',
+      feedbackHintBm: 'Dua puluh ribu mempunyai 20 kumpulan seribu.',
+      feedbackExample: 'In 43 007, the 43 shows 43 thousands.',
+      feedbackExampleBm: 'Dalam 43 007, angka 43 menunjukkan 43 ribu.',
+      reviewFocus: 'Check how many thousands are named before the ones.',
+      reviewFocusBm: 'Semak berapa ribu yang disebut sebelum sa.',
       validationStatus: 'validated',
     );
   }
@@ -104,13 +102,21 @@ void main() {
       await tester.tap(find.text('2 004'));
       await tester.pumpAndSettle();
 
-    expect(find.text("Let's review the steps"), findsOneWidget);
+      expect(find.text('Hint'), findsOneWidget);
       expect(
-        find.text('1. Read the place values from left to right.'),
+        find.text(
+          'Twenty thousand has 20 groups of one thousand.',
+        ),
         findsOneWidget,
       );
       expect(
-        find.text('2. Check every option against the same pattern.'),
+        find.text('Example: In 43 007, the 43 shows 43 thousands.'),
+        findsOneWidget,
+      );
+      expect(
+        find.text(
+          'Check how many thousands are named before the ones.',
+        ),
         findsOneWidget,
       );
       expect(find.text('Finish Quiz'), findsOneWidget);

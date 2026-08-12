@@ -11,9 +11,34 @@ const {
   questions: additionalBankQuestions,
   validateAdditionalQuestionBanks,
 } = require("./year4_whole_numbers_additional_banks");
+const {
+  questionBanks: year5ReadWriteQuestionBanks,
+  questions: year5BankQuestions,
+  validateQuestionBankSeed: validateYear5QuestionBankSeed,
+} = require("./year5_read_write_question_banks");
+const {
+  questionBanks: year6ReadWriteQuestionBanks,
+  questions: year6BankQuestions,
+  validateQuestionBankSeed: validateYear6QuestionBankSeed,
+} = require("./year6_read_write_question_banks");
+const {
+  DIFFICULTY_BANDS,
+  buildContentSourceManifest,
+  verifyApprovedContent,
+} = require("./content_source_manifest");
 
-const questionBanks = { ...readWriteQuestionBanks, ...additionalQuestionBanks };
-const allBankQuestions = [...bankQuestions, ...additionalBankQuestions];
+const questionBanks = {
+  ...readWriteQuestionBanks,
+  ...additionalQuestionBanks,
+  ...year5ReadWriteQuestionBanks,
+  ...year6ReadWriteQuestionBanks,
+};
+const allBankQuestions = [
+  ...bankQuestions,
+  ...additionalBankQuestions,
+  ...year5BankQuestions,
+  ...year6BankQuestions,
+];
 
 const seedPath = path.join(__dirname, "seed_data.json");
 const credentialCandidates = [
@@ -59,7 +84,8 @@ async function seedCollection(db, collectionName, documents) {
     const replaceDocument =
       collectionName === "questions" ||
       collectionName === "questionBanks" ||
-      collectionName === "questionAnswerKeys";
+      collectionName === "questionAnswerKeys" ||
+      collectionName === "contentSourceManifest";
     batch.set(ref, convertSpecialValues(documentData), {
       merge: !replaceDocument,
     });
@@ -112,6 +138,48 @@ async function reconcileCurrentQuestionAnswerKeys(db, answerKeys) {
   }
 }
 
+/// Removes curriculum documents that no longer belong to the current seed.
+/// The supervisor refinements renamed Year 4 topics and merged Fractions,
+/// Decimals, and Percentages into one textbook topic; without this step, old
+/// topic documents would keep appearing beside the new ones after a merge seed.
+async function reconcileCurrentTopicsAndSubtopics(db, topics, subtopics) {
+  const expectedTopicIds = new Set(Object.keys(topics));
+  const topicSnapshot = await db.collection('topics').get();
+  const obsoleteTopics = topicSnapshot.docs.filter(
+    (doc) => !expectedTopicIds.has(doc.id),
+  );
+  for (let start = 0; start < obsoleteTopics.length; start += 450) {
+    const batch = db.batch();
+    for (const document of obsoleteTopics.slice(start, start + 450)) {
+      batch.delete(document.ref);
+    }
+    await batch.commit();
+  }
+  if (obsoleteTopics.length > 0) {
+    console.log(
+      `Removed ${obsoleteTopics.length} obsolete topic document(s).`,
+    );
+  }
+
+  const expectedSubtopicIds = new Set(Object.keys(subtopics));
+  const subtopicSnapshot = await db.collection('subtopics').get();
+  const obsoleteSubtopics = subtopicSnapshot.docs.filter(
+    (doc) => !expectedSubtopicIds.has(doc.id),
+  );
+  for (let start = 0; start < obsoleteSubtopics.length; start += 450) {
+    const batch = db.batch();
+    for (const document of obsoleteSubtopics.slice(start, start + 450)) {
+      batch.delete(document.ref);
+    }
+    await batch.commit();
+  }
+  if (obsoleteSubtopics.length > 0) {
+    console.log(
+      `Removed ${obsoleteSubtopics.length} obsolete subtopic document(s).`,
+    );
+  }
+}
+
 function clientSafeLegacyQuestion(documentData) {
   const {
     answerIndex,
@@ -119,6 +187,11 @@ function clientSafeLegacyQuestion(documentData) {
     explanationBm,
     guidedSteps,
     guidedStepsBm,
+    feedbackByOption,
+    difficultyReview,
+    authorId,
+    reviewerId,
+    approvedAt,
     ...clientFields
   } = documentData;
   return {
@@ -130,11 +203,13 @@ function clientSafeLegacyQuestion(documentData) {
 
 function validateSecureQuestionSeed(secure) {
   const banks = Object.values(secure.questionBanks);
-  if (banks.length !== 7) {
-    throw new Error('Expected the three read/write banks and four follow-on Easy banks.');
+  if (banks.length !== 13) {
+    throw new Error(
+      'Expected seven Year 4 banks, three Year 5 banks, and three Year 6 banks.',
+    );
   }
   for (const bank of banks) {
-    if (bank.questionIds.length < 8 || bank.questionIds.length > 10) {
+    if (bank.questionIds.length !== 5) {
       throw new Error(`Invalid question count for ${bank.bankId}.`);
     }
   }
@@ -143,8 +218,30 @@ function validateSecureQuestionSeed(secure) {
     (question) => question.isActive === true,
   );
   for (const question of Object.values(secure.questions)) {
-    if ('answerIndex' in question || 'explanation' in question || 'explanationBm' in question || 'guidedSteps' in question || 'guidedStepsBm' in question) {
+    if (
+      'answerIndex' in question ||
+      'explanation' in question ||
+      'explanationBm' in question ||
+      'guidedSteps' in question ||
+      'guidedStepsBm' in question ||
+      'feedbackByOption' in question ||
+      'difficultyReview' in question ||
+      'authorId' in question ||
+      'reviewerId' in question ||
+      'approvedAt' in question
+    ) {
       throw new Error('Client-readable questions must not contain answer keys.');
+    }
+    if (question.isActive === true) {
+      if (
+        !('sourceReference' in question) ||
+        typeof question.sourceReference !== 'string' ||
+        question.sourceReference.trim() === ''
+      ) {
+        throw new Error(
+          `Client-readable question ${question.questionId} is missing sourceReference.`,
+        );
+      }
     }
   }
   if (Object.keys(secure.questionAnswerKeys).length !== activeQuestions.length) {
@@ -159,39 +256,41 @@ function validateSecureQuestionSeed(secure) {
       !Number.isInteger(key.answerIndex) ||
       key.answerIndex < 0 ||
       key.answerIndex >= question.options.length ||
-      typeof key.explanation !== 'string' ||
-      key.explanation.trim() === '' ||
-      typeof key.explanationBm !== 'string' ||
-      key.explanationBm.trim() === '' ||
       key.contentVersion !== question.contentVersion ||
       key.isActive !== question.isActive
     ) {
       throw new Error(`Server-only answer key is incomplete for ${question.questionId}.`);
     }
-    const steps = key.guidedSteps;
-    const stepsBm = key.guidedStepsBm;
-    if (
-      !Array.isArray(steps) || !Array.isArray(stepsBm) ||
-      steps.length < 2 || steps.length > 5 || steps.length !== stepsBm.length ||
-      [...steps, ...stepsBm].some((step) => typeof step !== 'string' || step.trim() === '')
-    ) {
-      throw new Error(`Guidance steps are incomplete for ${question.questionId}.`);
+    const feedback = key.feedbackByOption;
+    if (!feedback || typeof feedback !== 'object') {
+      throw new Error(`Option feedback is missing for ${question.questionId}.`);
     }
-    const correctOptions = [
-      question.options[key.answerIndex],
-      question.optionsBm[key.answerIndex],
-    ].filter((option) => typeof option === 'string' && option.trim().length >= 2)
-      .map((option) => option.trim().toLowerCase());
-    const answerPhrases = /the answer is|correct answer|answer:|choose option|jawapan ialah|jawapan yang betul|jawapan:|pilih pilihan/i;
-    if ([...steps, ...stepsBm].some((step) => {
-      const normalized = step.trim().toLowerCase().replace(/[^\w]+/g, ' ').trim();
-      return answerPhrases.test(step) || correctOptions.some((option) =>
-        normalized === option || normalized.includes(`${option} is correct`) ||
-        normalized.includes(`${option} ialah jawapan`) || normalized.includes(`${option} adalah jawapan`) ||
-        (normalized.includes(option) && /choose|select|pick|pilih/.test(normalized))
-      );
-    })) {
-      throw new Error(`Guidance steps reveal an answer for ${question.questionId}.`);
+    const wrongIndexes = question.options
+      .map((_, index) => index)
+      .filter((index) => index !== key.answerIndex);
+    for (const index of wrongIndexes) {
+      const entry = feedback[String(index)];
+      if (
+        !entry ||
+        typeof entry !== 'object' ||
+        !entry.misconceptionCode ||
+        !entry.hint ||
+        !entry.hintBm ||
+        !entry.reviewFocus ||
+        !entry.reviewFocusBm
+      ) {
+        throw new Error(`Incomplete option feedback for ${question.questionId} option ${index}.`);
+      }
+    }
+    const band = DIFFICULTY_BANDS[question.difficultyLevel];
+    const review = key.difficultyReview ?? {};
+    if (
+      !band ||
+      !band.cognitiveDemand.has(review.cognitiveDemand) ||
+      review.reasoningStepCount !== band.reasoningStepCount ||
+      review.transferRequired !== band.transferRequired
+    ) {
+      throw new Error(`Difficulty metadata mismatch for ${question.questionId}.`);
     }
   }
 }
@@ -199,6 +298,8 @@ function validateSecureQuestionSeed(secure) {
 function buildSecureQuestionSeed(seedData) {
   validateQuestionBankSeed();
   validateAdditionalQuestionBanks();
+  validateYear5QuestionBankSeed();
+  validateYear6QuestionBankSeed();
   const legacyQuestions = Object.fromEntries(
     Object.entries(seedData.questions ?? {}).map(([id, data]) => [
       id,
@@ -206,11 +307,18 @@ function buildSecureQuestionSeed(seedData) {
     ]),
   );
   const activeQuestions = Object.fromEntries(
-    allBankQuestions.map((item) => [item.id, item.client]),
+    allBankQuestions.map((item) => [
+      item.id,
+      // The Flutter client projection keeps the legacy `sourceReference`
+      // display field; the server-side contract stores the richer bilingual
+      // locators separately on `sourceLocator`/`sourceLocatorBm`.
+      { ...item.client, sourceReference: item.client.sourceLocator },
+    ]),
   );
   const answerKeys = Object.fromEntries(
     allBankQuestions.map((item) => [item.id, item.answerKey]),
   );
+  const contentSourceManifest = buildContentSourceManifest(allBankQuestions);
   const banksBySubtopic = Object.values(questionBanks).reduce((result, bank) => {
     const documentId = `${bank.topicId}_${bank.subtopicId}`;
     (result[documentId] ??= []).push(bank);
@@ -235,8 +343,16 @@ function buildSecureQuestionSeed(seedData) {
     questions: { ...legacyQuestions, ...activeQuestions },
     questionBanks,
     questionAnswerKeys: answerKeys,
+    contentSourceManifest,
   };
   validateSecureQuestionSeed(secure);
+  const contentErrors = verifyApprovedContent(
+    allBankQuestions,
+    contentSourceManifest,
+  );
+  if (contentErrors.length > 0) {
+    throw new Error(`Content approval verification failed:\n${contentErrors.join('\n')}`);
+  }
   return secure;
 }
 
@@ -265,6 +381,11 @@ async function main() {
   for (const [collectionName, documents] of Object.entries(secureSeedData)) {
     await seedCollection(db, collectionName, documents);
   }
+  await reconcileCurrentTopicsAndSubtopics(
+    db,
+    secureSeedData.topics,
+    secureSeedData.subtopics,
+  );
   await reconcileCurrentQuestionAnswerKeys(
     db,
     secureSeedData.questionAnswerKeys,

@@ -15,14 +15,39 @@ class FormulaForgePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
 
-    return LogicOasisScaffold(
-      children: [
+    return AnimatedBuilder(
+      animation: state,
+      builder: (context, _) => LogicOasisScaffold(
+        children: [
         LogicHeader(
           leading: const _ForgeVillageIcon(),
           title: 'Formula Forge',
           subtitle: state.t(
             'Practice topics that restore your oasis.',
             l10n.forgeSubtitle,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Center(
+          child: SegmentedButton<int>(
+            segments: <ButtonSegment<int>>[
+              ButtonSegment<int>(
+                value: 4,
+                label: Text(l10n.year4),
+              ),
+              ButtonSegment<int>(
+                value: 5,
+                label: Text(l10n.year5),
+              ),
+              ButtonSegment<int>(
+                value: 6,
+                label: Text(l10n.year6),
+              ),
+            ],
+            selected: <int>{state.yearLevel},
+            showSelectedIcon: false,
+            onSelectionChanged: (selection) =>
+                state.switchYear(selection.first),
           ),
         ),
         const SizedBox(height: 18),
@@ -54,7 +79,8 @@ class FormulaForgePage extends StatelessWidget {
           ),
           const SizedBox(height: 14),
         ],
-      ],
+        ],
+      ),
     );
   }
 

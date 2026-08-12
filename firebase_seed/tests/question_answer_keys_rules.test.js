@@ -46,6 +46,18 @@ async function main() {
         isActive: true,
       });
 
+      await setDoc(doc(adminDb, "contentSourceManifest", "en_y4"), {
+        materialId: "en_y4",
+        filename: "Mathematics Year 4 SK (DLP).pdf",
+        sha256: "private-material-checksum",
+        authorId: "content-author-supervisor",
+        reviewerId: "content-reviewer-supervisor",
+        approvedAt: new Date(),
+        questions: {
+          safe_q1: { sourceLocator: "p. 3", contentDigest: "private-digest" },
+        },
+      });
+
       await setDoc(doc(adminDb, "questionAnswerKeys", "safe_q1"), {
         questionId: "safe_q1",
         answerIndex: 1,
@@ -138,9 +150,17 @@ async function main() {
     await assertFails(getDoc(doc(anonymousDb, "questions", "safe_q1")));
     await assertFails(getDoc(doc(studentDb, "questionAnswerKeys", "safe_q1")));
     await assertFails(getDocs(collection(studentDb, "questionAnswerKeys")));
+    await assertFails(getDoc(doc(studentDb, "contentSourceManifest", "en_y4")));
+    await assertFails(getDocs(collection(studentDb, "contentSourceManifest")));
     await assertFails(
       setDoc(doc(studentDb, "questionAnswerKeys", "safe_q1"), {
         answerIndex: 0,
+      }),
+    );
+    await assertFails(
+      setDoc(doc(studentDb, "contentSourceManifest", "en_y4"), {
+        materialId: "en_y4",
+        filename: "forged.pdf",
       }),
     );
     await assertFails(
@@ -221,6 +241,7 @@ async function main() {
     await assertSucceeds(getDoc(doc(linkedParentDb, "studentAiStatuses", "attempt_safe")));
     await assertSucceeds(getDoc(doc(linkedParentDb, "adaptiveAssignments", "student_aiman_y4_read_write_numbers")));
     await assertSucceeds(getDoc(doc(linkedParentDb, "subtopicMastery", "student_aiman_y4_y4_whole_numbers_read_write_numbers")));
+    await assertFails(getDoc(doc(otherStudentDb, "subtopicMastery", "student_aiman_y4_y4_whole_numbers_read_write_numbers")));
     await assertSucceeds(getDoc(doc(linkedParentDb, "forumParticipationSummaries", "student_aiman_y4")));
     await assertFails(getDoc(doc(revokedParentDb, "studentAiStatuses", "attempt_safe")));
     await assertFails(getDoc(doc(otherParentDb, "forumParticipationSummaries", "student_aiman_y4")));

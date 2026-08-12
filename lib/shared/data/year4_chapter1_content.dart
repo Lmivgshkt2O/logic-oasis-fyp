@@ -6,9 +6,9 @@ import 'package:logic_oasis/shared/models/topic.dart';
 const _topicId = 'whole_numbers_y4';
 const _subtopicId = 'read_write_numbers';
 const _skillId = 'y4_whole_numbers_read_write';
-const _contentVersion = '2026.07.15';
-const _createdAt = '2026-07-15T00:00:00Z';
-const _source = 'KSSR Year 4 Whole Numbers 1.1.1';
+const _contentVersion = '2026.08.12';
+const _createdAt = '2026-08-12T00:00:00Z';
+const _source = 'KSSR Year 4: Whole Numbers 1.1.1';
 
 final List<QuestionBank> year4ReadWriteNumberBanks = <QuestionBank>[
   QuestionBank(
@@ -68,23 +68,26 @@ final List<QuestionBank> year4WholeNumbersBanks = <QuestionBank>[
 final List<Topic> year4Chapter1Topics = <Topic>[
   Topic(
     id: _topicId,
-    title: 'Whole Numbers up to 100 000',
-    titleBm: 'Nombor Bulat hingga 100 000',
-    area: 'Read and write whole numbers with place-value awareness.',
-    areaBm: 'Baca dan tulis nombor bulat dengan kesedaran nilai tempat.',
+    title: 'Numbers and Operations',
+    titleBm: 'Nombor dan Operasi',
+    area:
+        'Whole numbers up to 100 000: read, write, compare, classify, and continue patterns.',
+    areaBm:
+        'Nombor bulat hingga 100 000: kenal, tulis, banding, kelaskan dan sambung pola.',
     yearLevel: 4,
     progress: 0,
     mastery: 'New',
     subtopics: <Subtopic>[
       Subtopic(
         id: _subtopicId,
-        title: 'Read and Write Numbers',
-        titleBm: 'Baca dan Tulis Nombor',
+        title: 'Recognise and Write Numbers',
+        titleBm: 'Kenal dan Tulis Nombor',
         order: 1,
-        description: 'Read and write whole numbers in numerals and words.',
-        descriptionBm: 'Baca dan tulis nombor bulat dalam angka dan perkataan.',
+        description: 'Recognise and write numbers in numerals and words.',
+        descriptionBm: 'Kenal dan tulis nombor dalam angka dan perkataan.',
         standardCode: _source,
-        sourcePages: 'Buku Teks Matematik Tahun 4, pp. 2-3',
+        sourcePages:
+            'Buku Teks Matematik Tahun 4, hlm. 3-4; Mathematics Year 4 SK (DLP), pp. 3-4',
         skillIds: <String>[_skillId],
         contentVersion: _contentVersion,
         activeBankCount: 3,
@@ -94,41 +97,44 @@ final List<Topic> year4Chapter1Topics = <Topic>[
       ),
       const Subtopic(
         id: 'place_digit_value',
-        title: 'Place Value and Digit Value',
-        titleBm: 'Nilai Tempat dan Nilai Digit',
+        title: 'Explore Numbers',
+        titleBm: 'Teroka Nombor',
         order: 2,
-        description: 'Identify place value and digit value.',
-        descriptionBm: 'Kenal nilai tempat dan nilai digit.',
+        description: 'Identify place value, digit value, and expanded form.',
+        descriptionBm: 'Kenal nilai tempat, nilai digit dan bentuk cerakin.',
         standardCode: 'KSSR Year 4: Whole Numbers 1.1.2',
-        sourcePages: 'Buku Teks Matematik Tahun 4, pp. 4-5',
+        sourcePages:
+            'Buku Teks Matematik Tahun 4, hlm. 5; Mathematics Year 4 SK (DLP), p. 5',
         skillIds: const <String>['y4_whole_numbers_place_value'],
-        contentVersion: '2026.07.20',
+        contentVersion: '2026.08.12',
         activeBankCount: 0,
       ),
       const Subtopic(
         id: 'compare_order_numbers',
-        title: 'Compare and Order Numbers',
+        title: 'Compare and Arrange Numbers',
         titleBm: 'Banding dan Susun Nombor',
         order: 3,
         description: 'Compare numbers and arrange them in order.',
         descriptionBm: 'Banding nombor dan susun mengikut tertib.',
         standardCode: 'KSSR Year 4: Whole Numbers 1.1.2',
-        sourcePages: 'Buku Teks Matematik Tahun 4, pp. 6-8',
+        sourcePages:
+            'Buku Teks Matematik Tahun 4, hlm. 6-8; Mathematics Year 4 SK (DLP), pp. 6-8',
         skillIds: const <String>['y4_whole_numbers_compare_order'],
-        contentVersion: '2026.07.20',
+        contentVersion: '2026.08.12',
         activeBankCount: 0,
       ),
       const Subtopic(
         id: 'odd_even_numbers',
-        title: 'Odd and Even Numbers',
-        titleBm: 'Nombor Ganjil dan Nombor Genap',
+        title: 'Even Numbers and Odd Numbers',
+        titleBm: 'Nombor Genap dan Nombor Ganjil',
         order: 4,
         description: 'Classify whole numbers as odd or even.',
         descriptionBm: 'Kelaskan nombor bulat sebagai ganjil atau genap.',
-        standardCode: 'KSSR Year 4: Whole Numbers 1.4.1',
-        sourcePages: 'Buku Teks Matematik Tahun 4, pp. 9-10',
+        standardCode: 'KSSR Year 4: Whole Numbers 1.2.1-1.2.2',
+        sourcePages:
+            'Buku Teks Matematik Tahun 4, hlm. 9-10; Mathematics Year 4 SK (DLP), pp. 9-10',
         skillIds: const <String>['y4_whole_numbers_odd_even'],
-        contentVersion: '2026.07.20',
+        contentVersion: '2026.08.12',
         activeBankCount: 0,
       ),
       const Subtopic(
@@ -138,10 +144,11 @@ final List<Topic> year4Chapter1Topics = <Topic>[
         order: 5,
         description: 'Recognise and continue number patterns.',
         descriptionBm: 'Kenal dan sambung pola nombor.',
-        standardCode: 'KSSR Year 4: Whole Numbers 1.5.1',
-        sourcePages: 'Buku Teks Matematik Tahun 4, p. 11',
+        standardCode: 'KSSR Year 4: Whole Numbers 1.5.1-1.5.2',
+        sourcePages:
+            'Buku Teks Matematik Tahun 4, hlm. 11-12; Mathematics Year 4 SK (DLP), pp. 11-12',
         skillIds: const <String>['y4_whole_numbers_patterns'],
-        contentVersion: '2026.07.20',
+        contentVersion: '2026.08.12',
         activeBankCount: 0,
       ),
     ],
@@ -160,7 +167,7 @@ QuestionBank _catalogueBank({
     skillId: skillId,
     yearLevel: 4,
     difficulty: QuestionDifficulty.easy,
-    contentVersion: '2026.07.20',
+    contentVersion: '2026.08.12',
     questions: const <QuizQuestion>[],
   );
 }
@@ -231,43 +238,6 @@ final List<QuizQuestion> _easyQuestions = <QuizQuestion>[
     <String>['38 029', '38 209', '30 809', '83 209'],
     <String>['38 029', '38 209', '30 809', '83 209'],
   ),
-  _question(
-    'easy_06',
-    'Easy',
-    0.2,
-    'Which numeral shows nine thousand eighty?',
-    'Angka manakah menunjukkan sembilan ribu lapan puluh?',
-    <String>['9 080', '9 800', '90 080', '9 008'],
-    <String>['9 080', '9 800', '90 080', '9 008'],
-  ),
-  _question(
-    'easy_07',
-    'Easy',
-    0.22,
-    'Which wording matches 43 000?',
-    'Perkataan manakah sepadan dengan 43 000?',
-    <String>[
-      'forty-three thousand',
-      'four thousand three hundred',
-      'forty thousand three',
-      'fourteen thousand three',
-    ],
-    <String>[
-      'empat puluh tiga ribu',
-      'empat ribu tiga ratus',
-      'empat puluh ribu tiga',
-      'empat belas ribu tiga',
-    ],
-  ),
-  _question(
-    'easy_08',
-    'Easy',
-    0.22,
-    'Write five thousand six in numerals.',
-    'Tulis lima ribu enam dalam angka.',
-    <String>['5 006', '5 060', '5 600', '50 006'],
-    <String>['5 006', '5 060', '5 600', '50 006'],
-  ),
 ];
 
 final List<QuizQuestion> _moderateQuestions = <QuizQuestion>[
@@ -336,53 +306,6 @@ final List<QuizQuestion> _moderateQuestions = <QuizQuestion>[
     <String>['60 529', '65 029', '60 259', '6 529'],
     <String>['60 529', '65 029', '60 259', '6 529'],
   ),
-  _question(
-    'moderate_06',
-    'Moderate',
-    0.5,
-    'Which wording is incorrect for 30 070?',
-    'Perkataan manakah tidak betul untuk 30 070?',
-    <String>[
-      'thirty thousand seventy',
-      'three thousand seventy',
-      '30 070',
-      'both A and C are correct',
-    ],
-    <String>[
-      'tiga puluh ribu tujuh puluh',
-      'tiga ribu tujuh puluh',
-      '30 070',
-      'kedua-dua A dan C betul',
-    ],
-  ),
-  _question(
-    'moderate_07',
-    'Moderate',
-    0.52,
-    'A pupil writes 19 009 as nineteen thousand ninety. Which numeral exposes the mistake?',
-    'Murid menulis 19 009 sebagai sembilan belas ribu sembilan puluh. Angka manakah menunjukkan kesilapan itu?',
-    <String>[
-      '19 009 has 9 ones, not 9 tens.',
-      '19 009 has 9 thousands.',
-      '19 009 has 90 ones.',
-      '19 009 is less than 1 000.',
-    ],
-    <String>[
-      '19 009 mempunyai 9 sa, bukan 9 puluh.',
-      '19 009 mempunyai 9 ribu.',
-      '19 009 mempunyai 90 sa.',
-      '19 009 kurang daripada 1 000.',
-    ],
-  ),
-  _question(
-    'moderate_08',
-    'Moderate',
-    0.52,
-    'Which numeral is formed by eighty thousand, two thousand, and sixty-five?',
-    'Angka manakah dibentuk oleh lapan puluh ribu, dua ribu dan enam puluh lima?',
-    <String>['82 065', '80 265', '82 650', '8 265'],
-    <String>['82 065', '80 265', '82 650', '8 265'],
-  ),
 ];
 
 final List<QuizQuestion> _hardQuestions = <QuizQuestion>[
@@ -411,8 +334,8 @@ final List<QuizQuestion> _hardQuestions = <QuizQuestion>[
     0.75,
     'Which number has the same wording pattern as 20 004?',
     'Nombor manakah mempunyai pola bacaan yang sama seperti 20 004?',
-    <String>['30 006', '30 060', '36 000', '3 006'],
-    <String>['30 006', '30 060', '36 000', '3 006'],
+    <String>['30 006', '30 060', '36 000', '30 600'],
+    <String>['30 006', '30 060', '36 000', '30 600'],
   ),
   _question(
     'hard_03',
@@ -460,43 +383,6 @@ final List<QuizQuestion> _hardQuestions = <QuizQuestion>[
       'Kedua-duanya sama.',
       '70 007 mempunyai 7 ribu.',
     ],
-  ),
-  _question(
-    'hard_06',
-    'Hard',
-    0.8,
-    'A number is read as ninety thousand, nine hundred and nine. Which numeral is correct?',
-    'Satu nombor dibaca sebagai sembilan puluh ribu, sembilan ratus sembilan. Angka manakah betul?',
-    <String>['90 909', '90 099', '99 009', '9 909'],
-    <String>['90 909', '90 099', '99 009', '9 909'],
-  ),
-  _question(
-    'hard_07',
-    'Hard',
-    0.82,
-    'Which correction keeps every place value in 54 060?',
-    'Pembetulan manakah mengekalkan setiap nilai tempat dalam 54 060?',
-    <String>[
-      'fifty-four thousand sixty',
-      'fifty-four thousand six hundred',
-      'five thousand four hundred sixty',
-      'fifty thousand four hundred six',
-    ],
-    <String>[
-      'lima puluh empat ribu enam puluh',
-      'lima puluh empat ribu enam ratus',
-      'lima ribu empat ratus enam puluh',
-      'lima puluh ribu empat ratus enam',
-    ],
-  ),
-  _question(
-    'hard_08',
-    'Hard',
-    0.82,
-    'Which numeral is closest to the phrase one hundred thousand less one?',
-    'Angka manakah paling hampir dengan frasa seratus ribu tolak satu?',
-    <String>['99 999', '100 001', '90 999', '9 999'],
-    <String>['99 999', '100 001', '90 999', '9 999'],
   ),
 ];
 

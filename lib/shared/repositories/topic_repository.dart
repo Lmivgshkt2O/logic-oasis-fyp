@@ -290,7 +290,13 @@ class TopicRepository {
     final contentVersion = data['contentVersion'];
     final language = data['language'];
     final createdAt = data['createdAt'];
-    final sourceReference = data['sourceReference'];
+    // The server contract stores the bilingual locators separately; keep the
+    // legacy `sourceReference` display field working when it is absent.
+    final sourceReference = data['sourceReference'] is String
+        ? data['sourceReference'] as String
+        : (data['sourceLocator'] is String
+              ? data['sourceLocator'] as String
+              : '');
 
     if (questionText is! String ||
         questionTextBm is! String ||
@@ -306,7 +312,7 @@ class TopicRepository {
         contentVersion is! String ||
         language is! String ||
         createdAt is! String ||
-        sourceReference is! String ||
+        sourceReference.isEmpty ||
         data['isActive'] == false) {
       return null;
     }

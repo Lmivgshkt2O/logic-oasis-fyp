@@ -13,8 +13,12 @@ class QuestionResponse {
     this.isCorrect,
     this.positiveConfirmation,
     this.positiveConfirmationBm,
-    this.guidedSteps = const <String>[],
-    this.guidedStepsBm = const <String>[],
+    this.feedbackHint,
+    this.feedbackHintBm,
+    this.feedbackExample,
+    this.feedbackExampleBm,
+    this.reviewFocus,
+    this.reviewFocusBm,
     this.validationStatus = 'pending',
   });
 
@@ -27,8 +31,12 @@ class QuestionResponse {
   final bool? isCorrect;
   final String? positiveConfirmation;
   final String? positiveConfirmationBm;
-  final List<String> guidedSteps;
-  final List<String> guidedStepsBm;
+  final String? feedbackHint;
+  final String? feedbackHintBm;
+  final String? feedbackExample;
+  final String? feedbackExampleBm;
+  final String? reviewFocus;
+  final String? reviewFocusBm;
   final String validationStatus;
 
   bool get isValidated => validationStatus == 'validated' && isCorrect != null;
@@ -40,8 +48,28 @@ class QuestionResponse {
         : positiveConfirmation ?? '';
   }
 
-  List<String> localizedGuidedSteps(bool isBahasaMelayu) =>
-      isBahasaMelayu && guidedStepsBm.isNotEmpty ? guidedStepsBm : guidedSteps;
+  String? localizedFeedbackHint(bool isBahasaMelayu) =>
+      isBahasaMelayu ? (feedbackHintBm ?? feedbackHint) : feedbackHint;
+
+  String? localizedFeedbackExample(bool isBahasaMelayu) => isBahasaMelayu
+      ? (feedbackExampleBm ?? feedbackExample)
+      : feedbackExample;
+
+  String? localizedReviewFocus(bool isBahasaMelayu) =>
+      isBahasaMelayu ? (reviewFocusBm ?? reviewFocus) : reviewFocus;
+
+  /// The bounded, answer-free lines shown after a wrong answer: the authored
+  /// hint, an optional different-number worked example, and the review focus.
+  List<String> localizedFeedbackLines(bool isBahasaMelayu) {
+    final hint = localizedFeedbackHint(isBahasaMelayu);
+    final example = localizedFeedbackExample(isBahasaMelayu);
+    final focus = localizedReviewFocus(isBahasaMelayu);
+    return <String>[
+      if (hint != null && hint.isNotEmpty) hint,
+      if (example != null && example.isNotEmpty) 'Example: $example',
+      if (focus != null && focus.isNotEmpty) focus,
+    ];
+  }
 
   Map<String, Object> toSubmissionData({
     required int responseTimeMs,
@@ -70,20 +98,32 @@ class QuestionResponse {
     final isCorrect = data['serverIsCorrect'] as bool?;
     final positiveConfirmation = _string(data['positiveConfirmation']);
     final positiveConfirmationBm = _string(data['positiveConfirmationBm']);
-    final guidedSteps = _stringList(data['guidedSteps']);
-    final guidedStepsBm = _stringList(data['guidedStepsBm']);
+    final feedbackHint = _string(data['feedbackHint']);
+    final feedbackHintBm = _string(data['feedbackHintBm']);
+    final feedbackExample = _string(data['feedbackExample']);
+    final feedbackExampleBm = _string(data['feedbackExampleBm']);
+    final reviewFocus = _string(data['reviewFocus']);
+    final reviewFocusBm = _string(data['reviewFocusBm']);
     final validationStatus = _string(data['validationStatus']) ?? 'pending';
     if (validationStatus == 'validated' && isCorrect != null) {
-      final hasGuidance =
-          guidedSteps.length >= 2 &&
-          guidedSteps.length <= 5 &&
-          guidedSteps.length == guidedStepsBm.length;
+      final hasHint =
+          (feedbackHint?.isNotEmpty ?? false) &&
+          (feedbackHintBm?.isNotEmpty ?? false);
+      final hasReviewFocus =
+          (reviewFocus?.isNotEmpty ?? false) &&
+          (reviewFocusBm?.isNotEmpty ?? false);
+      final hasExample = feedbackExample != null;
+      final hasExampleBm = feedbackExampleBm != null;
+      final examplePairIsValid = hasExample == hasExampleBm;
       final hasConfirmation =
           (positiveConfirmation?.isNotEmpty ?? false) &&
           (positiveConfirmationBm?.isNotEmpty ?? false);
       if (isCorrect
-          ? !hasConfirmation || guidedSteps.isNotEmpty
-          : !hasGuidance || hasConfirmation) {
+          ? !hasConfirmation || hasHint || hasReviewFocus
+          : !hasHint ||
+                !hasReviewFocus ||
+                !examplePairIsValid ||
+                hasConfirmation) {
         throw const FormatException('Invalid secure quiz feedback payload.');
       }
     }
@@ -97,8 +137,12 @@ class QuestionResponse {
       isCorrect: isCorrect,
       positiveConfirmation: positiveConfirmation,
       positiveConfirmationBm: positiveConfirmationBm,
-      guidedSteps: guidedSteps,
-      guidedStepsBm: guidedStepsBm,
+      feedbackHint: feedbackHint,
+      feedbackHintBm: feedbackHintBm,
+      feedbackExample: feedbackExample,
+      feedbackExampleBm: feedbackExampleBm,
+      reviewFocus: reviewFocus,
+      reviewFocusBm: reviewFocusBm,
       validationStatus: validationStatus,
     );
   }
@@ -115,13 +159,4 @@ class QuestionResponse {
   }
 
   static String? _string(Object? value) => value is String ? value : null;
-
-  static List<String> _stringList(Object? value) {
-    if (value == null) return const <String>[];
-    if (value is! List ||
-        value.any((item) => item is! String || item.isEmpty)) {
-      throw const FormatException('Invalid callable guidance field.');
-    }
-    return value.cast<String>();
-  }
 }

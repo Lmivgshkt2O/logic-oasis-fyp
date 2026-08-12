@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:logic_oasis/features/formula_forge/subtopic_page.dart';
 import 'package:logic_oasis/features/quiz/quiz_page.dart';
+import 'package:logic_oasis/features/quiz/result_page.dart';
 import 'package:logic_oasis/l10n/app_localizations.dart';
+import 'package:logic_oasis/shared/models/ai_diagnosis.dart';
 import 'package:logic_oasis/shared/models/question_response.dart';
 import 'package:logic_oasis/shared/models/quiz_completion.dart';
 import 'package:logic_oasis/shared/models/quiz_question.dart';
 import 'package:logic_oasis/shared/models/quiz_session.dart';
+import 'package:logic_oasis/shared/models/subtopic.dart';
+import 'package:logic_oasis/shared/models/topic.dart';
 import 'package:logic_oasis/shared/services/quiz_session_service.dart';
+import 'package:logic_oasis/shared/state/app_state.dart';
 
 const _quizSession = QuizSession(
   id: 'session-1',
@@ -79,6 +85,140 @@ class _FinalizingQuizSessionService implements QuizSessionGateway {
       timeTakenSeconds: 3,
     );
   }
+}
+
+QuizQuestion _question(String id, String subtopicId) {
+  return QuizQuestion(
+    id: id,
+    bankId: 'bank-$subtopicId',
+    topicId: 'topic-1',
+    subtopicId: subtopicId,
+    skillId: 'skill',
+    yearLevel: 4,
+    difficultyLevel: 'Easy',
+    estimatedDifficulty: .2,
+    contentVersion: 'test',
+    language: 'en',
+    createdAt: '2026-08-12',
+    question: 'Question for $subtopicId',
+    questionBm: 'Soalan $subtopicId',
+    options: <String>['a', 'b'],
+    optionsBm: <String>['a', 'b'],
+    sourceReference: 'Test',
+  );
+}
+
+Subtopic _subtopic(String id, {int order = 1}) {
+  return Subtopic(
+    id: id,
+    title: 'Step $id',
+    titleBm: 'Langkah $id',
+    order: order,
+    activeBankCount: 1,
+    questions: <QuizQuestion>[_question('q-$id', id)],
+  );
+}
+
+Topic _topic(String id, String title, List<Subtopic> subtopics) {
+  return Topic(
+    id: id,
+    title: title,
+    titleBm: title,
+    area: 'Area',
+    yearLevel: 4,
+    progress: 0,
+    mastery: 'New',
+    subtopics: subtopics,
+  );
+}
+
+class _NavigatingQuizSessionService implements QuizSessionGateway {
+  final List<String> startedSubtopicIds = <String>[];
+  int _attempt = 0;
+
+  @override
+  Future<QuizSession> startSession({
+    required String topicId,
+    required String subtopicId,
+    required int yearLevel,
+  }) async {
+    startedSubtopicIds.add(subtopicId);
+    return QuizSession(
+      id: 'session-$subtopicId-${startedSubtopicIds.length}',
+      attemptId: 'attempt-${_attempt++}',
+      assignmentId: 'assignment',
+      assignmentSource: 'cold_start_easy',
+      bankId: 'bank-$subtopicId',
+      topicId: topicId,
+      subtopicId: subtopicId,
+      yearLevel: yearLevel,
+      difficultyLevel: 'Easy',
+      contentVersion: 'test',
+      questionIds: <String>['q-$subtopicId'],
+      questions: <QuizQuestion>[_question('q-$subtopicId', subtopicId)],
+    );
+  }
+
+  @override
+  Future<QuestionResponse> submitResponse({
+    required QuestionResponse pendingResponse,
+    required int responseTimeMs,
+    int hintCount = 0,
+  }) async {
+    return QuestionResponse(
+      sessionId: pendingResponse.sessionId,
+      questionId: pendingResponse.questionId,
+      selectedIndex: pendingResponse.selectedIndex,
+      sequenceIndex: pendingResponse.sequenceIndex,
+      idempotencyKey: pendingResponse.idempotencyKey,
+      isCorrect: true,
+      positiveConfirmation: 'Confirmed by the server.',
+      validationStatus: 'validated',
+    );
+  }
+
+  @override
+  Future<QuizCompletion> finalizeSession(String sessionId) async {
+    return const QuizCompletion(
+      correctCount: 1,
+      totalQuestions: 1,
+      score: 100,
+      timeTakenSeconds: 3,
+      attemptId: 'attempt-final',
+    );
+  }
+}
+
+AiDiagnosisStreamFactory _diagnosisWith(
+  String action, {
+  String? targetTopicId,
+  String? targetSubtopicId,
+}) {
+  return (String attemptId,
+      {String? topicId, String? subtopicId, int? yearLevel}) {
+    return Stream<AiDiagnosis?>.value(
+      AiDiagnosis(
+        attemptId: attemptId,
+        studentId: 'student',
+        sourceAttemptSequence: 1,
+        analysisState: 'completed',
+        displayCode: 'analysis_completed',
+        recommendedLearningAction: action,
+        recommendationBasis: 'bkt_mastery',
+        recommendationTargetTopicId: targetTopicId,
+        recommendationTargetSubtopicId: targetSubtopicId,
+      ),
+    );
+  };
+}
+
+Future<void> _completeOneQuiz(WidgetTester tester) async {
+  await tester.tap(find.text('Step s1'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('a'));
+  await tester.pump();
+  await tester.tap(find.text('Finish Quiz'));
+  await tester.pumpAndSettle();
 }
 
 void main() {
@@ -155,4 +295,159 @@ void main() {
     expect(find.text('Subtopic page'), findsOneWidget);
     expect(find.text('Quiz Result'), findsNothing);
   });
+
+  testWidgets('repeat action restarts the same subtopic through the callable', (
+    tester,
+  ) async {
+    final state = AppState();
+    state.topics
+      ..clear()
+      ..add(_topic('topic-1', 'Topic One', <Subtopic>[_subtopic('s1')]));
+    final service = _NavigatingQuizSessionService();
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: SubtopicPage(
+          state: state,
+          topic: state.topics.first,
+          sessionService: service,
+          aiDiagnosisStreamFactory: _diagnosisWith('repeat_subtopic'),
+        ),
+      ),
+    );
+
+    await _completeOneQuiz(tester);
+    final practiseAgain = find.text('Practise Again');
+    await tester.ensureVisible(practiseAgain);
+    await tester.tap(practiseAgain);
+    await tester.pumpAndSettle();
+
+    expect(service.startedSubtopicIds, <String>['s1', 's1']);
+  });
+
+  testWidgets('advance action starts the next ordered subtopic', (tester) async {
+    final state = AppState();
+    state.topics
+      ..clear()
+      ..add(
+        _topic('topic-1', 'Topic One', <Subtopic>[
+          _subtopic('s1', order: 1),
+          _subtopic('s2', order: 2),
+        ]),
+      );
+    final service = _NavigatingQuizSessionService();
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: SubtopicPage(
+          state: state,
+          topic: state.topics.first,
+          sessionService: service,
+          aiDiagnosisStreamFactory: _diagnosisWith(
+            'advance',
+            targetTopicId: 'topic-1',
+            targetSubtopicId: 's2',
+          ),
+        ),
+      ),
+    );
+
+    await _completeOneQuiz(tester);
+    final moveOn = find.text('Move On');
+    await tester.ensureVisible(moveOn);
+    await tester.tap(moveOn);
+    await tester.pumpAndSettle();
+
+    expect(service.startedSubtopicIds, <String>['s1', 's2']);
+  });
+
+  testWidgets(
+    'advance from the last subtopic opens the next topic subtopic page',
+    (tester) async {
+      final state = AppState();
+      state.topics
+        ..clear()
+        ..addAll(<Topic>[
+          _topic('topic-1', 'Topic One', <Subtopic>[_subtopic('s1')]),
+          _topic('topic-2', 'Topic Two', const <Subtopic>[]),
+        ]);
+      final service = _NavigatingQuizSessionService();
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: SubtopicPage(
+            state: state,
+            topic: state.topics.first,
+            sessionService: service,
+            aiDiagnosisStreamFactory: _diagnosisWith(
+              'advance',
+              targetTopicId: 'topic-2',
+            ),
+          ),
+        ),
+      );
+
+      await _completeOneQuiz(tester);
+      final moveOn = find.text('Move On');
+      await tester.ensureVisible(moveOn);
+      await tester.tap(moveOn);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Topic Two'), findsWidgets);
+      expect(service.startedSubtopicIds, <String>['s1']);
+    },
+  );
+
+  testWidgets(
+    'advance with no next topic returns to Formula Forge with a message',
+    (tester) async {
+      final state = AppState();
+      state.topics
+        ..clear()
+        ..add(_topic('topic-1', 'Topic One', <Subtopic>[_subtopic('s1')]));
+      final service = _NavigatingQuizSessionService();
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: Column(
+                children: <Widget>[
+                  const Text('Formula Forge'),
+                  FilledButton(
+                    onPressed: () => Navigator.of(context).push<void>(
+                      MaterialPageRoute<void>(
+                        builder: (_) => SubtopicPage(
+                          state: state,
+                          topic: state.topics.first,
+                          sessionService: service,
+                          aiDiagnosisStreamFactory: _diagnosisWith('advance'),
+                        ),
+                      ),
+                    ),
+                    child: const Text('Open topic'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open topic'));
+      await tester.pumpAndSettle();
+      await _completeOneQuiz(tester);
+      final moveOn = find.text('Move On');
+      await tester.ensureVisible(moveOn);
+      await tester.tap(moveOn);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Formula Forge'), findsOneWidget);
+      expect(find.text('You completed all available topics!'), findsOneWidget);
+    },
+  );
 }
