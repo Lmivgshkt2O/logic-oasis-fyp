@@ -94,6 +94,133 @@ void main() {
     );
   });
 
+  test('composite author guidance renders author-only messages', () {
+    const service = ForumAiStatusService();
+    const correction = ForumAnswerFeedback(
+      state: 'completed',
+      label: 'correction_needed',
+      message: '',
+      correctness: 'incorrect',
+      relevance: 'relevant',
+      reasoning: 'sufficient_reasoning',
+    );
+    expect(
+      service.statusText(correction),
+      contains('does not match the worked answer key'),
+    );
+    expect(
+      service.statusText(correction, isBahasaMelayu: true),
+      contains('tidak sepadan dengan kunci jawapan'),
+    );
+
+    const irrelevant = ForumAnswerFeedback(
+      state: 'completed',
+      label: 'may_be_irrelevant',
+      message: '',
+      correctness: 'correct',
+      relevance: 'irrelevant',
+      reasoning: 'sufficient_reasoning',
+    );
+    expect(
+      service.statusText(irrelevant),
+      contains('may not address the question'),
+    );
+
+    const verified = ForumAnswerFeedback(
+      state: 'completed',
+      label: 'verified',
+      message: '',
+      correctness: 'correct',
+      relevance: 'relevant',
+      reasoning: 'sufficient_reasoning',
+    );
+    expect(
+      service.statusText(verified),
+      contains('automated checks'),
+    );
+    expect(
+      service.statusText(
+        verified,
+        isBahasaMelayu: true,
+      ),
+      contains('semakan automatik'),
+    );
+
+    const needsReasoning = ForumAnswerFeedback(
+      state: 'completed',
+      label: 'needs_reasoning',
+      message: '',
+      correctness: 'correct',
+      relevance: 'relevant',
+      reasoning: 'needs_reasoning',
+    );
+    expect(
+      service.statusText(needsReasoning),
+      contains('Please add the steps'),
+    );
+  });
+
+  testWidgets('composite correction guidance is visible only to the author', (
+    tester,
+  ) async {
+    final answers = StreamController<List<ForumAnswer>>();
+    addTearDown(answers.close);
+    const question = ForumQuestion(
+      id: 'linked_q1_v1',
+      authorId: '',
+      title: 'Which numeral shows twenty thousand and four?',
+      text: 'Which numeral shows twenty thousand and four?',
+      mode: 'linked',
+      options: ['20 004', '24 000', '20 400', '20 040'],
+      optionsBm: ['20 004', '24 000', '20 400', '20 040'],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ForumDiscussionPage(
+          question: question,
+          state: AppState(),
+          answersStream: answers.stream,
+          blockedStudentIdsStream: Stream.value(const <String>{}),
+          authorFeedbackStreamForAnswer: (_) => Stream.value(
+            const ForumAnswerFeedback(
+              state: 'completed',
+              label: 'correction_needed',
+              message: '',
+              correctness: 'incorrect',
+              relevance: 'relevant',
+              reasoning: 'sufficient_reasoning',
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    answers.add([
+      const ForumAnswer(
+        id: 'linked_a1',
+        questionId: 'linked_q1_v1',
+        authorId: AppState.demoStudentId,
+        text: '',
+        mode: 'linked',
+        selectedOption: 1,
+        explanation: 'I compared the thousands digit.',
+        aiPublicState: 'none',
+        feedback: ForumAnswerFeedback(
+          state: 'queued',
+          label: 'uncertain',
+          message: '',
+        ),
+      ),
+    ]);
+    await tester.pump();
+    await tester.pump();
+
+    expect(
+      find.textContaining('does not match the worked answer key'),
+      findsOneWidget,
+    );
+  });
+
   test('linked discussion projection builds the forum question model', () {
     const discussion = LinkedDiscussion(
       id: 'linked_bank_q1_v1',

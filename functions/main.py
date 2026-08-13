@@ -37,7 +37,7 @@ from forum_runtime import (
     FORUM_RUNTIME_SERVICE_ACCOUNT,
     ForumRuntimeError,
     ForumRuntimeGateway,
-    load_forum_classifier,
+    load_forum_bundle,
 )
 from logic_oasis_ai.sinks.firestore_sink import adaptive_assignment_id, subtopic_mastery_id
 from parent_link_admin import (
@@ -1555,28 +1555,28 @@ def _active_forum_registry_documents() -> list[dict[str, Any]]:
 
 
 @lru_cache(maxsize=2)
-def _cached_verified_forum_classifier(
+def _cached_verified_forum_bundle(
     evidence_mode: str, code_revision: str, registry_payload: str,
 ) -> Any:
     registry_documents = json.loads(registry_payload)
-    classifier = load_forum_classifier(
+    bundle = load_forum_bundle(
         evidence_mode=evidence_mode, code_revision=code_revision,
         registry_documents=registry_documents,
     )
-    if classifier is None:
+    if bundle is None:
         # Do not pin a failed/missing verification for the life of a warm
         # instance. A repaired deployment may be retried on the next event.
         raise _ForumClassifierUnavailable
-    return classifier
+    return bundle
 
 
-def _forum_classifier() -> Any:
+def _forum_bundle() -> Any:
     try:
         registry_documents = _active_forum_registry_documents()
         registry_payload = json.dumps(
             registry_documents, sort_keys=True, separators=(",", ":"), default=str,
         )
-        return _cached_verified_forum_classifier(
+        return _cached_verified_forum_bundle(
             _resolved_string_param(FORUM_MODEL_EVIDENCE_MODE),
             _resolved_string_param(FORUM_RUNTIME_CODE_REVISION),
             registry_payload,
@@ -1622,7 +1622,7 @@ def processForumAnswer(event: firestore_fn.Event[Any]) -> None:
     data = snapshot.to_dict()
     gateway.record_answer(snapshot.id, data)
     gateway.process_answer(
-        snapshot.id, data, _forum_classifier(), event_id=getattr(event, "id", None),
+        snapshot.id, data, _forum_bundle(), event_id=getattr(event, "id", None),
     )
 
 
@@ -1644,7 +1644,7 @@ def reprocessForumAnswer(event: firestore_fn.Event[Any]) -> None:
     ForumRuntimeGateway(firestore_db()).process_answer(
         after.id,
         after_data,
-        _forum_classifier(),
+        _forum_bundle(),
         event_id=getattr(event, "id", None),
     )
 

@@ -17,6 +17,7 @@ from firebase_admin import firestore
 
 if TYPE_CHECKING:
     from logic_oasis_ai.forum_ai.classifier import ForumTextClassifier
+    from logic_oasis_ai.forum_ai.relevance import ForumRelevanceClassifier
 LOGGER = logging.getLogger(__name__)
 SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
 
@@ -26,9 +27,11 @@ FORUM_MODEL_MANIFEST_PATH = Path(__file__).resolve().parent / "forum_model_manif
 KUALA_LUMPUR = ZoneInfo("Asia/Kuala_Lumpur")
 COUNTER_FIELDS = ("questionsPostedCount", "answersSubmittedCount", "acceptedAnswersCount", "helpfulReceivedCount")
 FORUM_AI_POLICY_VERSION = "forum-advisory-policy-v1"
+FORUM_COMPOSITE_POLICY_VERSION = "forum-composite-policy-v1"
 FORUM_AI_LEASE_DURATION = timedelta(minutes=5)
 FORUM_AI_MAX_ATTEMPTS = 3
 FORUM_RELEASE_MANIFEST_SCHEMA = "forum-model-release-manifest-v1"
+FORUM_RELEASE_MANIFEST_SCHEMA_V2 = "forum-model-release-manifest-v2"
 FORUM_CONTROLLED_MODE = "controlled_demo"
 FORUM_REAL_EVALUATED_MODE = "real_evaluated_only"
 FORUM_CONTROLLED_CLAIM_LEVEL = "controlled_demonstration_only"
@@ -44,6 +47,21 @@ FORUM_PUBLIC_STATE_NONE = "none"
 FORUM_PUBLIC_STATE_VERIFIED = "verified"
 FORUM_PUBLIC_STATE_MAY_BE_IRRELEVANT = "may_be_irrelevant"
 FORUM_PRIVATE_FEEDBACK_COLLECTION = "forumAiFeedback"
+FORUM_REASONING_MODEL_VERSION = "forum-controlled-demo-nb-v1"
+FORUM_RELEVANCE_MODEL_VERSION = "forum-relevance-nb-v1"
+REASONING_ABSTENTION_THRESHOLD = 0.60
+RELEVANCE_POSITIVE_THRESHOLD = 0.65
+RELEVANCE_NEGATIVE_THRESHOLD = 0.80
+COMPOSITE_POLICY_CONTRACT = {
+    "policyVersion": FORUM_COMPOSITE_POLICY_VERSION,
+    "correctness": "deterministic_protected_answer_key_v1",
+    "relevancePositiveThreshold": RELEVANCE_POSITIVE_THRESHOLD,
+    "relevanceNegativeThreshold": RELEVANCE_NEGATIVE_THRESHOLD,
+    "reasoningAbstentionThreshold": REASONING_ABSTENTION_THRESHOLD,
+    "freeFormNeverVerified": True,
+    "withholdOnAnyAbstention": True,
+    "noPublicNegativeCorrectnessLabel": True,
+}
 LEGACY_EMBEDDED_FEEDBACK_ALLOWED = frozenset({"state", "label", "revision"})
 LEGACY_EMBEDDED_FEEDBACK_DISALLOWED = frozenset({
     "message", "probability", "modelVersion", "calibrationState",
@@ -63,6 +81,13 @@ _CONTROLLED_RELEASE_VALUES = {
     "claimLevel": FORUM_CONTROLLED_CLAIM_LEVEL,
 }
 
+_V2_SHA256_FIELDS = (
+    "reasoningArtifactSha256", "relevanceArtifactSha256", "catalogueSha256",
+    "datasetSha256", "datasetManifestSha256", "splitManifestSha256",
+    "rubricSha256", "evaluationReportSha256", "candidateManifestSha256",
+    "bundleManifestSha256",
+)
+
 
 @dataclass(frozen=True)
 class ForumAiClaim:
@@ -77,6 +102,26 @@ class ForumAiClaim:
     attempt_count: int
     event_id: str
     claim_level: str = FORUM_UNVALIDATED_CLAIM_LEVEL
+
+
+@dataclass(frozen=True)
+class ForumAiBundle:
+    reasoning: Any
+    relevance: Any
+    policy: Mapping[str, Any]
+    release_id: str
+    reasoning_artifact_identity: str
+    relevance_artifact_identity: str
+    claim_level: str = FORUM_CONTROLLED_CLAIM_LEVEL
+
+
+@dataclass(frozen=True)
+class ForumOutcome:
+    """One completed composite (or legacy advisory) result for an answer."""
+    public_state: str
+    private: Mapping[str, Any]
+    run_bindings: Mapping[str, Any]
+    state: str = "completed"
 
 
 class ForumRuntimeError(ValueError):
@@ -144,6 +189,22 @@ def _answer_analysis_text(data: Mapping[str, Any]) -> str | None:
     return value.strip() if isinstance(value, str) else None
 
 
+def _answer_content_hash(data: Mapping[str, Any]) -> str | None:
+    """Revision-bound fingerprint of the analysable answer content.
+
+    Includes the explanation (or legacy free-form text) and, for linked
+    answers, the selected option, so a swapped option or edited explanation
+    fences the stale run without a re-read of the source document.
+    """
+    text = _answer_analysis_text(data)
+    if text is None:
+        return None
+    return sha256(json.dumps({
+        "text": text,
+        "selectedOption": data.get("selectedOption"),
+    }, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+
+
 def _linked_discussion_id(question_id: str, content_version: str) -> str:
     return f"{LINKED_DISCUSSION_PREFIX}{question_id}_{content_version}"
 
@@ -186,6 +247,45 @@ def _feedback_payload(
     }
 
 
+def _composite_feedback_payload(
+    *,
+    outcome: Mapping[str, Any],
+    revision: int,
+    logical_inference_id: str,
+    bundle: ForumAiBundle,
+    source_question_id: str | None,
+    source_content_version: str | None,
+    reasoning_probability: float | None,
+    relevance_probability: float | None,
+) -> dict[str, Any]:
+    """Author-only composite guidance projection (never client-written)."""
+    return {
+        "state": "completed",
+        "label": outcome["privateLabel"],
+        "message": outcome["message"],
+        "probability": reasoning_probability,
+        "relevanceProbability": relevance_probability,
+        "modelVersion": bundle.reasoning.model_version,
+        "relevanceModelVersion": bundle.relevance.model_version,
+        "calibrationState": "not_calibrated",
+        "revision": revision,
+        "logicalInferenceId": logical_inference_id,
+        "correctness": outcome["correctness"],
+        "relevance": outcome["relevance"],
+        "reasoning": outcome["reasoning"],
+        "correctnessGuidance": outcome["correctnessGuidance"],
+        "relevanceGuidance": outcome["relevanceGuidance"],
+        "reasoningGuidance": outcome["reasoningGuidance"],
+        "relevancePositiveThreshold": RELEVANCE_POSITIVE_THRESHOLD,
+        "relevanceNegativeThreshold": RELEVANCE_NEGATIVE_THRESHOLD,
+        "reasoningAbstentionThreshold": REASONING_ABSTENTION_THRESHOLD,
+        "policyVersion": FORUM_COMPOSITE_POLICY_VERSION,
+        "sourceQuestionId": source_question_id,
+        "sourceContentVersion": source_content_version,
+        "updatedAt": firestore.SERVER_TIMESTAMP,
+    }
+
+
 def _public_answer_projection(
     *, state: str, logical_inference_id: str, revision: int,
 ) -> dict[str, Any]:
@@ -196,14 +296,188 @@ def _public_answer_projection(
     probabilities, thresholds, and component diagnostics stay in the
     author-only ``forumAiFeedback`` projection.
     """
-    # The composite gate computes verified/may_be_irrelevant later (U4).
-    # Reasoning-only U1 outcomes are always the neutral public state.
-    public_state = FORUM_PUBLIC_STATE_NONE
+    public_state = (
+        state
+        if state in {
+            FORUM_PUBLIC_STATE_NONE,
+            FORUM_PUBLIC_STATE_VERIFIED,
+            FORUM_PUBLIC_STATE_MAY_BE_IRRELEVANT,
+        }
+        else FORUM_PUBLIC_STATE_NONE
+    )
     return {
         "aiPublicState": public_state,
         "aiRunId": logical_inference_id,
         "aiRevision": revision,
     }
+
+
+def composite_decision(
+    *,
+    mode: str,
+    reasoning_label: str,
+    relevance_label: str,
+    correctness: str,
+) -> dict[str, Any]:
+    """Apply the frozen composite policy to one answer.
+
+    ``correctness`` is one of ``correct``, ``incorrect``, ``unavailable``, or
+    ``not_applicable``. Public state is emitted only when every applicable
+    component is non-abstaining and the protected key is authoritative.
+    """
+    if mode == FORUM_MODE_FREE_FORM:
+        if relevance_label == "irrelevant":
+            public_state = FORUM_PUBLIC_STATE_MAY_BE_IRRELEVANT
+            private_label = "may_be_irrelevant"
+        else:
+            public_state = FORUM_PUBLIC_STATE_NONE
+            private_label = (
+                "needs_reasoning"
+                if reasoning_label == "needs_reasoning"
+                else "advisory"
+            )
+        guidance = {
+            "correctnessGuidance": None,
+            "relevanceGuidance": (
+                "This explanation may not address the question directly. "
+                "Try explaining how you worked out this question."
+                if relevance_label == "irrelevant"
+                else None
+            ),
+            "reasoningGuidance": (
+                "Please add the steps or mathematical reason behind your answer "
+                "so a peer can learn from it."
+                if reasoning_label == "needs_reasoning"
+                else None
+            ),
+        }
+        return {
+            "publicState": public_state,
+            "privateLabel": private_label,
+            "correctness": "not_applicable",
+            "relevance": relevance_label,
+            "reasoning": reasoning_label,
+            "message": _composite_message(private_label),
+            **guidance,
+        }
+
+    if correctness == "unavailable":
+        return {
+            "publicState": FORUM_PUBLIC_STATE_NONE,
+            "privateLabel": "advisory",
+            "correctness": "unavailable",
+            "relevance": relevance_label,
+            "reasoning": reasoning_label,
+            "message": (
+                "Your answer is saved. Verification is unavailable for this "
+                "question version, so no badge can be shown."
+            ),
+            "correctnessGuidance": None,
+            "relevanceGuidance": None,
+            "reasoningGuidance": None,
+        }
+    if (
+        reasoning_label == "uncertain"
+        or relevance_label == "uncertain"
+    ):
+        return {
+            "publicState": FORUM_PUBLIC_STATE_NONE,
+            "privateLabel": "uncertain",
+            "correctness": (
+                "correct" if correctness == "correct" else "incorrect"
+            ),
+            "relevance": relevance_label,
+            "reasoning": reasoning_label,
+            "message": (
+                "Your answer is saved. We could not reach a confident "
+                "automated decision, so no badge is shown."
+            ),
+            "correctnessGuidance": None,
+            "relevanceGuidance": None,
+            "reasoningGuidance": None,
+        }
+    if correctness == "incorrect":
+        return {
+            "publicState": FORUM_PUBLIC_STATE_NONE,
+            "privateLabel": "correction_needed",
+            "correctness": "incorrect",
+            "relevance": relevance_label,
+            "reasoning": reasoning_label,
+            "message": (
+                "Your selected final answer does not match the worked answer "
+                "key. Check the steps again and edit your answer if you wish."
+            ),
+            "correctnessGuidance": (
+                "Your selected final answer does not match the worked answer "
+                "key. No public incorrect label is shown; only you can see this."
+            ),
+            "relevanceGuidance": None,
+            "reasoningGuidance": None,
+        }
+    if relevance_label == "irrelevant":
+        return {
+            "publicState": FORUM_PUBLIC_STATE_MAY_BE_IRRELEVANT,
+            "privateLabel": "may_be_irrelevant",
+            "correctness": "correct",
+            "relevance": "irrelevant",
+            "reasoning": reasoning_label,
+            "message": (
+                "This explanation may not address the question directly. "
+                "Try explaining how you worked out this question."
+            ),
+            "correctnessGuidance": None,
+            "relevanceGuidance": (
+                "A public advisory note may show that this answer may be "
+                "irrelevant. Only you can see this private guidance."
+            ),
+            "reasoningGuidance": None,
+        }
+    if reasoning_label == "needs_reasoning":
+        return {
+            "publicState": FORUM_PUBLIC_STATE_NONE,
+            "privateLabel": "needs_reasoning",
+            "correctness": "correct",
+            "relevance": "relevant",
+            "reasoning": "needs_reasoning",
+            "message": (
+                "Please add the steps or mathematical reason behind your "
+                "answer so a peer can learn from it."
+            ),
+            "correctnessGuidance": None,
+            "relevanceGuidance": None,
+            "reasoningGuidance": (
+                "Please add the steps or mathematical reason behind your "
+                "answer so a peer can learn from it."
+            ),
+        }
+    return {
+        "publicState": FORUM_PUBLIC_STATE_VERIFIED,
+        "privateLabel": "verified",
+        "correctness": "correct",
+        "relevance": "relevant",
+        "reasoning": "sufficient_reasoning",
+        "message": (
+            "Your final answer and explanation passed the system's automated "
+            "checks. This is an advisory result, not human verification."
+        ),
+        "correctnessGuidance": None,
+        "relevanceGuidance": None,
+        "reasoningGuidance": None,
+    }
+
+
+def _composite_message(private_label: str) -> str:
+    if private_label == "may_be_irrelevant":
+        return (
+            "This explanation may not address the question directly. "
+            "Try explaining how you worked out this question."
+        )
+    if private_label == "needs_reasoning":
+        return (
+            "Please add the steps or mathematical reason behind your answer "
+            "so a peer can learn from it."
+        )
+    return "Your answer is saved. You can add a little more about how you reached it if you wish."
 
 
 def _transaction_snapshot(transaction: Any, reference: Any) -> Any:
@@ -775,18 +1049,16 @@ class ForumRuntimeGateway:
         transaction: Any,
         answer_ref: Any,
         *,
-        state: str,
-        prediction: Any,
-        revision: int,
-        logical_inference_id: str,
+        public_state: str,
+        private_payload: Mapping[str, Any],
     ) -> None:
         """Write the public advisory projection and the author-only feedback."""
         transaction.set(
             answer_ref,
             _public_answer_projection(
-                state=state,
-                logical_inference_id=logical_inference_id,
-                revision=revision,
+                state=public_state,
+                logical_inference_id=str(private_payload["logicalInferenceId"]),
+                revision=int(private_payload["revision"]),
             ),
             merge=True,
         )
@@ -795,20 +1067,173 @@ class ForumRuntimeGateway:
         ).document(answer_ref.id)
         transaction.set(
             feedback_ref,
-            _feedback_payload(
-                state=state,
-                prediction=prediction,
-                revision=revision,
-                logical_inference_id=logical_inference_id,
-            ),
+            dict(private_payload),
             merge=True,
+        )
+
+    def _resolve_linked_correctness(
+        self, data: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Resolve the protected answer key for a linked answer.
+
+        The key is never copied into the public answer document, model input,
+        run records, or guidance; only the deterministic correctness verdict
+        and the authoritative source bindings are derived server-side.
+        """
+        discussion_id = data.get("questionId")
+        unavailable = {
+            "status": "unavailable", "answerIndex": None,
+            "sourceQuestionId": None, "sourceContentVersion": None,
+            "prompt": None,
+        }
+        if not isinstance(discussion_id, str) or not discussion_id:
+            return unavailable
+        discussion_ref = self.database.collection("forumQuestions").document(
+            discussion_id
+        )
+
+        @firestore.transactional
+        def resolve(transaction: Any) -> dict[str, Any]:
+            discussion = _transaction_snapshot(
+                transaction, discussion_ref,
+            ) or _MissingSnapshot()
+            if not discussion.exists:
+                return unavailable
+            discussion_data = discussion.to_dict()
+            if discussion_data.get("mode") != FORUM_MODE_LINKED:
+                return unavailable
+            source_question_id = discussion_data.get("sourceQuestionId")
+            source_content_version = discussion_data.get("sourceContentVersion")
+            prompt = (discussion_data.get("promptSnapshot") or {}).get(
+                "questionText"
+            )
+            if (
+                not isinstance(source_question_id, str)
+                or not source_question_id
+                or not isinstance(source_content_version, str)
+                or not source_content_version
+            ):
+                return {
+                    **unavailable,
+                    "sourceQuestionId": source_question_id,
+                    "sourceContentVersion": source_content_version,
+                    "prompt": prompt,
+                }
+            key_ref = self.database.collection(
+                "questionAnswerKeys"
+            ).document(source_question_id)
+            key_snapshot = _transaction_snapshot(
+                transaction, key_ref,
+            ) or _MissingSnapshot()
+            key = key_snapshot.to_dict() if key_snapshot.exists else {}
+            answer_index = key.get("answerIndex")
+            valid = (
+                key_snapshot.exists
+                and key.get("questionId") == source_question_id
+                and key.get("contentVersion") == source_content_version
+                and key.get("isActive") is True
+                and isinstance(answer_index, int)
+                and not isinstance(answer_index, bool)
+                and 0 <= answer_index < LINKED_OPTION_COUNT
+            )
+            return {
+                "status": "valid" if valid else "unavailable",
+                "answerIndex": answer_index if valid else None,
+                "sourceQuestionId": source_question_id,
+                "sourceContentVersion": source_content_version,
+                "prompt": prompt,
+            }
+
+        return resolve(self.database.transaction())
+
+    def _evaluate_composite(
+        self,
+        data: Mapping[str, Any],
+        bundle: ForumAiBundle,
+        *,
+        logical_inference_id: str,
+    ) -> ForumOutcome:
+        """Run deterministic correctness, relevance, and reasoning together."""
+        mode = data.get("mode", FORUM_MODE_FREE_FORM)
+        source = (
+            self._resolve_linked_correctness(data)
+            if mode == FORUM_MODE_LINKED
+            else {
+                "status": "unavailable", "answerIndex": None,
+                "sourceQuestionId": None, "sourceContentVersion": None,
+                "prompt": None,
+            }
+        )
+        text = _answer_analysis_text(data) or ""
+        reasoning_prediction = bundle.reasoning.predict(text)
+        reasoning_label = str(reasoning_prediction.label)
+        reasoning_code = {
+            "sufficient_reasoning": "sufficient_reasoning",
+            "needs_reasoning": "needs_reasoning",
+            "uncertain": "uncertain",
+        }.get(reasoning_label, "uncertain")
+        prompt = source.get("prompt") or ""
+        relevance_prediction = bundle.relevance.predict(prompt, text)
+        relevance_label = str(relevance_prediction.label)
+        if mode == FORUM_MODE_LINKED and source["status"] == "valid":
+            correctness = (
+                "correct"
+                if data.get("selectedOption") == source["answerIndex"]
+                else "incorrect"
+            )
+        elif mode == FORUM_MODE_LINKED:
+            correctness = "unavailable"
+        else:
+            correctness = "not_applicable"
+        decision = composite_decision(
+            mode=mode,
+            reasoning_label=reasoning_code,
+            relevance_label=relevance_label,
+            correctness=correctness,
+        )
+        private = _composite_feedback_payload(
+            outcome=decision,
+            revision=int(data.get("revision", 1)),
+            logical_inference_id=logical_inference_id,
+            bundle=bundle,
+            source_question_id=source.get("sourceQuestionId"),
+            source_content_version=source.get("sourceContentVersion"),
+            reasoning_probability=float(reasoning_prediction.probability),
+            relevance_probability=float(relevance_prediction.probability),
+        )
+        run_bindings: dict[str, Any] = {
+            "sourceQuestionId": source.get("sourceQuestionId"),
+            "sourceContentVersion": source.get("sourceContentVersion"),
+            "selectedOption": data.get("selectedOption"),
+            "explanationHash": sha256(text.encode("utf-8")).hexdigest(),
+            "reasoningModelVersion": bundle.reasoning.model_version,
+            "relevanceModelVersion": bundle.relevance.model_version,
+            "reasoningArtifactIdentity": bundle.reasoning_artifact_identity,
+            "relevanceArtifactIdentity": bundle.relevance_artifact_identity,
+            "policyVersion": FORUM_COMPOSITE_POLICY_VERSION,
+            "relevancePositiveThreshold": RELEVANCE_POSITIVE_THRESHOLD,
+            "relevanceNegativeThreshold": RELEVANCE_NEGATIVE_THRESHOLD,
+            "reasoningAbstentionThreshold": REASONING_ABSTENTION_THRESHOLD,
+            "releaseId": bundle.release_id,
+            "composite": {
+                "publicState": decision["publicState"],
+                "correctness": decision["correctness"],
+                "relevance": decision["relevance"],
+                "reasoning": decision["reasoning"],
+                "privateLabel": decision["privateLabel"],
+            },
+        }
+        return ForumOutcome(
+            public_state=decision["publicState"],
+            private=private,
+            run_bindings=run_bindings,
         )
 
     def process_answer(
         self,
         answer_id: str,
         data: Mapping[str, Any],
-        classifier: ForumTextClassifier | None,
+        classifier: Any,
         *,
         event_id: str | None = None,
         now: datetime | None = None,
@@ -834,37 +1259,62 @@ class ForumRuntimeGateway:
                 event_id=audit_event_id,
                 error=error,
             )
-        model_version = classifier.model_version if classifier is not None else "safe-fallback-v1"
-        artifact_identity = (
-            str(getattr(classifier, "artifact_sha256", model_version))
-            if classifier is not None else model_version
-        )
-        claim_level = (
-            str(getattr(classifier, "claim_level", FORUM_UNVALIDATED_CLAIM_LEVEL))
-            if classifier is not None else FORUM_FALLBACK_CLAIM_LEVEL
-        )
-        text_hash = _forum_text_hash(text)
-        if text_hash is None:
+        if isinstance(classifier, ForumAiBundle):
+            reasoning = classifier.reasoning
+            model_version = reasoning.model_version
+            artifact_identity = str(
+                getattr(reasoning, "artifact_sha256", model_version)
+            )
+            relevance_identity = classifier.relevance_artifact_identity
+            claim_level = classifier.claim_level
+            policy_version = FORUM_COMPOSITE_POLICY_VERSION
+        else:
+            reasoning = classifier
+            model_version = (
+                reasoning.model_version
+                if reasoning is not None
+                else "safe-fallback-v1"
+            )
+            artifact_identity = (
+                str(getattr(reasoning, "artifact_sha256", model_version))
+                if reasoning is not None
+                else model_version
+            )
+            relevance_identity = None
+            claim_level = (
+                str(
+                    getattr(
+                        reasoning, "claim_level", FORUM_UNVALIDATED_CLAIM_LEVEL,
+                    )
+                )
+                if reasoning is not None
+                else FORUM_FALLBACK_CLAIM_LEVEL
+            )
+            policy_version = FORUM_AI_POLICY_VERSION
+        content_hash = _answer_content_hash(data)
+        if content_hash is None:
             raise ForumRuntimeError("failed-precondition", "Forum answer text is invalid.")
         logical_id = sha256(
             json.dumps({
                 "answerId": answer_id,
                 "revision": revision,
-                "textHash": text_hash,
+                "contentHash": content_hash,
                 "modelVersion": model_version,
                 "artifactIdentity": artifact_identity,
+                "relevanceArtifactIdentity": relevance_identity,
                 "claimLevel": claim_level,
-                "policyVersion": FORUM_AI_POLICY_VERSION,
+                "policyVersion": policy_version,
             }, sort_keys=True, separators=(",", ":")).encode("utf-8")
         ).hexdigest()
         claim_or_state = self._claim_answer(
             answer_id=answer_id,
             logical_inference_id=logical_id,
             revision=revision,
-            text_hash=text_hash,
+            text_hash=content_hash,
             model_version=model_version,
             artifact_identity=artifact_identity,
             claim_level=claim_level,
+            policy_version=policy_version,
             event_id=audit_event_id,
             now=now,
         )
@@ -872,14 +1322,56 @@ class ForumRuntimeGateway:
             return claim_or_state
         claim = claim_or_state
         try:
-            prediction = classifier.predict(text) if classifier is not None else None
-            return self._finalize_answer(claim, prediction, now=now)
+            outcome = self._evaluate_outcome(
+                data, classifier, logical_inference_id=logical_id,
+            )
+            return self._finalize_answer(claim, outcome, now=now)
         except Exception as error:
             permanent = isinstance(error, (ForumRuntimeError, ValueError, TypeError))
             state = self._fail_answer(claim, error, permanent=permanent, now=now)
             if state == "retryable":
                 raise
             return state
+
+    def _evaluate_outcome(
+        self,
+        data: Mapping[str, Any],
+        classifier: Any,
+        *,
+        logical_inference_id: str,
+    ) -> ForumOutcome:
+        """Return the composite outcome, or the legacy advisory outcome."""
+        if isinstance(classifier, ForumAiBundle) and classifier.relevance is not None:
+            return self._evaluate_composite(
+                data, classifier, logical_inference_id=logical_inference_id,
+            )
+        if isinstance(classifier, ForumAiBundle):
+            predictor = classifier.reasoning
+        else:
+            predictor = classifier
+        text = _answer_analysis_text(data) or ""
+        prediction = (
+            predictor.predict(text) if predictor is not None else None
+        )
+        revision = int(data.get("revision", 1))
+        if prediction is None:
+            return ForumOutcome(
+                public_state=FORUM_PUBLIC_STATE_NONE,
+                private=_feedback_payload(
+                    state="fallback", prediction=None, revision=revision,
+                    logical_inference_id=logical_inference_id,
+                ),
+                run_bindings={},
+                state="fallback",
+            )
+        return ForumOutcome(
+            public_state=FORUM_PUBLIC_STATE_NONE,
+            private=_feedback_payload(
+                state="completed", prediction=prediction, revision=revision,
+                logical_inference_id=logical_inference_id,
+            ),
+            run_bindings={},
+        )
 
     def _terminalize_invalid_answer(
         self,
@@ -898,7 +1390,7 @@ class ForumRuntimeGateway:
             current = answer_snapshot.to_dict() if answer_snapshot.exists else {}
             if (
                 current.get("revision", 1) != data.get("revision", 1)
-                or _answer_analysis_text(current) != _answer_analysis_text(data)
+                or _answer_content_hash(current) != _answer_content_hash(data)
             ):
                 return "superseded"
             transaction.set(job_ref, {
@@ -927,6 +1419,7 @@ class ForumRuntimeGateway:
         event_id: str,
         now: datetime,
         claim_level: str = FORUM_UNVALIDATED_CLAIM_LEVEL,
+        policy_version: str = FORUM_AI_POLICY_VERSION,
     ) -> ForumAiClaim | str:
         answer_ref = self.database.collection("forumAnswers").document(answer_id)
         job_ref = self.database.collection("forumAiJobs").document(answer_id)
@@ -936,8 +1429,11 @@ class ForumRuntimeGateway:
         def claim(transaction: Any) -> ForumAiClaim | str:
             answer_snapshot = _transaction_snapshot(transaction, answer_ref) or _MissingSnapshot()
             answer = answer_snapshot.to_dict() if answer_snapshot.exists else {}
-            current_text_hash = _forum_text_hash(_answer_analysis_text(answer))
-            if answer.get("revision", 1) != revision or current_text_hash != text_hash:
+            current_content_hash = _answer_content_hash(answer)
+            if (
+                answer.get("revision", 1) != revision
+                or current_content_hash != text_hash
+            ):
                 return "superseded"
             job_snapshot = _transaction_snapshot(transaction, job_ref) or _MissingSnapshot()
             job = job_snapshot.to_dict() if job_snapshot.exists else {}
@@ -990,10 +1486,13 @@ class ForumRuntimeGateway:
                     self._write_feedback_projections(
                         transaction,
                         answer_ref,
-                        state=state,
-                        prediction=prediction,
-                        revision=revision,
-                        logical_inference_id=logical_inference_id,
+                        public_state=FORUM_PUBLIC_STATE_NONE,
+                        private_payload=_feedback_payload(
+                            state=state,
+                            prediction=prediction,
+                            revision=revision,
+                            logical_inference_id=logical_inference_id,
+                        ),
                     )
                 transaction.set(job_ref, {
                     "answerId": answer_id, "state": state,
@@ -1037,7 +1536,7 @@ class ForumRuntimeGateway:
                 "modelVersion": model_version,
                 "artifactIdentity": artifact_identity,
                 "claimLevel": claim_level,
-                "policyVersion": FORUM_AI_POLICY_VERSION,
+                "policyVersion": policy_version,
                 "claimEventId": event_id,
                 "attemptCount": attempt_count,
                 "fencingGeneration": fencing_generation,
@@ -1051,10 +1550,13 @@ class ForumRuntimeGateway:
             self._write_feedback_projections(
                 transaction,
                 answer_ref,
-                state="pending",
-                prediction=None,
-                revision=revision,
-                logical_inference_id=logical_inference_id,
+                public_state=FORUM_PUBLIC_STATE_NONE,
+                private_payload=_feedback_payload(
+                    state="pending",
+                    prediction=None,
+                    revision=revision,
+                    logical_inference_id=logical_inference_id,
+                ),
             )
             return ForumAiClaim(
                 answer_id=answer_id,
@@ -1064,7 +1566,7 @@ class ForumRuntimeGateway:
                 model_version=model_version,
                 artifact_identity=artifact_identity,
                 claim_level=claim_level,
-                policy_version=FORUM_AI_POLICY_VERSION,
+                policy_version=policy_version,
                 fencing_generation=fencing_generation,
                 attempt_count=attempt_count,
                 event_id=event_id,
@@ -1072,7 +1574,9 @@ class ForumRuntimeGateway:
 
         return claim(self.database.transaction())
 
-    def _finalize_answer(self, claim: ForumAiClaim, prediction: Any, *, now: datetime) -> str:
+    def _finalize_answer(
+        self, claim: ForumAiClaim, outcome: ForumOutcome, *, now: datetime,
+    ) -> str:
         answer_ref = self.database.collection("forumAnswers").document(claim.answer_id)
         job_ref = self.database.collection("forumAiJobs").document(claim.answer_id)
         run_ref = self.database.collection("forumAiRuns").document(claim.logical_inference_id)
@@ -1087,16 +1591,16 @@ class ForumRuntimeGateway:
             job_snapshot = _transaction_snapshot(transaction, job_ref) or _MissingSnapshot()
             answer = answer_snapshot.to_dict() if answer_snapshot.exists else {}
             job = job_snapshot.to_dict() if job_snapshot.exists else {}
-            current_text_hash = _forum_text_hash(_answer_analysis_text(answer))
+            current_content_hash = _answer_content_hash(answer)
             compatible = (
                 job.get("state") == "processing"
                 and job.get("logicalInferenceId") == claim.logical_inference_id
                 and job.get("fencingGeneration") == claim.fencing_generation
                 and job.get("artifactIdentity") == claim.artifact_identity
                 and answer.get("revision", 1) == claim.revision
-                and current_text_hash == claim.text_hash
+                and current_content_hash == claim.text_hash
             )
-            result_state = "completed" if prediction is not None else "fallback"
+            result_state = outcome.state
             run_state = result_state if compatible else "superseded"
             if (
                 not compatible
@@ -1109,6 +1613,7 @@ class ForumRuntimeGateway:
                 "logicalInferenceId": claim.logical_inference_id,
                 "revision": claim.revision,
                 "textHash": claim.text_hash,
+                "contentHash": claim.text_hash,
                 "modelVersion": claim.model_version,
                 "artifactIdentity": claim.artifact_identity,
                 "claimLevel": claim.claim_level,
@@ -1117,7 +1622,8 @@ class ForumRuntimeGateway:
                 "claimEventId": claim.event_id,
                 "state": run_state,
                 "resultState": result_state,
-                "prediction": asdict(prediction) if prediction is not None else None,
+                "prediction": None,
+                **outcome.run_bindings,
                 "createdAt": firestore.SERVER_TIMESTAMP,
             })
             if not compatible:
@@ -1125,10 +1631,8 @@ class ForumRuntimeGateway:
             self._write_feedback_projections(
                 transaction,
                 answer_ref,
-                state=result_state,
-                prediction=prediction,
-                revision=claim.revision,
-                logical_inference_id=claim.logical_inference_id,
+                public_state=outcome.public_state,
+                private_payload=outcome.private,
             )
             transaction.set(job_ref, {
                 "state": result_state,
@@ -1177,15 +1681,18 @@ class ForumRuntimeGateway:
             if (
                 state == "failed"
                 and answer.get("revision", 1) == claim.revision
-                and _forum_text_hash(_answer_analysis_text(answer)) == claim.text_hash
+                and _answer_content_hash(answer) == claim.text_hash
             ):
                 self._write_feedback_projections(
                     transaction,
                     answer_ref,
-                    state="fallback",
-                    prediction=None,
-                    revision=claim.revision,
-                    logical_inference_id=claim.logical_inference_id,
+                    public_state=FORUM_PUBLIC_STATE_NONE,
+                    private_payload=_feedback_payload(
+                        state="fallback",
+                        prediction=None,
+                        revision=claim.revision,
+                        logical_inference_id=claim.logical_inference_id,
+                    ),
                 )
             return state
 
@@ -1247,6 +1754,234 @@ def load_forum_classifier(
             code_revision or "",
         )
         return None
+
+
+def load_forum_bundle(
+    reasoning_path: Path = FORUM_MODEL_PATH,
+    relevance_path: Path | None = None,
+    manifest_path: Path = FORUM_MODEL_MANIFEST_PATH,
+    *,
+    registry_documents: list[Mapping[str, Any]] | None = None,
+    evidence_mode: str | None = None,
+    code_revision: str | None = None,
+) -> ForumAiBundle | None:
+    """Load the verified dual-component composite bundle (release manifest v2).
+
+    The emulator fixture manifest keeps the reasoning-only path; every other
+    activation requires a fully bound v2 release with both components, the
+    frozen composite policy, and matching source/vendor/runtime/bundle hashes.
+    """
+    from logic_oasis_ai.forum_ai.classifier import ForumTextClassifier
+    from logic_oasis_ai.forum_ai.relevance import ForumRelevanceClassifier
+
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if not isinstance(manifest, dict):
+            return None
+        if manifest.get("evidenceState") == "emulator_fixture_only":
+            if os.environ.get("FUNCTIONS_EMULATOR") != "true":
+                return None
+            if (
+                manifest.get("artifactSha256")
+                != sha256(reasoning_path.read_bytes()).hexdigest()
+            ):
+                return None
+            reasoning = ForumTextClassifier.load(reasoning_path)
+            if manifest.get("modelVersion") != reasoning.model_version:
+                return None
+            return ForumAiBundle(
+                reasoning=reasoning,
+                relevance=None,
+                policy={},
+                release_id="emulator-fixture",
+                reasoning_artifact_identity=manifest["artifactSha256"],
+                relevance_artifact_identity="",
+                claim_level="unvalidated_model_output",
+            )
+
+        mode = evidence_mode or os.environ.get(
+            "FORUM_MODEL_EVIDENCE_MODE", FORUM_REAL_EVALUATED_MODE,
+        )
+        revision = code_revision or os.environ.get(
+            "FORUM_RUNTIME_CODE_REVISION", "",
+        )
+        documents = [] if registry_documents is None else list(registry_documents)
+        compatible = [
+            item for item in documents
+            if isinstance(item, Mapping)
+            and item.get("lifecycleStatus") == "released"
+            and item.get("isActive") is True
+            and item.get("deploymentScope") == FORUM_CONTROLLED_MODE
+            and item.get("releaseId") == manifest.get("releaseId")
+        ]
+        if mode != FORUM_CONTROLLED_MODE or len(compatible) != 1:
+            _log_forum_activation_failure("mode_or_registry_incompatible", manifest, revision)
+            return None
+        if any(
+            compatible[0].get(key) != value
+            for key, value in manifest.items()
+        ):
+            _log_forum_activation_failure("registry_manifest_mismatch", manifest, revision)
+            return None
+        relevance_path = relevance_path or (
+            manifest_path.parent / "forum_relevance_model.joblib"
+        )
+        if not _controlled_forum_release_v2_valid(
+            manifest, reasoning_path, relevance_path, manifest_path, revision,
+        ):
+            _log_forum_activation_failure("release_validation_failed", manifest, revision)
+            return None
+        reasoning = ForumTextClassifier.load(reasoning_path)
+        relevance = ForumRelevanceClassifier.load(relevance_path)
+        if manifest.get("reasoningModelVersion") != reasoning.model_version:
+            _log_forum_activation_failure("classifier_version_mismatch", manifest, revision)
+            return None
+        if manifest.get("relevanceModelVersion") != relevance.model_version:
+            _log_forum_activation_failure("classifier_version_mismatch", manifest, revision)
+            return None
+        reasoning.artifact_sha256 = manifest["reasoningArtifactSha256"]
+        reasoning.claim_level = manifest["claimLevel"]
+        relevance.artifact_sha256 = manifest["relevanceArtifactSha256"]
+        relevance.claim_level = manifest["claimLevel"]
+        return ForumAiBundle(
+            reasoning=reasoning,
+            relevance=relevance,
+            policy=dict(COMPOSITE_POLICY_CONTRACT),
+            release_id=manifest["releaseId"],
+            reasoning_artifact_identity=manifest["reasoningArtifactSha256"],
+            relevance_artifact_identity=manifest["relevanceArtifactSha256"],
+            claim_level=manifest["claimLevel"],
+        )
+    except Exception:
+        _log_forum_activation_failure(
+            "activation_exception",
+            locals().get("manifest"),
+            code_revision or "",
+        )
+        return None
+
+
+def _controlled_forum_release_v2_valid(
+    manifest: Mapping[str, Any],
+    reasoning_path: Path,
+    relevance_path: Path,
+    manifest_path: Path,
+    code_revision: str,
+) -> bool:
+    from logic_oasis_ai.forum_ai.classifier import NAIVE_BAYES_VARIANTS
+
+    if manifest.get("manifestSchemaVersion") != FORUM_RELEASE_MANIFEST_SCHEMA_V2:
+        return False
+    if any(
+        manifest.get(key) != value
+        for key, value in _CONTROLLED_RELEASE_VALUES.items()
+    ):
+        return False
+    if (
+        manifest.get("reasoningModelType") not in NAIVE_BAYES_VARIANTS
+        or manifest.get("relevanceModelType") not in NAIVE_BAYES_VARIANTS
+    ):
+        return False
+    if not isinstance(manifest.get("releaseId"), str) or not manifest.get("releaseId"):
+        return False
+    if not isinstance(manifest.get("releasedBy"), str) or not manifest.get("releasedBy"):
+        return False
+    released_at = manifest.get("releasedAt")
+    if not isinstance(released_at, str) or not released_at.endswith("Z"):
+        return False
+    rationale = manifest.get("releaseRationale")
+    if not isinstance(rationale, str) or "not evaluated on real learner forum responses" not in rationale.casefold():
+        return False
+    if manifest.get("codeRevision") != code_revision or not code_revision:
+        return False
+    if manifest.get("codeRevisionKind") != "sha256_bounded_release_sources_v1":
+        return False
+    if any(
+        not isinstance(manifest.get(field), str)
+        or not SHA256_PATTERN.fullmatch(manifest[field])
+        for field in _V2_SHA256_FIELDS
+    ):
+        return False
+    reasoning_bytes = reasoning_path.read_bytes()
+    relevance_bytes = relevance_path.read_bytes()
+    if sha256(reasoning_bytes).hexdigest() != manifest.get("reasoningArtifactSha256"):
+        return False
+    if sha256(relevance_bytes).hexdigest() != manifest.get("relevanceArtifactSha256"):
+        return False
+    if manifest.get("reasoningArtifactSizeBytes") != len(reasoning_bytes):
+        return False
+    if manifest.get("relevanceArtifactSizeBytes") != len(relevance_bytes):
+        return False
+    if manifest.get("candidateGateStatus") != "passed" or manifest.get("failedGates") != []:
+        return False
+    if manifest.get("semanticReproducibilityStatus") != "verified_same_runtime_contract":
+        return False
+    if manifest.get("baselineComparisonResult") not in {
+        "naive_bayes_advantage_demonstrated",
+        "no_controlled_scenario_advantage_demonstrated",
+    }:
+        return False
+    if manifest.get("compositePolicy") != dict(COMPOSITE_POLICY_CONTRACT):
+        return False
+    dependencies = manifest.get("dependencies")
+    if not isinstance(dependencies, Mapping) or set(dependencies) != {"joblib", "numpy", "scikit-learn"}:
+        return False
+    if any(
+        importlib.metadata.version(name) != version
+        for name, version in dependencies.items()
+    ):
+        return False
+    vectorizer = manifest.get("vectorizerContract")
+    relevance_vectorizer = manifest.get("relevanceVectorizerContract")
+    if (
+        not isinstance(vectorizer, Mapping)
+        or vectorizer.get("family") != "TfidfVectorizer"
+        or not isinstance(relevance_vectorizer, Mapping)
+        or relevance_vectorizer.get("family") != "TfidfVectorizer"
+        or float(relevance_vectorizer.get("positiveThreshold"))
+        != RELEVANCE_POSITIVE_THRESHOLD
+        or float(relevance_vectorizer.get("negativeThreshold"))
+        != RELEVANCE_NEGATIVE_THRESHOLD
+    ):
+        return False
+    source_hashes = manifest.get("sourceRuntimeHashes")
+    vendor_hashes = manifest.get("vendorRuntimeHashes")
+    if (
+        source_hashes != vendor_hashes
+        or not isinstance(vendor_hashes, Mapping)
+        or set(vendor_hashes) != {"__init__.py", "classifier.py", "relevance.py"}
+    ):
+        return False
+    vendor_root = manifest_path.parent / "vendor/logic_oasis_ai/forum_ai"
+    if any(
+        sha256((vendor_root / name).read_bytes()).hexdigest() != expected
+        for name, expected in vendor_hashes.items()
+    ):
+        return False
+    deployment_hashes = manifest.get("deploymentRuntimeHashes")
+    if (
+        not isinstance(deployment_hashes, Mapping)
+        or set(deployment_hashes) != {"forum_runtime.py", "main.py"}
+    ):
+        return False
+    if any(
+        sha256((manifest_path.parent / name).read_bytes()).hexdigest() != expected
+        for name, expected in deployment_hashes.items()
+    ):
+        return False
+    bundle_path = manifest_path.parent / "vendor/bundle_manifest.json"
+    bundle_bytes = bundle_path.read_bytes()
+    if sha256(bundle_bytes).hexdigest() != manifest.get("bundleManifestSha256"):
+        return False
+    bundle = json.loads(bundle_bytes)
+    forum_bundle = bundle.get("forumRuntimeBundle") if isinstance(bundle, dict) else None
+    if (
+        not isinstance(forum_bundle, Mapping)
+        or forum_bundle.get("bundleSchemaVersion") != "forum-runtime-bundle-v1"
+        or forum_bundle.get("files") != vendor_hashes
+    ):
+        return False
+    return True
 
 
 def _log_forum_activation_failure(

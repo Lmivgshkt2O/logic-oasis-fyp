@@ -15,14 +15,28 @@ sys.path.insert(0, str(ROOT / "functions/vendor"))
 
 from forum_runtime import (
     ForumAiClaim,
+    ForumAiBundle,
+    ForumOutcome,
+    FORUM_COMPOSITE_POLICY_VERSION,
+    FORUM_CONTROLLED_CLAIM_LEVEL,
+    FORUM_PUBLIC_STATE_MAY_BE_IRRELEVANT,
     ForumRuntimeError,
     ForumRuntimeGateway,
+    FORUM_PUBLIC_STATE_VERIFIED,
+    FORUM_PUBLIC_STATE_NONE,
+    FORUM_REASONING_MODEL_VERSION,
+    FORUM_RELEVANCE_MODEL_VERSION,
+    RELEVANCE_NEGATIVE_THRESHOLD,
+    RELEVANCE_POSITIVE_THRESHOLD,
+    _answer_content_hash,
     _transaction_snapshot,
     feedback_for,
+    load_forum_bundle,
     load_forum_classifier,
     malaysia_week_start,
 )
 from logic_oasis_ai.forum_ai.classifier import ForumPrediction, REVISION, SUFFICIENT, UNCERTAIN
+from logic_oasis_ai.forum_ai.relevance import ForumRelevancePrediction
 
 
 class _Snapshot:
@@ -114,6 +128,17 @@ class _Database:
 
     def transaction(self):
         return _Transaction(self)
+
+
+def _completed_outcome(logical_inference_id="run-id", revision=1):
+    return ForumOutcome(
+        public_state=FORUM_PUBLIC_STATE_NONE,
+        private={
+            "state": "completed", "label": "sufficient_reasoning",
+            "revision": revision, "logicalInferenceId": logical_inference_id,
+        },
+        run_bindings={},
+    )
 
 
 def _linked_source(question_id="bank_q1", version="v1"):
@@ -421,7 +446,7 @@ class ForumRuntimeTests(unittest.TestCase):
 
         with patch("forum_runtime.firestore.transactional", lambda function: function):
             state = gateway._finalize_answer(
-                stale, ForumPrediction(SUFFICIENT, 0.9, "model-v1"), now=now,
+                stale, _completed_outcome("old-run", 1), now=now,
             )
 
         self.assertEqual("superseded", state)
@@ -432,7 +457,7 @@ class ForumRuntimeTests(unittest.TestCase):
     def test_reclaimed_same_identity_lease_lets_only_new_fencing_generation_win(self):
         now = datetime(2026, 8, 3, tzinfo=timezone.utc)
         text = "I regrouped and checked each place value."
-        text_hash = sha256(text.encode("utf-8")).hexdigest()
+        text_hash = _answer_content_hash({"text": text})
         logical_id = "same-logical-run"
         database = _Database({
             ("forumAnswers", "a1"): {
@@ -461,11 +486,17 @@ class ForumRuntimeTests(unittest.TestCase):
 
         with patch("forum_runtime.firestore.transactional", lambda function: function):
             self.assertEqual(
-                "superseded", gateway._finalize_answer(old_claim, prediction, now=now),
+                "superseded",
+                gateway._finalize_answer(
+                    old_claim, _completed_outcome(logical_id, 1), now=now,
+                ),
             )
             self.assertNotIn(("forumAiRuns", logical_id), database.rows)
             self.assertEqual(
-                "completed", gateway._finalize_answer(winning_claim, prediction, now=now),
+                "completed",
+                gateway._finalize_answer(
+                    winning_claim, _completed_outcome(logical_id, 1), now=now,
+                ),
             )
 
         self.assertEqual("completed", database.rows[("forumAiRuns", logical_id)]["state"])
@@ -500,7 +531,7 @@ class ForumRuntimeTests(unittest.TestCase):
     def test_immutable_run_repairs_terminal_job_and_feedback_after_partial_failure(self):
         now = datetime(2026, 8, 3, tzinfo=timezone.utc)
         answer = {"authorId": "student-a", "revision": 1, "text": "My reasoning."}
-        text_hash = sha256(answer["text"].encode("utf-8")).hexdigest()
+        text_hash = _answer_content_hash(answer)
         logical_id = "winning-run"
         prediction = ForumPrediction(SUFFICIENT, 0.9, "model-v1")
         database = _Database({
@@ -1246,6 +1277,368 @@ class ForumLinkedDiscussionTests(unittest.TestCase):
         self.assertEqual(SUFFICIENT, feedback["label"])
         self.assertEqual(0.9, feedback["probability"])
         self.assertEqual(public_answer["aiRunId"], feedback["logicalInferenceId"])
+
+
+class ForumCompositeRuntimeTests(unittest.TestCase):
+    NOW = datetime(2026, 8, 13, 9, 0, tzinfo=timezone.utc)
+
+    def _bundle(self, reasoning_label=SUFFICIENT, relevance_label="relevant"):
+        reasoning = type("Reasoning", (), {
+            "model_version": FORUM_REASONING_MODEL_VERSION,
+            "artifact_sha256": "a" * 64,
+            "predict": lambda self, text: ForumPrediction(
+                reasoning_label, 0.9, self.model_version,
+            ),
+        })()
+        relevance = type("Relevance", (), {
+            "model_version": FORUM_RELEVANCE_MODEL_VERSION,
+            "artifact_sha256": "b" * 64,
+            "predict": lambda self, prompt, text: ForumRelevancePrediction(
+                relevance_label, 0.9, self.model_version,
+            ),
+        })()
+        return ForumAiBundle(
+            reasoning=reasoning,
+            relevance=relevance,
+            policy={"policyVersion": FORUM_COMPOSITE_POLICY_VERSION},
+            release_id="v2-test",
+            reasoning_artifact_identity="a" * 64,
+            relevance_artifact_identity="b" * 64,
+            claim_level=FORUM_CONTROLLED_CLAIM_LEVEL,
+        )
+
+    def _linked_database(
+        self, *, answer_index=2, selected_option=2, key_active=True,
+        key_version="v1", explanation=None,
+    ):
+        rows = {
+            ("forumQuestions", "linked_q1_v1"): {
+                "mode": "linked", "sourceQuestionId": "bank_q1",
+                "sourceContentVersion": "v1",
+                "promptSnapshot": {"questionText": "What is 46 + 27?"},
+            },
+            ("questionAnswerKeys", "bank_q1"): {
+                "questionId": "bank_q1", "contentVersion": key_version,
+                "isActive": key_active, "answerIndex": answer_index,
+            },
+            ("forumAnswers", "a1"): {
+                "questionId": "linked_q1_v1", "authorId": "student-a",
+                "mode": "linked", "selectedOption": selected_option,
+                "explanation": explanation or (
+                    "I regrouped the ones and added the tens, then checked "
+                    "by subtraction."
+                ),
+                "revision": 1,
+            },
+        }
+        return _Database(rows)
+
+    def _process(self, database, bundle, *, mode="linked"):
+        gateway = ForumRuntimeGateway(database)
+        data = database.rows[("forumAnswers", "a1")]
+        with patch("forum_runtime.firestore.transactional", lambda function: function):
+            return gateway.process_answer(
+                "a1", data, bundle, event_id="composite-event", now=self.NOW,
+            )
+
+    def test_composite_verified_path_binds_public_state_and_private_guidance(self):
+        database = self._linked_database(answer_index=2, selected_option=2)
+        state = self._process(database, self._bundle())
+        self.assertEqual("completed", state)
+        answer = database.rows[("forumAnswers", "a1")]
+        self.assertEqual(FORUM_PUBLIC_STATE_VERIFIED, answer["aiPublicState"])
+        private = database.rows[("forumAiFeedback", "a1")]
+        self.assertEqual("verified", private["label"])
+        self.assertEqual("correct", private["correctness"])
+        self.assertEqual("relevant", private["relevance"])
+        self.assertEqual("sufficient_reasoning", private["reasoning"])
+        run = next(value for key, value in database.rows.items() if key[0] == "forumAiRuns")
+        self.assertEqual("verified", run["composite"]["publicState"])
+        self.assertEqual("v2-test", run["releaseId"])
+        self.assertEqual("bank_q1", run["sourceQuestionId"])
+        self.assertEqual("v1", run["sourceContentVersion"])
+        self.assertEqual(2, run["selectedOption"])
+        self.assertEqual(FORUM_COMPOSITE_POLICY_VERSION, run["policyVersion"])
+
+    def test_composite_incorrect_option_has_no_public_negative(self):
+        database = self._linked_database(answer_index=2, selected_option=1)
+        self._process(database, self._bundle())
+        answer = database.rows[("forumAnswers", "a1")]
+        self.assertEqual(FORUM_PUBLIC_STATE_NONE, answer["aiPublicState"])
+        private = database.rows[("forumAiFeedback", "a1")]
+        self.assertEqual("correction_needed", private["label"])
+        self.assertEqual("incorrect", private["correctness"])
+        self.assertIn("does not match", private["correctnessGuidance"])
+
+    def test_composite_may_be_irrelevant_is_public_with_private_guidance(self):
+        database = self._linked_database(answer_index=2, selected_option=2)
+        self._process(
+            database, self._bundle(reasoning_label=SUFFICIENT, relevance_label="irrelevant"),
+        )
+        answer = database.rows[("forumAnswers", "a1")]
+        self.assertEqual(FORUM_PUBLIC_STATE_MAY_BE_IRRELEVANT, answer["aiPublicState"])
+        private = database.rows[("forumAiFeedback", "a1")]
+        self.assertEqual("may_be_irrelevant", private["label"])
+        self.assertIn("may not address", private["message"])
+        self.assertIn("may be irrelevant", private["relevanceGuidance"])
+
+    def test_composite_needs_reasoning_withholds_badge(self):
+        database = self._linked_database(answer_index=2, selected_option=2)
+        self._process(database, self._bundle(reasoning_label=REVISION))
+        answer = database.rows[("forumAnswers", "a1")]
+        self.assertEqual(FORUM_PUBLIC_STATE_NONE, answer["aiPublicState"])
+        private = database.rows[("forumAiFeedback", "a1")]
+        self.assertEqual("needs_reasoning", private["label"])
+
+    def test_missing_or_stale_key_never_verifies(self):
+        for kwargs in (
+            {"key_active": False},
+            {"key_version": "v2"},
+            {"answer_index": 9},
+        ):
+            with self.subTest(kwargs=kwargs):
+                database = self._linked_database(**kwargs)
+                self._process(database, self._bundle())
+                answer = database.rows[("forumAnswers", "a1")]
+                self.assertEqual(FORUM_PUBLIC_STATE_NONE, answer["aiPublicState"])
+                private = database.rows[("forumAiFeedback", "a1")]
+                self.assertEqual("unavailable", private["correctness"])
+
+    def test_free_form_never_verified_but_may_show_irrelevance(self):
+        for relevance_label, expected in (
+            ("relevant", FORUM_PUBLIC_STATE_NONE),
+            ("irrelevant", FORUM_PUBLIC_STATE_MAY_BE_IRRELEVANT),
+        ):
+            with self.subTest(relevance=relevance_label):
+                database = _Database({
+                    ("forumAnswers", "a1"): {
+                        "questionId": "free_q1", "authorId": "student-a",
+                        "text": "I regrouped the ones and checked with subtraction.",
+                        "revision": 1,
+                    },
+                })
+                self._process(
+                    database, self._bundle(
+                        reasoning_label=SUFFICIENT, relevance_label=relevance_label,
+                    ),
+                    mode="free_form",
+                )
+                answer = database.rows[("forumAnswers", "a1")]
+                self.assertEqual(expected, answer["aiPublicState"])
+                private = database.rows[("forumAiFeedback", "a1")]
+                self.assertEqual("not_applicable", private["correctness"])
+
+    def test_component_abstention_withholds_public_decisions(self):
+        for reasoning_label, relevance_label in (
+            (UNCERTAIN, "relevant"),
+            (SUFFICIENT, "uncertain"),
+            (UNCERTAIN, "uncertain"),
+        ):
+            with self.subTest(reasoning=reasoning_label, relevance=relevance_label):
+                database = self._linked_database(answer_index=2, selected_option=2)
+                self._process(
+                    database,
+                    self._bundle(
+                        reasoning_label=reasoning_label,
+                        relevance_label=relevance_label,
+                    ),
+                )
+                answer = database.rows[("forumAnswers", "a1")]
+                self.assertEqual(FORUM_PUBLIC_STATE_NONE, answer["aiPublicState"])
+
+    def test_public_payload_contains_only_allowlisted_fields(self):
+        database = self._linked_database(answer_index=2, selected_option=2)
+        self._process(database, self._bundle())
+        answer = database.rows[("forumAnswers", "a1")]
+        for forbidden in (
+            "message", "probability", "correctness", "relevance",
+            "reasoning", "answerIndex", "guidance", "policyVersion",
+        ):
+            self.assertNotIn(forbidden, answer)
+
+    def test_canary_answer_key_is_absent_from_all_written_records(self):
+        database = self._linked_database(
+            answer_index=2, selected_option=3,
+        )
+        self._process(database, self._bundle())
+        written = {
+            str(key): value for key, value in database.rows.items()
+            if key[0] in {
+                "forumAnswers", "forumAiJobs", "forumAiRuns",
+                "forumAiFeedback",
+            }
+        }
+        rendered = json.dumps(written, default=str)
+        self.assertNotIn("answerIndex", rendered)
+
+    def test_swapped_option_fences_the_stale_run(self):
+        original = self._linked_database(answer_index=2, selected_option=2)
+        self._process(original, self._bundle())
+        original_run = next(
+            key for key in original.rows if key[0] == "forumAiRuns"
+        )
+        swapped = self._linked_database(answer_index=2, selected_option=1)
+        self._process(swapped, self._bundle())
+        self.assertNotIn(original_run, swapped.rows)
+
+    def test_v2_bundle_loader_requires_every_binding(self):
+        from importlib import metadata
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            reasoning_source = ROOT / (
+                "ai_pipeline/forum_controlled_demo/generated/"
+                "forum_controlled_demo_candidate.joblib"
+            )
+            relevance_source = ROOT / (
+                "ai_pipeline/forum_controlled_demo/generated/"
+                "forum_controlled_demo_relevance_candidate.joblib"
+            )
+            reasoning_path = root / "forum_model.joblib"
+            relevance_path = root / "forum_relevance_model.joblib"
+            shutil.copyfile(reasoning_source, reasoning_path)
+            shutil.copyfile(relevance_source, relevance_path)
+            shutil.copyfile(
+                ROOT / "functions/forum_runtime.py", root / "forum_runtime.py",
+            )
+            shutil.copyfile(
+                ROOT / "functions/main.py", root / "main.py",
+            )
+            vendor_root = root / "vendor/logic_oasis_ai/forum_ai"
+            vendor_root.mkdir(parents=True)
+            vendor_hashes = {}
+            for name in ("__init__.py", "classifier.py", "relevance.py"):
+                source = ROOT / "functions/vendor/logic_oasis_ai/forum_ai" / name
+                shutil.copyfile(source, vendor_root / name)
+                vendor_hashes[name] = sha256(source.read_bytes()).hexdigest()
+            bundle_manifest = root / "vendor/bundle_manifest.json"
+            bundle_manifest.write_text(json.dumps({
+                "bundleVersion": "u8-ai-runtime-v1",
+                "forumRuntimeBundle": {
+                    "bundleSchemaVersion": "forum-runtime-bundle-v1",
+                    "files": vendor_hashes,
+                },
+            }), encoding="utf-8")
+            manifest_path = root / "forum_model_manifest.json"
+            revision = "0" * 64
+            manifest = {
+                "manifestSchemaVersion": "forum-model-release-manifest-v2",
+                "releaseId": "forum-controlled-demo-nb-v1-release-5",
+                "releasedBy": "developer",
+                "releasedAt": "2026-08-13T00:00:00Z",
+                "lifecycleStatus": "released", "isActive": True,
+                "releaseRationale": (
+                    "Developer-released FYP1 controlled-demonstration model. "
+                    "Not evaluated on real learner forum responses."
+                ),
+                "supersedesReleaseId": None,
+                "trainingDataProvenance": "expert_authored_controlled_demo",
+                "evidenceLevel": "controlled_demonstration",
+                "releaseScope": "fyp1_forum_controlled_demo",
+                "deploymentScope": "controlled_demo",
+                "claimLevel": FORUM_CONTROLLED_CLAIM_LEVEL,
+                "candidateGateStatus": "passed", "failedGates": [],
+                "reasoningModelType": "MultinomialNB",
+                "relevanceModelType": "MultinomialNB",
+                "reasoningModelVersion": FORUM_REASONING_MODEL_VERSION,
+                "relevanceModelVersion": FORUM_RELEVANCE_MODEL_VERSION,
+                "reasoningArtifactSha256": sha256(
+                    reasoning_path.read_bytes()
+                ).hexdigest(),
+                "relevanceArtifactSha256": sha256(
+                    relevance_path.read_bytes()
+                ).hexdigest(),
+                "reasoningArtifactSizeBytes": reasoning_path.stat().st_size,
+                "relevanceArtifactSizeBytes": relevance_path.stat().st_size,
+                "catalogueSha256": "1" * 64,
+                "datasetSha256": "2" * 64,
+                "datasetManifestSha256": "3" * 64,
+                "splitManifestSha256": "4" * 64,
+                "rubricSha256": "5" * 64,
+                "evaluationReportSha256": "6" * 64,
+                "candidateManifestSha256": "7" * 64,
+                "bundleManifestSha256": sha256(
+                    bundle_manifest.read_bytes()
+                ).hexdigest(),
+                "codeRevision": revision,
+                "codeRevisionKind": "sha256_bounded_release_sources_v1",
+                "dependencies": {
+                    name: metadata.version(name)
+                    for name in ("joblib", "numpy", "scikit-learn")
+                },
+                "semanticReproducibilityStatus": "verified_same_runtime_contract",
+                "baselineComparisonResult": "naive_bayes_advantage_demonstrated",
+                "compositePolicy": {
+                    "policyVersion": FORUM_COMPOSITE_POLICY_VERSION,
+                    "correctness": "deterministic_protected_answer_key_v1",
+                    "relevancePositiveThreshold": RELEVANCE_POSITIVE_THRESHOLD,
+                    "relevanceNegativeThreshold": RELEVANCE_NEGATIVE_THRESHOLD,
+                    "reasoningAbstentionThreshold": 0.60,
+                    "freeFormNeverVerified": True,
+                    "withholdOnAnyAbstention": True,
+                    "noPublicNegativeCorrectnessLabel": True,
+                },
+                "vectorizerContract": {
+                    "family": "TfidfVectorizer",
+                    "abstentionPolicyVersion": "forum-advisory-policy-v1",
+                },
+                "relevanceVectorizerContract": {
+                    "family": "TfidfVectorizer",
+                    "positiveThreshold": RELEVANCE_POSITIVE_THRESHOLD,
+                    "negativeThreshold": RELEVANCE_NEGATIVE_THRESHOLD,
+                },
+                "sourceRuntimeHashes": vendor_hashes,
+                "vendorRuntimeHashes": vendor_hashes,
+                "deploymentRuntimeHashes": {
+                    "forum_runtime.py": sha256(
+                        (root / "forum_runtime.py").read_bytes()
+                    ).hexdigest(),
+                    "main.py": sha256(
+                        (root / "main.py").read_bytes()
+                    ).hexdigest(),
+                },
+            }
+            manifest_path.write_text(
+                json.dumps(manifest), encoding="utf-8",
+            )
+
+            env = {
+                "FORUM_MODEL_EVIDENCE_MODE": "controlled_demo",
+                "FORUM_RUNTIME_CODE_REVISION": revision,
+            }
+            with patch.dict(os.environ, env, clear=False):
+                loaded = load_forum_bundle(
+                    reasoning_path, relevance_path, manifest_path,
+                    registry_documents=[manifest],
+                )
+            self.assertIsNotNone(loaded)
+            self.assertEqual(
+                FORUM_REASONING_MODEL_VERSION, loaded.reasoning.model_version,
+            )
+            self.assertEqual(
+                FORUM_RELEVANCE_MODEL_VERSION, loaded.relevance.model_version,
+            )
+
+            for field in (
+                "reasoningArtifactSha256", "relevanceArtifactSha256",
+                "catalogueSha256", "bundleManifestSha256", "codeRevision",
+                "compositePolicy",
+            ):
+                with self.subTest(field=field):
+                    broken = dict(manifest)
+                    broken[field] = (
+                        "x" if field == "compositePolicy" else "f" * 64
+                    )
+                    manifest_path.write_text(
+                        json.dumps(broken), encoding="utf-8",
+                    )
+                    with patch.dict(os.environ, env, clear=False):
+                        self.assertIsNone(
+                            load_forum_bundle(
+                                reasoning_path, relevance_path, manifest_path,
+                                registry_documents=[manifest],
+                            )
+                        )
 
 
 if __name__ == "__main__":

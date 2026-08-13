@@ -8,6 +8,12 @@ class ForumAnswerFeedback {
     this.probability,
     this.modelVersion,
     this.calibrationState,
+    this.correctness,
+    this.relevance,
+    this.reasoning,
+    this.correctnessGuidance,
+    this.relevanceGuidance,
+    this.reasoningGuidance,
   });
 
   final String state;
@@ -16,6 +22,12 @@ class ForumAnswerFeedback {
   final double? probability;
   final String? modelVersion;
   final String? calibrationState;
+  final String? correctness;
+  final String? relevance;
+  final String? reasoning;
+  final String? correctnessGuidance;
+  final String? relevanceGuidance;
+  final String? reasoningGuidance;
 
   factory ForumAnswerFeedback.fromFirestore(Map<String, dynamic>? data) {
     final rawProbability = data?['probability'];
@@ -26,6 +38,12 @@ class ForumAnswerFeedback {
       probability: rawProbability is num ? rawProbability.toDouble() : null,
       modelVersion: data?['modelVersion'] as String?,
       calibrationState: data?['calibrationState'] as String?,
+      correctness: data?['correctness'] as String?,
+      relevance: data?['relevance'] as String?,
+      reasoning: data?['reasoning'] as String?,
+      correctnessGuidance: data?['correctnessGuidance'] as String?,
+      relevanceGuidance: data?['relevanceGuidance'] as String?,
+      reasoningGuidance: data?['reasoningGuidance'] as String?,
     );
   }
 }
