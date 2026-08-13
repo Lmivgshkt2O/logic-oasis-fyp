@@ -52,6 +52,16 @@ and run the app with:
 flutter run --dart-define=USE_FIREBASE_EMULATORS=true
 ```
 
+The composite forum runtime requires the operator-supplied, gitignored
+project env (see `functions/.env.logic-oasis-fyp.example`). For an emulator run,
+set these in the shell first (values generated from the selected release
+manifest):
+
+```powershell
+$env:FORUM_MODEL_EVIDENCE_MODE='controlled_demo'
+$env:FORUM_RUNTIME_CODE_REVISION='<sha256-of-the-selected-release-code-revision>'
+```
+
 The emulator host is resolved once and shared by Auth, Firestore, and Functions:
 
 - Android Virtual Device (default): `10.0.2.2` (the host loopback alias).

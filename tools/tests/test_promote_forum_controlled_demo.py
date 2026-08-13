@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from hashlib import sha256
 import json
 from pathlib import Path
 import sys
@@ -13,6 +14,7 @@ from promote_controlled_demo_model import (
     promote_forum_controlled_demo_model,
     revoke_forum_controlled_demo_model,
 )
+from forum_function_inventory import forum_inventory_digest
 from tools.tests.test_controlled_demo_registry_contract import Database
 
 
@@ -25,6 +27,22 @@ def release_manifest() -> dict[str, object]:
     )
 
 
+def deployment_attestation(document: dict[str, object]) -> dict[str, object]:
+    payload = {
+        "attestationKind": "live_deployment_attestation_v1",
+        "deploymentState": "deployed",
+        "releaseId": document["releaseId"],
+        "codeRevision": document["codeRevision"],
+        "functionInventorySha256": forum_inventory_digest(),
+        "observedFunctionCount": 9,
+        "attestedAt": "2026-08-13T00:00:00Z",
+    }
+    payload["attestationSha256"] = sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    return payload
+
+
 class ForumControlledDemoPromotionTests(unittest.TestCase):
     def test_transaction_creates_one_immutable_active_forum_release(self):
         document = release_manifest()
@@ -33,14 +51,24 @@ class ForumControlledDemoPromotionTests(unittest.TestCase):
             "firebase_admin.firestore.transactional",
             lambda function: lambda transaction: function(transaction),
         ):
-            promoted = promote_forum_controlled_demo_model(database, document, now=NOW)
+            promoted = promote_forum_controlled_demo_model(
+                database, document, now=NOW,
+                deployment_attestation=deployment_attestation(document),
+            )
         self.assertEqual(document["releaseId"], promoted["releaseId"])
         self.assertTrue(database.registry[str(document["releaseId"])]["isActive"])
+        self.assertEqual(
+            database.registry[str(document["releaseId"])]["deploymentAttestationSha256"],
+            deployment_attestation(document)["attestationSha256"],
+        )
         with patch(
             "firebase_admin.firestore.transactional",
             lambda function: lambda transaction: function(transaction),
         ), self.assertRaisesRegex(ValueError, "immutable"):
-            promote_forum_controlled_demo_model(database, document, now=NOW)
+            promote_forum_controlled_demo_model(
+                database, document, now=NOW,
+                deployment_attestation=deployment_attestation(document),
+            )
 
     def test_replacement_supersedes_prior_release_in_same_transaction(self):
         prior = release_manifest()
@@ -53,7 +81,10 @@ class ForumControlledDemoPromotionTests(unittest.TestCase):
             "firebase_admin.firestore.transactional",
             lambda function: lambda transaction: function(transaction),
         ):
-            promote_forum_controlled_demo_model(database, replacement, now=NOW)
+            promote_forum_controlled_demo_model(
+                database, replacement, now=NOW,
+                deployment_attestation=deployment_attestation(replacement),
+            )
         self.assertFalse(database.registry["forum-release-1"]["isActive"])
         self.assertEqual("superseded", database.registry["forum-release-1"]["lifecycleStatus"])
         self.assertTrue(database.registry["forum-release-2"]["isActive"])
@@ -69,7 +100,10 @@ class ForumControlledDemoPromotionTests(unittest.TestCase):
             "firebase_admin.firestore.transactional",
             lambda function: lambda transaction: function(transaction),
         ), self.assertRaisesRegex(ValueError, "identify the active"):
-            promote_forum_controlled_demo_model(database, replacement, now=NOW)
+            promote_forum_controlled_demo_model(
+                database, replacement, now=NOW,
+                deployment_attestation=deployment_attestation(replacement),
+            )
         self.assertTrue(database.registry["forum-release-1"]["isActive"])
 
     def test_revocation_preserves_bindings_and_deactivates_the_record(self):
@@ -106,7 +140,10 @@ class ForumControlledDemoPromotionTests(unittest.TestCase):
             "firebase_admin.firestore.transactional",
             lambda function: lambda transaction: function(transaction),
         ):
-            promote_forum_controlled_demo_model(database, replacement, now=NOW)
+            promote_forum_controlled_demo_model(
+                database, replacement, now=NOW,
+                deployment_attestation=deployment_attestation(replacement),
+            )
         self.assertEqual("revoked", database.registry["forum-release-1"]["lifecycleStatus"])
         self.assertTrue(database.registry["forum-release-2"]["isActive"])
 
@@ -123,6 +160,51 @@ class ForumControlledDemoPromotionTests(unittest.TestCase):
             revoke_forum_controlled_demo_model(database, "forum-release-1")
         self.assertTrue(database.registry["forum-release-1"]["isActive"])
         self.assertTrue(database.registry["forum-release-2"]["isActive"])
+
+    def test_promotion_requires_a_matching_live_deployment_attestation(self):
+        document = release_manifest()
+        database = Database()
+        with patch(
+            "firebase_admin.firestore.transactional",
+            lambda function: lambda transaction: function(transaction),
+        ), self.assertRaisesRegex(ValueError, "attestation"):
+            promote_forum_controlled_demo_model(database, document, now=NOW)
+
+        mismatched = deployment_attestation(document)
+        mismatched["releaseId"] = "different-release"
+        with patch(
+            "firebase_admin.firestore.transactional",
+            lambda function: lambda transaction: function(transaction),
+        ), self.assertRaisesRegex(ValueError, "does not match"):
+            promote_forum_controlled_demo_model(
+                database, document, now=NOW,
+                deployment_attestation=mismatched,
+            )
+
+        incomplete = deployment_attestation(document)
+        incomplete["observedFunctionCount"] = 8
+        with patch(
+            "firebase_admin.firestore.transactional",
+            lambda function: lambda transaction: function(transaction),
+        ), self.assertRaisesRegex(ValueError, "nine"):
+            promote_forum_controlled_demo_model(
+                database, document, now=NOW,
+                deployment_attestation=incomplete,
+            )
+
+    def test_first_rollout_cannot_supersede_an_earlier_release(self):
+        document = release_manifest()
+        document["supersedesReleaseId"] = "forum-release-1"
+        database = Database()
+        with patch(
+            "firebase_admin.firestore.transactional",
+            lambda function: lambda transaction: function(transaction),
+        ), self.assertRaisesRegex(ValueError, "first forum rollout"):
+            promote_forum_controlled_demo_model(
+                database, document, now=NOW,
+                deployment_attestation=deployment_attestation(document),
+            )
+        self.assertEqual({}, database.registry)
 
 
 if __name__ == "__main__":

@@ -85,7 +85,7 @@ _V2_SHA256_FIELDS = (
     "reasoningArtifactSha256", "relevanceArtifactSha256", "catalogueSha256",
     "datasetSha256", "datasetManifestSha256", "splitManifestSha256",
     "rubricSha256", "evaluationReportSha256", "candidateManifestSha256",
-    "bundleManifestSha256",
+    "bundleManifestSha256", "dependencyLockSha256",
 )
 
 

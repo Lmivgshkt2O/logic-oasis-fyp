@@ -49,7 +49,7 @@ def expected_bundle_manifest(*, include_forum_runtime: bool) -> dict[str, object
             "bundleSchemaVersion": "forum-runtime-bundle-v1",
             "files": {
                 name: file_sha256(PACKAGE / "forum_ai" / name)
-                for name in ("__init__.py", "classifier.py")
+                for name in ("__init__.py", "classifier.py", "relevance.py")
             },
         }
     return manifest

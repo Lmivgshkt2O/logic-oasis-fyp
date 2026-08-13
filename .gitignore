@@ -69,3 +69,8 @@ ai_pipeline/xgboost_logic_oasis_model.pkl
 ai_pipeline/external_data/assistments/raw/
 ai_pipeline/external_data/assistments/processed/
 ai_pipeline/external_data/assistments/j0/
+
+# Operator-supplied, gitignored project env (generated from the release manifest)
+functions/.env.logic-oasis-fyp
+functions/.env.logic-oasis-fyp.local
+

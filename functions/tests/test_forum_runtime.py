@@ -830,89 +830,37 @@ class ForumRuntimeTests(unittest.TestCase):
             "FORUM_RUNTIME_CODE_REVISION": revision,
         }
         with patch.dict(os.environ, controlled, clear=False):
-            self.assertIsNotNone(load_forum_classifier(registry_documents=[release_manifest]))
+            self.assertIsNotNone(
+                load_forum_bundle(registry_documents=[release_manifest])
+            )
         with self.assertLogs("forum_runtime", level="WARNING") as logs, patch.dict(
             os.environ,
             {**controlled, "FORUM_MODEL_EVIDENCE_MODE": "real_evaluated_only"},
             clear=False,
         ):
-            self.assertIsNone(load_forum_classifier(registry_documents=[release_manifest]))
+            self.assertIsNone(
+                load_forum_bundle(registry_documents=[release_manifest])
+            )
         rendered = " ".join(logs.output)
         self.assertIn("mode_or_registry_incompatible", rendered)
         self.assertNotIn("learner", rendered)
 
-    def test_every_binding_is_validated_before_joblib_load(self):
-        original = json.loads(
+    def test_committed_v2_bundle_loads_and_legacy_v1_loader_is_superseded(self):
+        release = json.loads(
             (ROOT / "functions/forum_model_manifest.json").read_text(encoding="utf-8")
         )
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            artifact = root / "forum_model.joblib"
-            shutil.copyfile(ROOT / "functions/forum_model.joblib", artifact)
-            shutil.copyfile(ROOT / "functions/forum_runtime.py", root / "forum_runtime.py")
-            shutil.copyfile(ROOT / "functions/main.py", root / "main.py")
-            shutil.copytree(
-                ROOT / "functions/vendor/logic_oasis_ai/forum_ai",
-                root / "vendor/logic_oasis_ai/forum_ai",
-            )
-            shutil.copyfile(
-                ROOT / "functions/vendor/bundle_manifest.json",
-                root / "vendor/bundle_manifest.json",
-            )
-            manifest = root / "forum_model_manifest.json"
-            manifest.write_text(json.dumps(original), encoding="utf-8")
-            sentinel = type("Classifier", (), {"model_version": original["modelVersion"]})()
-            with patch(
-                "logic_oasis_ai.forum_ai.classifier.ForumTextClassifier.load",
-                return_value=sentinel,
-            ) as valid_load:
-                self.assertIs(
-                    sentinel,
-                    load_forum_classifier(
-                        artifact,
-                        manifest,
-                        registry_documents=[original],
-                        evidence_mode="controlled_demo",
-                        code_revision=original["codeRevision"],
-                    ),
-                )
-                valid_load.assert_called_once_with(artifact)
-            for field in (
-                "artifactSha256", "catalogueSha256", "datasetSha256",
-                "evaluationReportSha256", "bundleManifestSha256", "codeRevision",
-            ):
-                with self.subTest(field=field):
-                    broken = dict(original)
-                    broken[field] = "0" * 64
-                    manifest.write_text(json.dumps(broken), encoding="utf-8")
-                    with patch.dict(os.environ, {
-                        "FORUM_MODEL_EVIDENCE_MODE": "controlled_demo",
-                        "FORUM_RUNTIME_CODE_REVISION": original["codeRevision"],
-                    }, clear=False), patch(
-                        "logic_oasis_ai.forum_ai.classifier.ForumTextClassifier.load",
-                    ) as unsafe_load:
-                        self.assertIsNone(
-                            load_forum_classifier(
-                                artifact, manifest, registry_documents=[original],
-                            )
-                        )
-                        unsafe_load.assert_not_called()
-            manifest.write_text(json.dumps(original), encoding="utf-8")
-            vendored_classifier = root / "vendor/logic_oasis_ai/forum_ai/classifier.py"
-            vendored_classifier.write_bytes(vendored_classifier.read_bytes() + b"\n# tampered\n")
-            with patch(
-                "logic_oasis_ai.forum_ai.classifier.ForumTextClassifier.load",
-            ) as unsafe_load:
-                self.assertIsNone(
-                    load_forum_classifier(
-                        artifact,
-                        manifest,
-                        registry_documents=[original],
-                        evidence_mode="controlled_demo",
-                        code_revision=original["codeRevision"],
-                    )
-                )
-                unsafe_load.assert_not_called()
+        with patch.dict(os.environ, {
+            "FORUM_MODEL_EVIDENCE_MODE": "controlled_demo",
+            "FORUM_RUNTIME_CODE_REVISION": release["codeRevision"],
+        }, clear=False):
+            bundle = load_forum_bundle(registry_documents=[release])
+        self.assertIsNotNone(bundle)
+        self.assertEqual(
+            FORUM_RELEVANCE_MODEL_VERSION, bundle.relevance.model_version,
+        )
+        self.assertEqual(release["claimLevel"], bundle.claim_level)
+        # The legacy single-component loader is superseded by the v2 bundle.
+        self.assertIsNone(load_forum_classifier(registry_documents=[release]))
 
     def test_zero_or_multiple_active_compatible_releases_fail_closed(self):
         release = json.loads(
@@ -923,8 +871,10 @@ class ForumRuntimeTests(unittest.TestCase):
             "FORUM_RUNTIME_CODE_REVISION": release["codeRevision"],
         }
         with patch.dict(os.environ, env, clear=False):
-            self.assertIsNone(load_forum_classifier(registry_documents=[]))
-            self.assertIsNone(load_forum_classifier(registry_documents=[release, release]))
+            self.assertIsNone(load_forum_bundle(registry_documents=[]))
+            self.assertIsNone(
+                load_forum_bundle(registry_documents=[release, release])
+            )
 
     def test_demo_student_answer_reaches_genuine_nb_once_without_corpus_or_text_log(self):
         release = json.loads(
@@ -934,9 +884,12 @@ class ForumRuntimeTests(unittest.TestCase):
             "FORUM_MODEL_EVIDENCE_MODE": "controlled_demo",
             "FORUM_RUNTIME_CODE_REVISION": release["codeRevision"],
         }, clear=False):
-            classifier = load_forum_classifier(registry_documents=[release])
-        self.assertIsNotNone(classifier)
-        self.assertEqual("MultinomialNB", type(classifier.pipeline.named_steps["classifier"]).__name__)
+            bundle = load_forum_bundle(registry_documents=[release])
+        self.assertIsNotNone(bundle)
+        self.assertEqual(
+            "MultinomialNB",
+            type(bundle.reasoning.pipeline.named_steps["classifier"]).__name__,
+        )
         answer = {
             "authorId": "u10-demo-student", "questionId": "u10-demo-question",
             "revision": 1,
@@ -945,7 +898,7 @@ class ForumRuntimeTests(unittest.TestCase):
         database = _Database({("forumAnswers", "u10-demo-answer"): dict(answer)})
         with patch("forum_runtime.firestore.transactional", lambda function: function):
             state = ForumRuntimeGateway(database).process_answer(
-                "u10-demo-answer", answer, classifier,
+                "u10-demo-answer", answer, bundle,
                 event_id="u10-demo-event", now=datetime(2026, 8, 9, tzinfo=timezone.utc),
             )
         self.assertEqual("completed", state)
@@ -955,13 +908,69 @@ class ForumRuntimeTests(unittest.TestCase):
             value for key, value in database.rows.items() if key[0] == "forumAiRuns"
         )
         self.assertEqual("controlled_demonstration_only", run["claimLevel"])
-        self.assertEqual(release["artifactSha256"], run["artifactIdentity"])
+        self.assertEqual(release["reasoningArtifactSha256"], run["artifactIdentity"])
+        self.assertEqual(
+            release["relevanceArtifactSha256"], run["relevanceArtifactIdentity"],
+        )
+        self.assertEqual("not_applicable", run["composite"]["correctness"])
         ai_records = {
             str(key): value for key, value in database.rows.items()
             if key[0] in {"forumAiJobs", "forumAiRuns"}
         }
         self.assertNotIn(answer["text"], json.dumps(ai_records, default=str))
         self.assertFalse(any("training" in key[0].casefold() or "dataset" in key[0].casefold() for key in database.rows))
+
+    def test_committed_v2_bundle_verifies_a_correct_linked_answer(self):
+        release = json.loads(
+            (ROOT / "functions/forum_model_manifest.json").read_text(encoding="utf-8")
+        )
+        with patch.dict(os.environ, {
+            "FORUM_MODEL_EVIDENCE_MODE": "controlled_demo",
+            "FORUM_RUNTIME_CODE_REVISION": release["codeRevision"],
+        }, clear=False):
+            bundle = load_forum_bundle(registry_documents=[release])
+        self.assertIsNotNone(bundle)
+        database = _Database({
+            ("forumQuestions", "linked_bank_q1_v1"): {
+                "mode": "linked", "sourceQuestionId": "bank_q1",
+                "sourceContentVersion": "v1",
+                "promptSnapshot": {
+                    "questionText": "What is 46 + 27? Show your working.",
+                },
+            },
+            ("questionAnswerKeys", "bank_q1"): {
+                "questionId": "bank_q1", "contentVersion": "v1",
+                "isActive": True, "answerIndex": 2,
+            },
+            ("forumAnswers", "linked-a1"): {
+                "questionId": "linked_bank_q1_v1", "authorId": "student-a",
+                "mode": "linked", "selectedOption": 2, "revision": 1,
+                "explanation": (
+                    "I regrouped the ones into one ten and added the tens, "
+                    "then checked by subtraction."
+                ),
+            },
+        })
+        with patch("forum_runtime.firestore.transactional", lambda function: function):
+            state = ForumRuntimeGateway(database).process_answer(
+                "linked-a1", database.rows[("forumAnswers", "linked-a1")],
+                bundle, event_id="linked-event",
+                now=datetime(2026, 8, 13, 9, 0, tzinfo=timezone.utc),
+            )
+        self.assertEqual("completed", state)
+        self.assertEqual(
+            FORUM_PUBLIC_STATE_VERIFIED,
+            database.rows[("forumAnswers", "linked-a1")]["aiPublicState"],
+        )
+        self.assertEqual(
+            "correct",
+            database.rows[("forumAiFeedback", "linked-a1")]["correctness"],
+        )
+        run = next(
+            value for key, value in database.rows.items() if key[0] == "forumAiRuns"
+        )
+        self.assertEqual("verified", run["composite"]["publicState"])
+        self.assertEqual("bank_q1", run["sourceQuestionId"])
 
 
 class ForumLinkedDiscussionTests(unittest.TestCase):
@@ -1560,6 +1569,7 @@ class ForumCompositeRuntimeTests(unittest.TestCase):
                 "bundleManifestSha256": sha256(
                     bundle_manifest.read_bytes()
                 ).hexdigest(),
+                "dependencyLockSha256": "8" * 64,
                 "codeRevision": revision,
                 "codeRevisionKind": "sha256_bounded_release_sources_v1",
                 "dependencies": {

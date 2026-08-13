@@ -6,7 +6,8 @@
     "bundleSchemaVersion": "forum-runtime-bundle-v1",
     "files": {
       "__init__.py": "4a91ba70aefb24ff8a4b0b83269d23548c1e7623e4d1f3ce0e2ac218f20c4417",
-      "classifier.py": "a16acf03d4d3621ef6112ae2477b2fd1dd4227c1541913b8112eaac88b18802f"
+      "classifier.py": "a16acf03d4d3621ef6112ae2477b2fd1dd4227c1541913b8112eaac88b18802f",
+      "relevance.py": "842684b464dbe815f5877932a1816ea96e95b52d923c9ddf789099ccf2062a96"
     }
   },
   "packageSha256": "5e2dfd6bba77ee4aafca61962621cc3f7c15f799fe2e3f9c0de1be18fba65e87",

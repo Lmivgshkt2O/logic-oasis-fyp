@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 import json
+import platform
 import sys
 from tempfile import TemporaryDirectory
 import unittest
@@ -103,23 +104,40 @@ class ForumModelPromotionTests(unittest.TestCase):
 
     def test_publisher_releases_only_eligible_naive_bayes_with_complete_bindings(self):
         with TemporaryDirectory() as directory:
+            functions_root = Path(directory) / "functions"
+            functions_root.mkdir(parents=True)
+            import shutil
+            shutil.copyfile(
+                ROOT / "functions/forum-runtime-requirements.lock.txt",
+                functions_root / "forum-runtime-requirements.lock.txt",
+            )
             result = publish_forum_controlled_demo(
                 repository_root=ROOT,
-                functions_root=Path(directory) / "functions",
+                functions_root=functions_root,
                 released_by="developer",
                 released_at=NOW,
                 release_id="forum-controlled-demo-nb-v1-release-1",
             )
             manifest = json.loads(result.manifest_path.read_text(encoding="utf-8"))
+            self.assertEqual("forum-model-release-manifest-v2", manifest["manifestSchemaVersion"])
             self.assertEqual("MultinomialNB", manifest["modelType"])
+            self.assertEqual("MultinomialNB", manifest["relevanceModelType"])
+            self.assertEqual("forum-relevance-nb-v1", manifest["relevanceModelVersion"])
             self.assertEqual("released", manifest["lifecycleStatus"])
             self.assertTrue(manifest["isActive"])
             self.assertEqual("controlled_demonstration_only", manifest["claimLevel"])
             self.assertEqual("pending_cloud_deployment", manifest["deploymentState"])
+            self.assertEqual(platform.python_version(), manifest["pythonVersion"])
+            self.assertEqual(
+                "forum-composite-policy-v1",
+                manifest["compositePolicy"]["policyVersion"],
+            )
+            self.assertRegex(manifest["dependencyLockSha256"], r"^[0-9a-f]{64}$")
             for key in (
                 "catalogueSha256", "datasetSha256", "datasetManifestSha256",
                 "splitManifestSha256", "rubricSha256", "evaluationReportSha256",
                 "candidateManifestSha256", "artifactSha256", "bundleManifestSha256",
+                "reasoningArtifactSha256", "relevanceArtifactSha256",
                 "codeRevision", "dependencies", "sourceRuntimeHashes", "vendorRuntimeHashes",
             ):
                 self.assertIn(key, manifest)

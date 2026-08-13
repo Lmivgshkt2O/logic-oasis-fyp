@@ -11,10 +11,10 @@
     "developer"
   ],
   "environmentMode": "controlled_demo_generation",
-  "executionTimestampUtc": "2026-08-13T07:01:08.458293+00:00",
+  "executionTimestampUtc": "2026-08-13T10:16:11.475419+00:00",
   "logicalWorkingPath": "ai_pipeline",
-  "observedWarmPredictionLatencyMs": 2.0424,
+  "observedWarmPredictionLatencyMs": 6.6354,
   "operatingSystem": "Windows",
   "operatorRole": "developer",
-  "pythonVersion": "3.12.13"
+  "pythonVersion": "3.11.9"
 }

@@ -3,7 +3,7 @@
   "accuracy": 1.0,
   "activationStatus": "pending_u5_activation",
   "applicableFinalTestStatus": "final_test",
-  "artifactByteHash": "3f7bc41df2c127d32b5cb31f2d32a5826819e0b8c76fbd040c024e1b87d2dc7e",
+  "artifactByteHash": "6081fd603285c7ae9be2bdeffe0c67820a2528dd3fb37b31f6f2772717639cdd",
   "balancedAccuracy": 1.0,
   "baselineComparisonResult": "naive_bayes_advantage_demonstrated",
   "calibrationStatus": "not_established_on_real_learners",
@@ -358,7 +358,7 @@
     "selectedNaiveBayesVariant": "MultinomialNB"
   },
   "releaseScope": "fyp1_forum_controlled_demo",
-  "relevanceArtifactByteHash": "db2abcd33e4c369dc6a6a7060b0d24f273094e002a08be4441795fd20636bdaf",
+  "relevanceArtifactByteHash": "8df2fea527df9053f9c3c27c11ddbcc9441e7f16fa3ada305bf3f05df922a6e8",
   "relevanceBaselineComparisonResult": "naive_bayes_advantage_demonstrated",
   "relevanceCandidateSelectionDecision": "selected_MultinomialNB_using_training_and_validation_only",
   "relevanceComparators": {
@@ -603,9 +603,9 @@
     "operatingSystem": "Windows",
     "pyYamlVersion": "6.0.3",
     "pythonImplementation": "CPython",
-    "pythonVersion": "3.12.13",
+    "pythonVersion": "3.11.9",
     "scikitLearnVersion": "1.9.0",
-    "sha256": "5d4dd28a180370bd6acabd01a1b53ddacb30c6572cba994afb95018d2270ae94"
+    "sha256": "aa002975006440406c7ef40c3431023984b42ed3fa0d3e2ea7cc0aa1114ed0a3"
   },
   "selectedNaiveBayesVariant": "MultinomialNB",
   "selectedRelevanceNaiveBayesVariant": "MultinomialNB",
