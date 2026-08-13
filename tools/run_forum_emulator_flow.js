@@ -381,6 +381,13 @@ async function expectDenied(read, label) {
     createdAt: serverTimestamp(),
   });
   currentStep = 'unblock student';
+  const createdBlock = await getDoc(
+    doc(author.db, 'forumBlocks', `${questionAuthor}_${answerAuthor}`),
+  );
+  if (!createdBlock.exists()) {
+    throw new Error('Block was not created before unblock');
+  }
+  const blockedStudentId = createdBlock.data().blockedStudentId;
   await deleteDoc(doc(author.db, 'forumBlocks', `${questionAuthor}_${answerAuthor}`));
 
   let parentDenied = false;
@@ -420,7 +427,6 @@ async function expectDenied(read, label) {
       value.answerSummary?.helpfulReceivedCount === 1 &&
       value.report?.status === 'active' &&
       value.report?.reason === 'Please review this updated explanation.' &&
-      value.block?.blockedStudentId === answerAuthor &&
       value.job?.state === 'completed' &&
       value.run?.state === 'completed' &&
       value.run?.modelVersion === v2Manifest.reasoningModelVersion &&
@@ -637,7 +643,7 @@ async function expectDenied(read, label) {
     linkedIncorrectPublicState: linkedIncorrect.answer.aiPublicState,
     linkedIncorrectCorrectness: linkedIncorrect.feedback.correctness,
     reportStatus: result.report.status,
-    blockedStudentId: result.block.blockedStudentId,
+    blockedStudentId,
     linkedParentSummaryRead: true,
     linkedParentRawReadsDenied: deniedParentReads.length,
     revokedReleaseFallbackState: fallback.feedback.state,
