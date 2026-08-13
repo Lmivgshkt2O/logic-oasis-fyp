@@ -77,6 +77,19 @@ class ForumQuestion {
       );
 }
 
+/// One deterministic page of forum questions plus an opaque cursor.
+class ForumQuestionPage {
+  const ForumQuestionPage({
+    required this.questions,
+    required this.nextCursor,
+    required this.hasMore,
+  });
+
+  final List<ForumQuestion> questions;
+  final String? nextCursor;
+  final bool hasMore;
+}
+
 /// Server-owned canonical linked-discussion projection returned by the
 /// ``openOrCreateForumDiscussion`` callable. The prompt/options snapshot is
 /// client-safe; the answer key never leaves the server.

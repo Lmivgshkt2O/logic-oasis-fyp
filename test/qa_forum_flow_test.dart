@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -346,30 +347,62 @@ void main() {
     });
   });
 
+  test('forum paging cursor round-trips timestamp and id and rejects malformed input', () {
+    final updatedAt = DateTime.utc(2026, 8, 1, 10, 30, 15, 123, 456);
+    final cursor = encodeForumQuestionCursor(
+      id: 'q42',
+      data: {'updatedAt': Timestamp.fromDate(updatedAt)},
+    );
+    final decoded = decodeForumQuestionCursor(cursor);
+    expect(decoded.id, 'q42');
+    expect(decoded.updatedAt, updatedAt);
+
+    expect(
+      () => decodeForumQuestionCursor('not-base64'),
+      throwsFormatException,
+    );
+    expect(
+      () => decodeForumQuestionCursor(
+        base64Url.encode(utf8.encode('{}')),
+      ),
+      throwsFormatException,
+    );
+    expect(
+      () => decodeForumQuestionCursor(
+        base64Url.encode(utf8.encode('{"u":"","i":"x"}')),
+      ),
+      throwsFormatException,
+    );
+  });
+
   testWidgets('forum shows loading, empty, filter, and clear-filter states', (
     tester,
   ) async {
-    final questions = StreamController<List<ForumQuestion>>();
+    final pager = _ControlledPager()..gate = Completer<void>();
+    final latest = StreamController<List<ForumQuestion>>();
     final blocked = StreamController<Set<String>>();
-    addTearDown(questions.close);
+    addTearDown(latest.close);
     addTearDown(blocked.close);
     await tester.pumpWidget(
       MaterialApp(
         home: QaForumPage(
           state: AppState(),
-          questionsStream: questions.stream,
+          questionPager: pager.call,
+          latestQuestionsStream: latest.stream,
           blockedStudentIdsStream: blocked.stream,
         ),
       ),
     );
     blocked.add(const {});
+    await tester.pump();
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
 
-    questions.add(const []);
+    pager.gate!.complete();
+    pager.gate = null;
     await tester.pump();
     expect(find.textContaining('No questions yet'), findsOneWidget);
 
-    questions.add(const [
+    const twoQuestions = <ForumQuestion>[
       ForumQuestion(
         id: 'q1',
         authorId: 'student-2',
@@ -382,27 +415,226 @@ void main() {
         title: 'How do place values work?',
         text: 'I split the number into hundreds, tens, and ones.',
       ),
-    ]);
+    ];
+    pager.page = twoQuestions;
+    latest.add(twoQuestions);
+    await tester.pump();
     await tester.pump();
     expect(find.text('How can I check subtraction?'), findsOneWidget);
     expect(find.text('How do place values work?'), findsOneWidget);
 
     blocked.add(const {'student-2'});
     await tester.pump();
+    await tester.pump();
     expect(find.text('How can I check subtraction?'), findsNothing);
     expect(find.text('How do place values work?'), findsOneWidget);
 
     await tester.enterText(find.byType(TextField).first, 'place values');
+    await tester.pump();
     await tester.pump();
     expect(find.text('How can I check subtraction?'), findsNothing);
     expect(find.text('How do place values work?'), findsOneWidget);
 
     await tester.enterText(find.byType(TextField).first, 'geometry');
     await tester.pump();
+    await tester.pump();
     expect(find.text('No questions match this filter.'), findsOneWidget);
     await tester.tap(find.byTooltip('Clear filter'));
     await tester.pump();
+    await tester.pump();
     expect(find.text('How do place values work?'), findsOneWidget);
+  });
+
+  testWidgets('paging loads more than forty questions without duplicates or skips', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(900, 6000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final questions = List.generate(
+      55,
+      (index) => ForumQuestion(
+        id: 'q$index',
+        authorId: 'student-$index',
+        title: 'Question $index',
+        text: 'Body for question $index',
+      ),
+    );
+    final pager = _PagedPager([
+      questions.sublist(0, 20),
+      <ForumQuestion>[questions[19], ...questions.sublist(20, 40)],
+      questions.sublist(40, 55),
+    ]);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: QaForumPage(
+          state: AppState(),
+          questionPager: pager.call,
+          latestQuestionsStream: Stream.value(const []),
+          blockedStudentIdsStream: Stream.value(const <String>{}),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    expect(find.byType(Card), findsNWidgets(20));
+
+    await tester.tap(find.text('Load more'));
+    await tester.pumpAndSettle();
+    expect(pager.requestedCursors, <String?>[null, '1']);
+    expect(find.byType(Card), findsNWidgets(40));
+
+    await tester.tap(find.text('Load more'));
+    await tester.pumpAndSettle();
+    expect(pager.requestedCursors, <String?>[null, '1', '2']);
+    expect(find.byType(Card), findsNWidgets(55));
+    expect(find.text('Load more'), findsNothing);
+
+    final titles = <String>{};
+    for (final question in questions) {
+      expect(titles.add(question.title), isTrue);
+    }
+  });
+
+  testWidgets('load-more error preserves the current page and retries', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(900, 6000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final questions = List.generate(
+      40,
+      (index) => ForumQuestion(
+        id: 'q$index',
+        authorId: 'student-$index',
+        title: 'Question $index',
+        text: 'Body for question $index',
+      ),
+    );
+    final pager = _PagedPager([
+      questions.sublist(0, 20),
+      questions.sublist(20, 40),
+    ])
+      ..failOnce('1');
+    await tester.pumpWidget(
+      MaterialApp(
+        home: QaForumPage(
+          state: AppState(),
+          questionPager: pager.call,
+          latestQuestionsStream: Stream.value(const []),
+          blockedStudentIdsStream: Stream.value(const <String>{}),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    expect(find.byType(Card), findsNWidgets(20));
+
+    await tester.tap(find.text('Load more'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('current list is unchanged'), findsOneWidget);
+    expect(find.byType(Card), findsNWidgets(20));
+
+    await tester.tap(find.text('Retry'));
+    await tester.pumpAndSettle();
+    expect(find.byType(Card), findsNWidgets(40));
+    expect(find.text('Load more'), findsNothing);
+  });
+
+  testWidgets('ordering-affecting live change refetches from the first page', (
+    tester,
+  ) async {
+    const firstPage = <ForumQuestion>[
+      ForumQuestion(
+        id: 'q0',
+        authorId: 'a',
+        title: 'First question',
+        text: 'Body zero.',
+      ),
+      ForumQuestion(
+        id: 'q1',
+        authorId: 'b',
+        title: 'Second question',
+        text: 'Body one.',
+      ),
+    ];
+    final pager = _ControlledPager()..page = firstPage;
+    final latest = StreamController<List<ForumQuestion>>();
+    addTearDown(latest.close);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: QaForumPage(
+          state: AppState(),
+          questionPager: pager.call,
+          latestQuestionsStream: latest.stream,
+          blockedStudentIdsStream: Stream.value(const <String>{}),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('First question'), findsOneWidget);
+    final callsAfterLoad = pager.calls;
+
+    latest.add(firstPage);
+    await tester.pump();
+    await tester.pump();
+    expect(pager.calls, callsAfterLoad);
+
+    const newest = ForumQuestion(
+      id: 'q-new',
+      authorId: 'c',
+      title: 'Newest question',
+      text: 'Body newest.',
+    );
+    latest.add(<ForumQuestion>[newest, firstPage[0]]);
+    await tester.pump();
+    await tester.pump();
+    expect(pager.calls, greaterThan(callsAfterLoad));
+    expect(find.text('First question'), findsOneWidget);
+  });
+
+  testWidgets('filter changes reset the accumulated paging state', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(900, 6000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final questions = List.generate(
+      40,
+      (index) => ForumQuestion(
+        id: 'q$index',
+        authorId: 'student-$index',
+        title: 'Question $index',
+        text: 'Body for question $index',
+      ),
+    );
+    final pager = _PagedPager([
+      questions.sublist(0, 20),
+      questions.sublist(20, 40),
+    ]);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: QaForumPage(
+          state: AppState(),
+          questionPager: pager.call,
+          latestQuestionsStream: Stream.value(const []),
+          blockedStudentIdsStream: Stream.value(const <String>{}),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    await tester.tap(find.text('Load more'));
+    await tester.pumpAndSettle();
+    expect(pager.requestedCursors, <String?>[null, '1']);
+
+    await tester.enterText(find.byType(TextField).first, 'Question 3');
+    await tester.pump();
+    await tester.pump();
+    expect(pager.requestedCursors, <String?>[null, '1', null]);
+    expect(find.widgetWithText(Card, 'Question 3'), findsOneWidget);
+    expect(find.text('Load more'), findsOneWidget);
   });
 
   testWidgets('accepted answer is visibly singular in the answer view', (
@@ -431,7 +663,13 @@ void main() {
       MaterialApp(
         home: QaForumPage(
           state: AppState(),
-          questionsStream: Stream.value(const [question]),
+          questionPager: ({required int limit, String? cursor}) async =>
+              const ForumQuestionPage(
+                questions: const [question],
+                nextCursor: null,
+                hasMore: false,
+              ),
+          latestQuestionsStream: Stream.value(const [question]),
           blockedStudentIdsStream: blocked,
           answersStreamForQuestion: (_) => Stream.value(const [answer]),
         ),
@@ -471,7 +709,13 @@ void main() {
       MaterialApp(
         home: QaForumPage(
           state: state,
-          questionsStream: Stream.value(const [question]),
+          questionPager: ({required int limit, String? cursor}) async =>
+              const ForumQuestionPage(
+                questions: const [question],
+                nextCursor: null,
+                hasMore: false,
+              ),
+          latestQuestionsStream: Stream.value(const [question]),
           blockedStudentIdsStream: Stream.value(
             const <String>{},
           ).asBroadcastStream(),
@@ -493,7 +737,13 @@ void main() {
       MaterialApp(
         home: QaForumPage(
           state: state,
-          questionsStream: Stream.value(const []),
+          questionPager: ({required int limit, String? cursor}) async =>
+              const ForumQuestionPage(
+                questions: [],
+                nextCursor: null,
+                hasMore: false,
+              ),
+          latestQuestionsStream: Stream.value(const []),
           blockedStudentIdsStream: Stream.value(const <String>{}),
         ),
       ),
@@ -927,7 +1177,13 @@ void main() {
       MaterialApp(
         home: QaForumPage(
           state: AppState(),
-          questionsStream: Stream.value(const [question]),
+          questionPager: ({required int limit, String? cursor}) async =>
+              const ForumQuestionPage(
+                questions: const [question],
+                nextCursor: null,
+                hasMore: false,
+              ),
+          latestQuestionsStream: Stream.value(const [question]),
           blockedStudentIdsStream: Stream.value(
             const <String>{},
           ).asBroadcastStream(),
@@ -967,7 +1223,13 @@ void main() {
       MaterialApp(
         home: QaForumPage(
           state: AppState(),
-          questionsStream: Stream.value(const []),
+          questionPager: ({required int limit, String? cursor}) async =>
+              const ForumQuestionPage(
+                questions: [],
+                nextCursor: null,
+                hasMore: false,
+              ),
+          latestQuestionsStream: Stream.value(const []),
           blockedStudentIdsStream: blocked.stream,
         ),
       ),
@@ -982,38 +1244,42 @@ void main() {
   testWidgets('forum distinguishes denied access from retryable load failure', (
     tester,
   ) async {
-    final denied = StreamController<List<ForumQuestion>>();
-    addTearDown(denied.close);
+    final deniedPager = _ControlledPager()
+      ..error = FirebaseException(
+        plugin: 'cloud_firestore',
+        code: 'permission-denied',
+      );
     await tester.pumpWidget(
       MaterialApp(
         home: QaForumPage(
           state: AppState(),
-          questionsStream: denied.stream,
+          questionPager: deniedPager.call,
+          latestQuestionsStream: Stream.value(const <ForumQuestion>[]),
           blockedStudentIdsStream: Stream.value(const <String>{}),
         ),
       ),
     );
-    denied.addError(
-      FirebaseException(plugin: 'cloud_firestore', code: 'permission-denied'),
-    );
+    await tester.pump();
     await tester.pump();
     expect(find.textContaining('student profile'), findsOneWidget);
 
-    final retryable = StreamController<List<ForumQuestion>>();
-    addTearDown(retryable.close);
+    final retryablePager = _ControlledPager()
+      ..error = FirebaseException(
+        plugin: 'cloud_firestore',
+        code: 'unavailable',
+      );
     await tester.pumpWidget(
       MaterialApp(
         home: QaForumPage(
           key: const ValueKey('retryable-forum'),
           state: AppState(),
-          questionsStream: retryable.stream,
+          questionPager: retryablePager.call,
+          latestQuestionsStream: Stream.value(const <ForumQuestion>[]),
           blockedStudentIdsStream: Stream.value(const <String>{}),
         ),
       ),
     );
-    retryable.addError(
-      FirebaseException(plugin: 'cloud_firestore', code: 'unavailable'),
-    );
+    await tester.pump();
     await tester.pump();
     expect(find.textContaining('check your connection'), findsOneWidget);
   });
@@ -1098,7 +1364,13 @@ Future<void> _openAnswerActions(
       home: QaForumPage(
         state: AppState(),
         repository: repository,
-        questionsStream: Stream.value(const [question]),
+        questionPager: ({required int limit, String? cursor}) async =>
+            const ForumQuestionPage(
+              questions: const [question],
+              nextCursor: null,
+              hasMore: false,
+            ),
+        latestQuestionsStream: Stream.value(const [question]),
         blockedStudentIdsStream: Stream.value(
           const <String>{},
         ).asBroadcastStream(),
@@ -1175,6 +1447,63 @@ class _LinkedActionRepository implements CollaborationRepository {
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _ControlledPager {
+  List<ForumQuestion> page = const [];
+  bool hasMore = false;
+  int calls = 0;
+  Object? error;
+  Completer<void>? gate;
+
+  Future<ForumQuestionPage> call({
+    required int limit,
+    String? cursor,
+  }) async {
+    calls += 1;
+    final pendingGate = gate;
+    if (pendingGate != null) await pendingGate.future;
+    final failure = error;
+    if (failure != null) {
+      error = null;
+      throw failure;
+    }
+    return ForumQuestionPage(
+      questions: page,
+      nextCursor: null,
+      hasMore: hasMore,
+    );
+  }
+}
+
+class _PagedPager {
+  _PagedPager(this.pages);
+
+  final List<List<ForumQuestion>> pages;
+  final List<String?> requestedCursors = [];
+  final Set<String> _failedCursors = {};
+  int calls = 0;
+
+  void failOnce(String cursor) => _failedCursors.add(cursor);
+
+  Future<ForumQuestionPage> call({
+    required int limit,
+    String? cursor,
+  }) async {
+    calls += 1;
+    requestedCursors.add(cursor);
+    if (_failedCursors.remove(cursor)) {
+      throw Exception('load more failed');
+    }
+    final index = cursor == null ? 0 : int.parse(cursor);
+    final page = pages[index];
+    final hasMore = index < pages.length - 1;
+    return ForumQuestionPage(
+      questions: page,
+      nextCursor: hasMore ? '${index + 1}' : null,
+      hasMore: hasMore,
+    );
+  }
 }
 
 class _FakeFirestore implements FirebaseFirestore {

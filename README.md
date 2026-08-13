@@ -43,6 +43,36 @@ flutter run
 
 If using an Android emulator, open the emulator first from Android Studio.
 
+## Firebase Emulators (development only)
+
+Start the local emulators (`firebase emulators:start --only auth,firestore,functions`)
+and run the app with:
+
+```powershell
+flutter run --dart-define=USE_FIREBASE_EMULATORS=true
+```
+
+The emulator host is resolved once and shared by Auth, Firestore, and Functions:
+
+- Android Virtual Device (default): `10.0.2.2` (the host loopback alias).
+- Desktop and web (default): `localhost`.
+- Physical Android device on the same LAN: pass your computer's LAN address, e.g.
+  `--dart-define=FIREBASE_EMULATOR_HOST=192.168.1.50`.
+- Physical Android device with `adb reverse` (no LAN needed):
+  `--dart-define=FIREBASE_EMULATOR_HOST=localhost`, then tunnel the three ports:
+
+  ```powershell
+  adb reverse tcp:9099 tcp:9099   # Auth
+  adb reverse tcp:8080 tcp:8080   # Firestore
+  adb reverse tcp:5001 tcp:5001   # Functions
+  ```
+
+The override must be a bare host: no scheme, port, or path. `localhost` is
+allowed as the `adb reverse` tunnel alias; numeric loopback addresses
+(`127.0.0.1`, `::1`) are rejected because they point at the device itself.
+Release builds never enable emulators unless the developer explicitly passes
+`--dart-define=USE_FIREBASE_EMULATORS=true`.
+
 ## Next Build Steps
 
 1. Add Firebase project configuration with FlutterFire.

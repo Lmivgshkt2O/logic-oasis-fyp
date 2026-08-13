@@ -4,6 +4,7 @@ import 'package:logic_oasis/app/logic_oasis_design.dart';
 import 'package:logic_oasis/app/theme.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:logic_oasis/shared/models/forum_answer.dart';
 import 'package:logic_oasis/shared/models/forum_question.dart';
@@ -16,14 +17,23 @@ class QaForumPage extends StatefulWidget {
     super.key,
     required this.state,
     this.repository,
-    this.questionsStream,
+    this.questionPager,
+    this.latestQuestionsStream,
     this.blockedStudentIdsStream,
     this.answersStreamForQuestion,
     this.authorFeedbackStreamForAnswer,
   });
+
+  static const int pageSize = 20;
+
   final AppState state;
   final CollaborationRepository? repository;
-  final Stream<List<ForumQuestion>>? questionsStream;
+  final Future<ForumQuestionPage> Function({
+    required int limit,
+    String? cursor,
+  })?
+  questionPager;
+  final Stream<List<ForumQuestion>>? latestQuestionsStream;
   final Stream<Set<String>>? blockedStudentIdsStream;
   final Stream<List<ForumAnswer>> Function(String questionId)?
   answersStreamForQuestion;
@@ -42,9 +52,17 @@ class _QaForumPageState extends State<QaForumPage> {
   final _questionTitle = TextEditingController();
   final _questionBody = TextEditingController();
   StreamSubscription<Set<String>>? _blockedSubscription;
+  StreamSubscription<List<ForumQuestion>>? _latestSubscription;
   Set<String> _blockedAuthors = const {};
   Object? _blockedError;
   bool _postingQuestion = false;
+  List<ForumQuestion> _questions = const [];
+  String? _nextCursor;
+  bool _hasMore = false;
+  bool _loading = true;
+  Object? _loadError;
+  bool _loadingMore = false;
+  Object? _loadMoreError;
 
   String _t(String english, String bahasaMelayu) =>
       widget.state.t(english, bahasaMelayu);
@@ -68,6 +86,21 @@ class _QaForumPageState extends State<QaForumPage> {
         if (mounted) setState(() => _blockedError = error);
       },
     );
+    final latest =
+        widget.latestQuestionsStream ??
+        _repo.watchLatestForumQuestions(limit: QaForumPage.pageSize);
+    _latestSubscription = latest.listen(
+      (questions) {
+        if (!mounted) return;
+        _handleLatestPage(questions);
+      },
+      onError: (Object error) {
+        // The latest-page signal is advisory; a failed signal must not break
+        // the already-loaded paged list.
+        if (mounted) setState(() {});
+      },
+    );
+    _refresh();
   }
 
   @override
@@ -76,6 +109,7 @@ class _QaForumPageState extends State<QaForumPage> {
     _questionTitle.dispose();
     _questionBody.dispose();
     _blockedSubscription?.cancel();
+    _latestSubscription?.cancel();
     super.dispose();
   }
 
@@ -96,95 +130,233 @@ class _QaForumPageState extends State<QaForumPage> {
       icon: const Icon(Icons.add_comment_outlined),
       label: Text(_t('Ask a question', 'Tanya soalan')),
     ),
-    body: StreamBuilder<List<ForumQuestion>>(
-      stream: widget.questionsStream ?? _repo.watchQuestions(),
-      builder: (context, snapshot) {
-        if (_blockedError != null) {
-          return _Message(_friendlyError(_blockedError!, widget.state));
-        }
-        if (snapshot.hasError) {
-          final error = snapshot.error;
-          final denied =
-              error is FirebaseException && error.code == 'permission-denied';
-          return _Message(
-            denied
-                ? _t(
-                    'Forum access is unavailable for this account. Sign in with a student profile, then try again.',
-                    'Akses forum tidak tersedia untuk akaun ini. Log masuk dengan profil murid dan cuba lagi.',
-                  )
-                : _t(
-                    'The forum could not be loaded. Please check your connection and try again.',
-                    'Forum tidak dapat dimuatkan. Periksa sambungan anda dan cuba lagi.',
-                  ),
-          );
-        }
-        if (!snapshot.hasData)
-          return const Center(child: CircularProgressIndicator());
-        final query = _filter.text.trim().toLowerCase();
-        final questions = snapshot.data!
-            .where(
-              (question) =>
-                  !_blockedAuthors.contains(question.authorId) &&
-                  (query.isEmpty ||
-                      question.title.toLowerCase().contains(query) ||
-                      question.text.toLowerCase().contains(query)),
-            )
-            .toList(growable: false);
-        if (questions.isEmpty)
-          return Column(
-            children: [
-              _filterField(),
-              Expanded(
-                child: _Message(
-                  query.isEmpty
-                      ? _t(
-                          'No questions yet. Start the conversation by asking how you solved a problem.',
-                          'Belum ada soalan. Mulakan perbualan dengan bertanya cara menyelesaikan masalah.',
-                        )
-                      : _t(
-                          'No questions match this filter.',
-                          'Tiada soalan sepadan dengan tapisan ini.',
-                        ),
-                ),
-              ),
-            ],
-          );
-        return Column(
-          children: [
-            _filterField(),
-            Expanded(
-              child: ListView.separated(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
-                itemCount: questions.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 10),
-                itemBuilder: (context, index) {
-                  final question = questions[index];
-                  return Card(
-                    child: ListTile(
-                      title: Text(question.title),
-                      subtitle: Text(
-                        question.text,
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: () => _openAnswers(context, question),
+    body: _buildQuestionList(context),
+  );
+
+  Widget _buildQuestionList(BuildContext context) {
+    if (_blockedError != null) {
+      return _Message(_friendlyError(_blockedError!, widget.state));
+    }
+    if (_loading && _questions.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_loadError != null && _questions.isEmpty) {
+      final error = _loadError!;
+      final denied =
+          error is FirebaseException && error.code == 'permission-denied';
+      return Column(
+        children: [
+          _filterField(),
+          Expanded(
+            child: _Message(
+              denied
+                  ? _t(
+                      'Forum access is unavailable for this account. Sign in with a student profile, then try again.',
+                      'Akses forum tidak tersedia untuk akaun ini. Log masuk dengan profil murid dan cuba lagi.',
+                    )
+                  : _t(
+                      'The forum could not be loaded. Please check your connection and try again.',
+                      'Forum tidak dapat dimuatkan. Periksa sambungan anda dan cuba lagi.',
                     ),
-                  );
-                },
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 24),
+            child: OutlinedButton.icon(
+              onPressed: _refresh,
+              icon: const Icon(Icons.refresh),
+              label: Text(_t('Retry', 'Cuba semula')),
+            ),
+          ),
+        ],
+      );
+    }
+    final query = _filter.text.trim().toLowerCase();
+    final questions = _questions
+        .where(
+          (question) =>
+              !_blockedAuthors.contains(question.authorId) &&
+              (query.isEmpty ||
+                  question.title.toLowerCase().contains(query) ||
+                  question.text.toLowerCase().contains(query)),
+        )
+        .toList(growable: false);
+    if (questions.isEmpty) {
+      return Column(
+        children: [
+          _filterField(),
+          Expanded(
+            child: _Message(
+              query.isEmpty
+                  ? _t(
+                      'No questions yet. Start the conversation by asking how you solved a problem.',
+                      'Belum ada soalan. Mulakan perbualan dengan bertanya cara menyelesaikan masalah.',
+                    )
+                  : _t(
+                      'No questions match this filter.',
+                      'Tiada soalan sepadan dengan tapisan ini.',
+                    ),
+            ),
+          ),
+        ],
+      );
+    }
+    final showFooter = _hasMore || _loadMoreError != null;
+    return Column(
+      children: [
+        _filterField(),
+        Expanded(
+          child: ListView.separated(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+            itemCount: questions.length + (showFooter ? 1 : 0),
+            separatorBuilder: (_, _) => const SizedBox(height: 10),
+            itemBuilder: (context, index) {
+              if (index == questions.length) return _pagingFooter();
+              final question = questions[index];
+              return Card(
+                child: ListTile(
+                  title: Text(question.title),
+                  subtitle: Text(
+                    question.text,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _openAnswers(context, question),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _pagingFooter() {
+    if (_loadMoreError != null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Column(
+          children: [
+            Text(
+              _t(
+                'Could not load more questions. Your current list is unchanged.',
+                'Tidak dapat memuatkan lebih banyak soalan. Senarai semasa tidak berubah.',
               ),
+              textAlign: TextAlign.center,
+            ),
+            TextButton.icon(
+              onPressed: _loadingMore ? null : _loadMore,
+              icon: const Icon(Icons.refresh),
+              label: Text(_t('Retry', 'Cuba semula')),
             ),
           ],
-        );
-      },
-    ),
-  );
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Center(
+        child: _loadingMore
+            ? const SizedBox.square(
+                dimension: 22,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : OutlinedButton.icon(
+                onPressed: _loadMore,
+                icon: const Icon(Icons.expand_more),
+                label: Text(_t('Load more', 'Muat lagi')),
+              ),
+      ),
+    );
+  }
+
+  Future<ForumQuestionPage> _loadPage({required String? cursor}) {
+    final pager =
+        widget.questionPager ?? _repo.loadForumQuestions;
+    return pager(limit: QaForumPage.pageSize, cursor: cursor);
+  }
+
+  Future<void> _refresh() async {
+    setState(() {
+      _loading = true;
+      _loadError = null;
+      _loadMoreError = null;
+    });
+    try {
+      final page = await _loadPage(cursor: null);
+      if (!mounted) return;
+      setState(() {
+        _questions = page.questions;
+        _nextCursor = page.nextCursor;
+        _hasMore = page.hasMore;
+        _loading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _loadError = error;
+      });
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_loading || _loadingMore || !_hasMore || _nextCursor == null) return;
+    setState(() {
+      _loadingMore = true;
+      _loadMoreError = null;
+    });
+    try {
+      final page = await _loadPage(cursor: _nextCursor);
+      if (!mounted) return;
+      setState(() {
+        final seen = _questions.map((question) => question.id).toSet();
+        _questions = [
+          ..._questions,
+          ...page.questions
+              .where((question) => !seen.contains(question.id))
+              .toList(growable: false),
+        ];
+        _nextCursor = page.nextCursor;
+        _hasMore = page.hasMore;
+        _loadingMore = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loadingMore = false;
+        _loadMoreError = error;
+      });
+    }
+  }
+
+  void _handleLatestPage(List<ForumQuestion> latest) {
+    final firstPageIds = _questions
+        .take(QaForumPage.pageSize)
+        .map((question) => question.id)
+        .toList(growable: false);
+    final latestIds = latest
+        .map((question) => question.id)
+        .toList(growable: false);
+    final reordered = !listEquals(latestIds, firstPageIds);
+    if (reordered && !_loading && !_loadingMore && mounted) {
+      _refresh();
+    }
+  }
+
+  void _onFilterChanged() {
+    setState(() {});
+    // Filters operate on loaded pages but reset the accumulated paging state
+    // so a stale cursor cannot create gaps behind a narrower filter.
+    _refresh();
+  }
 
   Widget _filterField() => Padding(
     padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
     child: TextField(
       controller: _filter,
-      onChanged: (_) => setState(() {}),
+      onChanged: (_) => _onFilterChanged(),
       decoration: InputDecoration(
         prefixIcon: const Icon(Icons.search),
         hintText: _t('Filter questions', 'Tapis soalan'),
@@ -194,7 +366,7 @@ class _QaForumPageState extends State<QaForumPage> {
                 tooltip: _t('Clear filter', 'Kosongkan tapisan'),
                 onPressed: () {
                   _filter.clear();
-                  setState(() {});
+                  _onFilterChanged();
                 },
                 icon: const Icon(Icons.clear),
               ),

@@ -61,15 +61,20 @@ void main() {
   testWidgets('Forum loading and denied states render inside the shell', (
     tester,
   ) async {
-    final questions = StreamController<List<ForumQuestion>>();
-    addTearDown(questions.close);
+    final pager = _ShellPager()
+      ..gate = Completer<void>()
+      ..error = FirebaseException(
+        plugin: 'cloud_firestore',
+        code: 'permission-denied',
+      );
     final state = AppState()..changeTab(2);
     await _pumpShell(
       tester,
       state,
       forumPageBuilder: (_) => QaForumPage(
         state: state,
-        questionsStream: questions.stream,
+        questionPager: pager.call,
+        latestQuestionsStream: Stream.value(const <ForumQuestion>[]),
         blockedStudentIdsStream: Stream.value(const <String>{}),
       ),
     );
@@ -79,9 +84,9 @@ void main() {
     expect(find.text('Q&A Forum'), findsNWidgets(2));
     expect(find.text('Ask a question'), findsOneWidget);
 
-    questions.addError(
-      FirebaseException(plugin: 'cloud_firestore', code: 'permission-denied'),
-    );
+    pager.gate!.complete();
+    pager.gate = null;
+    await tester.pump();
     await tester.pump();
 
     expect(
@@ -89,6 +94,26 @@ void main() {
       findsOneWidget,
     );
   });
+}
+
+class _ShellPager {
+  Completer<void>? gate;
+  Object? error;
+
+  Future<ForumQuestionPage> call({
+    required int limit,
+    String? cursor,
+  }) async {
+    final pendingGate = gate;
+    if (pendingGate != null) await pendingGate.future;
+    final failure = error;
+    if (failure != null) throw failure;
+    return const ForumQuestionPage(
+      questions: [],
+      nextCursor: null,
+      hasMore: false,
+    );
+  }
 }
 
 Future<void> _pumpShell(
