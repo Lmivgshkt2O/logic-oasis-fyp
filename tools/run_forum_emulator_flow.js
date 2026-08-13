@@ -220,6 +220,11 @@ function prepareV2Release() {
       ),
     ),
     bundleManifestSha256: sha256hex(fs.readFileSync(bundleManifestPath)),
+    dependencyLockSha256: sha256hex(
+      fs.readFileSync(
+        path.join(functionsRoot, 'forum-runtime-requirements.lock.txt'),
+      ),
+    ),
     codeRevision,
     codeRevisionKind: 'sha256_bounded_release_sources_v1',
     dependencies: releaseManifest.dependencies,
