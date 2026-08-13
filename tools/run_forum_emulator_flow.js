@@ -39,7 +39,7 @@ const releaseManifest = JSON.parse(
   fs.readFileSync(path.join(repositoryRoot, 'functions', 'forum_model_manifest.json'), 'utf8'),
 );
 const controlledEvidenceFiles = [
-  'ai_pipeline/forum_controlled_demo/forum_scenario_catalog_v1.yaml',
+  'ai_pipeline/forum_controlled_demo/forum_verification_catalog_v1.yaml',
   'ai_pipeline/forum_controlled_demo/generated/forum_controlled_demo_v1.jsonl',
   'ai_pipeline/forum_controlled_demo/generated/forum_controlled_demo_v1_manifest.json',
   'ai_pipeline/forum_controlled_demo/generated/forum_controlled_demo_split_manifest.json',

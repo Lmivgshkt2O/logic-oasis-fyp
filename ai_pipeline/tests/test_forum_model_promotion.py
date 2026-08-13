@@ -21,6 +21,67 @@ NOW = datetime(2026, 8, 9, 8, 0, tzinfo=timezone.utc)
 
 
 class ForumModelPromotionTests(unittest.TestCase):
+    def test_committed_composite_candidate_is_eligible_with_zero_false_decisions(self):
+        generated = ROOT / "ai_pipeline/forum_controlled_demo/generated"
+        reports = ROOT / "ai_pipeline/reports"
+        candidate = json.loads(
+            (generated / "forum_controlled_demo_candidate_manifest.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        report = json.loads(
+            (reports / "forum_controlled_demo_report.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(
+            "forum-controlled-demo-candidate-manifest-v2",
+            candidate["manifestSchemaVersion"],
+        )
+        self.assertEqual("forum-relevance-nb-v1", candidate["relevanceModelVersion"])
+        self.assertIn("relevanceArtifactSha256", candidate)
+        self.assertIn("relevanceVectorizerContract", candidate)
+        self.assertIn("compositePolicy", candidate)
+        self.assertIn("relevanceArtifactFile", candidate)
+        self.assertEqual("eligible", candidate["controlledCandidateStatus"])
+        self.assertEqual(0, report["composite"]["falseVerifiedCount"])
+        self.assertEqual(0, report["composite"]["falseMayBeIrrelevantCount"])
+        self.assertGreaterEqual(report["composite"]["verifiedEmittedCount"], 8)
+        self.assertGreaterEqual(report["composite"]["mayBeIrrelevantEmittedCount"], 8)
+
+    def test_composite_false_decision_gates_reject_candidates(self):
+        from training.evaluate_forum_classifier import candidate_gate_failures
+
+        base = dict(
+            training_labels=[0, 1], validation_labels=[0, 1], held_out_labels=[0, 1],
+            predictions=[0, 1], confusion_matrix=[[1, 0], [0, 1]], vocabulary_size=2,
+            preprocessing_valid=True, leakage_free=True, no_test_fit=True,
+            published_count=1, held_out_count=2, artifact_reproduces=True,
+            bindings_valid=True,
+        )
+        cases = {
+            "false_verified": {"composite": {
+                "falseVerifiedCount": 1, "falseMayBeIrrelevantCount": 0,
+                "verifiedCoverage": 0.5, "mayBeIrrelevantCoverage": 0.5,
+            }},
+            "false_may_be_irrelevant": {"composite": {
+                "falseVerifiedCount": 0, "falseMayBeIrrelevantCount": 1,
+                "verifiedCoverage": 0.5, "mayBeIrrelevantCoverage": 0.5,
+            }},
+            "verified_no_coverage": {"composite": {
+                "falseVerifiedCount": 0, "falseMayBeIrrelevantCount": 0,
+                "verifiedCoverage": 0.0, "mayBeIrrelevantCoverage": 0.5,
+            }},
+            "may_be_irrelevant_no_coverage": {"composite": {
+                "falseVerifiedCount": 0, "falseMayBeIrrelevantCount": 0,
+                "verifiedCoverage": 0.5, "mayBeIrrelevantCoverage": 0.0,
+            }},
+        }
+        for expected, override in cases.items():
+            with self.subTest(gate=expected):
+                failures = candidate_gate_failures(**(base | override))
+                self.assertIn(expected, failures)
+
     def test_publisher_cli_carries_the_superseded_release_id(self):
         arguments = [
             "publish_forum_controlled_demo",

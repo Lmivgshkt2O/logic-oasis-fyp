@@ -5,19 +5,20 @@
   "relatedQuestionGroupKey": "questionFamilyId",
   "splitSchemaVersion": "forum-controlled-demo-grouped-split-v1",
   "testScenarioFamilyIds": [
+    "fractions-equivalent-mixed-v2",
     "multiplication-groups-en-v1",
     "subtraction-borrowing-ms-v1"
   ],
-  "testUsePolicy": "untouched_until_naive_bayes_variant_and_pipeline_are_frozen",
+  "testUsePolicy": "untouched_until_naive_bayes_variants_and_policy_are_frozen",
   "trainScenarioFamilyIds": [
-    "area-array-en-v1",
-    "decimals-place-value-mixed-v1",
+    "addition-regrouping-en-v2",
     "division-sharing-ms-v1",
     "fractions-equivalent-mixed-v1",
-    "money-change-ms-v1",
-    "ratio-sharing-ms-v1",
-    "rounding-estimate-mixed-v1",
-    "time-duration-en-v1"
+    "free-form-addition-en-v1",
+    "free-form-fractions-mixed-v1",
+    "free-form-money-en-v1",
+    "free-form-subtraction-ms-v1",
+    "subtraction-borrowing-ms-v2"
   ],
   "validationScenarioFamilyIds": [
     "addition-regrouping-en-v1",

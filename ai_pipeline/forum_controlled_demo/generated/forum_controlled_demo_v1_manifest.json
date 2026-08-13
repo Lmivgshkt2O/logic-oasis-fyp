@@ -1,32 +1,54 @@
 {
   "authorDeclaration": "developer-authored-fictional-forum-scenarios-v1",
-  "catalogVersion": "forum-controlled-demo-catalog-v1",
-  "catalogueSha256": "614aefeffe4929f9b096452a4bb5e473cf671c809231a42edf2e8358b1f01c3a",
+  "catalogVersion": "forum-verification-catalog-v1",
+  "catalogueSha256": "c896a2af1a2f796d60a570a9de35262bb88f14c019ca464f5981b1aa4350bffd",
   "claimLevel": "controlled_demonstration_only",
   "classCounts": {
-    "answer_only_or_insufficient": 12,
-    "explanation_sufficient": 12
+    "answer_only_or_insufficient": 44,
+    "explanation_sufficient": 44
+  },
+  "compositeCounts": {
+    "advisory_only": 16,
+    "should_not_verify": 45,
+    "verified": 27
   },
   "containsAnswerKeys": false,
   "containsCopiedForumText": false,
   "containsLearnerDistributionClaims": false,
   "containsLearnerIdentity": false,
-  "datasetSha256": "5d096d6ab1c6ce59428c9d89b8d972d743d6d613ae249b619c1c51579b3a8399",
+  "correctnessCounts": {
+    "correct": 63,
+    "incorrect": 9,
+    "not_applicable": 16
+  },
+  "datasetSha256": "1d0ba2ffefdc12239bcd29a90d2311f68c73e4a528f74bf5dec2e5d18d479265",
   "datasetVersion": "forum-controlled-demo-dataset-v1",
   "deploymentScope": "controlled_demo",
   "evaluationGroupKey": "scenarioFamilyId",
   "evidenceLevel": "controlled_demonstration",
+  "irrelevantCount": 35,
   "languageCounts": {
-    "en": 8,
-    "mixed": 8,
-    "ms": 8
+    "en": 32,
+    "mixed": 28,
+    "ms": 28
   },
-  "questionFamilyCount": 12,
+  "modeCounts": {
+    "free_form": 16,
+    "linked": 72
+  },
+  "questionFamilyCount": 13,
   "relatedQuestionGroupKey": "questionFamilyId",
   "releaseScope": "fyp1_forum_controlled_demo",
-  "rowCount": 24,
-  "rubricSha256": "678505add7d4901d49ce1636baf8289877480383e3515b38e847b114da7ba05b",
-  "rubricVersion": "forum-explanation-rubric-v1",
-  "scenarioFamilyCount": 12,
-  "trainingDataProvenance": "expert_authored_controlled_demo"
+  "relevanceCounts": {
+    "irrelevant": 35,
+    "relevant": 53
+  },
+  "relevantControlCount": 53,
+  "rowCount": 88,
+  "rubricSha256": "85a3daace207c001a719f35b5425600266b23fe99f5cf14d91bc6ddaf2372394",
+  "rubricVersion": "forum-verification-rubric-v1",
+  "scenarioFamilyCount": 13,
+  "shouldNotVerifyCount": 45,
+  "trainingDataProvenance": "expert_authored_controlled_demo",
+  "verifiedEligibleCount": 27
 }

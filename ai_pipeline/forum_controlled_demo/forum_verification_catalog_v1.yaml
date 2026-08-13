@@ -1,0 +1,193 @@
+catalogVersion: forum-verification-catalog-v1
+rubricVersion: forum-verification-rubric-v1
+trainingDataProvenance: expert_authored_controlled_demo
+evidenceLevel: controlled_demonstration
+claimLevel: controlled_demonstration_only
+releaseScope: fyp1_forum_controlled_demo
+deploymentScope: controlled_demo
+authorDeclaration: developer-authored-fictional-forum-scenarios-v1
+limitations:
+  - The catalogue is fictional and contains no real learner forum text.
+  - Correctness labels apply only to linked four-option contexts and never to free-form responses.
+  - Relevance and reasoning labels are advisory and are not learner-calibrated confidence.
+  - Language coverage is limited to controlled English, Bahasa Melayu, and mixed examples.
+scenarioFamilies:
+  - scenarioFamilyId: addition-regrouping-en-v1
+    questionFamilyId: place-value-addition-v1
+    mathematicsScenarioFamily: addition_with_regrouping
+    mode: linked
+    prompt: "What is 46 + 27? Show your working."
+    promptBm: "Berapakah 46 + 27? Tunjukkan jalan kerja anda."
+    examples:
+      - {exampleId: add-en-v1, text: "First I add the ones: 6 plus 7 is 13, so I regroup ten ones as one ten. Then 40 plus 20 plus the regrouped ten is 70, so the total is 73. I checked by subtracting 27 from 73.", label: explanation_sufficient, language: en, expectedCorrect: true, expectedRelevance: relevant, expectedComposite: verified}
+      - {exampleId: add-en-v2, text: "I counted on from 46 in place-value steps: 46 plus 20 is 66, then 66 plus 7 is 73. I checked each step by adding back from the total.", label: explanation_sufficient, language: en, expectedCorrect: true, expectedRelevance: relevant, expectedComposite: verified}
+      - {exampleId: add-en-v3, text: "I regrouped the ones first because 6 and 7 make more than ten. Then I added the tens and the new ten together and verified the answer with subtraction.", label: explanation_sufficient, language: en, expectedCorrect: true, expectedRelevance: relevant, expectedComposite: verified}
+      - {exampleId: add-en-i1, text: "My favourite lunch is rice with fried chicken, and my friend agrees.", label: answer_only_or_insufficient, language: en, expectedCorrect: true, expectedRelevance: irrelevant, expectedComposite: should_not_verify}
+      - {exampleId: add-en-i2, text: "We played football after school and my friend scored a goal.", label: answer_only_or_insufficient, language: en, expectedCorrect: true, expectedRelevance: irrelevant, expectedComposite: should_not_verify}
+      - {exampleId: add-en-i3, text: "I told my friend a story about my favourite game at home.", label: answer_only_or_insufficient, language: en, expectedCorrect: true, expectedRelevance: irrelevant, expectedComposite: should_not_verify}
+      - {exampleId: add-en-r, text: "The answer is 73.", label: answer_only_or_insufficient, language: en, expectedCorrect: true, expectedRelevance: relevant, expectedComposite: should_not_verify}
+      - {exampleId: add-en-c, text: "I added 40 plus 20 to get 60, then added 6 plus 7 to get 13, so the final answer is 63.", label: explanation_sufficient, language: en, expectedCorrect: false, expectedRelevance: relevant, expectedComposite: should_not_verify}
+  - scenarioFamilyId: addition-regrouping-en-v2
+    questionFamilyId: place-value-addition-v2
+    mathematicsScenarioFamily: addition_with_regrouping
+    mode: linked
+    prompt: "What is 38 + 45? Show your working."
+    promptBm: "Berapakah 38 + 45? Tunjukkan jalan kerja anda."
+    examples:
+      - {exampleId: add2-en-v1, text: "I added the ones first: 8 plus 5 is 13, so I regrouped ten ones into one ten. Then 30 plus 40 plus the regrouped ten is 80, and the total is 83. I checked by subtracting 45 from 83.", label: explanation_sufficient, language: en, expectedCorrect: true, expectedRelevance: relevant, expectedComposite: verified}
+      - {exampleId: add2-en-v2, text: "I counted on from 38: 38 plus 40 is 78, then 78 plus 5 is 83. I verified by adding back the parts.", label: explanation_sufficient, language: en, expectedCorrect: true, expectedRelevance: relevant, expectedComposite: verified}
+      - {exampleId: add2-en-v3, text: "Because the ones made more than ten, I exchanged ten ones for one ten, then combined all the tens and checked the result with subtraction.", label: explanation_sufficient, language: en, expectedCorrect: true, expectedRelevance: relevant, expectedComposite: verified}
+      - {exampleId: add2-en-i1, text: "My favourite game is played at home with my friend after lunch.", label: answer_only_or_insufficient, language: en, expectedCorrect: true, expectedRelevance: irrelevant, expectedComposite: should_not_verify}
+      - {exampleId: add2-en-i2, text: "My friend told me a story about football during lunch at school.", label: answer_only_or_insufficient, language: en, expectedCorrect: true, expectedRelevance: irrelevant, expectedComposite: should_not_verify}
+      - {exampleId: add2-en-i3, text: "We walked home together and talked about our favourite lunch.", label: answer_only_or_insufficient, language: en, expectedCorrect: true, expectedRelevance: irrelevant, expectedComposite: should_not_verify}
+      - {exampleId: add2-en-r, text: "It is 83 altogether.", label: answer_only_or_insufficient, language: en, expectedCorrect: true, expectedRelevance: relevant, expectedComposite: should_not_verify}
+      - {exampleId: add2-en-c, text: "I added 30 plus 40 to get 70, then added 8 plus 5 to get 13, so the answer is 83 plus the extra ten, which makes 93.", label: explanation_sufficient, language: en, expectedCorrect: false, expectedRelevance: relevant, expectedComposite: should_not_verify}
+  - scenarioFamilyId: subtraction-borrowing-ms-v1
+    questionFamilyId: place-value-subtraction-v1
+    mathematicsScenarioFamily: subtraction_with_regrouping
+    mode: linked
+    prompt: "What is 52 − 28? Show your working."
+    promptBm: "Berapakah 52 − 28? Tunjukkan jalan kerja anda."
+    examples:
+      - {exampleId: sub-ms-v1, text: "Mula-mula saya pinjam satu puluh daripada 5 puluh, jadi 12 sa tolak 8 sa tinggal 4 sa. Kemudian 4 puluh tolak 2 puluh tinggal 2 puluh, jadi jawapannya 24. Saya semak dengan menambah 28 kepada 24.", label: explanation_sufficient, language: ms, expectedCorrect: true, expectedRelevance: relevant, expectedComposite: verified}
+      - {exampleId: sub-ms-v2, text: "Saya kira menurun daripada 52: 52 tolak 20 ialah 32, kemudian 32 tolak 8 ialah 24. Saya semak setiap langkah dengan menambah semula.", label: explanation_sufficient, language: ms, expectedCorrect: true, expectedRelevance: relevant, expectedComposite: verified}
+      - {exampleId: sub-ms-v3, text: "Oleh sebab 2 sa tidak cukup untuk tolak 8, saya pinjam satu puluh, tolak sa dahulu, kemudian tolak puluh, dan semak jawapan dengan operasi tambah.", label: explanation_sufficient, language: ms, expectedCorrect: true, expectedRelevance: relevant, expectedComposite: verified}
+      - {exampleId: sub-ms-i1, text: "Makanan kegemaran saya ialah nasi goreng dan kawan saya suka itu juga.", label: answer_only_or_insufficient, language: ms, expectedCorrect: true, expectedRelevance: irrelevant, expectedComposite: should_not_verify}
+      - {exampleId: sub-ms-i2, text: "Kami bermain bola sepak selepas sekolah dan kawan saya menjaringkan gol.", label: answer_only_or_insufficient, language: ms, expectedCorrect: true, expectedRelevance: irrelevant, expectedComposite: should_not_verify}
+      - {exampleId: sub-ms-i3, text: "Saya bercerita tentang permainan kegemaran saya di rumah kepada kawan.", label: answer_only_or_insufficient, language: ms, expectedCorrect: true, expectedRelevance: irrelevant, expectedComposite: should_not_verify}
+      - {exampleId: sub-ms-r, text: "Jawapannya ialah 24.", label: answer_only_or_insufficient, language: ms, expectedCorrect: true, expectedRelevance: relevant, expectedComposite: should_not_verify}
+      - {exampleId: sub-ms-c, text: "Saya tolak 20 daripada 50 dahulu untuk dapat 30, kemudian tolak 8 untuk dapat 22, jadi jawapan saya ialah 22.", label: explanation_sufficient, language: ms, expectedCorrect: false, expectedRelevance: relevant, expectedComposite: should_not_verify}
+  - scenarioFamilyId: subtraction-borrowing-ms-v2
+    questionFamilyId: place-value-subtraction-v2
+    mathematicsScenarioFamily: subtraction_with_regrouping
+    mode: linked
+    prompt: "What is 63 − 27? Show your working."
+    promptBm: "Berapakah 63 − 27? Tunjukkan jalan kerja anda."
+    examples:
+      - {exampleId: sub2-ms-v1, text: "Saya pinjam satu puluh daripada 6 puluh supaya 13 sa tolak 7 sa tinggal 6 sa. Kemudian 5 puluh tolak 2 puluh tinggal 3 puluh, jadi jawapannya 36. Saya semak dengan menambah 27 kepada 36.", label: explanation_sufficient, language: ms, expectedCorrect: true, expectedRelevance: relevant, expectedComposite: verified}
+      - {exampleId: sub2-ms-v2, text: "Saya kira menurun: 63 tolak 20 ialah 43, kemudian 43 tolak 7 ialah 36, dan saya semak dengan penambahan.", label: explanation_sufficient, language: ms, expectedCorrect: true, expectedRelevance: relevant, expectedComposite: verified}
+      - {exampleId: sub2-ms-v3, text: "Saya pinjam satu puluh kerana 3 sa tidak cukup, tolak sa dan puluh mengikut nilai tempat, kemudian semak jawapan dengan menambah baki.", label: explanation_sufficient, language: ms, expectedCorrect: true, expectedRelevance: relevant, expectedComposite: verified}
+      - {exampleId: sub2-ms-i1, text: "Permainan kegemaran saya dimainkan di rumah bersama kawan selepas makan tengah hari.", label: answer_only_or_insufficient, language: ms, expectedCorrect: true, expectedRelevance: irrelevant, expectedComposite: should_not_verify}
+      - {exampleId: sub2-ms-i2, text: "Kawan saya bercerita tentang bola sepak semasa makan tengah hari di sekolah.", label: answer_only_or_insufficient, language: ms, expectedCorrect: true, expectedRelevance: irrelevant, expectedComposite: should_not_verify}
+      - {exampleId: sub2-ms-i3, text: "Kami berjalan pulang ke rumah dan berbincang tentang makanan kegemaran kami.", label: answer_only_or_insufficient, language: ms, expectedCorrect: true, expectedRelevance: irrelevant, expectedComposite: should_not_verify}
+      - {exampleId: sub2-ms-r, text: "Jawapannya 36.", label: answer_only_or_insufficient, language: ms, expectedCorrect: true, expectedRelevance: relevant, expectedComposite: should_not_verify}
+      - {exampleId: sub2-ms-c, text: "Saya tolak 7 daripada 63 dahulu untuk dapat 56, kemudian tolak 20 untuk dapat 36, tetapi saya tersilap semasa meminjam dan menulis 46.", label: explanation_sufficient, language: ms, expectedCorrect: false, expectedRelevance: relevant, expectedComposite: should_not_verify}
+  - scenarioFamilyId: fractions-equivalent-mixed-v1
+    questionFamilyId: equivalent-fractions-v1
+    mathematicsScenarioFamily: equivalent_fractions
+    mode: linked
+    prompt: "Which fraction is equivalent to 3/6? Show your working."
+    promptBm: "Pecahan manakah yang setara dengan 3/6? Tunjukkan jalan kerja anda."
+    examples:
+      - {exampleId: frac-mix-v1, text: "I divide pembilang dan penyebut by three: 3 divided by 3 is 1, dan 6 divided by 3 is 2, jadi 3/6 setara dengan 1/2. Saya semak dengan mendarab kembali.", label: explanation_sufficient, language: mixed, expectedCorrect: true, expectedRelevance: relevant, expectedComposite: verified}
+      - {exampleId: frac-mix-v2, text: "I compare 3/6 with 1/2 dengan mendarab silang: 3 times 2 is 6 and 1 times 6 is 6, jadi kedua-duanya sama. Saya tunjukkan setiap langkah.", label: explanation_sufficient, language: mixed, expectedCorrect: true, expectedRelevance: relevant, expectedComposite: verified}
+      - {exampleId: frac-mix-v3, text: "I simplify the fraction dengan mencari faktor sepunya, bahagikan atas dan bawah, dan semak nilai pecahan tidak berubah.", label: explanation_sufficient, language: mixed, expectedCorrect: true, expectedRelevance: relevant, expectedComposite: verified}
+      - {exampleId: frac-mix-i1, text: "My favourite lunch is nasi goreng dan kawan saya setuju.", label: answer_only_or_insufficient, language: mixed, expectedCorrect: true, expectedRelevance: irrelevant, expectedComposite: should_not_verify}
+      - {exampleId: frac-mix-i2, text: "We played football selepas sekolah dan kawan saya menjaringkan gol.", label: answer_only_or_insufficient, language: mixed, expectedCorrect: true, expectedRelevance: irrelevant, expectedComposite: should_not_verify}
+      - {exampleId: frac-mix-i3, text: "I told my friend a story tentang permainan kegemaran saya di rumah.", label: answer_only_or_insufficient, language: mixed, expectedCorrect: true, expectedRelevance: irrelevant, expectedComposite: should_not_verify}
+      - {exampleId: frac-mix-r, text: "Pecahan yang setara ialah 1/2.", label: answer_only_or_insufficient, language: mixed, expectedCorrect: true, expectedRelevance: relevant, expectedComposite: should_not_verify}
+      - {exampleId: frac-mix-c, text: "I multiply 3/6 by 2 to get 6/12, then I divide by 3 to get 2/4, so the equivalent fraction is 2/4 dan saya pilih itu.", label: explanation_sufficient, language: mixed, expectedCorrect: false, expectedRelevance: relevant, expectedComposite: should_not_verify}
+  - scenarioFamilyId: fractions-equivalent-mixed-v2
+    questionFamilyId: equivalent-fractions-v2
+    mathematicsScenarioFamily: equivalent_fractions
+    mode: linked
+    prompt: "Which fraction is equivalent to 4/8? Show your working."
+    promptBm: "Pecahan manakah yang setara dengan 4/8? Tunjukkan jalan kerja anda."
+    examples:
+      - {exampleId: frac2-mix-v1, text: "I divide pembilang dan penyebut by four: 4 divided by 4 is 1 dan 8 divided by 4 is 2, jadi 4/8 setara dengan 1/2. Saya semak dengan mendarab kembali.", label: explanation_sufficient, language: mixed, expectedCorrect: true, expectedRelevance: relevant, expectedComposite: verified}
+      - {exampleId: frac2-mix-v2, text: "I simplify 4/8 dengan membahagi atas dan bawah dengan faktor sepunya empat, kemudian saya semak nilai pecahan kekal sama.", label: explanation_sufficient, language: mixed, expectedCorrect: true, expectedRelevance: relevant, expectedComposite: verified}
+      - {exampleId: frac2-mix-v3, text: "I compare 4/8 with 1/2 dengan mendarab silang: 4 times 2 is 8 and 1 times 8 is 8, jadi kedua-dua pecahan adalah sama.", label: explanation_sufficient, language: mixed, expectedCorrect: true, expectedRelevance: relevant, expectedComposite: verified}
+      - {exampleId: frac2-mix-i1, text: "My favourite game is dimainkan di rumah dengan kawan selepas makan tengah hari.", label: answer_only_or_insufficient, language: mixed, expectedCorrect: true, expectedRelevance: irrelevant, expectedComposite: should_not_verify}
+      - {exampleId: frac2-mix-i2, text: "My friend bercerita tentang football semasa makan tengah hari di sekolah.", label: answer_only_or_insufficient, language: mixed, expectedCorrect: true, expectedRelevance: irrelevant, expectedComposite: should_not_verify}
+      - {exampleId: frac2-mix-i3, text: "We berjalan pulang ke rumah dan bercakap tentang makanan kegemaran kami.", label: answer_only_or_insufficient, language: mixed, expectedCorrect: true, expectedRelevance: irrelevant, expectedComposite: should_not_verify}
+      - {exampleId: frac2-mix-r, text: "Jawapannya ialah 1/2.", label: answer_only_or_insufficient, language: mixed, expectedCorrect: true, expectedRelevance: relevant, expectedComposite: should_not_verify}
+      - {exampleId: frac2-mix-c, text: "I divide 4/8 by 2 to get 2/4, then I add another 2/4 to get 4/8, so the equivalent fraction is 4/8 itself.", label: explanation_sufficient, language: mixed, expectedCorrect: false, expectedRelevance: relevant, expectedComposite: should_not_verify}
+  - scenarioFamilyId: multiplication-groups-en-v1
+    questionFamilyId: multiplication-groups-v1
+    mathematicsScenarioFamily: multiplication_equal_groups
+    mode: linked
+    prompt: "There are 6 groups of 4. How many altogether? Show your working."
+    promptBm: "Terdapat 6 kumpulan 4. Berapakah jumlah keseluruhan? Tunjukkan jalan kerja anda."
+    examples:
+      - {exampleId: mult-en-v1, text: "I drew six equal groups with four in each group, counted each group, and used repeated addition: 4 plus 4 plus 4 plus 4 plus 4 plus 4 is 24. I checked by multiplying 6 by 4.", label: explanation_sufficient, language: en, expectedCorrect: true, expectedRelevance: relevant, expectedComposite: verified}
+      - {exampleId: mult-en-v2, text: "I know six groups of four make twenty-four because I counted the groups in order and then checked with multiplication.", label: explanation_sufficient, language: en, expectedCorrect: true, expectedRelevance: relevant, expectedComposite: verified}
+      - {exampleId: mult-en-v3, text: "I arranged the counters in six rows of four, counted each row, and verified the total by adding the rows together.", label: explanation_sufficient, language: en, expectedCorrect: true, expectedRelevance: relevant, expectedComposite: verified}
+      - {exampleId: mult-en-i1, text: "My favourite lunch is noodles and my friend likes it too.", label: answer_only_or_insufficient, language: en, expectedCorrect: true, expectedRelevance: irrelevant, expectedComposite: should_not_verify}
+      - {exampleId: mult-en-i2, text: "We played football after lunch and my friend won the game.", label: answer_only_or_insufficient, language: en, expectedCorrect: true, expectedRelevance: irrelevant, expectedComposite: should_not_verify}
+      - {exampleId: mult-en-i3, text: "I read my friend a story about our favourite game at school.", label: answer_only_or_insufficient, language: en, expectedCorrect: true, expectedRelevance: irrelevant, expectedComposite: should_not_verify}
+      - {exampleId: mult-en-r, text: "There are 24 altogether.", label: answer_only_or_insufficient, language: en, expectedCorrect: true, expectedRelevance: relevant, expectedComposite: should_not_verify}
+      - {exampleId: mult-en-c, text: "I added six groups of four and got 24, but then I wrote the answer as 28 because I counted one group twice.", label: explanation_sufficient, language: en, expectedCorrect: false, expectedRelevance: relevant, expectedComposite: should_not_verify}
+  - scenarioFamilyId: division-sharing-ms-v1
+    questionFamilyId: division-sharing-v1
+    mathematicsScenarioFamily: division_equal_sharing
+    mode: linked
+    prompt: "Share 35 objects equally among 5 friends. How many does each friend get? Show your working."
+    promptBm: "Bahagikan 35 objek sama rata kepada 5 rakan. Berapakah setiap rakan dapat? Tunjukkan jalan kerja anda."
+    examples:
+      - {exampleId: div-ms-v1, text: "Saya bahagikan 35 objek kepada lima kumpulan sama banyak dengan memberi satu objek kepada setiap rakan dalam pusingan, jadi setiap rakan mendapat 7 objek. Saya semak dengan mendarab 7 dengan 5.", label: explanation_sufficient, language: ms, expectedCorrect: true, expectedRelevance: relevant, expectedComposite: verified}
+      - {exampleId: div-ms-v2, text: "Saya kira 35 bahagi 5 dengan mengira kumpulan lima: setiap kumpulan ada 7, dan saya semak dengan penambahan berulang.", label: explanation_sufficient, language: ms, expectedCorrect: true, expectedRelevance: relevant, expectedComposite: verified}
+      - {exampleId: div-ms-v3, text: "Saya letakkan 35 objek dalam lima baris sama banyak, kira setiap baris, dan sahkan jumlah dengan mendarab bilangan baris dengan bilangan dalam satu baris.", label: explanation_sufficient, language: ms, expectedCorrect: true, expectedRelevance: relevant, expectedComposite: verified}
+      - {exampleId: div-ms-i1, text: "Makanan kegemaran saya ialah mi goreng dan kawan saya suka itu juga.", label: answer_only_or_insufficient, language: ms, expectedCorrect: true, expectedRelevance: irrelevant, expectedComposite: should_not_verify}
+      - {exampleId: div-ms-i2, text: "Kami bermain bola sepak selepas makan tengah hari dan kawan saya menang.", label: answer_only_or_insufficient, language: ms, expectedCorrect: true, expectedRelevance: irrelevant, expectedComposite: should_not_verify}
+      - {exampleId: div-ms-i3, text: "Saya membacakan cerita tentang permainan kegemaran kami kepada kawan di sekolah.", label: answer_only_or_insufficient, language: ms, expectedCorrect: true, expectedRelevance: irrelevant, expectedComposite: should_not_verify}
+      - {exampleId: div-ms-r, text: "Setiap rakan mendapat 7 objek.", label: answer_only_or_insufficient, language: ms, expectedCorrect: true, expectedRelevance: relevant, expectedComposite: should_not_verify}
+      - {exampleId: div-ms-c, text: "Saya bahagikan 35 kepada 5 kumpulan dan setiap kumpulan mendapat 7, tetapi saya tersilap menulis 8 pada helaian jawapan.", label: explanation_sufficient, language: ms, expectedCorrect: false, expectedRelevance: relevant, expectedComposite: should_not_verify}
+  - scenarioFamilyId: perimeter-rectangle-mixed-v1
+    questionFamilyId: rectangle-perimeter-v1
+    mathematicsScenarioFamily: rectangle_perimeter
+    mode: linked
+    prompt: "A rectangle is 9 cm long and 6 cm wide. What is its perimeter? Show your working."
+    promptBm: "Sebuah segi empat tepat panjangnya 9 cm dan lebarnya 6 cm. Berapakah perimeternya? Tunjukkan jalan kerja anda."
+    examples:
+      - {exampleId: peri-mix-v1, text: "I add dua panjang dan dua lebar: 9 plus 9 is 18 dan 6 plus 6 is 12, then I add 18 and 12 to get 30 cm. Saya semak keempat-empat sisi dimasukkan.", label: explanation_sufficient, language: mixed, expectedCorrect: true, expectedRelevance: relevant, expectedComposite: verified}
+      - {exampleId: peri-mix-v2, text: "I multiply the length by two and the width by two, then add them: 18 plus 12 is 30, and I checked every side.", label: explanation_sufficient, language: mixed, expectedCorrect: true, expectedRelevance: relevant, expectedComposite: verified}
+      - {exampleId: peri-mix-v3, text: "Perimeter means jumlah semua sisi, jadi saya tambah 9, 6, 9, dan 6, dan semak pengiraan dua kali.", label: explanation_sufficient, language: mixed, expectedCorrect: true, expectedRelevance: relevant, expectedComposite: verified}
+      - {exampleId: peri-mix-i1, text: "My favourite lunch is nasi lemak and kawan saya suka itu juga.", label: answer_only_or_insufficient, language: mixed, expectedCorrect: true, expectedRelevance: irrelevant, expectedComposite: should_not_verify}
+      - {exampleId: peri-mix-i2, text: "We bermain football selepas makan tengah hari dan kawan saya menang.", label: answer_only_or_insufficient, language: mixed, expectedCorrect: true, expectedRelevance: irrelevant, expectedComposite: should_not_verify}
+      - {exampleId: peri-mix-i3, text: "I read kawan saya a story tentang permainan kegemaran kami di sekolah.", label: answer_only_or_insufficient, language: mixed, expectedCorrect: true, expectedRelevance: irrelevant, expectedComposite: should_not_verify}
+      - {exampleId: peri-mix-r, text: "Perimeter ialah 30 cm.", label: answer_only_or_insufficient, language: mixed, expectedCorrect: true, expectedRelevance: relevant, expectedComposite: should_not_verify}
+      - {exampleId: peri-mix-c, text: "I added 9 and 6 to get 15, then multiplied by two to get 30, but I forgot to include both widths and wrote 21 cm.", label: explanation_sufficient, language: mixed, expectedCorrect: false, expectedRelevance: relevant, expectedComposite: should_not_verify}
+  - scenarioFamilyId: free-form-addition-en-v1
+    questionFamilyId: free-form-addition-v1
+    mathematicsScenarioFamily: addition_with_regrouping
+    mode: free_form
+    prompt: "How do you check an addition like 46 + 27?"
+    promptBm: "Bagaimana anda menyemak penambahan seperti 46 + 27?"
+    examples:
+      - {exampleId: ff-add-en-s, text: "I check by subtracting one of the addends from the total, then I compare the result with the other addend.", label: explanation_sufficient, language: en, expectedCorrect: null, expectedRelevance: relevant, expectedComposite: advisory_only}
+      - {exampleId: ff-add-en-r, text: "The answer is 73.", label: answer_only_or_insufficient, language: en, expectedCorrect: null, expectedRelevance: relevant, expectedComposite: advisory_only}
+      - {exampleId: ff-add-en-i1, text: "I explained my favourite lunch game to my friend step by step after school.", label: explanation_sufficient, language: en, expectedCorrect: null, expectedRelevance: irrelevant, expectedComposite: advisory_only}
+      - {exampleId: ff-add-en-i2, text: "It is my favourite lunch.", label: answer_only_or_insufficient, language: en, expectedCorrect: null, expectedRelevance: irrelevant, expectedComposite: advisory_only}
+  - scenarioFamilyId: free-form-subtraction-ms-v1
+    questionFamilyId: free-form-subtraction-v1
+    mathematicsScenarioFamily: subtraction_with_regrouping
+    mode: free_form
+    prompt: "How do you check a subtraction like 52 − 28?"
+    promptBm: "Bagaimana anda menyemak penolakan seperti 52 − 28?"
+    examples:
+      - {exampleId: ff-sub-ms-s, text: "Saya semak dengan menambah baki kepada nombor yang ditolak, kemudian bandingkan hasil dengan nombor asal.", label: explanation_sufficient, language: ms, expectedCorrect: null, expectedRelevance: relevant, expectedComposite: advisory_only}
+      - {exampleId: ff-sub-ms-r, text: "Jawapannya ialah 24.", label: answer_only_or_insufficient, language: ms, expectedCorrect: null, expectedRelevance: relevant, expectedComposite: advisory_only}
+      - {exampleId: ff-sub-ms-i1, text: "Saya menerangkan permainan kegemaran saya kepada kawan langkah demi langkah selepas sekolah.", label: explanation_sufficient, language: ms, expectedCorrect: null, expectedRelevance: irrelevant, expectedComposite: advisory_only}
+      - {exampleId: ff-sub-ms-i2, text: "Ia adalah makanan kegemaran saya.", label: answer_only_or_insufficient, language: ms, expectedCorrect: null, expectedRelevance: irrelevant, expectedComposite: advisory_only}
+  - scenarioFamilyId: free-form-fractions-mixed-v1
+    questionFamilyId: free-form-fractions-v1
+    mathematicsScenarioFamily: equivalent_fractions
+    mode: free_form
+    prompt: "How do you know two fractions are equivalent?"
+    promptBm: "Bagaimana anda tahu dua pecahan itu setara?"
+    examples:
+      - {exampleId: ff-frac-mix-s, text: "I multiply atau bahagikan pembilang dan penyebut dengan nombor yang sama, kemudian semak nilai pecahan tidak berubah.", label: explanation_sufficient, language: mixed, expectedCorrect: null, expectedRelevance: relevant, expectedComposite: advisory_only}
+      - {exampleId: ff-frac-mix-r, text: "Mereka adalah sama.", label: answer_only_or_insufficient, language: mixed, expectedCorrect: null, expectedRelevance: relevant, expectedComposite: advisory_only}
+      - {exampleId: ff-frac-mix-i1, text: "I explained permainan kegemaran saya kepada kawan langkah demi langkah selepas sekolah.", label: explanation_sufficient, language: mixed, expectedCorrect: null, expectedRelevance: irrelevant, expectedComposite: advisory_only}
+      - {exampleId: ff-frac-mix-i2, text: "Ia adalah permainan kegemaran saya.", label: answer_only_or_insufficient, language: mixed, expectedCorrect: null, expectedRelevance: irrelevant, expectedComposite: advisory_only}
+  - scenarioFamilyId: free-form-money-en-v1
+    questionFamilyId: free-form-money-v1
+    mathematicsScenarioFamily: money_change
+    mode: free_form
+    prompt: "How do you work out the change from RM10 when something costs RM6.50?"
+    promptBm: "Bagaimana anda mengira baki daripada RM10 apabila harga barang ialah RM6.50?"
+    examples:
+      - {exampleId: ff-money-en-s, text: "I subtract the price from ten ringgit, then count the change from the price up to ten to check the difference.", label: explanation_sufficient, language: en, expectedCorrect: null, expectedRelevance: relevant, expectedComposite: advisory_only}
+      - {exampleId: ff-money-en-r, text: "The change is RM3.50.", label: answer_only_or_insufficient, language: en, expectedCorrect: null, expectedRelevance: relevant, expectedComposite: advisory_only}
+      - {exampleId: ff-money-en-i1, text: "I described my favourite lunch game to my friend step by step after school.", label: explanation_sufficient, language: en, expectedCorrect: null, expectedRelevance: irrelevant, expectedComposite: advisory_only}
+      - {exampleId: ff-money-en-i2, text: "It is my favourite game.", label: answer_only_or_insufficient, language: en, expectedCorrect: null, expectedRelevance: irrelevant, expectedComposite: advisory_only}

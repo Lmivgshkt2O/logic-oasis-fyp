@@ -16,6 +16,12 @@ from forum_controlled_demo.build_forum_dataset import (
     forum_dataset_jsonl_bytes,
 )
 from logic_oasis_ai.forum_ai.classifier import CONTROLLED_REVISION, ForumTextClassifier
+from logic_oasis_ai.forum_ai.relevance import (
+    RELEVANCE_CONTRACT,
+    ForumRelevanceClassifier,
+    relevance_input,
+    train_relevance_classifier,
+)
 from training.evaluate_forum_classifier import (
     LIMITATION_STATEMENT,
     candidate_gate_failures,
@@ -23,6 +29,106 @@ from training.evaluate_forum_classifier import (
     reject_controlled_provenance_for_real_evaluation,
     write_forum_evaluation,
 )
+
+
+class ForumRelevanceComponentTests(unittest.TestCase):
+    def _training_rows(self):
+        return [
+            (
+                "What is 46 + 27?",
+                "First I add the ones, regroup ten ones as one ten, then add the tens and check by subtracting.",
+                "relevant",
+            ),
+            (
+                "What is 46 + 27?",
+                "I counted on from forty-six and added twenty-seven in place-value steps.",
+                "relevant",
+            ),
+            (
+                "What is 46 + 27?",
+                "I added the tens, regrouped the ones, and checked with subtraction.",
+                "relevant",
+            ),
+            (
+                "What is 46 + 27?",
+                "My favourite football team scored three goals at lunch.",
+                "irrelevant",
+            ),
+            (
+                "What is 46 + 27?",
+                "After lunch I told my friend about the football match.",
+                "irrelevant",
+            ),
+            (
+                "What is 46 + 27?",
+                "I drew a picture of my favourite colour for the school fair.",
+                "irrelevant",
+            ),
+        ]
+
+    def test_relevance_classifier_emits_positive_and_negative_with_frozen_thresholds(self):
+        classifier = train_relevance_classifier(
+            self._training_rows(), variant="ComplementNB",
+        )
+        positive = classifier.predict(
+            "What is 46 + 27?",
+            "I regrouped the ones into one ten and added the tens by place value.",
+        )
+        self.assertEqual("relevant", positive.label)
+        self.assertGreaterEqual(
+            positive.probability,
+            float(RELEVANCE_CONTRACT["positiveThreshold"]),
+        )
+
+        negative = classifier.predict(
+            "What is 46 + 27?",
+            "At lunch my favourite football team won the match.",
+        )
+        self.assertEqual("irrelevant", negative.label)
+        self.assertGreaterEqual(
+            negative.probability,
+            float(RELEVANCE_CONTRACT["negativeThreshold"]),
+        )
+
+    def test_relevance_classifier_can_abstain_and_round_trips(self):
+        import tempfile
+        from pathlib import Path
+
+        classifier = train_relevance_classifier(
+            self._training_rows(), variant="MultinomialNB",
+        )
+        uncertain = classifier.predict(
+            "What is 46 + 27?",
+            "Maybe I should ask a friend about this.",
+        )
+        self.assertIn(uncertain.label, {"relevant", "irrelevant", "uncertain"})
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "relevance.joblib"
+            classifier.save(path)
+            restored = ForumRelevanceClassifier.load(path)
+            self.assertEqual(
+                classifier.predict("What is 46 + 27?", "First I add the ones."),
+                restored.predict("What is 46 + 27?", "First I add the ones."),
+            )
+
+    def test_relevance_contract_and_variant_validation(self):
+        self.assertLess(
+            float(RELEVANCE_CONTRACT["positiveThreshold"]),
+            float(RELEVANCE_CONTRACT["negativeThreshold"]),
+        )
+        with self.assertRaisesRegex(ValueError, "variant"):
+            train_relevance_classifier(
+                self._training_rows(), variant="GaussianNB",
+            )
+        with self.assertRaisesRegex(ValueError, "both relevance labels"):
+            train_relevance_classifier(self._training_rows()[:2])
+
+    def test_relevance_input_combines_prompt_and_response_deterministically(self):
+        self.assertEqual(
+            "what is 46 + 27? first i add the ones.",
+            relevance_input("What is 46 + 27?", "First I add the ones."),
+        )
 
 
 class ForumControlledDemoEvaluationTests(unittest.TestCase):
@@ -38,9 +144,10 @@ class ForumControlledDemoEvaluationTests(unittest.TestCase):
         validation = set(split["validationScenarioFamilyIds"])
         test = set(split["testScenarioFamilyIds"])
         self.assertFalse(train & validation or train & test or validation & test)
-        self.assertEqual(12, len(train | validation | test))
+        self.assertEqual(13, len(train | validation | test))
         self.assertEqual("final_test", self.evaluation.report["applicableFinalTestStatus"])
         self.assertEqual(1, self.evaluation.report["untouchedTestEvaluationCount"])
+        self.assertGreaterEqual(len(test), 3)
 
     def test_training_never_receives_an_untouched_test_group(self):
         import training.evaluate_forum_classifier as evaluator
@@ -92,7 +199,10 @@ class ForumControlledDemoEvaluationTests(unittest.TestCase):
         self.assertEqual("grouped_cross_validation", cv.split_manifest["evaluationMode"])
         self.assertEqual("no_untouched_final_test", cv.report["applicableFinalTestStatus"])
         self.assertEqual(0, cv.report["untouchedTestEvaluationCount"])
-        self.assertIn(cv.report["controlledCandidateStatus"], {"eligible", "rejected"})
+        self.assertEqual("rejected", cv.report["controlledCandidateStatus"])
+        self.assertEqual("blocked", cv.report["activationStatus"])
+        self.assertIn("no_untouched_final_test", cv.report["failedGates"])
+        self.assertIsNone(cv.candidate)
 
         insufficient_rows = tuple(row for row in self.build.rows if row.scenario_family_id in set(group_order[:3]))
         insufficient = evaluate_forum_controlled_demo(insufficient_rows, self.build.manifest)
@@ -148,15 +258,28 @@ class ForumControlledDemoEvaluationTests(unittest.TestCase):
 
     def test_comparators_share_contract_and_baseline_never_becomes_candidate(self):
         comparators = self.evaluation.report["comparators"]
+        relevance_comparators = self.evaluation.report["relevanceComparators"]
         self.assertEqual(
             {"MultinomialNB", "ComplementNB", "deterministic_answer_only_baseline"},
             set(comparators),
         )
+        self.assertEqual(
+            {"MultinomialNB", "ComplementNB", "deterministic_majority_baseline"},
+            set(relevance_comparators),
+        )
         contracts = {json.dumps(value["evidenceContract"], sort_keys=True) for value in comparators.values()}
         self.assertEqual(1, len(contracts))
+        relevance_contracts = {
+            json.dumps(value["evidenceContract"], sort_keys=True)
+            for value in relevance_comparators.values()
+        }
+        self.assertEqual(1, len(relevance_contracts))
         self.assertGreater(comparators["deterministic_answer_only_baseline"]["fitRows"], 0)
         self.assertGreater(
             comparators["deterministic_answer_only_baseline"]["vectorizerVocabularySize"], 0,
+        )
+        self.assertGreater(
+            relevance_comparators["deterministic_majority_baseline"]["fitRows"], 0,
         )
         self.assertIn(
             self.evaluation.report["baselineComparisonResult"],
@@ -309,6 +432,9 @@ class ForumControlledDemoEvaluationTests(unittest.TestCase):
             "serializedSizeBytes", "datasetCounts", "splitSeed", "preprocessingVersion",
             "rubricVersion", "rubricSha256", "catalogueVersion", "catalogueSha256", "datasetSha256",
             "candidateSelectionDecision", "selectedNaiveBayesVariant", "baselineComparisonResult",
+            "relevanceCandidateSelectionDecision", "selectedRelevanceNaiveBayesVariant",
+            "relevanceBaselineComparisonResult", "relevanceComponent", "composite",
+            "compositePolicy", "relevanceArtifactByteHash", "relevanceSerializedSizeBytes",
             "controlledDemoActivationDecision", "controlledCandidateStatus", "activationStatus",
             "claimLevel", "calibrationStatus", "semanticReproducibilityStatus",
             "runtimeEnvironmentFingerprint", "failedGates", "limitations",
@@ -325,6 +451,18 @@ class ForumControlledDemoEvaluationTests(unittest.TestCase):
         with TemporaryDirectory() as directory:
             paths = write_forum_evaluation(self.build, directory, operator_role="developer")
             restored = ForumTextClassifier.load(paths["candidate"])
+            self.assertTrue(paths["relevance_candidate"].exists())
+            from logic_oasis_ai.forum_ai.relevance import ForumRelevanceClassifier
+            restored_relevance = ForumRelevanceClassifier.load(
+                paths["relevance_candidate"],
+            )
+            sample_row = self.build.rows[0]
+            self.assertEqual(
+                self.evaluation.relevance_candidate.predict(
+                    sample_row.prompt, sample_row.text,
+                ),
+                restored_relevance.predict(sample_row.prompt, sample_row.text),
+            )
             sample = "First I regrouped the tens, then I checked the total."
             self.assertEqual(
                 self.evaluation.candidate.predict(sample),
@@ -341,15 +479,16 @@ class ForumControlledDemoEvaluationTests(unittest.TestCase):
             self.assertEqual(
                 {
                     "datasetVersion": "forum-controlled-demo-dataset-v1",
-                    "catalogVersion": "forum-controlled-demo-catalog-v1",
+                    "catalogVersion": "forum-verification-catalog-v1",
                     "splitSchemaVersion": "forum-controlled-demo-grouped-split-v1",
-                    "reportSchemaVersion": "forum-controlled-demo-report-v1",
-                    "catalogueFile": "ai_pipeline/forum_controlled_demo/forum_scenario_catalog_v1.yaml",
+                    "reportSchemaVersion": "forum-controlled-demo-report-v2",
+                    "catalogueFile": "ai_pipeline/forum_controlled_demo/forum_verification_catalog_v1.yaml",
                     "datasetFile": "forum_controlled_demo_v1.jsonl",
                     "datasetManifestFile": "forum_controlled_demo_v1_manifest.json",
                     "splitManifestFile": "forum_controlled_demo_split_manifest.json",
                     "evaluationReportFile": "forum_controlled_demo_report.json",
                     "artifactFile": "forum_controlled_demo_candidate.joblib",
+                    "relevanceArtifactFile": "forum_controlled_demo_relevance_candidate.joblib",
                 },
                 {
                     key: candidate_manifest[key]
@@ -357,7 +496,7 @@ class ForumControlledDemoEvaluationTests(unittest.TestCase):
                         "datasetVersion", "catalogVersion", "splitSchemaVersion",
                         "reportSchemaVersion", "catalogueFile", "datasetFile",
                         "datasetManifestFile", "splitManifestFile",
-                        "evaluationReportFile", "artifactFile",
+                        "evaluationReportFile", "artifactFile", "relevanceArtifactFile",
                     )
                 },
             )
@@ -441,17 +580,40 @@ class ForumControlledDemoEvaluationTests(unittest.TestCase):
             committed_candidate_path = committed_generated / "forum_controlled_demo_candidate.joblib"
             committed_candidate = joblib.load(committed_candidate_path)
             fresh_candidate = joblib.load(paths["candidate"])
+            committed_relevance_candidate = joblib.load(
+                committed_generated / "forum_controlled_demo_relevance_candidate.joblib"
+            )
+            fresh_relevance_candidate = joblib.load(
+                paths["relevance_candidate"]
+            )
             self.assertEqual(committed_candidate["modelVersion"], fresh_candidate["modelVersion"])
+            self.assertEqual(
+                committed_relevance_candidate["modelVersion"],
+                fresh_relevance_candidate["modelVersion"],
+            )
             committed_classifier = ForumTextClassifier(
                 committed_candidate["pipeline"], model_version=committed_candidate["modelVersion"],
             )
             fresh_classifier = ForumTextClassifier(
                 fresh_candidate["pipeline"], model_version=fresh_candidate["modelVersion"],
             )
+            from logic_oasis_ai.forum_ai.relevance import ForumRelevanceClassifier
+            committed_relevance = ForumRelevanceClassifier(
+                committed_relevance_candidate["pipeline"],
+                model_version=committed_relevance_candidate["modelVersion"],
+            )
+            fresh_relevance = ForumRelevanceClassifier(
+                fresh_relevance_candidate["pipeline"],
+                model_version=fresh_relevance_candidate["modelVersion"],
+            )
             for row in self.build.rows:
                 self.assertEqual(
                     committed_classifier.predict(row.text),
                     fresh_classifier.predict(row.text),
+                )
+                self.assertEqual(
+                    committed_relevance.predict(row.prompt, row.text),
+                    fresh_relevance.predict(row.prompt, row.text),
                 )
 
             committed_report = json.loads(
@@ -468,6 +630,8 @@ class ForumControlledDemoEvaluationTests(unittest.TestCase):
             )
             committed_report.pop("artifactByteHash")
             fresh_report.pop("artifactByteHash")
+            committed_report.pop("relevanceArtifactByteHash")
+            fresh_report.pop("relevanceArtifactByteHash")
             self.assertEqual(committed_report, fresh_report)
 
             committed_manifest = json.loads(
@@ -485,6 +649,7 @@ class ForumControlledDemoEvaluationTests(unittest.TestCase):
                     sha256(report_path.read_bytes()).hexdigest(),
                 )
                 manifest.pop("artifactSha256")
+                manifest.pop("relevanceArtifactSha256")
                 manifest.pop("evaluationReportSha256")
             self.assertEqual(committed_manifest, fresh_manifest)
 
@@ -527,7 +692,7 @@ class ForumControlledDemoEvaluationTests(unittest.TestCase):
             first_paths = write_forum_evaluation(self.build, first, operator_role="developer")
             second_paths = write_forum_evaluation(self.build, second, operator_role="reviewer")
             for key in (
-                "dataset", "manifest", "split_manifest", "candidate",
+                "dataset", "manifest", "split_manifest", "candidate", "relevance_candidate",
                 "candidate_manifest", "report_json", "report_markdown",
             ):
                 with self.subTest(key=key):

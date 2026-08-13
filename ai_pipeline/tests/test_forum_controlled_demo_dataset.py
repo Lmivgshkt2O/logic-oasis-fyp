@@ -33,16 +33,32 @@ class ForumControlledDemoDatasetTests(unittest.TestCase):
     def test_default_catalogue_is_strict_fictional_multilingual_grouped_evidence(self):
         build = build_forum_dataset()
 
-        self.assertEqual(24, len(build.rows))
+        self.assertEqual(88, len(build.rows))
         self.assertEqual(
             {"explanation_sufficient", "answer_only_or_insufficient"},
             {row.label for row in build.rows},
         )
         self.assertEqual({"en", "ms", "mixed"}, {row.language for row in build.rows})
         self.assertEqual({"expert_authored_controlled_demo"}, {row.provenance for row in build.rows})
-        self.assertEqual(12, build.manifest["scenarioFamilyCount"])
+        self.assertEqual(13, build.manifest["scenarioFamilyCount"])
         self.assertEqual("scenarioFamilyId", build.manifest["evaluationGroupKey"])
         self.assertEqual("controlled_demonstration_only", build.manifest["claimLevel"])
+        self.assertEqual(
+            {"relevant", "irrelevant"},
+            set(build.manifest["relevanceCounts"]),
+        )
+        self.assertEqual(
+            {"verified", "should_not_verify", "advisory_only"},
+            set(build.manifest["compositeCounts"]),
+        )
+        self.assertEqual(
+            {"linked", "free_form"},
+            set(build.manifest["modeCounts"]),
+        )
+        self.assertGreaterEqual(build.manifest["verifiedEligibleCount"], 8)
+        self.assertGreaterEqual(build.manifest["shouldNotVerifyCount"], 8)
+        self.assertGreaterEqual(build.manifest["irrelevantCount"], 8)
+        self.assertGreaterEqual(build.manifest["relevantControlCount"], 8)
         self.assertFalse(build.manifest["containsLearnerIdentity"])
         self.assertFalse(build.manifest["containsAnswerKeys"])
 
@@ -76,6 +92,8 @@ class ForumControlledDemoDatasetTests(unittest.TestCase):
             ("language", "fr"),
             ("label", "correct"),
             ("rubricVersion", "other-rubric"),
+            ("expectedRelevance", "maybe"),
+            ("expectedComposite", "partially_verified"),
         )
         for field, value in mutations:
             with self.subTest(field=field), TemporaryDirectory() as directory:
@@ -86,6 +104,87 @@ class ForumControlledDemoDatasetTests(unittest.TestCase):
                     document["scenarioFamilies"][0]["examples"][0][field] = value
                 with self.assertRaises(ValueError):
                     build_forum_dataset(self._catalogue(directory, document))
+
+    def test_free_form_examples_cannot_declare_correctness_and_linked_must(self):
+        with TemporaryDirectory() as directory:
+            document = copy.deepcopy(self.document)
+            family = next(
+                item for item in document["scenarioFamilies"]
+                if item["mode"] == "free_form"
+            )
+            family["examples"][0]["expectedCorrect"] = True
+            with self.assertRaisesRegex(ValueError, "cannot declare"):
+                build_forum_dataset(self._catalogue(directory, document))
+
+        with TemporaryDirectory() as directory:
+            document = copy.deepcopy(self.document)
+            family = next(
+                item for item in document["scenarioFamilies"]
+                if item["mode"] == "linked"
+            )
+            del family["examples"][0]["expectedCorrect"]
+            with self.assertRaisesRegex(ValueError, "exactly"):
+                build_forum_dataset(self._catalogue(directory, document))
+
+    def test_composite_labels_must_match_the_frozen_decision_rule(self):
+        with TemporaryDirectory() as directory:
+            document = copy.deepcopy(self.document)
+            linked = next(
+                item for item in document["scenarioFamilies"]
+                if item["mode"] == "linked"
+            )
+            verified = next(
+                item for item in linked["examples"]
+                if (
+                    item["expectedComposite"] == "verified"
+                    and item["expectedCorrect"] is True
+                    and item["expectedRelevance"] == "relevant"
+                    and item["label"] == "explanation_sufficient"
+                )
+            )
+            verified["expectedCorrect"] = False
+            with self.assertRaisesRegex(ValueError, "failing linked"):
+                build_forum_dataset(self._catalogue(directory, document))
+
+        with TemporaryDirectory() as directory:
+            document = copy.deepcopy(self.document)
+            linked = next(
+                item for item in document["scenarioFamilies"]
+                if item["mode"] == "linked"
+            )
+            failing = next(
+                item for item in linked["examples"]
+                if item["expectedCorrect"] is False
+            )
+            failing["expectedCorrect"] = True
+            failing["expectedRelevance"] = "relevant"
+            failing["label"] = "explanation_sufficient"
+            failing["expectedComposite"] = "should_not_verify"
+            with self.assertRaisesRegex(ValueError, "passing linked"):
+                build_forum_dataset(self._catalogue(directory, document))
+
+    def test_verification_catalogue_enforces_r22_support_and_language_coverage(self):
+        with TemporaryDirectory() as directory:
+            document = copy.deepcopy(self.document)
+            document["scenarioFamilies"] = [
+                item for item in document["scenarioFamilies"]
+                if item["scenarioFamilyId"] in {
+                    "addition-regrouping-en-v1",
+                    "subtraction-borrowing-ms-v1",
+                }
+            ]
+            with self.assertRaisesRegex(ValueError, "verified-eligible"):
+                build_forum_dataset(self._catalogue(directory, document))
+
+        with TemporaryDirectory() as directory:
+            document = copy.deepcopy(self.document)
+            family = next(
+                item for item in document["scenarioFamilies"]
+                if item["mode"] == "linked"
+            )
+            family["promptBm"] = ""
+            with self.assertRaisesRegex(ValueError, "non-empty"):
+                build_forum_dataset(self._catalogue(directory, document))
 
     def test_example_text_rejects_obvious_identifiers_credentials_and_answer_keys(self):
         forbidden_texts = (
