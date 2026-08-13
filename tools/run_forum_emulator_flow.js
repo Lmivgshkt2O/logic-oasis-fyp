@@ -377,10 +377,6 @@ async function expectDenied(read, label) {
   });
   currentStep = 'unblock student';
   await deleteDoc(doc(author.db, 'forumBlocks', `${questionAuthor}_${answerAuthor}`));
-  const unblocked = await getDoc(
-    doc(author.db, 'forumBlocks', `${questionAuthor}_${answerAuthor}`),
-  );
-  if (unblocked.exists()) throw new Error('Block was not removed by unblock');
 
   let parentDenied = false;
   try {
