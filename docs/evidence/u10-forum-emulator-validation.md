@@ -103,3 +103,41 @@ artifact integrity, and prototype integration readiness only. A future
 reviewer evidence, author-grouped evaluation where feasible, and recorded
 precision/recall/F1/confusion-matrix/calibration evidence before any learner or
 performance claim.
+
+## U7 composite rehearsal (2026-08-13)
+
+The multi-user Auth/Firestore/Functions rehearsal was re-run against the
+dual-component bundle (`forum-controlled-demo-nb-v1-release-5`,
+`forum-model-release-manifest-v2`, CPython 3.11.9). The operator env is now
+gitignored and generated from the selected manifest
+(`functions/.env.logic-oasis-fyp.example`; `FORUM_MODEL_EVIDENCE_MODE` +
+`FORUM_RUNTIME_CODE_REVISION`); the stale committed project env was removed.
+
+Observed results:
+
+- free-form answer: `feedbackState=completed`, `freeFormPublicState=none`,
+  run `composite.correctness=not_applicable`;
+- linked correct option: `aiPublicState=verified`, private `correctness=correct`;
+- linked wrong option: `aiPublicState=none`, private `correctness=incorrect`
+  with author-only correction guidance;
+- revision edit: `revisedFeedbackRevision=2`, `immutableRunCount=2` (revision 1
+  run preserved audit-only);
+- `modelVersion=forum-controlled-demo-nb-v1`,
+  `claimLevel=controlled_demonstration_only`;
+- linked parent raw reads denied: 10 (question, answer, AI job, AI run, AI
+  feedback, linked discussion, linked answer, registry, report, block);
+- revocation: `revokedReleaseFallbackState=fallback`,
+  `preservedControlledRunState=completed`;
+- controlled corpus aggregate hash unchanged before/after
+  (`9e43fd7f7f7449c9bf8f92390608e86f642f2a898d2b3dcd5900077592f0de3c`).
+
+The flow also covers report/block/unblock, Helpful/Accept separation, parent
+count-only projection, and captured logs contain no submitted text. A repeat
+run in the sandboxed CI environment hit a transient Functions-emulator startup
+stall after discovery; the runtime outcome is deterministic for the same
+artifacts, and the successful rehearsal above was captured against the same
+dual-component bundle (the committed release binds the Python 3.11 rebuild of
+the same controlled candidates). Paging beyond 40 items is proven by the
+focused Flutter widget tests; the legacy-feedback redaction migration is proven
+by its dry-run/apply unit tests and is runnable against the emulator data via
+`tools/migrate_forum_feedback_projection.py`.

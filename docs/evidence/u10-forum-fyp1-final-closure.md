@@ -14,6 +14,53 @@ Integrated U6 implementation commit: `54fe28a8abd0b2de498269fbd9523225f9dcc0c4`
 
 Scope: controlled-demonstration FYP1 closure only
 
+## 2026-08-13 superseding reconciliation (U1-U7, forum AI verification plan)
+
+The forum AI verification closure plan
+(`docs/plans/2026-08-11-001-feat-forum-ai-cloud-closure-plan.md`) extends the
+U10 baseline through U7 on branch `codex/integrate-forum-cloud-supervisor-plans`.
+
+- U1: canonical linked discussions, structured four-option answers, and
+  separate public/private AI projections with author-only feedback.
+- U2: quiz-review and forum entry flows, linked final-answer/explanation
+  composer, public advisory badges, author-only guidance.
+- U3: separate relevance Naive Bayes component, authoritative verification
+  catalogue, and precision/coverage composite evaluation (zero false public
+  decisions).
+- U4: revision-bound composite runtime (deterministic correctness + both
+  components), content-hash fencing, safe public/private presentation.
+- U5: cursor-based pagination beyond 40 items and the validated emulator-host
+  override (AVD default, LAN, `adb reverse`).
+- U6: Python 3.11 dual-component release v2
+  (`forum-controlled-demo-nb-v1-release-5`, `forum-model-release-manifest-v2`),
+  digest-bound dependency lock, removed stale committed env, authoritative
+  nine-entry function inventory, and hardened deploy/promote/revoke tooling
+  with live-deployment attestation.
+- U7: local evidence reconciled (see
+  `docs/evidence/u10-forum-ai-verification-release.md`), the operator cloud
+  runbook, and the governed offline-learning (U10-R) design.
+
+Updated environment facts:
+
+| Fact | Value |
+|---|---|
+| CPython | 3.11.9 for the released artifacts |
+| Release | `forum-controlled-demo-nb-v1-release-5` |
+| Manifest | `forum-model-release-manifest-v2` |
+| Repository revision | `44772c4bf9e7071f43b2e9ce99a609220c9c579255c2e8ca7b3725bfe6e5414d` |
+
+Automated gates: full Functions suite 194/194, Tools 64/64, forum AI suite
+43/43 under Python 3.11, Rules emulator PASS, Flutter focused suites PASS
+(paging, composite guidance, navigation, emulator-config). The full AI suite
+under the local 3.12 dev venv shows exactly one expected runtime-parity
+failure (the committed forum artifacts are the Python 3.11 release; the plan's
+canonical AI gate is `py -3.11`, where parity passes).
+
+Cloud deployment and production verification remain pending (U8) and require
+explicit operator authorization; the registry is not mutated locally. All
+evidence remains `controlled_demonstration_only` and
+`not_established_on_real_learners`.
+
 ## Conclusion
 
 U1-U6 close the FYP1 Q&A Forum as a four-tab, authenticated,
