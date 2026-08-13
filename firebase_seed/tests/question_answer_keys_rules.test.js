@@ -284,13 +284,18 @@ async function main() {
     await assertFails(getDoc(doc(linkedParentDb, "forumReports", "student_other_question_forum_q1")));
     await assertFails(getDoc(doc(linkedParentDb, "forumBlocks", "student_other_student_aiman_y4")));
     await assertFails(getDoc(doc(studentDb, "forumAiJobs", "forum_a1")));
+    await assertSucceeds(getDoc(doc(otherStudentDb, "forumAiFeedback", "forum_a1")));
+    await assertSucceeds(getDoc(doc(otherStudentDb, "forumAiFeedback", "forum_linked_a1")));
     await assertFails(getDoc(doc(studentDb, "forumAiFeedback", "forum_a1")));
-    await assertFails(getDoc(doc(otherStudentDb, "forumAiFeedback", "forum_a1")));
     await assertFails(getDoc(doc(linkedParentDb, "forumAiFeedback", "forum_a1")));
     await assertFails(getDoc(doc(studentDb, "forumAiFeedback", "forum_linked_a1")));
     await assertFails(getDoc(doc(studentDb, "forumAiFeedback", "guessed-private-id")));
     await assertFails(getDocs(collection(studentDb, "forumAiFeedback")));
+    await assertFails(getDocs(collection(linkedParentDb, "forumAiFeedback")));
     await assertFails(setDoc(doc(studentDb, "forumAiFeedback", "forum_a1"), {
+      state: "pending", revision: 2, updatedAt: serverTimestamp(),
+    }));
+    await assertFails(setDoc(doc(otherStudentDb, "forumAiFeedback", "forum_a1"), {
       state: "pending", revision: 2, updatedAt: serverTimestamp(),
     }));
     await assertFails(setDoc(doc(studentDb, "forumQuestions", "linked_forum_q1_v1"), {

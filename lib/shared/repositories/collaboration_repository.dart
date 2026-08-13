@@ -50,6 +50,15 @@ class CollaborationRepository {
             .toList(growable: false),
       );
 
+  /// Author-only AI guidance for one answer. The server writes this projection
+  /// and Rules allow only the answer author to read it; peers and parents are
+  /// denied by [firestore.rules].
+  Stream<ForumAnswerFeedback> watchOwnFeedback(String answerId) => _firestore
+      .collection('forumAiFeedback')
+      .doc(answerId)
+      .snapshots()
+      .map((snapshot) => ForumAnswerFeedback.fromFirestore(snapshot.data()));
+
   Future<void> createQuestion({
     required String studentId,
     required String title,

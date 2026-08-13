@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:logic_oasis/features/collaboration/qa_forum/qa_forum_page.dart';
 import 'package:logic_oasis/features/formula_forge/subtopic_page.dart';
 import 'package:logic_oasis/features/quiz/quiz_page.dart';
 import 'package:logic_oasis/features/quiz/result_page.dart';
 import 'package:logic_oasis/l10n/app_localizations.dart';
 import 'package:logic_oasis/shared/models/ai_diagnosis.dart';
+import 'package:logic_oasis/shared/models/forum_answer.dart';
+import 'package:logic_oasis/shared/models/forum_question.dart';
 import 'package:logic_oasis/shared/models/question_response.dart';
 import 'package:logic_oasis/shared/models/quiz_completion.dart';
 import 'package:logic_oasis/shared/models/quiz_question.dart';
+import 'package:logic_oasis/shared/models/quiz_review_item.dart';
 import 'package:logic_oasis/shared/models/quiz_session.dart';
 import 'package:logic_oasis/shared/models/subtopic.dart';
 import 'package:logic_oasis/shared/models/topic.dart';
+import 'package:logic_oasis/shared/repositories/collaboration_repository.dart';
 import 'package:logic_oasis/shared/services/quiz_session_service.dart';
 import 'package:logic_oasis/shared/state/app_state.dart';
 
@@ -85,6 +90,88 @@ class _FinalizingQuizSessionService implements QuizSessionGateway {
       timeTakenSeconds: 3,
     );
   }
+}
+
+class _ReviewingQuizSessionService implements QuizSessionGateway {
+  @override
+  Future<QuizSession> startSession({
+    required String topicId,
+    required String subtopicId,
+    required int yearLevel,
+  }) {
+    throw UnsupportedError('The quiz page receives an existing session.');
+  }
+
+  @override
+  Future<QuestionResponse> submitResponse({
+    required QuestionResponse pendingResponse,
+    required int responseTimeMs,
+    int hintCount = 0,
+  }) async {
+    return QuestionResponse(
+      sessionId: pendingResponse.sessionId,
+      questionId: pendingResponse.questionId,
+      selectedIndex: pendingResponse.selectedIndex,
+      sequenceIndex: pendingResponse.sequenceIndex,
+      idempotencyKey: pendingResponse.idempotencyKey,
+      isCorrect: true,
+      positiveConfirmation: 'Confirmed by the server.',
+      validationStatus: 'validated',
+    );
+  }
+
+  @override
+  Future<QuizCompletion> finalizeSession(String sessionId) async {
+    return const QuizCompletion(
+      correctCount: 0,
+      totalQuestions: 1,
+      score: 0,
+      timeTakenSeconds: 3,
+      reviewItems: <QuizReviewItem>[
+        QuizReviewItem(
+          questionId: 'question-1',
+          sequenceIndex: 0,
+          questionText: 'Which numeral shows twenty thousand four?',
+          questionTextBm: 'Nombor manakah menunjukkan dua puluh ribu empat?',
+          questionType: 'Place value',
+          questionTypeBm: 'Nilai tempat',
+          reviewFocus: 'Check the value of each digit.',
+          reviewFocusBm: 'Semak nilai setiap digit.',
+        ),
+      ],
+    );
+  }
+}
+
+class _IntegrationDiscussRepository implements CollaborationRepository {
+  String? openedQuestionId;
+
+  @override
+  Future<LinkedDiscussion> openOrCreateLinkedDiscussion({
+    required String questionId,
+  }) async {
+    openedQuestionId = questionId;
+    return LinkedDiscussion(
+      id: 'linked_question-1_v1',
+      sourceQuestionId: questionId,
+      sourceContentVersion: 'test',
+      prompt: 'Which numeral shows twenty thousand four?',
+      promptBm: 'Nombor manakah menunjukkan dua puluh ribu empat?',
+      options: const ['2 004', '20 004'],
+      optionsBm: const ['2 004', '20 004'],
+    );
+  }
+
+  @override
+  Stream<Set<String>> watchBlockedStudentIds(String studentId) =>
+      const Stream<Set<String>>.empty();
+
+  @override
+  Stream<List<ForumAnswer>> watchAnswers(String questionId) =>
+      Stream.value(const <ForumAnswer>[]);
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 QuizQuestion _question(String id, String subtopicId) {
@@ -246,6 +333,41 @@ void main() {
     expect(find.text('100%'), findsOneWidget);
     expect(find.text('Back to Forge'), findsOneWidget);
     expect(find.text('Quiz complete!'), findsNothing);
+  });
+
+  testWidgets('quiz review opens the canonical linked forum discussion', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(900, 1400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final repository = _IntegrationDiscussRepository();
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: QuizPage(
+          title: 'Whole Numbers',
+          isBahasaMelayu: false,
+          sessionService: _ReviewingQuizSessionService(),
+          session: _quizSession,
+          forumRepository: repository,
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('20 004'));
+    await tester.pump();
+    await tester.tap(find.text('Finish Quiz'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Review these first'), findsOneWidget);
+    await tester.tap(find.text('Discuss in forum'));
+    await tester.pumpAndSettle();
+
+    expect(repository.openedQuestionId, 'question-1');
+    expect(find.byType(ForumDiscussionPage), findsOneWidget);
+    expect(find.text('Choose your final answer'), findsOneWidget);
   });
 
   testWidgets('back to forge returns from the result to the subtopic page', (

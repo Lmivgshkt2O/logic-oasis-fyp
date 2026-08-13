@@ -2,12 +2,17 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:logic_oasis/app/theme.dart';
+import 'package:logic_oasis/features/collaboration/qa_forum/qa_forum_page.dart';
 import 'package:logic_oasis/l10n/app_localizations.dart';
 import 'package:logic_oasis/shared/models/ai_diagnosis.dart';
+import 'package:logic_oasis/shared/models/forum_question.dart';
 import 'package:logic_oasis/shared/models/next_learning_action.dart';
 import 'package:logic_oasis/shared/models/quiz_completion.dart';
 import 'package:logic_oasis/shared/models/quiz_reward.dart';
+import 'package:logic_oasis/shared/models/quiz_review_item.dart';
+import 'package:logic_oasis/shared/repositories/collaboration_repository.dart';
 import 'package:logic_oasis/shared/services/ai_status_service.dart';
+import 'package:logic_oasis/shared/state/app_state.dart';
 import 'package:logic_oasis/shared/widgets/logic_oasis_figma_components.dart';
 import 'package:logic_oasis/shared/widgets/recommendation_box.dart';
 import 'package:logic_oasis/shared/widgets/section_card.dart';
@@ -32,6 +37,7 @@ class ResultPage extends StatelessWidget {
     this.aiDiagnosis,
     this.attemptId,
     this.aiDiagnosisStreamFactory,
+    this.forumRepository,
   });
 
   final QuizCompletion completion;
@@ -44,6 +50,36 @@ class ResultPage extends StatelessWidget {
   final AiDiagnosis? aiDiagnosis;
   final String? attemptId;
   final AiDiagnosisStreamFactory? aiDiagnosisStreamFactory;
+  final CollaborationRepository? forumRepository;
+
+  Future<void> _openDiscussion(
+    BuildContext context,
+    QuizReviewItem item,
+  ) async {
+    final l10n = AppLocalizations.of(context)!;
+    final repository = forumRepository ?? CollaborationRepository();
+    try {
+      final discussion = await repository.openOrCreateLinkedDiscussion(
+        questionId: item.questionId,
+      );
+      if (!context.mounted) return;
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute(
+          builder: (_) => ForumDiscussionPage(
+            question: ForumQuestion.fromLinkedDiscussion(discussion),
+            state: AppState()
+              ..language = isBahasaMelayu ? 'Bahasa Melayu' : 'English',
+            repository: repository,
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.discussionUnavailable)));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -108,6 +144,7 @@ class ResultPage extends StatelessWidget {
           _ReviewSection(
             completion: completion,
             isBahasaMelayu: isBahasaMelayu,
+            onDiscuss: (item) => _openDiscussion(context, item),
           ),
           const SizedBox(height: 14),
           RecommendationBox(
@@ -176,10 +213,12 @@ class _ReviewSection extends StatelessWidget {
   const _ReviewSection({
     required this.completion,
     required this.isBahasaMelayu,
+    required this.onDiscuss,
   });
 
   final QuizCompletion completion;
   final bool isBahasaMelayu;
+  final Future<void> Function(QuizReviewItem item) onDiscuss;
 
   @override
   Widget build(BuildContext context) {
@@ -200,7 +239,11 @@ class _ReviewSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           for (var index = 0; index < items.length; index++) ...[
-            _ReviewCard(item: items[index], isBahasaMelayu: isBahasaMelayu),
+            _ReviewCard(
+              item: items[index],
+              isBahasaMelayu: isBahasaMelayu,
+              onDiscuss: () => onDiscuss(items[index]),
+            ),
             if (index < items.length - 1) const SizedBox(height: 12),
           ],
         ],
@@ -210,10 +253,15 @@ class _ReviewSection extends StatelessWidget {
 }
 
 class _ReviewCard extends StatelessWidget {
-  const _ReviewCard({required this.item, required this.isBahasaMelayu});
+  const _ReviewCard({
+    required this.item,
+    required this.isBahasaMelayu,
+    required this.onDiscuss,
+  });
 
   final dynamic item;
   final bool isBahasaMelayu;
+  final Future<void> Function() onDiscuss;
 
   @override
   Widget build(BuildContext context) {
@@ -269,11 +317,50 @@ class _ReviewCard extends StatelessWidget {
                   item.localizedReviewFocus(isBahasaMelayu),
                   style: theme.textTheme.bodySmall,
                 ),
+                const SizedBox(height: 8),
+                _DiscussInForumButton(onPressed: onDiscuss),
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _DiscussInForumButton extends StatefulWidget {
+  const _DiscussInForumButton({required this.onPressed});
+
+  final Future<void> Function() onPressed;
+
+  @override
+  State<_DiscussInForumButton> createState() => _DiscussInForumButtonState();
+}
+
+class _DiscussInForumButtonState extends State<_DiscussInForumButton> {
+  bool _opening = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return TextButton.icon(
+      onPressed: _opening
+          ? null
+          : () async {
+              setState(() => _opening = true);
+              try {
+                await widget.onPressed();
+              } finally {
+                if (mounted) setState(() => _opening = false);
+              }
+            },
+      icon: _opening
+          ? const SizedBox.square(
+              dimension: 14,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.forum_outlined),
+      label: Text(_opening ? l10n.openingDiscussion : l10n.discussInForum),
     );
   }
 }

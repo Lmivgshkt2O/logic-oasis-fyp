@@ -8,6 +8,7 @@ import 'package:logic_oasis/shared/models/question_response.dart';
 import 'package:logic_oasis/shared/models/quiz_completion.dart';
 import 'package:logic_oasis/shared/models/quiz_question.dart';
 import 'package:logic_oasis/shared/models/quiz_session.dart';
+import 'package:logic_oasis/shared/repositories/collaboration_repository.dart';
 import 'package:logic_oasis/shared/services/quiz_session_service.dart';
 import 'package:logic_oasis/shared/widgets/logic_oasis_figma_components.dart';
 import 'package:logic_oasis/shared/widgets/recommendation_box.dart';
@@ -21,6 +22,7 @@ class QuizPage extends StatefulWidget {
     this.sessionService,
     this.onFinalized,
     this.aiDiagnosisStreamFactory,
+    this.forumRepository,
   });
 
   final QuizSession session;
@@ -29,6 +31,7 @@ class QuizPage extends StatefulWidget {
   final QuizSessionGateway? sessionService;
   final Future<void> Function(QuizCompletion completion)? onFinalized;
   final AiDiagnosisStreamFactory? aiDiagnosisStreamFactory;
+  final CollaborationRepository? forumRepository;
 
   @override
   State<QuizPage> createState() => _QuizPageState();
@@ -149,6 +152,7 @@ class _QuizPageState extends State<QuizPage> {
             yearLevel: widget.session.yearLevel,
             attemptId: completion.attemptId,
             aiDiagnosisStreamFactory: widget.aiDiagnosisStreamFactory,
+            forumRepository: widget.forumRepository,
           ),
         ),
       );

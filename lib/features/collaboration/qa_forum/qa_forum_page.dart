@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:logic_oasis/app/logic_oasis_design.dart';
+import 'package:logic_oasis/app/theme.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
@@ -17,6 +19,7 @@ class QaForumPage extends StatefulWidget {
     this.questionsStream,
     this.blockedStudentIdsStream,
     this.answersStreamForQuestion,
+    this.authorFeedbackStreamForAnswer,
   });
   final AppState state;
   final CollaborationRepository? repository;
@@ -24,6 +27,8 @@ class QaForumPage extends StatefulWidget {
   final Stream<Set<String>>? blockedStudentIdsStream;
   final Stream<List<ForumAnswer>> Function(String questionId)?
   answersStreamForQuestion;
+  final Stream<ForumAnswerFeedback> Function(String answerId)?
+  authorFeedbackStreamForAnswer;
 
   @override
   State<QaForumPage> createState() => _QaForumPageState();
@@ -361,36 +366,42 @@ class _QaForumPageState extends State<QaForumPage> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => _AnswersPage(
+          builder: (_) => ForumDiscussionPage(
             question: question,
             state: widget.state,
             repository: _repository ?? widget.repository,
             answersStream: widget.answersStreamForQuestion?.call(question.id),
             blockedStudentIdsStream: widget.blockedStudentIdsStream,
+            authorFeedbackStreamForAnswer:
+                widget.authorFeedbackStreamForAnswer,
           ),
         ),
       );
 }
 
-class _AnswersPage extends StatefulWidget {
-  const _AnswersPage({
+class ForumDiscussionPage extends StatefulWidget {
+  const ForumDiscussionPage({
     required this.question,
     required this.state,
     this.repository,
     this.answersStream,
     this.blockedStudentIdsStream,
+    this.authorFeedbackStreamForAnswer,
   });
   final ForumQuestion question;
   final AppState state;
   final CollaborationRepository? repository;
   final Stream<List<ForumAnswer>>? answersStream;
   final Stream<Set<String>>? blockedStudentIdsStream;
+  final Stream<ForumAnswerFeedback> Function(String answerId)?
+  authorFeedbackStreamForAnswer;
   @override
-  State<_AnswersPage> createState() => _AnswersPageState();
+  State<ForumDiscussionPage> createState() => _AnswersPageState();
 }
 
-class _AnswersPageState extends State<_AnswersPage> {
+class _AnswersPageState extends State<ForumDiscussionPage> {
   final _answer = TextEditingController();
+  final _explanation = TextEditingController();
   final _status = const ForumAiStatusService();
   final Set<String> _inFlight = {};
   StreamSubscription<Set<String>>? _blockedSubscription;
@@ -398,6 +409,13 @@ class _AnswersPageState extends State<_AnswersPage> {
   Object? _blockedError;
   String? _acceptedAnswerId;
   bool _submitting = false;
+
+  bool get _isLinked => widget.question.mode == 'linked';
+
+  List<String> get _options =>
+      widget.state.isBahasaMelayu
+          ? widget.question.optionsBm
+          : widget.question.options;
   CollaborationRepository? _repository;
   CollaborationRepository get _repo =>
       _repository ??= widget.repository ?? CollaborationRepository();
@@ -430,6 +448,7 @@ class _AnswersPageState extends State<_AnswersPage> {
   @override
   void dispose() {
     _answer.dispose();
+    _explanation.dispose();
     _blockedSubscription?.cancel();
     super.dispose();
   }
@@ -493,7 +512,22 @@ class _AnswersPageState extends State<_AnswersPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(answer.text),
+                            Text(
+                              answer.mode == 'linked'
+                                  ? (answer.explanation ?? '')
+                                  : answer.text,
+                            ),
+                            if (answer.mode == 'linked') ...[
+                              const SizedBox(height: 6),
+                              Text(
+                                _t(
+                                  'Final answer: ${_optionLabel(answer.selectedOption)}',
+                                  'Jawapan akhir: ${_optionLabel(answer.selectedOption)}',
+                                ),
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(fontWeight: FontWeight.w800),
+                              ),
+                            ],
                             if (answer.acceptedAt != null ||
                                 effectiveAcceptedAnswerId == answer.id) ...[
                               const SizedBox(height: 8),
@@ -510,13 +544,44 @@ class _AnswersPageState extends State<_AnswersPage> {
                             const SizedBox(height: 8),
                             if (answer.authorId ==
                                 widget.state.currentStudentId)
-                              Text(
-                                _status.statusText(
-                                  answer.feedback,
-                                  isBahasaMelayu: widget.state.isBahasaMelayu,
-                                ),
-                                style: Theme.of(context).textTheme.bodySmall,
+                              _AuthorFeedbackText(
+                                legacyFeedbackPresent:
+                                    answer.feedback.state != 'queued',
+                                legacyFeedback: answer.feedback,
+                                feedbackFactory: () =>
+                                    widget.authorFeedbackStreamForAnswer?.call(
+                                      answer.id,
+                                    ) ??
+                                    _repo.watchOwnFeedback(answer.id),
+                                status: _status,
+                                isBahasaMelayu:
+                                    widget.state.isBahasaMelayu,
                               ),
+                            if (_status.publicBadgeLabel(
+                                  answer.aiPublicState,
+                                  isBahasaMelayu:
+                                      widget.state.isBahasaMelayu,
+                                ) !=
+                                null) ...[
+                              const SizedBox(height: 8),
+                              _PublicAdvisoryBadge(
+                                label: _status.publicBadgeLabel(
+                                      answer.aiPublicState,
+                                      isBahasaMelayu:
+                                          widget.state.isBahasaMelayu,
+                                    )!,
+                                explanation: _status.publicBadgeExplanation(
+                                  answer.aiPublicState,
+                                  isBahasaMelayu:
+                                      widget.state.isBahasaMelayu,
+                                ),
+                                icon:
+                                    answer.aiPublicState ==
+                                        'may_be_irrelevant'
+                                    ? Icons.help_outline
+                                    : Icons.verified_outlined,
+                              ),
+                            ],
                             Row(
                               children: [
                                 TextButton.icon(
@@ -596,29 +661,41 @@ class _AnswersPageState extends State<_AnswersPage> {
         SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _answer,
-                    minLines: 2,
-                    maxLines: 4,
-                    maxLength: 4000,
-                    decoration: InputDecoration(
-                      hintText: _t(
-                        'Explain how you worked it out…',
-                        'Terangkan cara anda menyelesaikannya…',
+            child: _isLinked
+                ? ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 360),
+                    child: SingleChildScrollView(
+                      child: _LinkedAnswerForm(
+                        options: _options,
+                        isBahasaMelayu: widget.state.isBahasaMelayu,
+                        submitLabel: _t('Submit answer', 'Hantar jawapan'),
+                        onSubmit: _submitLinked,
                       ),
                     ),
+                  )
+                : Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _answer,
+                          minLines: 2,
+                          maxLines: 4,
+                          maxLength: 4000,
+                          decoration: InputDecoration(
+                            hintText: _t(
+                              'Explain how you worked it out…',
+                              'Terangkan cara anda menyelesaikannya…',
+                            ),
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.send),
+                        tooltip: _t('Post answer', 'Hantar jawapan'),
+                        onPressed: _submitting ? null : _submit,
+                      ),
+                    ],
                   ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.send),
-                  tooltip: _t('Post answer', 'Hantar jawapan'),
-                  onPressed: _submitting ? null : _submit,
-                ),
-              ],
-            ),
           ),
         ),
       ],
@@ -646,6 +723,57 @@ class _AnswersPageState extends State<_AnswersPage> {
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
+  }
+
+  String _optionLabel(int? index) {
+    final options = _options;
+    if (index == null || index < 0 || index >= options.length) return '';
+    return options[index];
+  }
+
+  Future<bool> _submitLinked(int selectedOption, String explanation) async {
+    try {
+      await _repo.submitLinkedAnswer(
+        discussionId: widget.question.id,
+        selectedOption: selectedOption,
+        explanation: explanation,
+      );
+      _message(
+        _t(
+          'Answer posted and queued for review.',
+          'Jawapan telah dihantar dan menunggu semakan.',
+        ),
+      );
+      return true;
+    } catch (error) {
+      _message(_friendlyError(error, widget.state));
+      return false;
+    }
+  }
+
+  Future<void> _editLinkedAnswer(ForumAnswer answer) async {
+    final result = await showDialog<_LinkedAnswerResult>(
+      context: context,
+      builder: (_) => _LinkedAnswerDialog(
+        options: _options,
+        isBahasaMelayu: widget.state.isBahasaMelayu,
+        initialOption: answer.selectedOption,
+        initialExplanation: answer.explanation ?? '',
+      ),
+    );
+    if (result == null) return;
+    await _runAction(
+      'edit:${answer.id}',
+      () => _repo.editLinkedAnswer(
+        answerId: answer.id,
+        selectedOption: result.option,
+        explanation: result.explanation,
+      ),
+      _t(
+        'Response edited successfully. Feedback review queued.',
+        'Jawapan berjaya diedit. Semakan maklum balas sedang menunggu.',
+      ),
+    );
   }
 
   Future<bool> _runAction(
@@ -692,6 +820,10 @@ class _AnswersPageState extends State<_AnswersPage> {
       if (blocked && mounted) {
         setState(() => _blockedAuthors = {..._blockedAuthors, answer.authorId});
       }
+      return;
+    }
+    if (action == _AnswerAction.edit && answer.mode == 'linked') {
+      await _editLinkedAnswer(answer);
       return;
     }
     final value = await showDialog<String>(
@@ -875,4 +1007,318 @@ class _Message extends StatelessWidget {
       child: Text(text, textAlign: TextAlign.center),
     ),
   );
+}
+
+class _LinkedAnswerForm extends StatefulWidget {
+  const _LinkedAnswerForm({
+    required this.options,
+    required this.isBahasaMelayu,
+    required this.submitLabel,
+    required this.onSubmit,
+    this.initialOption,
+    this.initialExplanation = '',
+  });
+
+  final List<String> options;
+  final bool isBahasaMelayu;
+  final String submitLabel;
+  final Future<bool> Function(int option, String explanation) onSubmit;
+  final int? initialOption;
+  final String initialExplanation;
+
+  @override
+  State<_LinkedAnswerForm> createState() => _LinkedAnswerFormState();
+}
+
+class _LinkedAnswerFormState extends State<_LinkedAnswerForm> {
+  int? _selectedOption;
+  late final TextEditingController _explanation = TextEditingController(
+    text: widget.initialExplanation,
+  );
+  bool _submitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedOption = widget.initialOption;
+  }
+
+  @override
+  void dispose() {
+    _explanation.dispose();
+    super.dispose();
+  }
+
+  String _t(String english, String bahasaMelayu) =>
+      widget.isBahasaMelayu ? bahasaMelayu : english;
+
+  void _message(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _submit() async {
+    final option = _selectedOption;
+    final explanation = _explanation.text.trim();
+    if (option == null) {
+      _message(_t('Select an option first.', 'Pilih satu pilihan dahulu.'));
+      return;
+    }
+    if (explanation.length < 8) {
+      _message(
+        _t(
+          'Add at least 8 characters of explanation.',
+          'Tambah sekurang-kurangnya 8 aksara penerangan.',
+        ),
+      );
+      return;
+    }
+    setState(() => _submitting = true);
+    try {
+      final success = await widget.onSubmit(option, explanation);
+      if (success && mounted) {
+        setState(() {
+          _selectedOption = null;
+          _explanation.clear();
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          _t('Choose your final answer', 'Pilih jawapan akhir'),
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 8),
+        for (var index = 0; index < widget.options.length; index++) ...[
+          _OptionTile(
+            label: widget.options[index],
+            selected: _selectedOption == index,
+            onTap: _submitting
+                ? null
+                : () => setState(() => _selectedOption = index),
+          ),
+          if (index < widget.options.length - 1) const SizedBox(height: 8),
+        ],
+        const SizedBox(height: 12),
+        TextField(
+          controller: _explanation,
+          minLines: 2,
+          maxLines: 4,
+          maxLength: 4000,
+          decoration: InputDecoration(
+            labelText: _t('Explain your answer', 'Terangkan jawapan anda'),
+            hintText: _t(
+              'Show the steps you used…',
+              'Tunjukkan langkah yang anda gunakan…',
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        FilledButton.icon(
+          onPressed: _submitting ? null : _submit,
+          icon: _submitting
+              ? const SizedBox.square(
+                  dimension: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.send),
+          label: Text(widget.submitLabel),
+        ),
+      ],
+    );
+  }
+}
+
+class _OptionTile extends StatelessWidget {
+  const _OptionTile({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: selected ? LogicOasisTheme.sky : LogicOasisDesign.card,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected ? LogicOasisTheme.water : LogicOasisTheme.line,
+            width: 1.4,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              selected
+                  ? Icons.radio_button_checked
+                  : Icons.radio_button_off,
+              color: selected ? LogicOasisTheme.water : LogicOasisTheme.ink,
+              size: 20,
+            ),
+            const SizedBox(width: 10),
+            Expanded(child: Text(label, style: theme.textTheme.bodyMedium)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LinkedAnswerResult {
+  const _LinkedAnswerResult(this.option, this.explanation);
+
+  final int option;
+  final String explanation;
+}
+
+class _LinkedAnswerDialog extends StatelessWidget {
+  const _LinkedAnswerDialog({
+    required this.options,
+    required this.isBahasaMelayu,
+    this.initialOption,
+    this.initialExplanation,
+  });
+
+  final List<String> options;
+  final bool isBahasaMelayu;
+  final int? initialOption;
+  final String? initialExplanation;
+
+  @override
+  Widget build(BuildContext context) {
+    final isBahasaMelayu = this.isBahasaMelayu;
+    return AlertDialog(
+      title: Text(
+        isBahasaMelayu ? 'Edit jawapan' : 'Edit answer',
+      ),
+      content: SingleChildScrollView(
+        child: _LinkedAnswerForm(
+          options: options,
+          isBahasaMelayu: isBahasaMelayu,
+          initialOption: initialOption,
+          initialExplanation: initialExplanation ?? '',
+          submitLabel: isBahasaMelayu ? 'Hantar' : 'Submit',
+          onSubmit: (option, explanation) async {
+            Navigator.of(
+              context,
+            ).pop(_LinkedAnswerResult(option, explanation));
+            return true;
+          },
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(isBahasaMelayu ? 'Batal' : 'Cancel'),
+        ),
+      ],
+    );
+  }
+}
+
+class _AuthorFeedbackText extends StatefulWidget {
+  const _AuthorFeedbackText({
+    required this.legacyFeedbackPresent,
+    required this.legacyFeedback,
+    required this.feedbackFactory,
+    required this.status,
+    required this.isBahasaMelayu,
+  });
+
+  final bool legacyFeedbackPresent;
+  final ForumAnswerFeedback legacyFeedback;
+  final Stream<ForumAnswerFeedback> Function() feedbackFactory;
+  final ForumAiStatusService status;
+  final bool isBahasaMelayu;
+
+  @override
+  State<_AuthorFeedbackText> createState() => _AuthorFeedbackTextState();
+}
+
+class _AuthorFeedbackTextState extends State<_AuthorFeedbackText> {
+  Stream<ForumAnswerFeedback>? _stream;
+
+  @override
+  void initState() {
+    super.initState();
+    if (!widget.legacyFeedbackPresent) {
+      _stream = widget.feedbackFactory();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final stream = _stream;
+    if (stream == null) {
+      return Text(
+        widget.status.statusText(
+          widget.legacyFeedback,
+          isBahasaMelayu: widget.isBahasaMelayu,
+        ),
+        style: Theme.of(context).textTheme.bodySmall,
+      );
+    }
+    return StreamBuilder<ForumAnswerFeedback>(
+      stream: stream,
+      builder: (context, snapshot) {
+        final feedback = snapshot.data;
+        if (feedback == null) return const SizedBox.shrink();
+        return Text(
+          widget.status.statusText(
+            feedback,
+            isBahasaMelayu: widget.isBahasaMelayu,
+          ),
+          style: Theme.of(context).textTheme.bodySmall,
+        );
+      },
+    );
+  }
+}
+
+class _PublicAdvisoryBadge extends StatelessWidget {
+  const _PublicAdvisoryBadge({
+    required this.label,
+    required this.explanation,
+    required this.icon,
+  });
+
+  final String label;
+  final String? explanation;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: explanation ?? label,
+      container: true,
+      child: Chip(
+        avatar: Icon(icon, size: 18),
+        label: Text(label),
+      ),
+    );
+  }
 }

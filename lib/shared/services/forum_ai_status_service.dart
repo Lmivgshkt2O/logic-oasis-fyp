@@ -4,6 +4,32 @@ import 'package:logic_oasis/shared/models/forum_answer.dart';
 class ForumAiStatusService {
   const ForumAiStatusService();
 
+  /// Allow-listed public advisory badge text. Returns null when the answer
+  /// carries no public AI decision (the neutral state).
+  String? publicBadgeLabel(
+    String publicState, {
+    bool isBahasaMelayu = false,
+  }) => switch (publicState) {
+    'verified' => isBahasaMelayu ? 'AI-disahkan' : 'AI-verified',
+    'may_be_irrelevant' =>
+      isBahasaMelayu ? 'Mungkin tidak berkaitan' : 'May be irrelevant',
+    _ => null,
+  };
+
+  /// Accessible explanatory copy for the public advisory badge.
+  String? publicBadgeExplanation(
+    String publicState, {
+    bool isBahasaMelayu = false,
+  }) => switch (publicState) {
+    'verified' => isBahasaMelayu
+        ? 'Jawapan ini lulus semakan automatik sistem (nasihat sahaja).'
+        : "This answer passed the system's automated checks (advisory only).",
+    'may_be_irrelevant' => isBahasaMelayu
+        ? 'Jawapan ini mungkin tidak menjawab soalan secara langsung.'
+        : 'This answer may not directly address the question.',
+    _ => null,
+  };
+
   String statusText(
     ForumAnswerFeedback feedback, {
     bool isBahasaMelayu = false,

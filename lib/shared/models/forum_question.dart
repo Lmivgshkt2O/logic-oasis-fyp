@@ -58,6 +58,23 @@ class ForumQuestion {
           const [],
     );
   }
+
+  /// Build the discussion page model from a server-owned linked-discussion
+  /// projection returned by the create-or-open callable.
+  factory ForumQuestion.fromLinkedDiscussion(LinkedDiscussion discussion) =>
+      ForumQuestion(
+        id: discussion.id,
+        authorId: '',
+        title: discussion.title ?? discussion.prompt,
+        text: discussion.text ?? discussion.prompt,
+        mode: 'linked',
+        sourceQuestionId: discussion.sourceQuestionId,
+        sourceContentVersion: discussion.sourceContentVersion,
+        prompt: discussion.prompt,
+        promptBm: discussion.promptBm,
+        options: discussion.options,
+        optionsBm: discussion.optionsBm,
+      );
 }
 
 /// Server-owned canonical linked-discussion projection returned by the

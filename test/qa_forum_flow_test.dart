@@ -68,6 +68,50 @@ void main() {
     );
   });
 
+  test('public advisory badge exposes only allow-listed states', () {
+    const service = ForumAiStatusService();
+    expect(service.publicBadgeLabel('verified'), 'AI-verified');
+    expect(service.publicBadgeLabel('may_be_irrelevant'), 'May be irrelevant');
+    expect(service.publicBadgeLabel('none'), isNull);
+    expect(
+      service.publicBadgeExplanation('verified'),
+      contains('automated checks'),
+    );
+    expect(
+      service.publicBadgeLabel('verified', isBahasaMelayu: true),
+      'AI-disahkan',
+    );
+    expect(
+      service.publicBadgeLabel('may_be_irrelevant', isBahasaMelayu: true),
+      'Mungkin tidak berkaitan',
+    );
+    expect(
+      service.publicBadgeExplanation(
+        'may_be_irrelevant',
+        isBahasaMelayu: true,
+      ),
+      contains('mungkin tidak menjawab'),
+    );
+  });
+
+  test('linked discussion projection builds the forum question model', () {
+    const discussion = LinkedDiscussion(
+      id: 'linked_bank_q1_v1',
+      sourceQuestionId: 'bank_q1',
+      sourceContentVersion: 'v1',
+      prompt: 'Which numeral shows twenty thousand and four?',
+      promptBm: 'Angka manakah menunjukkan dua puluh ribu empat?',
+      options: ['20 004', '24 000', '20 400', '20 040'],
+      optionsBm: ['20 004', '24 000', '20 400', '20 040'],
+    );
+    final question = ForumQuestion.fromLinkedDiscussion(discussion);
+    expect(question.id, 'linked_bank_q1_v1');
+    expect(question.mode, 'linked');
+    expect(question.sourceQuestionId, 'bank_q1');
+    expect(question.options, hasLength(4));
+    expect(question.prompt, 'Which numeral shows twenty thousand and four?');
+  });
+
   test('linked question model parses the server-owned source contract', () {
     final question = ForumQuestion.fromFirestore('linked_q1_v1', {
       'mode': 'linked',
@@ -333,6 +377,395 @@ void main() {
     expect(find.text('Tapis soalan'), findsOneWidget);
   });
 
+  testWidgets('linked discussion renders options, explanation, and validation', (
+    tester,
+  ) async {
+    final answers = StreamController<List<ForumAnswer>>();
+    addTearDown(answers.close);
+    const question = ForumQuestion(
+      id: 'linked_q1_v1',
+      authorId: '',
+      title: 'Which numeral shows twenty thousand and four?',
+      text: 'Which numeral shows twenty thousand and four?',
+      mode: 'linked',
+      options: ['20 004', '24 000', '20 400', '20 040'],
+      optionsBm: ['20 004', '24 000', '20 400', '20 040'],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ForumDiscussionPage(
+          question: question,
+          state: AppState(),
+          answersStream: answers.stream,
+          blockedStudentIdsStream: Stream.value(const <String>{}),
+        ),
+      ),
+    );
+    await tester.pump();
+    answers.add(const []);
+    await tester.pump();
+
+    expect(find.text('Choose your final answer'), findsOneWidget);
+    expect(find.text('Explain your answer'), findsOneWidget);
+    expect(find.text('Submit answer'), findsOneWidget);
+    await tester.enterText(
+      find.byType(TextField).last,
+      'I compared each digit from left to right.',
+    );
+    await tester.ensureVisible(find.text('Submit answer'));
+    await tester.tap(find.text('Submit answer'));
+    await tester.pump();
+    expect(find.text('Select an option first.'), findsOneWidget);
+  });
+
+  testWidgets('linked composer submits the selected option and explanation', (
+    tester,
+  ) async {
+    final answers = StreamController<List<ForumAnswer>>();
+    addTearDown(answers.close);
+    final repository = _LinkedActionRepository();
+    const question = ForumQuestion(
+      id: 'linked_q1_v1',
+      authorId: '',
+      title: 'Which numeral shows twenty thousand and four?',
+      text: 'Which numeral shows twenty thousand and four?',
+      mode: 'linked',
+      options: ['20 004', '24 000', '20 400', '20 040'],
+      optionsBm: ['20 004', '24 000', '20 400', '20 040'],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ForumDiscussionPage(
+          question: question,
+          state: AppState(),
+          repository: repository,
+          answersStream: answers.stream,
+          blockedStudentIdsStream: Stream.value(const <String>{}),
+          authorFeedbackStreamForAnswer: (_) => Stream.value(
+            const ForumAnswerFeedback(
+              state: 'queued',
+              label: 'uncertain',
+              message: '',
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    answers.add(const []);
+    await tester.pump();
+
+    await tester.tap(find.text('24 000'));
+    await tester.enterText(
+      find.byType(TextField).last,
+      '  I compared the thousands digit.  ',
+    );
+    await tester.ensureVisible(find.text('Submit answer'));
+    await tester.tap(find.text('Submit answer'));
+    await tester.pumpAndSettle();
+
+    expect(repository.submittedDiscussionId, 'linked_q1_v1');
+    expect(repository.submittedOption, 1);
+    expect(repository.submittedExplanation, 'I compared the thousands digit.');
+    expect(find.textContaining('queued for review'), findsOneWidget);
+  });
+
+  testWidgets('linked composer uses Bahasa Melayu labels', (tester) async {
+    final answers = StreamController<List<ForumAnswer>>();
+    addTearDown(answers.close);
+    final state = AppState()..language = 'Bahasa Melayu';
+    const question = ForumQuestion(
+      id: 'linked_q1_v1',
+      authorId: '',
+      title: 'Angka manakah menunjukkan dua puluh ribu empat?',
+      text: 'Angka manakah menunjukkan dua puluh ribu empat?',
+      mode: 'linked',
+      options: ['20 004', '24 000', '20 400', '20 040'],
+      optionsBm: ['20 004', '24 000', '20 400', '20 040'],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ForumDiscussionPage(
+          question: question,
+          state: state,
+          answersStream: answers.stream,
+          blockedStudentIdsStream: Stream.value(const <String>{}),
+        ),
+      ),
+    );
+    await tester.pump();
+    answers.add(const []);
+    await tester.pump();
+
+    expect(find.text('Pilih jawapan akhir'), findsOneWidget);
+    expect(find.text('Terangkan jawapan anda'), findsOneWidget);
+    expect(find.text('Hantar jawapan'), findsOneWidget);
+  });
+
+  testWidgets('linked answer shows option, explanation, and public badge', (
+    tester,
+  ) async {
+    final answers = StreamController<List<ForumAnswer>>();
+    addTearDown(answers.close);
+    const question = ForumQuestion(
+      id: 'linked_q1_v1',
+      authorId: '',
+      title: 'Which numeral shows twenty thousand and four?',
+      text: 'Which numeral shows twenty thousand and four?',
+      mode: 'linked',
+      options: ['20 004', '24 000', '20 400', '20 040'],
+      optionsBm: ['20 004', '24 000', '20 400', '20 040'],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ForumDiscussionPage(
+          question: question,
+          state: AppState(),
+          answersStream: answers.stream,
+          blockedStudentIdsStream: Stream.value(const <String>{}),
+          authorFeedbackStreamForAnswer: (_) => Stream.value(
+            const ForumAnswerFeedback(
+              state: 'completed',
+              label: 'sufficient_reasoning',
+              message: 'Private guidance.',
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    answers.add(const [
+      ForumAnswer(
+        id: 'linked_a1',
+        questionId: 'linked_q1_v1',
+        authorId: 'student-peer',
+        text: '',
+        mode: 'linked',
+        selectedOption: 0,
+        explanation: 'I compared the digits from left to right.',
+        aiPublicState: 'verified',
+        aiRunId: 'run-1',
+        aiRevision: 1,
+        feedback: ForumAnswerFeedback(
+          state: 'queued',
+          label: 'uncertain',
+          message: '',
+        ),
+      ),
+    ]);
+    await tester.pump();
+
+    expect(find.text('I compared the digits from left to right.'), findsOneWidget);
+    expect(find.textContaining('Final answer:'), findsOneWidget);
+    expect(find.text('AI-verified'), findsOneWidget);
+    expect(find.text('Private guidance.'), findsNothing);
+  });
+
+  testWidgets('author sees private guidance while peers see only public state', (
+    tester,
+  ) async {
+    final answers = StreamController<List<ForumAnswer>>();
+    addTearDown(answers.close);
+    const question = ForumQuestion(
+      id: 'linked_q1_v1',
+      authorId: '',
+      title: 'Which numeral shows twenty thousand and four?',
+      text: 'Which numeral shows twenty thousand and four?',
+      mode: 'linked',
+      options: ['20 004', '24 000', '20 400', '20 040'],
+      optionsBm: ['20 004', '24 000', '20 400', '20 040'],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ForumDiscussionPage(
+          question: question,
+          state: AppState(),
+          answersStream: answers.stream,
+          blockedStudentIdsStream: Stream.value(const <String>{}),
+          authorFeedbackStreamForAnswer: (_) => Stream.value(
+            const ForumAnswerFeedback(
+              state: 'completed',
+              label: 'needs_reasoning',
+              message: 'Please add more reasoning.',
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    answers.add([
+      const ForumAnswer(
+        id: 'linked_a1',
+        questionId: 'linked_q1_v1',
+        authorId: AppState.demoStudentId,
+        text: '',
+        mode: 'linked',
+        selectedOption: 1,
+        explanation: 'I compared the thousands digit.',
+        aiPublicState: 'may_be_irrelevant',
+        feedback: ForumAnswerFeedback(
+          state: 'queued',
+          label: 'uncertain',
+          message: '',
+        ),
+      ),
+    ]);
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.textContaining('Please add the steps'), findsOneWidget);
+    expect(find.text('May be irrelevant'), findsOneWidget);
+  });
+
+  testWidgets('editing a linked answer clears the public badge via the stream', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(900, 1400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final answers = StreamController<List<ForumAnswer>>();
+    addTearDown(answers.close);
+    final repository = _LinkedActionRepository();
+    const question = ForumQuestion(
+      id: 'linked_q1_v1',
+      authorId: '',
+      title: 'Which numeral shows twenty thousand and four?',
+      text: 'Which numeral shows twenty thousand and four?',
+      mode: 'linked',
+      options: ['20 004', '24 000', '20 400', '20 040'],
+      optionsBm: ['20 004', '24 000', '20 400', '20 040'],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ForumDiscussionPage(
+          question: question,
+          state: AppState(),
+          repository: repository,
+          answersStream: answers.stream,
+          blockedStudentIdsStream: Stream.value(const <String>{}),
+          authorFeedbackStreamForAnswer: (_) => Stream.value(
+            const ForumAnswerFeedback(
+              state: 'queued',
+              label: 'uncertain',
+              message: '',
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    answers.add([
+      const ForumAnswer(
+        id: 'linked_a1',
+        questionId: 'linked_q1_v1',
+        authorId: AppState.demoStudentId,
+        text: '',
+        mode: 'linked',
+        selectedOption: 0,
+        explanation: 'I compared the digits from left to right.',
+        aiPublicState: 'verified',
+        aiRunId: 'run-1',
+        aiRevision: 1,
+        feedback: ForumAnswerFeedback(
+          state: 'queued',
+          label: 'uncertain',
+          message: '',
+        ),
+      ),
+    ]);
+    await tester.pump();
+    expect(find.text('AI-verified'), findsOneWidget);
+
+    await tester.ensureVisible(find.byTooltip('Answer actions'));
+    await tester.tap(find.byTooltip('Answer actions'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Edit answer'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('24 000').last);
+    await tester.enterText(
+      find.byType(TextField).last,
+      'A revised explanation with more steps.',
+    );
+    await tester.ensureVisible(find.text('Submit'));
+    await tester.tap(find.text('Submit'));
+    await tester.pumpAndSettle();
+
+    expect(repository.editedAnswerId, 'linked_a1');
+    expect(repository.editedOption, 1);
+    answers.add([
+      const ForumAnswer(
+        id: 'linked_a1',
+        questionId: 'linked_q1_v1',
+        authorId: AppState.demoStudentId,
+        text: '',
+        mode: 'linked',
+        selectedOption: 1,
+        explanation: 'A revised explanation with more steps.',
+        revision: 2,
+        aiPublicState: 'none',
+        aiRunId: null,
+        aiRevision: null,
+        feedback: ForumAnswerFeedback(
+          state: 'queued',
+          label: 'uncertain',
+          message: '',
+        ),
+      ),
+    ]);
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('AI-verified'), findsNothing);
+  });
+
+  testWidgets('linked answers keep Helpful distinct and have no owner accept', (
+    tester,
+  ) async {
+    final answers = StreamController<List<ForumAnswer>>();
+    addTearDown(answers.close);
+    const question = ForumQuestion(
+      id: 'linked_q1_v1',
+      authorId: '',
+      title: 'Which numeral shows twenty thousand and four?',
+      text: 'Which numeral shows twenty thousand and four?',
+      mode: 'linked',
+      options: ['20 004', '24 000', '20 400', '20 040'],
+      optionsBm: ['20 004', '24 000', '20 400', '20 040'],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ForumDiscussionPage(
+          question: question,
+          state: AppState(),
+          answersStream: answers.stream,
+          blockedStudentIdsStream: Stream.value(const <String>{}),
+        ),
+      ),
+    );
+    await tester.pump();
+    answers.add(const [
+      ForumAnswer(
+        id: 'linked_a1',
+        questionId: 'linked_q1_v1',
+        authorId: 'student-peer',
+        text: '',
+        mode: 'linked',
+        selectedOption: 2,
+        explanation: 'I compared the thousands and hundreds digits.',
+        aiPublicState: 'none',
+        feedback: ForumAnswerFeedback(
+          state: 'queued',
+          label: 'uncertain',
+          message: '',
+        ),
+      ),
+    ]);
+    await tester.pump();
+
+    expect(find.text('Helpful'), findsOneWidget);
+    expect(find.text('Accept'), findsNothing);
+    expect(find.textContaining('Final answer:'), findsOneWidget);
+  });
+
   testWidgets('remote acceptance hides every competing accept control', (
     tester,
   ) async {
@@ -572,6 +1005,46 @@ class _ActionRepository implements CollaborationRepository {
   }) async {
     reported = true;
   }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _LinkedActionRepository implements CollaborationRepository {
+  String? submittedDiscussionId;
+  int? submittedOption;
+  String? submittedExplanation;
+  String? editedAnswerId;
+  int? editedOption;
+  String? editedExplanation;
+
+  @override
+  Future<String> submitLinkedAnswer({
+    required String discussionId,
+    required int selectedOption,
+    required String explanation,
+  }) async {
+    submittedDiscussionId = discussionId;
+    submittedOption = selectedOption;
+    submittedExplanation = explanation;
+    return 'linked-a-new';
+  }
+
+  @override
+  Future<int> editLinkedAnswer({
+    required String answerId,
+    required int selectedOption,
+    required String explanation,
+  }) async {
+    editedAnswerId = answerId;
+    editedOption = selectedOption;
+    editedExplanation = explanation;
+    return 2;
+  }
+
+  @override
+  Stream<Set<String>> watchBlockedStudentIds(String studentId) =>
+      const Stream<Set<String>>.empty();
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);

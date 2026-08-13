@@ -813,6 +813,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{days} day ago'**
   String daysAgo(Object days);
+
+  /// No description provided for @discussInForum.
+  ///
+  /// In en, this message translates to:
+  /// **'Discuss in forum'**
+  String get discussInForum;
+
+  /// No description provided for @openingDiscussion.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening discussion...'**
+  String get openingDiscussion;
+
+  /// No description provided for @discussionUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'This question is not available for discussion.'**
+  String get discussionUnavailable;
 }
 
 class _AppLocalizationsDelegate
