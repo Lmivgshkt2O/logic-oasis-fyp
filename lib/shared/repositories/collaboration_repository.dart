@@ -178,7 +178,10 @@ class CollaborationRepository {
         .httpsCallable('submitLinkedForumAnswer')
         .call({
           'discussionId': discussionId,
-          'selectedOption': selectedOption,
+          // The callable bridge can deliver whole numbers as text or floats
+          // on some platforms; the backend accepts only plain digit strings,
+          // matching the quiz callable convention.
+          'selectedOption': selectedOption.toString(),
           'explanation': explanation.trim(),
         });
     final data = Map<String, dynamic>.from(result.data as Map);
@@ -194,7 +197,7 @@ class CollaborationRepository {
         .httpsCallable('editLinkedForumAnswer')
         .call({
           'answerId': answerId,
-          'selectedOption': selectedOption,
+          'selectedOption': selectedOption.toString(),
           'explanation': explanation.trim(),
         });
     final data = Map<String, dynamic>.from(result.data as Map);

@@ -330,7 +330,7 @@ void main() {
     expect(answerId, 'linked_a1');
     expect(functions.calls['submitLinkedForumAnswer'], {
       'discussionId': 'linked_bank_q1_v1',
-      'selectedOption': 1,
+      'selectedOption': '1',
       'explanation': 'I compared each option with the question.',
     });
 
@@ -342,7 +342,7 @@ void main() {
     expect(revision, 2);
     expect(functions.calls['editLinkedForumAnswer'], {
       'answerId': 'linked_a1',
-      'selectedOption': 2,
+      'selectedOption': '2',
       'explanation': 'I checked by adding back the group.',
     });
   });
