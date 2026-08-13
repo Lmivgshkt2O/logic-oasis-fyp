@@ -34,6 +34,21 @@ FORUM_REAL_EVALUATED_MODE = "real_evaluated_only"
 FORUM_CONTROLLED_CLAIM_LEVEL = "controlled_demonstration_only"
 FORUM_UNVALIDATED_CLAIM_LEVEL = "unvalidated_model_output"
 FORUM_FALLBACK_CLAIM_LEVEL = "safe_fallback_only"
+FORUM_MODE_FREE_FORM = "free_form"
+FORUM_MODE_LINKED = "linked"
+LINKED_DISCUSSION_PREFIX = "linked_"
+LINKED_OPTION_COUNT = 4
+FORUM_LINKED_EXPLANATION_MIN_LENGTH = 8
+FORUM_LINKED_EXPLANATION_MAX_LENGTH = 4000
+FORUM_PUBLIC_STATE_NONE = "none"
+FORUM_PUBLIC_STATE_VERIFIED = "verified"
+FORUM_PUBLIC_STATE_MAY_BE_IRRELEVANT = "may_be_irrelevant"
+FORUM_PRIVATE_FEEDBACK_COLLECTION = "forumAiFeedback"
+LEGACY_EMBEDDED_FEEDBACK_ALLOWED = frozenset({"state", "label", "revision"})
+LEGACY_EMBEDDED_FEEDBACK_DISALLOWED = frozenset({
+    "message", "probability", "modelVersion", "calibrationState",
+    "logicalInferenceId", "updatedAt", "policyVersion", "claimLevel",
+})
 _SHA256_FIELDS = (
     "artifactSha256", "catalogueSha256", "datasetSha256", "datasetManifestSha256",
     "splitManifestSha256", "rubricSha256", "evaluationReportSha256",
@@ -115,6 +130,24 @@ def _forum_text_hash(value: Any) -> str | None:
     return sha256(value.strip().encode("utf-8")).hexdigest()
 
 
+def _answer_analysis_text(data: Mapping[str, Any]) -> str | None:
+    """Return the text the advisory runtime should analyse for an answer.
+
+    Linked answers carry a structured final-answer selector plus a separate
+    explanation; the reasoning classifier reads the explanation. Free-form
+    answers keep the legacy single ``text`` field.
+    """
+    if data.get("mode") == FORUM_MODE_LINKED:
+        value = data.get("explanation")
+    else:
+        value = data.get("text")
+    return value.strip() if isinstance(value, str) else None
+
+
+def _linked_discussion_id(question_id: str, content_version: str) -> str:
+    return f"{LINKED_DISCUSSION_PREFIX}{question_id}_{content_version}"
+
+
 def _feedback_payload(
     *, state: str, prediction: Any, revision: int, logical_inference_id: str,
 ) -> dict[str, Any]:
@@ -135,16 +168,41 @@ def _feedback_payload(
         probability = None
         model_version = None
         calibration_state = "unavailable"
+    message = (
+        "Your answer is being reviewed."
+        if state == "pending"
+        else feedback_for(label)
+    )
     return {
         "state": state,
         "label": label,
         "probability": probability,
         "modelVersion": model_version,
         "calibrationState": calibration_state,
-        "message": feedback_for(label),
+        "message": message,
         "revision": revision,
         "logicalInferenceId": logical_inference_id,
         "updatedAt": firestore.SERVER_TIMESTAMP,
+    }
+
+
+def _public_answer_projection(
+    *, state: str, logical_inference_id: str, revision: int,
+) -> dict[str, Any]:
+    """Allow-listed public advisory state on the shared answer document.
+
+    Only the advisory enum and the non-sensitive current run/revision
+    references are shared. Correctness details, reasoning guidance,
+    probabilities, thresholds, and component diagnostics stay in the
+    author-only ``forumAiFeedback`` projection.
+    """
+    # The composite gate computes verified/may_be_irrelevant later (U4).
+    # Reasoning-only U1 outcomes are always the neutral public state.
+    public_state = FORUM_PUBLIC_STATE_NONE
+    return {
+        "aiPublicState": public_state,
+        "aiRunId": logical_inference_id,
+        "aiRevision": revision,
     }
 
 
@@ -265,6 +323,10 @@ class ForumRuntimeGateway:
         record(self.database.transaction())
 
     def record_question(self, question_id: str, data: Mapping[str, Any]) -> None:
+        if data.get("mode") == FORUM_MODE_LINKED:
+            # Canonical linked discussions are server content, not student
+            # participation; they never move the parent count-only summary.
+            return
         self._record_participation(event_id=f"question:{question_id}", student_id=_required(data, "authorId"), field="questionsPostedCount", occurred_at=data.get("createdAt"))
 
     def record_answer(self, answer_id: str, data: Mapping[str, Any]) -> None:
@@ -332,7 +394,16 @@ class ForumRuntimeGateway:
             target = _transaction_snapshot(transaction, target_ref) or _MissingSnapshot()
             if not target.exists:
                 raise ForumRuntimeError("not-found", "Report target not found.")
-            if _required(target.to_dict(), "authorId") == actor_id:
+            target_data = target.to_dict()
+            if (
+                target_type == "question"
+                and target_data.get("mode") == FORUM_MODE_LINKED
+            ):
+                raise ForumRuntimeError(
+                    "failed-precondition",
+                    "Linked discussions are server-owned and cannot be reported.",
+                )
+            if _required(target_data, "authorId") == actor_id:
                 raise ForumRuntimeError("failed-precondition", "You cannot report your own content.")
 
             existing = _transaction_snapshot(transaction, report_ref) or _MissingSnapshot()
@@ -366,6 +437,11 @@ class ForumRuntimeGateway:
             question_ref = self.database.collection("forumQuestions").document(question_id)
             question = _transaction_snapshot(transaction, question_ref) or _MissingSnapshot()
             question_data = question.to_dict() if question.exists else {}
+            if question_data.get("mode") == FORUM_MODE_LINKED:
+                raise ForumRuntimeError(
+                    "failed-precondition",
+                    "Linked discussions have no question owner to accept answers.",
+                )
             if not question.exists or _required(question_data, "authorId") != actor_id:
                 raise ForumRuntimeError("permission-denied", "Only the question author may accept an answer.")
             if author_id == actor_id:
@@ -430,6 +506,304 @@ class ForumRuntimeGateway:
         )
         return result
 
+    def open_or_create_linked_discussion(
+        self, *, question_id: str, actor_id: str, now: datetime,
+    ) -> dict[str, Any]:
+        """Create or open the canonical discussion for a question-bank item.
+
+        The callable accepts only the public question ID. Every authority
+        decision is derived server-side from ``questions`` and the protected
+        ``questionAnswerKeys``; no client-supplied linkage is trusted.
+        """
+        question_id = _document_id(question_id)
+        question_ref = self.database.collection("questions").document(question_id)
+        key_ref = self.database.collection("questionAnswerKeys").document(question_id)
+
+        @firestore.transactional
+        def open_or_create(transaction: Any) -> dict[str, Any]:
+            question_snapshot = _transaction_snapshot(transaction, question_ref) or _MissingSnapshot()
+            key_snapshot = _transaction_snapshot(transaction, key_ref) or _MissingSnapshot()
+            question = question_snapshot.to_dict() if question_snapshot.exists else {}
+            key = key_snapshot.to_dict() if key_snapshot.exists else {}
+            content_version = question.get("contentVersion")
+            if (
+                not question_snapshot.exists
+                or question.get("isActive") is not True
+                or not isinstance(content_version, str)
+                or not content_version
+            ):
+                raise ForumRuntimeError(
+                    "failed-precondition", "The linked question source is not active.",
+                )
+            if (
+                not key_snapshot.exists
+                or key.get("questionId") != question_id
+                or key.get("contentVersion") != content_version
+                or key.get("isActive") is not True
+            ):
+                raise ForumRuntimeError(
+                    "failed-precondition",
+                    "The linked question answer key is incompatible.",
+                )
+            answer_index = key.get("answerIndex")
+            options = question.get("options")
+            options_bm = question.get("optionsBm")
+            if (
+                isinstance(answer_index, bool)
+                or not isinstance(answer_index, int)
+                or answer_index < 0
+                or answer_index >= LINKED_OPTION_COUNT
+                or not isinstance(options, list)
+                or len(options) != LINKED_OPTION_COUNT
+                or any(
+                    not isinstance(option, str) or not option.strip()
+                    for option in options
+                )
+                or not isinstance(options_bm, list)
+                or len(options_bm) != LINKED_OPTION_COUNT
+                or any(
+                    not isinstance(option, str) or not option.strip()
+                    for option in options_bm
+                )
+            ):
+                raise ForumRuntimeError(
+                    "failed-precondition",
+                    "The linked question source has invalid options.",
+                )
+            prompt = question.get("questionText")
+            prompt_bm = question.get("questionTextBm")
+            if not isinstance(prompt, str) or not prompt.strip():
+                raise ForumRuntimeError(
+                    "failed-precondition",
+                    "The linked question source is missing its prompt.",
+                )
+            if not isinstance(prompt_bm, str) or not prompt_bm.strip():
+                raise ForumRuntimeError(
+                    "failed-precondition",
+                    "The linked question source is missing its Bahasa Melayu prompt.",
+                )
+            discussion_id = _linked_discussion_id(question_id, content_version)
+            discussion_ref = self.database.collection("forumQuestions").document(
+                discussion_id
+            )
+            existing = _transaction_snapshot(transaction, discussion_ref) or _MissingSnapshot()
+            if existing.exists:
+                existing_data = existing.to_dict()
+                if existing_data.get("mode") != FORUM_MODE_LINKED:
+                    raise ForumRuntimeError(
+                        "already-exists",
+                        "The canonical linked discussion ID collides with an existing forum question.",
+                    )
+                snapshot = existing_data.get("promptSnapshot") or {}
+                return {
+                    "discussionId": discussion_id,
+                    "sourceQuestionId": question_id,
+                    "sourceContentVersion": content_version,
+                    "promptSnapshot": snapshot,
+                    "title": existing_data.get("title", prompt.strip()),
+                    "text": existing_data.get("text", prompt.strip()),
+                    "createdAt": existing_data.get("createdAt"),
+                    "created": False,
+                }
+            clean_prompt = prompt.strip()
+            clean_prompt_bm = prompt_bm.strip()
+            snapshot = {
+                "questionText": clean_prompt,
+                "questionTextBm": clean_prompt_bm,
+                "options": [option.strip() for option in options],
+                "optionsBm": [option.strip() for option in options_bm],
+            }
+            transaction.set(discussion_ref, {
+                "mode": FORUM_MODE_LINKED,
+                "sourceQuestionId": question_id,
+                "sourceContentVersion": content_version,
+                "promptSnapshot": snapshot,
+                "title": clean_prompt[:140],
+                "text": clean_prompt,
+                "createdAt": now,
+                "updatedAt": now,
+            })
+            return {
+                "discussionId": discussion_id,
+                "sourceQuestionId": question_id,
+                "sourceContentVersion": content_version,
+                "promptSnapshot": snapshot,
+                "title": clean_prompt[:140],
+                "text": clean_prompt,
+                "createdAt": now,
+                "created": True,
+            }
+
+        return open_or_create(self.database.transaction())
+
+    def submit_linked_answer(
+        self,
+        *,
+        discussion_id: str,
+        selected_option: Any,
+        explanation: str,
+        actor_id: str,
+        now: datetime,
+    ) -> dict[str, Any]:
+        discussion_id = _document_id(discussion_id)
+        selected_option = self._validate_linked_option(selected_option)
+        clean_explanation = self._validate_linked_explanation(explanation)
+        discussion_ref = self.database.collection("forumQuestions").document(
+            discussion_id
+        )
+
+        @firestore.transactional
+        def submit(transaction: Any) -> dict[str, Any]:
+            discussion = _transaction_snapshot(transaction, discussion_ref) or _MissingSnapshot()
+            if not discussion.exists:
+                raise ForumRuntimeError("not-found", "Linked discussion not found.")
+            if discussion.to_dict().get("mode") != FORUM_MODE_LINKED:
+                raise ForumRuntimeError(
+                    "failed-precondition",
+                    "Only linked discussions accept structured answers.",
+                )
+            answer_ref = self.database.collection("forumAnswers").document()
+            transaction.set(answer_ref, {
+                "questionId": discussion_id,
+                "authorId": actor_id,
+                "mode": FORUM_MODE_LINKED,
+                "selectedOption": selected_option,
+                "explanation": clean_explanation,
+                "revision": 1,
+                "aiPublicState": FORUM_PUBLIC_STATE_NONE,
+                "createdAt": now,
+                "updatedAt": now,
+            })
+            return {
+                "answerId": answer_ref.id,
+                "questionId": discussion_id,
+                "revision": 1,
+            }
+
+        return submit(self.database.transaction())
+
+    def edit_linked_answer(
+        self,
+        *,
+        answer_id: str,
+        selected_option: Any,
+        explanation: str,
+        actor_id: str,
+        now: datetime,
+    ) -> dict[str, Any]:
+        answer_id = _document_id(answer_id)
+        selected_option = self._validate_linked_option(selected_option)
+        clean_explanation = self._validate_linked_explanation(explanation)
+        answer_ref = self.database.collection("forumAnswers").document(answer_id)
+
+        @firestore.transactional
+        def edit(transaction: Any) -> dict[str, Any]:
+            answer = _transaction_snapshot(transaction, answer_ref) or _MissingSnapshot()
+            if not answer.exists:
+                raise ForumRuntimeError("not-found", "Answer not found.")
+            data = answer.to_dict()
+            if data.get("mode") != FORUM_MODE_LINKED:
+                raise ForumRuntimeError(
+                    "failed-precondition",
+                    "Only linked answers can be edited with structured fields.",
+                )
+            if data.get("authorId") != actor_id:
+                raise ForumRuntimeError(
+                    "permission-denied", "Only the answer author may edit this answer.",
+                )
+            if data.get("acceptedAt") is not None:
+                raise ForumRuntimeError(
+                    "failed-precondition", "An accepted answer cannot be edited.",
+                )
+            current_revision = data.get("revision", 1)
+            if isinstance(current_revision, bool) or not isinstance(current_revision, int):
+                current_revision = 1
+            revision = current_revision + 1
+            transaction.update(answer_ref, {
+                "selectedOption": selected_option,
+                "explanation": clean_explanation,
+                "revision": revision,
+                "aiPublicState": FORUM_PUBLIC_STATE_NONE,
+                "aiRunId": None,
+                "aiRevision": None,
+                "updatedAt": now,
+            })
+            feedback_ref = self.database.collection(
+                FORUM_PRIVATE_FEEDBACK_COLLECTION
+            ).document(answer_id)
+            transaction.set(feedback_ref, {
+                "answerId": answer_id,
+                "state": "pending",
+                "label": "uncertain",
+                "message": "Your revised answer is being reviewed.",
+                "revision": revision,
+                "updatedAt": now,
+            })
+            return {"answerId": answer_id, "revision": revision}
+
+        return edit(self.database.transaction())
+
+    @staticmethod
+    def _validate_linked_option(selected_option: Any) -> int:
+        if (
+            isinstance(selected_option, bool)
+            or not isinstance(selected_option, int)
+            or selected_option < 0
+            or selected_option >= LINKED_OPTION_COUNT
+        ):
+            raise ForumRuntimeError(
+                "invalid-argument",
+                "Linked answer option must be an integer between 0 and 3.",
+            )
+        return selected_option
+
+    @staticmethod
+    def _validate_linked_explanation(explanation: Any) -> str:
+        clean = explanation.strip() if isinstance(explanation, str) else ""
+        if (
+            len(clean) < FORUM_LINKED_EXPLANATION_MIN_LENGTH
+            or len(clean) > FORUM_LINKED_EXPLANATION_MAX_LENGTH
+        ):
+            raise ForumRuntimeError(
+                "invalid-argument",
+                "Linked answer explanation must be between 8 and 4000 characters.",
+            )
+        return clean
+
+    def _write_feedback_projections(
+        self,
+        transaction: Any,
+        answer_ref: Any,
+        *,
+        state: str,
+        prediction: Any,
+        revision: int,
+        logical_inference_id: str,
+    ) -> None:
+        """Write the public advisory projection and the author-only feedback."""
+        transaction.set(
+            answer_ref,
+            _public_answer_projection(
+                state=state,
+                logical_inference_id=logical_inference_id,
+                revision=revision,
+            ),
+            merge=True,
+        )
+        feedback_ref = self.database.collection(
+            FORUM_PRIVATE_FEEDBACK_COLLECTION
+        ).document(answer_ref.id)
+        transaction.set(
+            feedback_ref,
+            _feedback_payload(
+                state=state,
+                prediction=prediction,
+                revision=revision,
+                logical_inference_id=logical_inference_id,
+            ),
+            merge=True,
+        )
+
     def process_answer(
         self,
         answer_id: str,
@@ -443,7 +817,11 @@ class ForumRuntimeGateway:
         now = now or datetime.now(timezone.utc)
         audit_event_id = event_id or f"answer:{answer_id}"
         try:
-            text = _required(data, "text")
+            text = _answer_analysis_text(data)
+            if text is None:
+                raise ForumRuntimeError(
+                    "failed-precondition", "Forum answer text is invalid.",
+                )
             revision = data.get("revision", 1)
             if isinstance(revision, bool) or not isinstance(revision, int) or revision < 1:
                 raise ForumRuntimeError(
@@ -520,7 +898,7 @@ class ForumRuntimeGateway:
             current = answer_snapshot.to_dict() if answer_snapshot.exists else {}
             if (
                 current.get("revision", 1) != data.get("revision", 1)
-                or current.get("text") != data.get("text")
+                or _answer_analysis_text(current) != _answer_analysis_text(data)
             ):
                 return "superseded"
             transaction.set(job_ref, {
@@ -558,15 +936,28 @@ class ForumRuntimeGateway:
         def claim(transaction: Any) -> ForumAiClaim | str:
             answer_snapshot = _transaction_snapshot(transaction, answer_ref) or _MissingSnapshot()
             answer = answer_snapshot.to_dict() if answer_snapshot.exists else {}
-            current_text_hash = _forum_text_hash(answer.get("text"))
+            current_text_hash = _forum_text_hash(_answer_analysis_text(answer))
             if answer.get("revision", 1) != revision or current_text_hash != text_hash:
                 return "superseded"
             job_snapshot = _transaction_snapshot(transaction, job_ref) or _MissingSnapshot()
             job = job_snapshot.to_dict() if job_snapshot.exists else {}
             state = job.get("state")
             feedback = answer.get("aiFeedback")
-            feedback_state = feedback.get("state") if isinstance(feedback, Mapping) else None
-            feedback_revision = feedback.get("revision") if isinstance(feedback, Mapping) else None
+            private_ref = self.database.collection(
+                FORUM_PRIVATE_FEEDBACK_COLLECTION
+            ).document(answer_id)
+            private_snapshot = _transaction_snapshot(transaction, private_ref) or _MissingSnapshot()
+            private_feedback = private_snapshot.to_dict() if private_snapshot.exists else {}
+            feedback_state = (
+                feedback.get("state")
+                if isinstance(feedback, Mapping)
+                else private_feedback.get("state")
+            )
+            feedback_revision = (
+                feedback.get("revision")
+                if isinstance(feedback, Mapping)
+                else private_feedback.get("revision")
+            )
             legacy_terminal_feedback = (
                 not job.get("logicalInferenceId")
                 and state in {"completed", "fallback", "failed"}
@@ -596,12 +987,14 @@ class ForumRuntimeGateway:
                 state = str(run.get("resultState") or run.get("state") or "completed")
                 prediction = run.get("prediction")
                 if run.get("state") != "superseded":
-                    transaction.set(answer_ref, {"aiFeedback": _feedback_payload(
+                    self._write_feedback_projections(
+                        transaction,
+                        answer_ref,
                         state=state,
                         prediction=prediction,
                         revision=revision,
                         logical_inference_id=logical_inference_id,
-                    )}, merge=True)
+                    )
                 transaction.set(job_ref, {
                     "answerId": answer_id, "state": state,
                     "logicalInferenceId": logical_inference_id,
@@ -655,11 +1048,14 @@ class ForumRuntimeGateway:
                 "recoveredFromRun": False,
                 "updatedAt": firestore.SERVER_TIMESTAMP,
             }, merge=True)
-            transaction.set(answer_ref, {"aiFeedback": {
-                "state": "pending", "revision": revision,
-                "logicalInferenceId": logical_inference_id,
-                "updatedAt": firestore.SERVER_TIMESTAMP,
-            }}, merge=True)
+            self._write_feedback_projections(
+                transaction,
+                answer_ref,
+                state="pending",
+                prediction=None,
+                revision=revision,
+                logical_inference_id=logical_inference_id,
+            )
             return ForumAiClaim(
                 answer_id=answer_id,
                 logical_inference_id=logical_inference_id,
@@ -691,7 +1087,7 @@ class ForumRuntimeGateway:
             job_snapshot = _transaction_snapshot(transaction, job_ref) or _MissingSnapshot()
             answer = answer_snapshot.to_dict() if answer_snapshot.exists else {}
             job = job_snapshot.to_dict() if job_snapshot.exists else {}
-            current_text_hash = _forum_text_hash(answer.get("text"))
+            current_text_hash = _forum_text_hash(_answer_analysis_text(answer))
             compatible = (
                 job.get("state") == "processing"
                 and job.get("logicalInferenceId") == claim.logical_inference_id
@@ -726,12 +1122,14 @@ class ForumRuntimeGateway:
             })
             if not compatible:
                 return "superseded"
-            transaction.set(answer_ref, {"aiFeedback": _feedback_payload(
+            self._write_feedback_projections(
+                transaction,
+                answer_ref,
                 state=result_state,
                 prediction=prediction,
                 revision=claim.revision,
                 logical_inference_id=claim.logical_inference_id,
-            )}, merge=True)
+            )
             transaction.set(job_ref, {
                 "state": result_state,
                 "completedAt": firestore.SERVER_TIMESTAMP,
@@ -779,14 +1177,16 @@ class ForumRuntimeGateway:
             if (
                 state == "failed"
                 and answer.get("revision", 1) == claim.revision
-                and _forum_text_hash(answer.get("text")) == claim.text_hash
+                and _forum_text_hash(_answer_analysis_text(answer)) == claim.text_hash
             ):
-                transaction.set(answer_ref, {"aiFeedback": _feedback_payload(
+                self._write_feedback_projections(
+                    transaction,
+                    answer_ref,
                     state="fallback",
                     prediction=None,
                     revision=claim.revision,
                     logical_inference_id=claim.logical_inference_id,
-                )}, merge=True)
+                )
             return state
 
         return fail(self.database.transaction())

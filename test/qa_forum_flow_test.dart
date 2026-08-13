@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -65,6 +66,113 @@ void main() {
       const ForumAiStatusService().statusText(feedback, isBahasaMelayu: true),
       contains('Sila tambah langkah'),
     );
+  });
+
+  test('linked question model parses the server-owned source contract', () {
+    final question = ForumQuestion.fromFirestore('linked_q1_v1', {
+      'mode': 'linked',
+      'sourceQuestionId': 'bank_q1',
+      'sourceContentVersion': 'v1',
+      'title': 'Which numeral shows twenty thousand and four?',
+      'text': 'Which numeral shows twenty thousand and four?',
+      'promptSnapshot': {
+        'questionText': 'Which numeral shows twenty thousand and four?',
+        'questionTextBm': 'Angka manakah menunjukkan dua puluh ribu empat?',
+        'options': ['20 004', '24 000', '20 400', '20 040'],
+        'optionsBm': ['20 004', '24 000', '20 400', '20 040'],
+      },
+    });
+
+    expect(question.mode, 'linked');
+    expect(question.sourceQuestionId, 'bank_q1');
+    expect(question.sourceContentVersion, 'v1');
+    expect(question.prompt, 'Which numeral shows twenty thousand and four?');
+    expect(question.promptBm, 'Angka manakah menunjukkan dua puluh ribu empat?');
+    expect(question.options, hasLength(4));
+    expect(question.optionsBm, hasLength(4));
+  });
+
+  test('linked answer model parses structured fields and public projection', () {
+    final answer = ForumAnswer.fromFirestore('linked_a1', {
+      'questionId': 'linked_q1_v1',
+      'authorId': 'student-a',
+      'mode': 'linked',
+      'selectedOption': 2,
+      'explanation': 'I added the thousands and compared the digits.',
+      'revision': 2,
+      'aiPublicState': 'none',
+      'aiRunId': 'opaque-run-id',
+      'aiRevision': 2,
+    });
+
+    expect(answer.mode, 'linked');
+    expect(answer.selectedOption, 2);
+    expect(answer.explanation, 'I added the thousands and compared the digits.');
+    expect(answer.aiPublicState, 'none');
+    expect(answer.aiRunId, 'opaque-run-id');
+    expect(answer.aiRevision, 2);
+  });
+
+  test('repository routes linked discussion and answer callables', () async {
+    final functions = _FakeFunctions({
+      'openOrCreateForumDiscussion': {
+        'discussionId': 'linked_bank_q1_v1',
+        'sourceQuestionId': 'bank_q1',
+        'sourceContentVersion': 'v1',
+        'promptSnapshot': {
+          'questionText': 'Which numeral shows twenty thousand and four?',
+          'options': ['20 004', '24 000', '20 400', '20 040'],
+        },
+        'created': true,
+      },
+      'submitLinkedForumAnswer': {
+        'answerId': 'linked_a1',
+        'questionId': 'linked_bank_q1_v1',
+        'revision': 1,
+      },
+      'editLinkedForumAnswer': {
+        'answerId': 'linked_a1',
+        'revision': 2,
+      },
+    });
+    final repository = CollaborationRepository(
+      firestore: _FakeFirestore(),
+      functions: functions,
+    );
+
+    final discussion = await repository.openOrCreateLinkedDiscussion(
+      questionId: 'bank_q1',
+    );
+    expect(discussion.id, 'linked_bank_q1_v1');
+    expect(discussion.created, isTrue);
+    expect(discussion.options, hasLength(4));
+    expect(functions.calls['openOrCreateForumDiscussion'], {
+      'questionId': 'bank_q1',
+    });
+
+    final answerId = await repository.submitLinkedAnswer(
+      discussionId: 'linked_bank_q1_v1',
+      selectedOption: 1,
+      explanation: '  I compared each option with the question.  ',
+    );
+    expect(answerId, 'linked_a1');
+    expect(functions.calls['submitLinkedForumAnswer'], {
+      'discussionId': 'linked_bank_q1_v1',
+      'selectedOption': 1,
+      'explanation': 'I compared each option with the question.',
+    });
+
+    final revision = await repository.editLinkedAnswer(
+      answerId: 'linked_a1',
+      selectedOption: 2,
+      explanation: 'I checked by adding back the group.',
+    );
+    expect(revision, 2);
+    expect(functions.calls['editLinkedForumAnswer'], {
+      'answerId': 'linked_a1',
+      'selectedOption': 2,
+      'explanation': 'I checked by adding back the group.',
+    });
   });
 
   testWidgets('forum shows loading, empty, filter, and clear-filter states', (
@@ -467,4 +575,51 @@ class _ActionRepository implements CollaborationRepository {
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _FakeFirestore implements FirebaseFirestore {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _FakeFunctions implements FirebaseFunctions {
+  _FakeFunctions(this.results);
+
+  final Map<String, Map<String, dynamic>> results;
+  final Map<String, Map<String, dynamic>> calls = {};
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) {
+    if (invocation.memberName == #httpsCallable) {
+      final name = invocation.positionalArguments.first as String;
+      return _FakeHttpsCallable((parameters) async {
+        calls[name] = Map<String, dynamic>.from(parameters);
+        return _FakeHttpsCallableResult(results[name] ?? {});
+      });
+    }
+    return super.noSuchMethod(invocation);
+  }
+}
+
+class _FakeHttpsCallable implements HttpsCallable {
+  _FakeHttpsCallable(this._handler);
+
+  final Future<_FakeHttpsCallableResult> Function(Map<String, dynamic>)
+  _handler;
+
+  @override
+  Future<HttpsCallableResult<T>> call<T>([dynamic parameters]) async {
+    final result = await _handler(Map<String, dynamic>.from(parameters as Map));
+    return _FakeHttpsCallableResult<T>(result.data as T);
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _FakeHttpsCallableResult<T> implements HttpsCallableResult<T> {
+  _FakeHttpsCallableResult(this.data);
+
+  @override
+  final T data;
 }

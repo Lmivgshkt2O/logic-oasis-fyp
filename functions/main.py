@@ -1223,6 +1223,70 @@ def reportForumContent(request: https_fn.CallableRequest) -> dict[str, Any]:
     )
 
 
+def _open_or_create_linked_discussion(
+    data: dict[str, Any], student_id: str,
+) -> dict[str, Any]:
+    """Create or open the canonical linked discussion for a question-bank item.
+
+    The server accepts only the public question ID and derives the canonical
+    source identity and client-safe prompt/options snapshot itself.
+    """
+    return ForumRuntimeGateway(firestore_db()).open_or_create_linked_discussion(
+        question_id=_string(data, "questionId"),
+        actor_id=student_id,
+        now=datetime.now(timezone.utc),
+    )
+
+
+def _submit_linked_forum_answer(
+    data: dict[str, Any], student_id: str,
+) -> dict[str, Any]:
+    return ForumRuntimeGateway(firestore_db()).submit_linked_answer(
+        discussion_id=_string(data, "discussionId"),
+        selected_option=_int(data, "selectedOption"),
+        explanation=_string(data, "explanation"),
+        actor_id=student_id,
+        now=datetime.now(timezone.utc),
+    )
+
+
+def _edit_linked_forum_answer(
+    data: dict[str, Any], student_id: str,
+) -> dict[str, Any]:
+    return ForumRuntimeGateway(firestore_db()).edit_linked_answer(
+        answer_id=_string(data, "answerId"),
+        selected_option=_int(data, "selectedOption"),
+        explanation=_string(data, "explanation"),
+        actor_id=student_id,
+        now=datetime.now(timezone.utc),
+    )
+
+
+@https_fn.on_call(region=FUNCTION_REGION, service_account=FORUM_RUNTIME_SERVICE_ACCOUNT)
+def openOrCreateForumDiscussion(request: https_fn.CallableRequest) -> dict[str, Any]:
+    return _forum_call(
+        lambda student_id: _open_or_create_linked_discussion(
+            _data(request), student_id,
+        ), request,
+    )
+
+
+@https_fn.on_call(region=FUNCTION_REGION, service_account=FORUM_RUNTIME_SERVICE_ACCOUNT)
+def submitLinkedForumAnswer(request: https_fn.CallableRequest) -> dict[str, Any]:
+    return _forum_call(
+        lambda student_id: _submit_linked_forum_answer(_data(request), student_id),
+        request,
+    )
+
+
+@https_fn.on_call(region=FUNCTION_REGION, service_account=FORUM_RUNTIME_SERVICE_ACCOUNT)
+def editLinkedForumAnswer(request: https_fn.CallableRequest) -> dict[str, Any]:
+    return _forum_call(
+        lambda student_id: _edit_linked_forum_answer(_data(request), student_id),
+        request,
+    )
+
+
 @https_fn.on_call(region=FUNCTION_REGION)
 def startQuizSession(request: https_fn.CallableRequest) -> dict[str, Any]:
     return _call(start_quiz_session, request)
@@ -1528,6 +1592,8 @@ def _forum_answer_needs_reprocessing(
     return (
         before.get("revision") != after.get("revision")
         or before.get("text") != after.get("text")
+        or before.get("selectedOption") != after.get("selectedOption")
+        or before.get("explanation") != after.get("explanation")
     )
 
 

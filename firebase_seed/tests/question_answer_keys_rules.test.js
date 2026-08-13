@@ -117,6 +117,29 @@ async function main() {
         },
         createdAt: new Date(), updatedAt: new Date(),
       });
+      await setDoc(doc(adminDb, "forumQuestions", "linked_forum_q1_v1"), {
+        mode: "linked", sourceQuestionId: "safe_q1", sourceContentVersion: "v1",
+        promptSnapshot: {
+          questionText: "Which option is correct?", options: ["A", "B", "C", "D"],
+        },
+        title: "Which option is correct?", text: "Which option is correct?",
+        createdAt: new Date(), updatedAt: new Date(),
+      });
+      await setDoc(doc(adminDb, "forumAnswers", "forum_linked_a1"), {
+        questionId: "linked_forum_q1_v1", authorId: "student_other", mode: "linked",
+        selectedOption: 1, explanation: "I compared each option with the question.",
+        revision: 1, aiPublicState: "none", createdAt: new Date(), updatedAt: new Date(),
+      });
+      await setDoc(doc(adminDb, "forumAiFeedback", "forum_a1"), {
+        answerId: "forum_a1", state: "completed", label: "needs_reasoning",
+        message: "Private author-only guidance.", probability: 0.74, revision: 1,
+        logicalInferenceId: "run-private", updatedAt: new Date(),
+      });
+      await setDoc(doc(adminDb, "forumAiFeedback", "forum_linked_a1"), {
+        answerId: "forum_linked_a1", state: "completed", label: "sufficient_reasoning",
+        message: "Private linked guidance.", probability: 0.9, revision: 1,
+        logicalInferenceId: "run-private-linked", updatedAt: new Date(),
+      });
       await setDoc(doc(adminDb, "forumReports", "student_other_question_forum_q1"), {
         reporterId: "student_other", targetType: "question", targetId: "forum_q1",
         reason: "This needs review.", status: "active", reviewState: "pending",
@@ -261,6 +284,39 @@ async function main() {
     await assertFails(getDoc(doc(linkedParentDb, "forumReports", "student_other_question_forum_q1")));
     await assertFails(getDoc(doc(linkedParentDb, "forumBlocks", "student_other_student_aiman_y4")));
     await assertFails(getDoc(doc(studentDb, "forumAiJobs", "forum_a1")));
+    await assertFails(getDoc(doc(studentDb, "forumAiFeedback", "forum_a1")));
+    await assertFails(getDoc(doc(otherStudentDb, "forumAiFeedback", "forum_a1")));
+    await assertFails(getDoc(doc(linkedParentDb, "forumAiFeedback", "forum_a1")));
+    await assertFails(getDoc(doc(studentDb, "forumAiFeedback", "forum_linked_a1")));
+    await assertFails(getDoc(doc(studentDb, "forumAiFeedback", "guessed-private-id")));
+    await assertFails(getDocs(collection(studentDb, "forumAiFeedback")));
+    await assertFails(setDoc(doc(studentDb, "forumAiFeedback", "forum_a1"), {
+      state: "pending", revision: 2, updatedAt: serverTimestamp(),
+    }));
+    await assertFails(setDoc(doc(studentDb, "forumQuestions", "linked_forum_q1_v1"), {
+      mode: "linked", sourceQuestionId: "safe_q1", sourceContentVersion: "v1",
+      promptSnapshot: {}, title: "Forged canonical thread", text: "Forged thread",
+      createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+    }));
+    await assertFails(updateDoc(doc(studentDb, "forumQuestions", "linked_forum_q1_v1"), {
+      title: "Changed canonical title", updatedAt: serverTimestamp(),
+    }));
+    await assertFails(setDoc(doc(studentDb, "forumAnswers", "forum_linked_a2"), {
+      questionId: "linked_forum_q1_v1", authorId: "student_aiman_y4", mode: "linked",
+      selectedOption: 0, explanation: "A forged structured answer.", revision: 1,
+      createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+    }));
+    await assertFails(updateDoc(doc(studentDb, "forumAnswers", "forum_linked_a1"), {
+      text: "A direct linked edit must fail.", revision: 2,
+      aiFeedback: { state: "pending", label: "uncertain", message: "Pending.", revision: 2 },
+      updatedAt: serverTimestamp(),
+    }));
+    await assertFails(updateDoc(doc(studentDb, "forumAnswers", "forum_linked_a1"), {
+      selectedOption: 2, explanation: "A forged structured edit.",
+      revision: 2, updatedAt: serverTimestamp(),
+    }));
+    await assertSucceeds(getDoc(doc(studentDb, "forumAnswers", "forum_linked_a1")));
+    await assertSucceeds(getDoc(doc(otherStudentDb, "forumAnswers", "forum_linked_a1")));
     await assertSucceeds(setDoc(doc(studentDb, "forumQuestions", "forum_q2"), {
       authorId: "student_aiman_y4", title: "How can I check this answer?",
       text: "I tried grouping the numbers and need help checking it.",

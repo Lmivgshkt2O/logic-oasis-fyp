@@ -188,6 +188,7 @@ service cloud.firestore {
         request.resource.data.createdAt == request.time &&
         request.resource.data.updatedAt == request.time;
       allow update: if isStudent() && resource.data.authorId == request.auth.uid &&
+        resource.data.get('mode', 'free_form') == 'free_form' &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'title', 'text', 'updatedAt'
         ]) && request.resource.data.title is string &&
@@ -200,6 +201,7 @@ service cloud.firestore {
     match /forumAnswers/{answerId} {
       allow read: if isStudent();
       allow create: if isStudent() &&
+        request.resource.data.get('mode', 'free_form') == 'free_form' &&
         request.resource.data.keys().hasOnly([
           'questionId', 'authorId', 'text', 'createdAt', 'updatedAt', 'revision'
         ]) && request.resource.data.authorId == request.auth.uid &&
@@ -211,8 +213,10 @@ service cloud.firestore {
         request.resource.data.createdAt == request.time &&
         request.resource.data.updatedAt == request.time;
       // A learner may revise only their text. AI feedback and acceptance are
-      // server-owned fields and cannot be forged from Flutter.
+      // server-owned fields and cannot be forged from Flutter. Linked answers
+      // carry structured fields and are mutated only by server callables.
       allow update: if isStudent() && resource.data.authorId == request.auth.uid &&
+        resource.data.get('mode', 'free_form') == 'free_form' &&
         resource.data.get('acceptedAt', null) == null &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'text', 'updatedAt', 'revision', 'aiFeedback'
@@ -257,6 +261,13 @@ service cloud.firestore {
     }
 
     match /forumAiJobs/{answerId} {
+      allow read, write: if false;
+    }
+
+    // Author-only AI guidance projection. Correctness details, reasoning
+    // guidance, probabilities, thresholds, and component diagnostics are
+    // never a peer, parent, or raw client read surface.
+    match /forumAiFeedback/{answerId} {
       allow read, write: if false;
     }
 

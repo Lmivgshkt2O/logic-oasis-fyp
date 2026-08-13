@@ -106,6 +106,52 @@ class CollaborationRepository {
     'updatedAt': FieldValue.serverTimestamp(),
   });
 
+  /// Create or open the canonical linked discussion for a question-bank item.
+  /// Only the public question ID is sent; the server derives source identity,
+  /// active-version eligibility, and the client-safe prompt/options snapshot.
+  Future<LinkedDiscussion> openOrCreateLinkedDiscussion({
+    required String questionId,
+  }) async {
+    final result = await _functions
+        .httpsCallable('openOrCreateForumDiscussion')
+        .call({'questionId': questionId});
+    return LinkedDiscussion.fromCallableResult(
+      Map<String, dynamic>.from(result.data as Map),
+    );
+  }
+
+  Future<String> submitLinkedAnswer({
+    required String discussionId,
+    required int selectedOption,
+    required String explanation,
+  }) async {
+    final result = await _functions
+        .httpsCallable('submitLinkedForumAnswer')
+        .call({
+          'discussionId': discussionId,
+          'selectedOption': selectedOption,
+          'explanation': explanation.trim(),
+        });
+    final data = Map<String, dynamic>.from(result.data as Map);
+    return data['answerId'] as String? ?? '';
+  }
+
+  Future<int> editLinkedAnswer({
+    required String answerId,
+    required int selectedOption,
+    required String explanation,
+  }) async {
+    final result = await _functions
+        .httpsCallable('editLinkedForumAnswer')
+        .call({
+          'answerId': answerId,
+          'selectedOption': selectedOption,
+          'explanation': explanation.trim(),
+        });
+    final data = Map<String, dynamic>.from(result.data as Map);
+    return data['revision'] as int? ?? 1;
+  }
+
   Future<void> acceptAnswer(String answerId) => _functions
       .httpsCallable('acceptForumAnswer')
       .call({'answerId': answerId});

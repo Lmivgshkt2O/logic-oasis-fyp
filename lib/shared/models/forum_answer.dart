@@ -40,6 +40,12 @@ class ForumAnswer {
     this.createdAt,
     this.acceptedAt,
     this.revision = 1,
+    this.mode = 'free_form',
+    this.selectedOption,
+    this.explanation,
+    this.aiPublicState = 'none',
+    this.aiRunId,
+    this.aiRevision,
   });
 
   final String id;
@@ -50,18 +56,33 @@ class ForumAnswer {
   final DateTime? createdAt;
   final DateTime? acceptedAt;
   final int revision;
+  final String mode;
+  final int? selectedOption;
+  final String? explanation;
+  final String aiPublicState;
+  final String? aiRunId;
+  final int? aiRevision;
 
-  factory ForumAnswer.fromFirestore(String id, Map<String, dynamic> data) =>
-      ForumAnswer(
-        id: id,
-        questionId: data['questionId'] as String? ?? '',
-        authorId: data['authorId'] as String? ?? '',
-        text: data['text'] as String? ?? '',
-        feedback: ForumAnswerFeedback.fromFirestore(
-          data['aiFeedback'] as Map<String, dynamic>?,
-        ),
-        createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
-        acceptedAt: (data['acceptedAt'] as Timestamp?)?.toDate(),
-        revision: data['revision'] as int? ?? 1,
-      );
+  factory ForumAnswer.fromFirestore(String id, Map<String, dynamic> data) {
+    final rawOption = data['selectedOption'];
+    final rawAiRevision = data['aiRevision'];
+    return ForumAnswer(
+      id: id,
+      questionId: data['questionId'] as String? ?? '',
+      authorId: data['authorId'] as String? ?? '',
+      text: data['text'] as String? ?? '',
+      feedback: ForumAnswerFeedback.fromFirestore(
+        data['aiFeedback'] as Map<String, dynamic>?,
+      ),
+      createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
+      acceptedAt: (data['acceptedAt'] as Timestamp?)?.toDate(),
+      revision: data['revision'] as int? ?? 1,
+      mode: data['mode'] as String? ?? 'free_form',
+      selectedOption: rawOption is int ? rawOption : null,
+      explanation: data['explanation'] as String?,
+      aiPublicState: data['aiPublicState'] as String? ?? 'none',
+      aiRunId: data['aiRunId'] as String?,
+      aiRevision: rawAiRevision is int ? rawAiRevision : null,
+    );
+  }
 }

@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "functions"))
+sys.path.insert(0, str(ROOT / "functions/vendor"))
 
 from forum_runtime import (
     ForumAiClaim,
@@ -39,6 +40,7 @@ class _Reference:
         self.database = database
         self.collection = collection
         self.identifier = identifier
+        self.id = identifier
 
 
 class _Collection:
@@ -46,7 +48,12 @@ class _Collection:
         self.database = database
         self.name = name
 
-    def document(self, identifier):
+    def document(self, identifier=None):
+        if identifier is None:
+            self.database._auto_ids[self.name] = (
+                self.database._auto_ids.get(self.name, 0) + 1
+            )
+            identifier = f"auto_{self.database._auto_ids[self.name]}"
         return _Reference(self.database, self.name, identifier)
 
     def where(self, field, operator, value):
@@ -100,12 +107,33 @@ class _Transaction:
 class _Database:
     def __init__(self, rows):
         self.rows = rows
+        self._auto_ids = {}
 
     def collection(self, name):
         return _Collection(self, name)
 
     def transaction(self):
         return _Transaction(self)
+
+
+def _linked_source(question_id="bank_q1", version="v1"):
+    return {
+        ("questions", question_id): {
+            "questionId": question_id,
+            "questionText": "Which numeral shows twenty thousand and four?",
+            "questionTextBm": "Angka manakah menunjukkan dua puluh ribu empat?",
+            "options": ["20 004", "24 000", "20 400", "20 040"],
+            "optionsBm": ["20 004", "24 000", "20 400", "20 040"],
+            "contentVersion": version,
+            "isActive": True,
+        },
+        ("questionAnswerKeys", question_id): {
+            "questionId": question_id,
+            "contentVersion": version,
+            "isActive": True,
+            "answerIndex": 0,
+        },
+    }
 
 
 class ForumRuntimeTests(unittest.TestCase):
@@ -301,7 +329,10 @@ class ForumRuntimeTests(unittest.TestCase):
             )
 
         self.assertEqual("fallback", database.rows[("forumAiJobs", "a1")]["state"])
-        self.assertEqual("fallback", database.rows[("forumAnswers", "a1")]["aiFeedback"]["state"])
+        self.assertEqual("fallback", database.rows[("forumAiFeedback", "a1")]["state"])
+        self.assertEqual("none", database.rows[("forumAnswers", "a1")]["aiPublicState"])
+        self.assertNotIn("message", database.rows[("forumAnswers", "a1")])
+        self.assertNotIn("probability", database.rows[("forumAnswers", "a1")])
         runs = [
             (key, value) for key, value in database.rows.items()
             if key[0] == "forumAiRuns"
@@ -438,7 +469,7 @@ class ForumRuntimeTests(unittest.TestCase):
             )
 
         self.assertEqual("completed", database.rows[("forumAiRuns", logical_id)]["state"])
-        self.assertEqual("completed", database.rows[("forumAnswers", "a1")]["aiFeedback"]["state"])
+        self.assertEqual("completed", database.rows[("forumAiFeedback", "a1")]["state"])
 
     def test_out_of_order_old_revision_does_not_replace_new_terminal_job_or_feedback(self):
         now = datetime(2026, 8, 3, tzinfo=timezone.utc)
@@ -456,13 +487,15 @@ class ForumRuntimeTests(unittest.TestCase):
                 "a1", current, classifier, event_id="new", now=now,
             ))
             new_job = dict(database.rows[("forumAiJobs", "a1")])
-            new_feedback = dict(database.rows[("forumAnswers", "a1")]["aiFeedback"])
+            new_public = dict(database.rows[("forumAnswers", "a1")])
+            new_feedback = dict(database.rows[("forumAiFeedback", "a1")])
             self.assertEqual("superseded", gateway.process_answer(
                 "a1", old, classifier, event_id="old", now=now + timedelta(seconds=1),
             ))
 
         self.assertEqual(new_job, database.rows[("forumAiJobs", "a1")])
-        self.assertEqual(new_feedback, database.rows[("forumAnswers", "a1")]["aiFeedback"])
+        self.assertEqual(new_public, database.rows[("forumAnswers", "a1")])
+        self.assertEqual(new_feedback, database.rows[("forumAiFeedback", "a1")])
 
     def test_immutable_run_repairs_terminal_job_and_feedback_after_partial_failure(self):
         now = datetime(2026, 8, 3, tzinfo=timezone.utc)
@@ -494,7 +527,7 @@ class ForumRuntimeTests(unittest.TestCase):
 
         self.assertEqual("completed", state)
         self.assertEqual("completed", database.rows[("forumAiJobs", "a1")]["state"])
-        self.assertEqual("completed", database.rows[("forumAnswers", "a1")]["aiFeedback"]["state"])
+        self.assertEqual("completed", database.rows[("forumAiFeedback", "a1")]["state"])
 
     def test_transient_failure_is_bounded_and_permanent_failure_terminates(self):
         now = datetime(2026, 8, 3, tzinfo=timezone.utc)
@@ -520,7 +553,8 @@ class ForumRuntimeTests(unittest.TestCase):
             )
         self.assertEqual("failed", state)
         self.assertEqual("attempts_exhausted", database.rows[("forumAiJobs", "a1")]["failureType"])
-        self.assertEqual("fallback", database.rows[("forumAnswers", "a1")]["aiFeedback"]["state"])
+        self.assertEqual("fallback", database.rows[("forumAiFeedback", "a1")]["state"])
+        self.assertEqual("none", database.rows[("forumAnswers", "a1")]["aiPublicState"])
 
         database = _Database({("forumAnswers", "a2"): dict(answer)})
         gateway = ForumRuntimeGateway(database)
@@ -535,7 +569,8 @@ class ForumRuntimeTests(unittest.TestCase):
                 "a2", answer, permanent, event_id="event-p", now=now,
             ))
         self.assertEqual("permanent", database.rows[("forumAiJobs", "a2")]["failureType"])
-        self.assertEqual("fallback", database.rows[("forumAnswers", "a2")]["aiFeedback"]["state"])
+        self.assertEqual("fallback", database.rows[("forumAiFeedback", "a2")]["state"])
+        self.assertEqual("none", database.rows[("forumAnswers", "a2")]["aiPublicState"])
     def test_reports_are_server_owned_deterministic_and_preserve_review_fields(self):
         now = datetime(2026, 8, 1, tzinfo=timezone.utc)
         later = datetime(2026, 8, 1, 1, tzinfo=timezone.utc)
@@ -797,7 +832,8 @@ class ForumRuntimeTests(unittest.TestCase):
             manifest.write_text(json.dumps(original), encoding="utf-8")
             sentinel = type("Classifier", (), {"model_version": original["modelVersion"]})()
             with patch(
-                "forum_runtime.ForumTextClassifier.load", return_value=sentinel,
+                "logic_oasis_ai.forum_ai.classifier.ForumTextClassifier.load",
+                return_value=sentinel,
             ) as valid_load:
                 self.assertIs(
                     sentinel,
@@ -822,7 +858,7 @@ class ForumRuntimeTests(unittest.TestCase):
                         "FORUM_MODEL_EVIDENCE_MODE": "controlled_demo",
                         "FORUM_RUNTIME_CODE_REVISION": original["codeRevision"],
                     }, clear=False), patch(
-                        "forum_runtime.ForumTextClassifier.load",
+                        "logic_oasis_ai.forum_ai.classifier.ForumTextClassifier.load",
                     ) as unsafe_load:
                         self.assertIsNone(
                             load_forum_classifier(
@@ -834,7 +870,7 @@ class ForumRuntimeTests(unittest.TestCase):
             vendored_classifier = root / "vendor/logic_oasis_ai/forum_ai/classifier.py"
             vendored_classifier.write_bytes(vendored_classifier.read_bytes() + b"\n# tampered\n")
             with patch(
-                "forum_runtime.ForumTextClassifier.load",
+                "logic_oasis_ai.forum_ai.classifier.ForumTextClassifier.load",
             ) as unsafe_load:
                 self.assertIsNone(
                     load_forum_classifier(
@@ -895,6 +931,321 @@ class ForumRuntimeTests(unittest.TestCase):
         }
         self.assertNotIn(answer["text"], json.dumps(ai_records, default=str))
         self.assertFalse(any("training" in key[0].casefold() or "dataset" in key[0].casefold() for key in database.rows))
+
+
+class ForumLinkedDiscussionTests(unittest.TestCase):
+    NOW = datetime(2026, 8, 11, 9, 0, tzinfo=timezone.utc)
+
+    def _gateway(self, rows):
+        return ForumRuntimeGateway(_Database(rows))
+
+    def test_open_or_create_linked_discussion_creates_one_canonical_thread(self):
+        now = self.NOW
+        database = _Database(_linked_source())
+        gateway = ForumRuntimeGateway(database)
+
+        with patch("forum_runtime.firestore.transactional", lambda function: function):
+            first = gateway.open_or_create_linked_discussion(
+                question_id="bank_q1", actor_id="student-a", now=now,
+            )
+            second = gateway.open_or_create_linked_discussion(
+                question_id="bank_q1", actor_id="student-b", now=now,
+            )
+
+        self.assertTrue(first["created"])
+        self.assertFalse(second["created"])
+        self.assertEqual(first["discussionId"], second["discussionId"])
+        self.assertEqual("linked_bank_q1_v1", first["discussionId"])
+        document = database.rows[("forumQuestions", "linked_bank_q1_v1")]
+        self.assertEqual("linked", document["mode"])
+        self.assertEqual("bank_q1", document["sourceQuestionId"])
+        self.assertEqual("v1", document["sourceContentVersion"])
+        self.assertEqual(4, len(document["promptSnapshot"]["options"]))
+        self.assertEqual(4, len(document["promptSnapshot"]["optionsBm"]))
+        self.assertNotIn("answerIndex", json.dumps(document, default=str))
+        self.assertNotIn("answerIndex", document["promptSnapshot"])
+        self.assertEqual("absent", document.get("authorId", "absent"))
+        self.assertEqual(1, sum(
+            key[0] == "forumQuestions" for key in database.rows
+        ))
+
+    def test_open_or_create_rejects_inactive_or_mismatched_sources(self):
+        now = self.NOW
+        mutations = (
+            (("questions", "bank_q1"), {"isActive": False}, "not active"),
+            (("questionAnswerKeys", "bank_q1"), {"isActive": False}, "incompatible"),
+            (("questionAnswerKeys", "bank_q1"), {"contentVersion": "v2"}, "incompatible"),
+            (("questionAnswerKeys", "bank_q1"), {"answerIndex": 4}, "invalid options"),
+            (("questionAnswerKeys", "bank_q1"), {"answerIndex": True}, "invalid options"),
+            (("questions", "bank_q1"), {"options": ["A", "B", "C"]}, "invalid options"),
+            (("questions", "bank_q1"), {"optionsBm": ["A", "B", "C", "D", "E"]}, "invalid options"),
+            (("questions", "bank_q1"), {"questionTextBm": ""}, "Bahasa Melayu"),
+        )
+        for key, mutation, expected in mutations:
+            with self.subTest(key=key, mutation=mutation):
+                source = _linked_source()
+                source[key].update(mutation)
+                gateway = self._gateway(source)
+                with patch("forum_runtime.firestore.transactional", lambda function: function):
+                    with self.assertRaisesRegex(ForumRuntimeError, expected):
+                        gateway.open_or_create_linked_discussion(
+                            question_id="bank_q1", actor_id="student-a", now=now,
+                        )
+                self.assertNotIn(("forumQuestions", "linked_bank_q1_v1"), gateway.database.rows)
+
+    def test_open_or_create_fails_closed_on_deterministic_id_collision(self):
+        now = self.NOW
+        rows = _linked_source()
+        rows[("forumQuestions", "linked_bank_q1_v1")] = {
+            "authorId": "student-x", "title": "A free-form question",
+            "text": "This doc already occupies the canonical linked ID.",
+        }
+        gateway = self._gateway(rows)
+
+        with patch("forum_runtime.firestore.transactional", lambda function: function):
+            with self.assertRaisesRegex(ForumRuntimeError, "collides"):
+                gateway.open_or_create_linked_discussion(
+                    question_id="bank_q1", actor_id="student-a", now=now,
+                )
+
+    def test_missing_question_or_key_fails_closed(self):
+        now = self.NOW
+        for rows in ({}, {("questions", "bank_q1"): _linked_source()["questions", "bank_q1"]}):
+            gateway = self._gateway(rows)
+            with patch("forum_runtime.firestore.transactional", lambda function: function):
+                with self.assertRaises(ForumRuntimeError):
+                    gateway.open_or_create_linked_discussion(
+                        question_id="bank_q1", actor_id="student-a", now=now,
+                    )
+
+    def test_submit_linked_answer_stores_only_server_owned_structured_fields(self):
+        now = self.NOW
+        database = _Database({
+            ("forumQuestions", "linked_bank_q1_v1"): {
+                "mode": "linked", "sourceQuestionId": "bank_q1",
+                "sourceContentVersion": "v1",
+            },
+        })
+        gateway = ForumRuntimeGateway(database)
+
+        with patch("forum_runtime.firestore.transactional", lambda function: function):
+            result = gateway.submit_linked_answer(
+                discussion_id="linked_bank_q1_v1", selected_option=2,
+                explanation="I added the thousands and compared the digits.",
+                actor_id="student-a", now=now,
+            )
+
+        self.assertEqual("linked_bank_q1_v1", result["questionId"])
+        self.assertEqual(1, result["revision"])
+        answer = next(value for key, value in database.rows.items() if key[0] == "forumAnswers")
+        self.assertEqual("linked", answer["mode"])
+        self.assertEqual(2, answer["selectedOption"])
+        self.assertEqual("student-a", answer["authorId"])
+        self.assertEqual("none", answer["aiPublicState"])
+        self.assertEqual(1, answer["revision"])
+        self.assertNotIn("text", answer)
+        self.assertNotIn("sourceQuestionId", answer)
+
+    def test_submit_linked_answer_validates_option_explanation_and_membership(self):
+        now = self.NOW
+        database = _Database({
+            ("forumQuestions", "linked_bank_q1_v1"): {"mode": "linked"},
+            ("forumQuestions", "free_q1"): {"mode": "free_form", "authorId": "student-a"},
+        })
+        gateway = ForumRuntimeGateway(database)
+
+        with patch("forum_runtime.firestore.transactional", lambda function: function):
+            for option in (-1, 4, True, "2", None):
+                with self.subTest(option=option):
+                    with self.assertRaisesRegex(ForumRuntimeError, "option"):
+                        gateway.submit_linked_answer(
+                            discussion_id="linked_bank_q1_v1", selected_option=option,
+                            explanation="I compared the digits carefully.", actor_id="student-a",
+                            now=now,
+                        )
+            for explanation in ("", "Short", "x" * 4001):
+                with self.subTest(explanation=explanation):
+                    with self.assertRaisesRegex(ForumRuntimeError, "explanation"):
+                        gateway.submit_linked_answer(
+                            discussion_id="linked_bank_q1_v1", selected_option=1,
+                            explanation=explanation, actor_id="student-a", now=now,
+                        )
+            with self.assertRaisesRegex(ForumRuntimeError, "not found"):
+                gateway.submit_linked_answer(
+                    discussion_id="missing", selected_option=1,
+                    explanation="I compared the digits carefully.", actor_id="student-a",
+                    now=now,
+                )
+            with self.assertRaisesRegex(ForumRuntimeError, "structured"):
+                gateway.submit_linked_answer(
+                    discussion_id="free_q1", selected_option=1,
+                    explanation="I compared the digits carefully.", actor_id="student-a",
+                    now=now,
+                )
+
+    def test_edit_linked_answer_increments_revision_and_clears_derived_state(self):
+        now = self.NOW
+        database = _Database({
+            ("forumQuestions", "linked_bank_q1_v1"): {"mode": "linked"},
+            ("forumAnswers", "a1"): {
+                "questionId": "linked_bank_q1_v1", "authorId": "student-a",
+                "mode": "linked", "selectedOption": 0, "explanation": "Old explanation.",
+                "revision": 2, "aiPublicState": "verified", "aiRunId": "run-1",
+                "aiRevision": 2,
+            },
+            ("forumAiFeedback", "a1"): {
+                "state": "completed", "label": "sufficient", "revision": 2,
+            },
+        })
+        gateway = ForumRuntimeGateway(database)
+
+        with patch("forum_runtime.firestore.transactional", lambda function: function):
+            result = gateway.edit_linked_answer(
+                answer_id="a1", selected_option=1,
+                explanation="I checked by adding back the group.", actor_id="student-a",
+                now=now,
+            )
+
+        self.assertEqual(3, result["revision"])
+        answer = database.rows[("forumAnswers", "a1")]
+        self.assertEqual(3, answer["revision"])
+        self.assertEqual(1, answer["selectedOption"])
+        self.assertEqual("none", answer["aiPublicState"])
+        self.assertIsNone(answer["aiRunId"])
+        self.assertIsNone(answer["aiRevision"])
+        feedback = database.rows[("forumAiFeedback", "a1")]
+        self.assertEqual("pending", feedback["state"])
+        self.assertEqual(3, feedback["revision"])
+
+    def test_edit_linked_answer_denies_foreign_accepted_missing_and_free_form(self):
+        now = self.NOW
+        base_answer = {
+            "questionId": "linked_bank_q1_v1", "authorId": "student-a",
+            "mode": "linked", "selectedOption": 0, "explanation": "I checked by adding back.",
+            "revision": 1,
+        }
+        database = _Database({
+            ("forumQuestions", "linked_bank_q1_v1"): {"mode": "linked"},
+            ("forumAnswers", "a1"): dict(base_answer),
+            ("forumAnswers", "accepted"): {**base_answer, "acceptedAt": now},
+            ("forumAnswers", "free"): {
+                "questionId": "free_q1", "authorId": "student-a", "text": "A free-form answer.",
+                "revision": 1,
+            },
+        })
+        gateway = ForumRuntimeGateway(database)
+
+        with patch("forum_runtime.firestore.transactional", lambda function: function):
+            with self.assertRaisesRegex(ForumRuntimeError, "author"):
+                gateway.edit_linked_answer(
+                    answer_id="a1", selected_option=1,
+                    explanation="A different explanation for the peer.", actor_id="student-b",
+                    now=now,
+                )
+            with self.assertRaisesRegex(ForumRuntimeError, "accepted answer"):
+                gateway.edit_linked_answer(
+                    answer_id="accepted", selected_option=1,
+                    explanation="A different explanation for the peer.", actor_id="student-a",
+                    now=now,
+                )
+            with self.assertRaisesRegex(ForumRuntimeError, "not found"):
+                gateway.edit_linked_answer(
+                    answer_id="missing", selected_option=1,
+                    explanation="A different explanation for the peer.", actor_id="student-a",
+                    now=now,
+                )
+            with self.assertRaisesRegex(ForumRuntimeError, "structured"):
+                gateway.edit_linked_answer(
+                    answer_id="free", selected_option=1,
+                    explanation="A different explanation for the peer.", actor_id="student-a",
+                    now=now,
+                )
+
+    def test_linked_question_creation_does_not_record_student_participation(self):
+        now = self.NOW
+        database = _Database({})
+        gateway = ForumRuntimeGateway(database)
+
+        with patch("forum_runtime.firestore.transactional", lambda function: function):
+            gateway.record_question("linked_bank_q1_v1", {"mode": "linked", "createdAt": now})
+
+        self.assertEqual({}, database.rows)
+
+    def test_linked_discussions_have_no_accept_owner_and_cannot_be_reported(self):
+        now = self.NOW
+        database = _Database({
+            ("forumQuestions", "linked_bank_q1_v1"): {"mode": "linked"},
+            ("forumAnswers", "a1"): {
+                "questionId": "linked_bank_q1_v1", "authorId": "student-a", "mode": "linked",
+            },
+        })
+        gateway = ForumRuntimeGateway(database)
+
+        with patch("forum_runtime.firestore.transactional", lambda function: function), patch.object(
+            gateway, "_record_participation"
+        ):
+            with self.assertRaisesRegex(ForumRuntimeError, "no question owner"):
+                gateway.accept_answer(
+                    answer_id="a1", actor_id="student-a", now=now,
+                )
+            with self.assertRaisesRegex(ForumRuntimeError, "cannot be reported"):
+                gateway.report_content(
+                    target_type="question", target_id="linked_bank_q1_v1",
+                    reason="This canonical thread is incorrect", actor_id="student-b",
+                    now=now,
+                )
+
+    def test_linked_answer_processing_uses_explanation_and_keeps_public_doc_clean(self):
+        now = self.NOW
+        answer = {
+            "authorId": "student-a", "questionId": "linked_bank_q1_v1",
+            "mode": "linked", "selectedOption": 0, "revision": 1,
+            "explanation": "I compared the digits from left to right.",
+        }
+        database = _Database({("forumAnswers", "a1"): dict(answer)})
+        gateway = ForumRuntimeGateway(database)
+
+        with patch("forum_runtime.firestore.transactional", lambda function: function):
+            state = gateway.process_answer(
+                "a1", answer, None, event_id="event-a", now=now,
+            )
+
+        self.assertEqual("fallback", state)
+        public_answer = database.rows[("forumAnswers", "a1")]
+        self.assertEqual("none", public_answer["aiPublicState"])
+        self.assertNotIn("message", public_answer)
+        self.assertNotIn("probability", public_answer)
+        self.assertNotIn("modelVersion", public_answer)
+        feedback = database.rows[("forumAiFeedback", "a1")]
+        self.assertEqual("fallback", feedback["state"])
+        self.assertIn("message", feedback)
+
+    def test_completed_processing_writes_private_feedback_and_public_projection(self):
+        now = self.NOW
+        answer = {"authorId": "student-a", "revision": 1, "text": "My checked steps."}
+        database = _Database({("forumAnswers", "a1"): dict(answer)})
+        gateway = ForumRuntimeGateway(database)
+        classifier = type("Classifier", (), {
+            "model_version": "model-v1",
+            "predict": lambda self, _text: ForumPrediction(SUFFICIENT, 0.9, "model-v1"),
+        })()
+
+        with patch("forum_runtime.firestore.transactional", lambda function: function):
+            self.assertEqual("completed", gateway.process_answer(
+                "a1", answer, classifier, event_id="event-a", now=now,
+            ))
+
+        public_answer = database.rows[("forumAnswers", "a1")]
+        self.assertEqual("none", public_answer["aiPublicState"])
+        self.assertEqual(1, public_answer["aiRevision"])
+        self.assertRegex(public_answer["aiRunId"], r"^[0-9a-f]{64}$")
+        for field in ("message", "probability", "modelVersion", "logicalInferenceId", "label"):
+            self.assertNotIn(field, public_answer)
+        feedback = database.rows[("forumAiFeedback", "a1")]
+        self.assertEqual("completed", feedback["state"])
+        self.assertEqual(SUFFICIENT, feedback["label"])
+        self.assertEqual(0.9, feedback["probability"])
+        self.assertEqual(public_answer["aiRunId"], feedback["logicalInferenceId"])
 
 
 if __name__ == "__main__":
