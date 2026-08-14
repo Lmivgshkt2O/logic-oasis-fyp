@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:logic_oasis/app/theme.dart';
+import 'package:logic_oasis/features/parent_dashboard/parent_dashboard_time.dart';
 import 'package:logic_oasis/l10n/app_localizations.dart';
 import 'package:logic_oasis/shared/models/ai_diagnosis.dart';
 import 'package:logic_oasis/shared/models/linked_child_context.dart';
@@ -692,27 +693,6 @@ class _AiDiagnosisDetails extends StatelessWidget {
       ),
     );
   }
-}
-
-String formatAiUpdatedAt(DateTime value) {
-  final malaysiaTime = _malaysiaTime(value);
-  final hour = malaysiaTime.hour;
-  final displayHour = hour == 0
-      ? 12
-      : hour > 12
-      ? hour - 12
-      : hour;
-  final minute = malaysiaTime.minute.toString().padLeft(2, '0');
-  final period = hour >= 12 ? 'PM' : 'AM';
-  return '${malaysiaTime.day}/${malaysiaTime.month}/${malaysiaTime.year} '
-      '$displayHour:$minute $period';
-}
-
-DateTime _malaysiaTime(DateTime value) {
-  if (value.isUtc) {
-    return value.add(const Duration(hours: 8));
-  }
-  return value.toUtc().add(const Duration(hours: 8));
 }
 
 class _ParentDashboardSafeStatusBanner extends StatelessWidget {
