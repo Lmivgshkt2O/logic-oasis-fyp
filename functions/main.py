@@ -62,6 +62,7 @@ from parent_link_invitation import (
     decline_parent_link_invitation,
     unlink_own_parent_link,
 )
+from parent_progress import ParentPracticeError, merge_practice_event
 from policy_evaluation import (
     POLICY_EVALUATION_ADMIN_SERVICE_ACCOUNT,
     PolicyEvaluationError,
@@ -949,6 +950,10 @@ def finalize_quiz_session(data: dict[str, Any], student_id: str) -> dict[str, An
     _reject_finalization_telemetry(data)
     database = firestore_db()
     session_ref = database.collection("quizSessions").document(session_id)
+    # Capture one trusted UTC instant before the transaction. Every retry
+    # reuses it so a retry across Malaysia Monday midnight cannot move the
+    # same completion into another week.
+    finalization_instant = datetime.now(timezone.utc)
 
     @firestore.transactional
     def finalize(transaction: firestore.Transaction) -> dict[str, Any]:
@@ -1149,6 +1154,25 @@ def finalize_quiz_session(data: dict[str, Any], student_id: str) -> dict[str, An
                 "updatedAt": firestore.SERVER_TIMESTAMP,
             },
         )
+        practice_ref = database.collection("parentPracticeSummaries").document(
+            student_id
+        )
+        practice_snapshot = practice_ref.get(transaction=transaction)
+        practice_data = (
+            dict(practice_snapshot.to_dict() or {})
+            if practice_snapshot.exists
+            else None
+        )
+        try:
+            practice_payload = merge_practice_event(
+                practice_data,
+                student_id=student_id,
+                event_instant=finalization_instant,
+                updated_at=firestore.SERVER_TIMESTAMP,
+            )
+        except ParentPracticeError as error:
+            raise QuizSessionError(error.code, str(error)) from error
+        transaction.set(practice_ref, practice_payload)
         transaction.update(session_ref, {"status": "finalized", "finalizedAt": firestore.SERVER_TIMESTAMP})
         return attempt
 

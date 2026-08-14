@@ -18,6 +18,7 @@ from uuid import uuid4
 from firebase_admin import firestore
 
 from parent_link_admin import link_document_id
+from parent_progress import ParentPracticeError, initialize_practice_week
 
 
 PARENT_INVITATION_SERVICE_ACCOUNT = (
@@ -264,6 +265,24 @@ def accept_parent_link_invitation(
         profile = dict(profile_snapshot.to_dict() or {}) if profile_snapshot.exists else None
         if profile and profile.get("role") != "parent":
             raise ParentInvitationError("permission-denied", "This account cannot be accepted as a parent account.")
+        practice_ref = database.collection("parentPracticeSummaries").document(student_id)
+        practice_snapshot = practice_ref.get(transaction=transaction)
+        practice_data = (
+            dict(practice_snapshot.to_dict() or {})
+            if practice_snapshot.exists
+            else None
+        )
+        try:
+            practice_init = initialize_practice_week(
+                practice_data,
+                student_id=student_id,
+                now=timestamp,
+                updated_at=timestamp,
+            )
+        except ParentPracticeError as error:
+            raise ParentInvitationError(error.code, str(error)) from error
+        if practice_init is not None:
+            transaction.set(practice_ref, practice_init)
         audit_ref = database.collection("parentLinkAudits").document(f"{invitation_id}_accepted")
         transaction.update(invitation_ref, {"status": "accepted", "acceptedBy": actor.uid, "acceptedAt": timestamp, "updatedAt": timestamp})
         transaction.create(link_ref, {"parentId": actor.uid, "studentId": student_id, "status": "active", "linkVersion": 1, "createdAt": timestamp, "linkedBy": "parent_invitation", "invitationId": invitation_id, "updatedAt": timestamp})

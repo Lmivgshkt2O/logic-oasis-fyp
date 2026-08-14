@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from typing import Any, Callable, Mapping
 
 from firebase_admin import auth, firestore
+from parent_progress import ParentPracticeError, initialize_practice_week
 
 
 PARENT_LINK_ADMIN_SERVICE_ACCOUNT = (
@@ -130,6 +131,26 @@ def manage_parent_link(
                 "failed-precondition",
                 "A revoked link requires a new supervisor-approved administration request.",
             )
+        practice_ref = database.collection("parentPracticeSummaries").document(
+            student_id
+        )
+        practice_snapshot = practice_ref.get(transaction=transaction)
+        practice_data = (
+            dict(practice_snapshot.to_dict() or {})
+            if practice_snapshot.exists
+            else None
+        )
+        try:
+            practice_init = initialize_practice_week(
+                practice_data,
+                student_id=student_id,
+                now=timestamp,
+                updated_at=timestamp,
+            )
+        except ParentPracticeError as error:
+            raise ParentLinkAdminError(error.code, str(error)) from error
+        if practice_init is not None:
+            transaction.set(practice_ref, practice_init)
         transaction.create(
             link_ref,
             {
