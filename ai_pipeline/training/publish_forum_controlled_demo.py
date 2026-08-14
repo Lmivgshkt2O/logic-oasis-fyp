@@ -8,6 +8,7 @@ from hashlib import sha256
 import importlib.metadata
 import json
 from pathlib import Path
+import platform
 import shutil
 from typing import Any
 
@@ -30,7 +31,8 @@ RATIONALE = (
     "Not evaluated on real learner forum responses."
 )
 DEPENDENCIES = ("joblib", "numpy", "scikit-learn")
-RUNTIME_FILES = ("__init__.py", "classifier.py")
+DEPENDENCY_LOCK_FILENAME = "forum-runtime-requirements.lock.txt"
+RUNTIME_FILES = ("__init__.py", "classifier.py", "relevance.py")
 
 
 @dataclass(frozen=True)
@@ -91,6 +93,10 @@ def publish_forum_controlled_demo(
         raise ValueError("only an eligible controlled candidate may be released")
     if candidate.get("modelType") not in NAIVE_BAYES_VARIANTS:
         raise ValueError("only the selected genuine Naive Bayes candidate may be released")
+    if candidate.get("relevanceModelType") not in NAIVE_BAYES_VARIANTS:
+        raise ValueError("only the selected genuine relevance Naive Bayes candidate may be released")
+    if candidate.get("manifestSchemaVersion") != "forum-controlled-demo-candidate-manifest-v2":
+        raise ValueError("the dual-component candidate manifest schema v2 is required")
     if candidate.get("evidenceLevel") != "controlled_demonstration":
         raise ValueError("candidate evidence level is incompatible")
     report_path = reports / str(candidate["evaluationReportFile"])
@@ -99,8 +105,11 @@ def publish_forum_controlled_demo(
         failures = ",".join(str(value) for value in report.get("failedGates", [])) or "candidate_not_eligible"
         raise ValueError(f"candidate non-degeneracy gates are not eligible: {failures}")
     artifact_source = generated / str(candidate["artifactFile"])
+    relevance_artifact_source = generated / str(candidate["relevanceArtifactFile"])
     if _hash(artifact_source) != candidate.get("artifactSha256"):
         raise ValueError("candidate artifact hash mismatch")
+    if _hash(relevance_artifact_source) != candidate.get("relevanceArtifactSha256"):
+        raise ValueError("relevance candidate artifact hash mismatch")
 
     dataset_path = generated / str(candidate["datasetFile"])
     dataset_manifest_path = generated / str(candidate["datasetManifestFile"])
@@ -129,11 +138,13 @@ def publish_forum_controlled_demo(
         raise ValueError("candidate split or evaluation report binding mismatch")
     report_bindings = {
         "artifactByteHash": candidate["artifactSha256"],
+        "relevanceArtifactByteHash": candidate["relevanceArtifactSha256"],
         "catalogueSha256": candidate["catalogueSha256"],
         "datasetSha256": candidate["datasetSha256"],
         "rubricSha256": candidate["rubricSha256"],
         "splitManifestSha256": candidate["splitManifestSha256"],
         "selectedNaiveBayesVariant": candidate["modelType"],
+        "selectedRelevanceNaiveBayesVariant": candidate["relevanceModelType"],
     }
     if any(report.get(key) != value for key, value in report_bindings.items()):
         raise ValueError("evaluation report does not match the selected candidate")
@@ -161,9 +172,15 @@ def publish_forum_controlled_demo(
     _write_json(bundle_path, bundle)
 
     artifact_path = functions_root / "forum_model.joblib"
+    relevance_artifact_path = functions_root / "forum_relevance_model.joblib"
     artifact_path.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(artifact_source, artifact_path)
+    shutil.copyfile(relevance_artifact_source, relevance_artifact_path)
     dependencies = {name: importlib.metadata.version(name) for name in DEPENDENCIES}
+    dependency_lock = functions_root / DEPENDENCY_LOCK_FILENAME
+    if not dependency_lock.exists():
+        raise ValueError("the pinned Functions dependency lock is required for release v2")
+    dependency_lock_sha256 = _hash(dependency_lock)
     deployment_runtime_hashes = {
         name: _hash(repository_root / "functions" / name)
         for name in ("forum_runtime.py", "main.py")
@@ -178,7 +195,7 @@ def publish_forum_controlled_demo(
     )
     code_revision = _content_revision(repository_root, tuple(revision_paths))
     manifest = {
-        "manifestSchemaVersion": "forum-model-release-manifest-v1",
+        "manifestSchemaVersion": "forum-model-release-manifest-v2",
         "releaseId": release_id,
         "releasedBy": released_by,
         "releasedAt": released_at.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
@@ -193,7 +210,15 @@ def publish_forum_controlled_demo(
         "deploymentState": "pending_cloud_deployment",
         "candidateGateStatus": "passed", "failedGates": [],
         "modelType": candidate["modelType"], "modelVersion": candidate["modelVersion"],
+        "reasoningModelType": candidate["modelType"],
+        "reasoningModelVersion": candidate["modelVersion"],
+        "relevanceModelType": candidate["relevanceModelType"],
+        "relevanceModelVersion": candidate["relevanceModelVersion"],
         "artifactSha256": _hash(artifact_path), "artifactSizeBytes": artifact_path.stat().st_size,
+        "reasoningArtifactSha256": _hash(artifact_path),
+        "reasoningArtifactSizeBytes": artifact_path.stat().st_size,
+        "relevanceArtifactSha256": _hash(relevance_artifact_path),
+        "relevanceArtifactSizeBytes": relevance_artifact_path.stat().st_size,
         "catalogueSha256": candidate["catalogueSha256"],
         "datasetSha256": candidate["datasetSha256"],
         "datasetManifestSha256": _canonical_text_hash(dataset_manifest_path),
@@ -205,11 +230,19 @@ def publish_forum_controlled_demo(
         "vectorizerContract": candidate["vectorizerContract"],
         "abstentionPolicyVersion": candidate["abstentionPolicyVersion"],
         "outputContract": candidate["outputContract"],
+        "relevanceOutputContract": candidate["relevanceOutputContract"],
+        "relevanceVectorizerContract": candidate["relevanceVectorizerContract"],
+        "relevanceAbstentionPolicyVersion": candidate["relevanceAbstentionPolicyVersion"],
+        "compositePolicy": candidate["compositePolicy"],
         "semanticReproducibilityStatus": candidate["semanticReproducibilityStatus"],
         "runtimeEnvironmentFingerprint": candidate["runtimeEnvironmentFingerprint"],
         "baselineComparisonResult": report["baselineComparisonResult"],
         "dependencies": dependencies, "codeRevision": code_revision,
         "codeRevisionKind": "sha256_bounded_release_sources_v1",
+        "dependencyLockFile": DEPENDENCY_LOCK_FILENAME,
+        "dependencyLockSha256": dependency_lock_sha256,
+        "pythonImplementation": platform.python_implementation(),
+        "pythonVersion": platform.python_version(),
         "deploymentRuntimeHashes": deployment_runtime_hashes,
         "sourceRuntimeHashes": source_hashes, "vendorRuntimeHashes": vendor_hashes,
         "bundleManifestSha256": _hash(bundle_path),

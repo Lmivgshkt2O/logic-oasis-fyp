@@ -15,7 +15,7 @@ from typing import Iterable, Mapping
 from .schema import RUBRIC_DOCUMENT, ForumScenarioCatalogue, catalogue_document, load_catalogue
 
 
-DEFAULT_CATALOGUE_PATH = Path(__file__).with_name("forum_scenario_catalog_v1.yaml")
+DEFAULT_CATALOGUE_PATH = Path(__file__).with_name("forum_verification_catalog_v1.yaml")
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 DATASET_VERSION = "forum-controlled-demo-dataset-v1"
 
@@ -36,6 +36,11 @@ class ForumDatasetRow:
     catalogue_sha256: str
     rubric_sha256: str
     author_declaration: str
+    prompt: str
+    mode: str
+    expected_correct: bool | None
+    expected_relevance: str
+    expected_composite: str
 
     def document(self) -> dict[str, object]:
         return {
@@ -53,6 +58,11 @@ class ForumDatasetRow:
             "sourceCatalogueSha256": self.catalogue_sha256,
             "sourceRubricSha256": self.rubric_sha256,
             "scenarioAuthorDeclaration": self.author_declaration,
+            "prompt": self.prompt,
+            "mode": self.mode,
+            "expectedCorrect": self.expected_correct,
+            "expectedRelevance": self.expected_relevance,
+            "expectedComposite": self.expected_composite,
         }
 
 
@@ -194,6 +204,13 @@ def build_forum_dataset_from_catalogue(
             catalogue_sha256=catalogue_sha,
             rubric_sha256=rubric_sha,
             author_declaration=catalogue.author_declaration,
+            prompt=(
+                family.prompt_bm if example.language == "ms" else family.prompt
+            ),
+            mode=family.mode,
+            expected_correct=example.expected_correct,
+            expected_relevance=example.expected_relevance,
+            expected_composite=example.expected_composite,
         )
         for family in catalogue.scenario_families
         for example in family.examples
@@ -212,6 +229,33 @@ def build_forum_dataset_from_catalogue(
         "questionFamilyCount": len(question_groups),
         "classCounts": dict(sorted(Counter(row.label for row in rows).items())),
         "languageCounts": dict(sorted(Counter(row.language for row in rows).items())),
+        "correctnessCounts": dict(sorted(
+            Counter(
+                "correct" if row.expected_correct is True
+                else "incorrect" if row.expected_correct is False
+                else "not_applicable"
+                for row in rows
+            ).items(),
+        )),
+        "relevanceCounts": dict(sorted(
+            Counter(row.expected_relevance for row in rows).items(),
+        )),
+        "compositeCounts": dict(sorted(
+            Counter(row.expected_composite for row in rows).items(),
+        )),
+        "modeCounts": dict(sorted(Counter(row.mode for row in rows).items())),
+        "verifiedEligibleCount": sum(
+            1 for row in rows if row.expected_composite == "verified"
+        ),
+        "shouldNotVerifyCount": sum(
+            1 for row in rows if row.expected_composite == "should_not_verify"
+        ),
+        "irrelevantCount": sum(
+            1 for row in rows if row.expected_relevance == "irrelevant"
+        ),
+        "relevantControlCount": sum(
+            1 for row in rows if row.expected_relevance == "relevant"
+        ),
         "evaluationGroupKey": "scenarioFamilyId",
         "relatedQuestionGroupKey": "questionFamilyId",
         "trainingDataProvenance": catalogue.training_data_provenance,

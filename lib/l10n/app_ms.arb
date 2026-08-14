@@ -116,5 +116,8 @@
   "justNow": "Baru sahaja",
   "minutesAgo": "{minutes} minit lalu",
   "hoursAgo": "{hours} jam lalu",
-  "daysAgo": "{days} hari lalu"
+  "daysAgo": "{days} hari lalu",
+  "discussInForum": "Bincang dalam forum",
+  "openingDiscussion": "Membuka perbincangan...",
+  "discussionUnavailable": "Soalan ini tidak tersedia untuk perbincangan."
 }

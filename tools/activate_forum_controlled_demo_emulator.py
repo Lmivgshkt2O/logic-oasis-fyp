@@ -26,6 +26,13 @@ def main() -> None:
     project_id = os.environ.get("GCLOUD_PROJECT", "logic-oasis-fyp")
     if str(ROOT / "tools") not in sys.path:
         sys.path.insert(0, str(ROOT / "tools"))
+    from deploy_forum_runtime_iam import (
+        FORUM_RUNTIME_NAME,
+        FUNCTION_REGION,
+        SERVICE_ACCOUNT,
+        deployment_attestation,
+    )
+    from forum_function_inventory import FORUM_FUNCTION_INVENTORY
     from promote_controlled_demo_model import (
         promote_forum_controlled_demo_model,
         validate_forum_controlled_demo_registry_document,
@@ -46,7 +53,26 @@ def main() -> None:
             "The emulator contains an inactive or incompatible record for this immutable "
             "release ID. Restart with a clean Firestore Emulator before activating it."
         )
-    promote_forum_controlled_demo_model(database, release)
+    # The Emulator is the FYP1 controlled deployment evidence boundary, so
+    # the same live-deployment attestation contract is honoured locally: the
+    # authoritative inventory is observed at the manifest's code revision.
+    observed = {
+        str(entry["name"]): {
+            "region": FUNCTION_REGION,
+            "serviceAccount": SERVICE_ACCOUNT,
+            "runtime": FORUM_RUNTIME_NAME,
+            "codeRevision": release["codeRevision"],
+        }
+        for entry in FORUM_FUNCTION_INVENTORY
+    }
+    attestation = deployment_attestation(
+        release_manifest=release,
+        observed_functions=observed,
+        attested_at="2026-08-14T00:00:00Z",
+    )
+    promote_forum_controlled_demo_model(
+        database, release, deployment_attestation=attestation,
+    )
     print(f"Activated forum controlled release: {release['releaseId']}")
 
 

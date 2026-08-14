@@ -1,34 +1,46 @@
 {
   "abstentionPolicyVersion": "forum-advisory-policy-v1",
-  "artifactSha256": "8307a480b5d5e61612b878653b2182d609ae594024ecae192e3677ace99a0049",
-  "artifactSizeBytes": 17634,
+  "artifactSha256": "6081fd603285c7ae9be2bdeffe0c67820a2528dd3fb37b31f6f2772717639cdd",
+  "artifactSizeBytes": 50066,
   "baselineComparisonResult": "naive_bayes_advantage_demonstrated",
-  "bundleManifestSha256": "cd1c07d23dcb472776381c7d6af43e9357922fe882cfb879ef88267edb2ed14f",
+  "bundleManifestSha256": "3f8310003e6e47771ff32cc61baeca5bf61b1a2f737308956aad71cb2f823e37",
   "candidateGateStatus": "passed",
-  "candidateManifestSha256": "45364c713b72351801afc00c37b5692085cf43d2c1225ca1eaf962c3cf2bfea5",
-  "catalogueSha256": "614aefeffe4929f9b096452a4bb5e473cf671c809231a42edf2e8358b1f01c3a",
+  "candidateManifestSha256": "d1a7e47938b6ca6d95ea16cf03f9cdab84e8e6f906a20036755bd6e12acfd8d1",
+  "catalogueSha256": "c896a2af1a2f796d60a570a9de35262bb88f14c019ca464f5981b1aa4350bffd",
   "claimLevel": "controlled_demonstration_only",
-  "codeRevision": "01e74fe579a81a3b3f39c675297b6f4791f5fb2f2c9b7bb62d028da9e3225d1f",
+  "codeRevision": "5cb68d79a5f235309d583140eb8ce2b5079fbd623f2f1846969be4645ca7b223",
   "codeRevisionKind": "sha256_bounded_release_sources_v1",
-  "datasetManifestSha256": "ce31bd081ea5e3f72d09171bfe7829d110a8fc5045fd202d3fe88255941c8d03",
-  "datasetSha256": "5d096d6ab1c6ce59428c9d89b8d972d743d6d613ae249b619c1c51579b3a8399",
+  "compositePolicy": {
+    "correctness": "deterministic_protected_answer_key_v1",
+    "freeFormNeverVerified": true,
+    "noPublicNegativeCorrectnessLabel": true,
+    "policyVersion": "forum-composite-policy-v1",
+    "reasoningAbstentionThreshold": 0.6,
+    "relevanceNegativeThreshold": 0.8,
+    "relevancePositiveThreshold": 0.65,
+    "withholdOnAnyAbstention": true
+  },
+  "datasetManifestSha256": "d4873ddedcef7bf75659a0155e0ed6f692d9334084f52016a76b4733dfbe9b24",
+  "datasetSha256": "1d0ba2ffefdc12239bcd29a90d2311f68c73e4a528f74bf5dec2e5d18d479265",
   "dependencies": {
     "joblib": "1.5.3",
     "numpy": "2.4.6",
     "scikit-learn": "1.9.0"
   },
+  "dependencyLockFile": "forum-runtime-requirements.lock.txt",
+  "dependencyLockSha256": "0067273f13fc463f830c49f4f91169a2dbf71c36246c7d2db2cba3e9e15c7006",
   "deploymentRuntimeHashes": {
-    "forum_runtime.py": "1c3dd55a395cc7949a77384558a40d2da5b8c92dc11bce74cebb28cc7f5005fe",
-    "main.py": "6c70eba02716f81271248ae09a043397d33c21675c0afaf735e852a293abb617"
+    "forum_runtime.py": "4c220d18913bcb1d006403e650702087436b89646881a1c2e685985ae9d9e817",
+    "main.py": "e1ca2a2ddd65fc0cf938770e7c3a88896e377e0b5698eb4f768efdc48a4c7206"
   },
   "deploymentScope": "controlled_demo",
   "deploymentState": "pending_cloud_deployment",
-  "evaluationReportSha256": "9bb9b4d1387ce943b88be042c6aade23594eb2aa9ea7413099ea44cf3f9ebb1a",
+  "evaluationReportSha256": "48b3211d2186ebe144b02799bc321e46ed508c6112633b8144794cd24955bb45",
   "evidenceLevel": "controlled_demonstration",
   "failedGates": [],
   "isActive": true,
   "lifecycleStatus": "released",
-  "manifestSchemaVersion": "forum-model-release-manifest-v1",
+  "manifestSchemaVersion": "forum-model-release-manifest-v2",
   "modelType": "MultinomialNB",
   "modelVersion": "forum-controlled-demo-nb-v1",
   "outputContract": {
@@ -37,12 +49,43 @@
     "explanation_sufficient": "sufficient_reasoning"
   },
   "preprocessingVersion": "forum-text-preprocessing-v1",
-  "releaseId": "forum-controlled-demo-nb-v1-release-4",
+  "pythonImplementation": "CPython",
+  "pythonVersion": "3.11.9",
+  "reasoningArtifactSha256": "6081fd603285c7ae9be2bdeffe0c67820a2528dd3fb37b31f6f2772717639cdd",
+  "reasoningArtifactSizeBytes": 50066,
+  "reasoningModelType": "MultinomialNB",
+  "reasoningModelVersion": "forum-controlled-demo-nb-v1",
+  "releaseId": "forum-controlled-demo-nb-v1-release-8",
   "releaseRationale": "Developer-released FYP1 controlled-demonstration model. Not evaluated on real learner forum responses.",
   "releaseScope": "fyp1_forum_controlled_demo",
-  "releasedAt": "2026-08-10T16:30:00Z",
-  "releasedBy": "zyonn",
-  "rubricSha256": "678505add7d4901d49ce1636baf8289877480383e3515b38e847b114da7ba05b",
+  "releasedAt": "2026-08-14T00:00:00Z",
+  "releasedBy": "developer",
+  "relevanceAbstentionPolicyVersion": "forum-relevance-policy-v1",
+  "relevanceArtifactSha256": "8df2fea527df9053f9c3c27c11ddbcc9441e7f16fa3ada305bf3f05df922a6e8",
+  "relevanceArtifactSizeBytes": 57586,
+  "relevanceModelType": "MultinomialNB",
+  "relevanceModelVersion": "forum-relevance-nb-v1",
+  "relevanceOutputContract": {
+    "abstained": "uncertain",
+    "irrelevant": "may_be_irrelevant_at_negative_threshold",
+    "relevant": "relevant"
+  },
+  "relevanceVectorizerContract": {
+    "abstentionPolicyVersion": "forum-relevance-policy-v1",
+    "family": "TfidfVectorizer",
+    "languageNormalization": "unicode_whitespace_casefold_v1",
+    "minimumDocumentFrequency": 1,
+    "negativeThreshold": 0.8,
+    "ngramRange": [
+      1,
+      2
+    ],
+    "positiveThreshold": 0.65,
+    "preprocessingVersion": "forum-relevance-preprocessing-v1",
+    "sublinearTf": true,
+    "tokenization": "sklearn_word_unicode_v1"
+  },
+  "rubricSha256": "85a3daace207c001a719f35b5425600266b23fe99f5cf14d91bc6ddaf2372394",
   "runtimeEnvironmentFingerprint": {
     "architecture": "AMD64",
     "joblibVersion": "1.5.3",
@@ -50,16 +93,17 @@
     "operatingSystem": "Windows",
     "pyYamlVersion": "6.0.3",
     "pythonImplementation": "CPython",
-    "pythonVersion": "3.12.13",
+    "pythonVersion": "3.11.9",
     "scikitLearnVersion": "1.9.0",
-    "sha256": "5d4dd28a180370bd6acabd01a1b53ddacb30c6572cba994afb95018d2270ae94"
+    "sha256": "aa002975006440406c7ef40c3431023984b42ed3fa0d3e2ea7cc0aa1114ed0a3"
   },
   "semanticReproducibilityStatus": "verified_same_runtime_contract",
   "sourceRuntimeHashes": {
     "__init__.py": "4a91ba70aefb24ff8a4b0b83269d23548c1e7623e4d1f3ce0e2ac218f20c4417",
-    "classifier.py": "a16acf03d4d3621ef6112ae2477b2fd1dd4227c1541913b8112eaac88b18802f"
+    "classifier.py": "a16acf03d4d3621ef6112ae2477b2fd1dd4227c1541913b8112eaac88b18802f",
+    "relevance.py": "842684b464dbe815f5877932a1816ea96e95b52d923c9ddf789099ccf2062a96"
   },
-  "splitManifestSha256": "6c994001f0d1791030664310ba4bc3b807421b74364141ec7f82572d2945ba6d",
+  "splitManifestSha256": "b07f4e9961e6bad3824f601000026d73df07b7e86a63293ee8956407f41db6cb",
   "supersedesReleaseId": null,
   "trainingDataProvenance": "expert_authored_controlled_demo",
   "vectorizerContract": {
@@ -78,6 +122,7 @@
   },
   "vendorRuntimeHashes": {
     "__init__.py": "4a91ba70aefb24ff8a4b0b83269d23548c1e7623e4d1f3ce0e2ac218f20c4417",
-    "classifier.py": "a16acf03d4d3621ef6112ae2477b2fd1dd4227c1541913b8112eaac88b18802f"
+    "classifier.py": "a16acf03d4d3621ef6112ae2477b2fd1dd4227c1541913b8112eaac88b18802f",
+    "relevance.py": "842684b464dbe815f5877932a1816ea96e95b52d923c9ddf789099ccf2062a96"
   }
 }

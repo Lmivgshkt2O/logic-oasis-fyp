@@ -188,18 +188,24 @@ service cloud.firestore {
         request.resource.data.createdAt == request.time &&
         request.resource.data.updatedAt == request.time;
       allow update: if isStudent() && resource.data.authorId == request.auth.uid &&
+        resource.data.get('mode', 'free_form') == 'free_form' &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'title', 'text', 'updatedAt'
         ]) && request.resource.data.title is string &&
         request.resource.data.title.size() >= 8 && request.resource.data.title.size() <= 140 &&
         request.resource.data.text is string && request.resource.data.text.size() >= 20 &&
         request.resource.data.text.size() <= 3000 && request.resource.data.updatedAt == request.time;
-      allow delete: if false;
+      // The delete callable enforces the server-side cascade and canonical
+      // thread guards; Rules still require the question author and forbid
+      // deleting server-owned linked discussions directly.
+      allow delete: if isStudent() && resource.data.authorId == request.auth.uid &&
+        resource.data.get('mode', 'free_form') == 'free_form';
     }
 
     match /forumAnswers/{answerId} {
       allow read: if isStudent();
       allow create: if isStudent() &&
+        request.resource.data.get('mode', 'free_form') == 'free_form' &&
         request.resource.data.keys().hasOnly([
           'questionId', 'authorId', 'text', 'createdAt', 'updatedAt', 'revision'
         ]) && request.resource.data.authorId == request.auth.uid &&
@@ -211,8 +217,10 @@ service cloud.firestore {
         request.resource.data.createdAt == request.time &&
         request.resource.data.updatedAt == request.time;
       // A learner may revise only their text. AI feedback and acceptance are
-      // server-owned fields and cannot be forged from Flutter.
+      // server-owned fields and cannot be forged from Flutter. Linked answers
+      // carry structured fields and are mutated only by server callables.
       allow update: if isStudent() && resource.data.authorId == request.auth.uid &&
+        resource.data.get('mode', 'free_form') == 'free_form' &&
         resource.data.get('acceptedAt', null) == null &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'text', 'updatedAt', 'revision', 'aiFeedback'
@@ -226,7 +234,9 @@ service cloud.firestore {
         request.resource.data.aiFeedback.message == 'Your revised answer is being reviewed.' &&
         request.resource.data.aiFeedback.revision == request.resource.data.revision &&
         request.resource.data.updatedAt == request.time;
-      allow delete: if false;
+      // The delete callable removes AI projections and enforces the accepted
+      // answer guard; Rules still require the answer author.
+      allow delete: if isStudent() && resource.data.authorId == request.auth.uid;
     }
 
     match /forumReports/{reportId} {
@@ -248,6 +258,14 @@ service cloud.firestore {
       allow update: if false;
     }
 
+    // Per-student removal of a canonical linked thread from the student's own
+    // forum list. The marker is server-owned via the delete callable; the
+    // shared discussion document itself is never deleted.
+    match /forumQuestionDeletions/{deletionId} {
+      allow read: if isStudent() && resource.data.studentId == request.auth.uid;
+      allow write: if false;
+    }
+
     match /forumHelpfulMarks/{markId} {
       allow read, write: if false;
     }
@@ -258,6 +276,16 @@ service cloud.firestore {
 
     match /forumAiJobs/{answerId} {
       allow read, write: if false;
+    }
+
+    // Author-only AI guidance projection. Correctness details, reasoning
+    // guidance, probabilities, thresholds, and component diagnostics are
+    // readable only by the answer author and never by peers, parents, or raw
+    // clients; derived fields are never client-written.
+    match /forumAiFeedback/{answerId} {
+      allow read: if isStudent() &&
+        get(/databases/$(database)/documents/forumAnswers/$(answerId)).data.authorId == request.auth.uid;
+      allow write: if false;
     }
 
     match /forumAiRuns/{answerId} {

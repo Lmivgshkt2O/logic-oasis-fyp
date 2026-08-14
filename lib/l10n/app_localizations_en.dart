@@ -434,4 +434,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String daysAgo(Object days) {
     return '$days day ago';
   }
+
+  @override
+  String get discussInForum => 'Discuss in forum';
+
+  @override
+  String get openingDiscussion => 'Opening discussion...';
+
+  @override
+  String get discussionUnavailable =>
+      'This question is not available for discussion.';
 }

@@ -16,6 +16,10 @@ from logic_oasis_ai.forum_ai.classifier import (
     ForumTextClassifier,
     train_classifier,
 )
+from logic_oasis_ai.forum_ai.relevance import (
+    ForumRelevanceClassifier,
+    train_relevance_classifier,
+)
 from logic_oasis_ai.forum_ai.dataset import grouped_rows, load_labelled_examples
 from forum_controlled_demo.schema import EVIDENCE_LEVEL, PROVENANCE
 from forum_controlled_demo.build_forum_dataset import ForumDatasetRow
@@ -39,6 +43,33 @@ def train_controlled_demo_candidate(
         raise ValueError("controlled-demo candidate requires both declared rubric labels")
     return train_classifier(
         [(row.text, row.label) for row in values],
+        model_version=model_version,
+        variant=variant,
+    )
+
+
+def train_relevance_candidate(
+    rows: Iterable[ForumDatasetRow],
+    *,
+    variant: str,
+    model_version: str,
+) -> ForumRelevanceClassifier:
+    """Train the relevance component only from fictional controlled rows."""
+    values = tuple(rows)
+    if not values or any(
+        row.provenance != PROVENANCE or row.evidence_level != EVIDENCE_LEVEL
+        for row in values
+    ):
+        raise ValueError(
+            "controlled-demo relevance candidate requires fictional controlled provenance",
+        )
+    labels = {row.expected_relevance for row in values}
+    if labels != {"relevant", "irrelevant"}:
+        raise ValueError(
+            "controlled-demo relevance candidate requires both relevance labels",
+        )
+    return train_relevance_classifier(
+        [(row.prompt, row.text, row.expected_relevance) for row in values],
         model_version=model_version,
         variant=variant,
     )

@@ -43,44 +43,44 @@ class ForumTriggerContractTests(unittest.TestCase):
             self.assertEqual(pattern, manifest.eventTrigger["eventFilterPathPatterns"]["document"])
             self.assertTrue(manifest.eventTrigger["retry"])
 
-    def test_warm_instance_caches_only_the_verified_classifier_result(self):
+    def test_warm_instance_caches_only_the_verified_bundle_result(self):
         sentinel = object()
         releases = [{"releaseId": "release-1"}]
-        main._cached_verified_forum_classifier.cache_clear()
+        main._cached_verified_forum_bundle.cache_clear()
         with patch("main._active_forum_registry_documents", return_value=releases), patch(
-            "main.load_forum_classifier", return_value=sentinel,
+            "main.load_forum_bundle", return_value=sentinel,
         ) as loader:
-            self.assertIs(sentinel, main._forum_classifier())
-            self.assertIs(sentinel, main._forum_classifier())
+            self.assertIs(sentinel, main._forum_bundle())
+            self.assertIs(sentinel, main._forum_bundle())
         loader.assert_called_once_with(
             evidence_mode="real_evaluated_only", code_revision="",
             registry_documents=releases,
         )
-        main._cached_verified_forum_classifier.cache_clear()
+        main._cached_verified_forum_bundle.cache_clear()
 
     def test_failed_verification_is_not_retained_in_the_warm_cache(self):
         sentinel = object()
         releases = [{"releaseId": "release-1"}]
-        main._cached_verified_forum_classifier.cache_clear()
+        main._cached_verified_forum_bundle.cache_clear()
         with patch("main._active_forum_registry_documents", return_value=releases), patch(
-            "main.load_forum_classifier", side_effect=[None, sentinel],
+            "main.load_forum_bundle", side_effect=[None, sentinel],
         ) as loader:
-            self.assertIsNone(main._forum_classifier())
-            self.assertIs(sentinel, main._forum_classifier())
+            self.assertIsNone(main._forum_bundle())
+            self.assertIs(sentinel, main._forum_bundle())
         self.assertEqual(2, loader.call_count)
-        main._cached_verified_forum_classifier.cache_clear()
+        main._cached_verified_forum_bundle.cache_clear()
 
     def test_warm_instance_rechecks_registry_revocation_before_using_cache(self):
         sentinel = object()
         active = [{"releaseId": "release-1", "isActive": True}]
-        main._cached_verified_forum_classifier.cache_clear()
+        main._cached_verified_forum_bundle.cache_clear()
         with patch(
             "main._active_forum_registry_documents", side_effect=[active, []],
-        ), patch("main.load_forum_classifier", side_effect=[sentinel, None]) as loader:
-            self.assertIs(sentinel, main._forum_classifier())
-            self.assertIsNone(main._forum_classifier())
+        ), patch("main.load_forum_bundle", side_effect=[sentinel, None]) as loader:
+            self.assertIs(sentinel, main._forum_bundle())
+            self.assertIsNone(main._forum_bundle())
         self.assertEqual(2, loader.call_count)
-        main._cached_verified_forum_classifier.cache_clear()
+        main._cached_verified_forum_bundle.cache_clear()
 
     def test_answer_update_reprocesses_only_a_new_content_revision(self):
         before = {"text": "Old explanation", "revision": 1}

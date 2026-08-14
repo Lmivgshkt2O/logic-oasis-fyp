@@ -116,5 +116,8 @@
   "justNow": "Just now",
   "minutesAgo": "{minutes} min ago",
   "hoursAgo": "{hours} hr ago",
-  "daysAgo": "{days} day ago"
+  "daysAgo": "{days} day ago",
+  "discussInForum": "Discuss in forum",
+  "openingDiscussion": "Opening discussion...",
+  "discussionUnavailable": "This question is not available for discussion."
 }
