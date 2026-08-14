@@ -386,6 +386,24 @@ class LinkedForumCallableTests(unittest.TestCase):
             raised.exception.code, https_fn.FunctionsErrorCode.PERMISSION_DENIED,
         )
 
+    def test_delete_forum_question_hides_linked_thread_from_the_viewer(self):
+        rows = _linked_rows()
+        rows[("forumQuestions", "linked_bank_q1_v1")] = {
+            "mode": "linked", "sourceQuestionId": "bank_q1",
+        }
+        result = self._call(
+            "_delete_forum_question",
+            rows,
+            {"questionId": "linked_bank_q1_v1"},
+        )
+        self.assertTrue(result["deleted"])
+        self.assertEqual("viewer", result["scope"])
+        # The canonical shared thread remains; only the viewer marker is added.
+        self.assertIn(("forumQuestions", "linked_bank_q1_v1"), rows)
+        marker = rows[("forumQuestionDeletions", "student-1_linked_bank_q1_v1")]
+        self.assertEqual("student-1", marker["studentId"])
+        self.assertEqual("linked_bank_q1_v1", marker["questionId"])
+
 
 if __name__ == "__main__":
     unittest.main()

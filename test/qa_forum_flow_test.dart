@@ -884,7 +884,7 @@ void main() {
     tester,
   ) async {
     final repository = _ActionRepository();
-    final question = ForumQuestion(
+    const question = ForumQuestion(
       id: 'question-to-delete',
       authorId: AppState.demoStudentId,
       title: 'How do I regroup 46 plus 27?',
@@ -896,12 +896,12 @@ void main() {
           state: AppState(),
           repository: repository,
           questionPager: ({required int limit, String? cursor}) async =>
-              ForumQuestionPage(
+              const ForumQuestionPage(
                 questions: [question],
                 nextCursor: null,
                 hasMore: false,
               ),
-          latestQuestionsStream: Stream.value([question]),
+          latestQuestionsStream: Stream.value(const [question]),
           blockedStudentIdsStream: Stream.value(const <String>{}),
         ),
       ),
@@ -918,6 +918,91 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(repository.deletedQuestionId, 'question-to-delete');
+  });
+
+  testWidgets('student can remove a linked question from their own list', (
+    tester,
+  ) async {
+    final repository = _ActionRepository();
+    const question = ForumQuestion(
+      id: 'linked_q1_v1',
+      authorId: '',
+      title: 'Which numeral shows twenty thousand and four?',
+      text: 'Which numeral shows twenty thousand and four?',
+      mode: 'linked',
+      prompt: 'Which numeral shows twenty thousand and four?',
+      promptBm: 'Angka manakah menunjukkan dua puluh ribu empat?',
+      options: ['20 004', '24 000', '20 400', '20 040'],
+      optionsBm: ['20 004', '24 000', '20 400', '20 040'],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: QaForumPage(
+          state: AppState(),
+          repository: repository,
+          questionPager: ({required int limit, String? cursor}) async =>
+              const ForumQuestionPage(
+                questions: [question],
+                nextCursor: null,
+                hasMore: false,
+              ),
+          latestQuestionsStream: Stream.value(const [question]),
+          blockedStudentIdsStream: Stream.value(const <String>{}),
+          deletedQuestionIdsStream: Stream.value(const <String>{}),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    await tester.ensureVisible(find.byTooltip('Question actions'));
+    await tester.tap(find.byTooltip('Question actions'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete question'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Remove this question from your list?'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Delete'));
+    await tester.pumpAndSettle();
+
+    expect(repository.deletedQuestionId, 'linked_q1_v1');
+  });
+
+  testWidgets('deleted linked questions are hidden from the student list', (
+    tester,
+  ) async {
+    const question = ForumQuestion(
+      id: 'linked_q1_v1',
+      authorId: '',
+      title: 'Which numeral shows twenty thousand and four?',
+      text: 'Which numeral shows twenty thousand and four?',
+      mode: 'linked',
+      prompt: 'Which numeral shows twenty thousand and four?',
+      options: ['20 004', '24 000', '20 400', '20 040'],
+      optionsBm: ['20 004', '24 000', '20 400', '20 040'],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: QaForumPage(
+          state: AppState(),
+          questionPager: ({required int limit, String? cursor}) async =>
+              const ForumQuestionPage(
+                questions: [question],
+                nextCursor: null,
+                hasMore: false,
+              ),
+          latestQuestionsStream: Stream.value(const [question]),
+          blockedStudentIdsStream: Stream.value(const <String>{}),
+          deletedQuestionIdsStream: Stream.value(const {'linked_q1_v1'}),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Which numeral shows twenty thousand and four?'), findsNothing);
   });
 
   testWidgets('linked discussion renders options, explanation, and validation', (
@@ -1584,6 +1669,10 @@ class _ActionRepository implements CollaborationRepository {
   }
 
   @override
+  Stream<Set<String>> watchDeletedQuestionIds(String studentId) =>
+      const Stream<Set<String>>.empty();
+
+  @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
@@ -1621,6 +1710,10 @@ class _LinkedActionRepository implements CollaborationRepository {
 
   @override
   Stream<Set<String>> watchBlockedStudentIds(String studentId) =>
+      const Stream<Set<String>>.empty();
+
+  @override
+  Stream<Set<String>> watchDeletedQuestionIds(String studentId) =>
       const Stream<Set<String>>.empty();
 
   @override

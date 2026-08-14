@@ -1268,6 +1268,7 @@ def _delete_forum_question(
     return ForumRuntimeGateway(firestore_db()).delete_question(
         question_id=_string(data, "questionId"),
         actor_id=student_id,
+        now=datetime.now(timezone.utc),
     )
 
 

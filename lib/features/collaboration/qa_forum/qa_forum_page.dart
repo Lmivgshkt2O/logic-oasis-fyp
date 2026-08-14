@@ -20,6 +20,7 @@ class QaForumPage extends StatefulWidget {
     this.questionPager,
     this.latestQuestionsStream,
     this.blockedStudentIdsStream,
+    this.deletedQuestionIdsStream,
     this.answersStreamForQuestion,
     this.authorFeedbackStreamForAnswer,
   });
@@ -35,6 +36,7 @@ class QaForumPage extends StatefulWidget {
   questionPager;
   final Stream<List<ForumQuestion>>? latestQuestionsStream;
   final Stream<Set<String>>? blockedStudentIdsStream;
+  final Stream<Set<String>>? deletedQuestionIdsStream;
   final Stream<List<ForumAnswer>> Function(String questionId)?
   answersStreamForQuestion;
   final Stream<ForumAnswerFeedback> Function(String answerId)?
@@ -52,8 +54,10 @@ class _QaForumPageState extends State<QaForumPage> {
   final _questionTitle = TextEditingController();
   final _questionBody = TextEditingController();
   StreamSubscription<Set<String>>? _blockedSubscription;
+  StreamSubscription<Set<String>>? _deletedSubscription;
   StreamSubscription<List<ForumQuestion>>? _latestSubscription;
   Set<String> _blockedAuthors = const {};
+  Set<String> _deletedQuestions = const {};
   Object? _blockedError;
   bool _postingQuestion = false;
   String? _deleting;
@@ -87,6 +91,25 @@ class _QaForumPageState extends State<QaForumPage> {
         if (mounted) setState(() => _blockedError = error);
       },
     );
+    Stream<Set<String>> deletedIds;
+    try {
+      deletedIds =
+          widget.deletedQuestionIdsStream ??
+          _repo.watchDeletedQuestionIds(widget.state.currentStudentId);
+    } catch (_) {
+      // The deletion signal is advisory for the loaded list; widget-test
+      // harnesses and degraded startup without Firestore fall back to empty.
+      deletedIds = const Stream<Set<String>>.empty();
+    }
+    _deletedSubscription = deletedIds.listen(
+      (ids) {
+        if (mounted) setState(() => _deletedQuestions = ids);
+      },
+      onError: (Object error) {
+        // A failed deletion signal must not break the loaded list.
+        if (mounted) setState(() {});
+      },
+    );
     final latest =
         widget.latestQuestionsStream ??
         _repo.watchLatestForumQuestions(limit: QaForumPage.pageSize);
@@ -110,6 +133,7 @@ class _QaForumPageState extends State<QaForumPage> {
     _questionTitle.dispose();
     _questionBody.dispose();
     _blockedSubscription?.cancel();
+    _deletedSubscription?.cancel();
     _latestSubscription?.cancel();
     super.dispose();
   }
@@ -177,6 +201,7 @@ class _QaForumPageState extends State<QaForumPage> {
         .where(
           (question) =>
               !_blockedAuthors.contains(question.authorId) &&
+              !_deletedQuestions.contains(question.id) &&
               (query.isEmpty ||
                   question.title.toLowerCase().contains(query) ||
                   question.text.toLowerCase().contains(query)),
@@ -231,8 +256,8 @@ class _QaForumPageState extends State<QaForumPage> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (question.authorId ==
-                              widget.state.currentStudentId &&
-                          question.mode != 'linked')
+                                  widget.state.currentStudentId ||
+                              question.mode == 'linked')
                         PopupMenuButton<_QuestionAction>(
                           tooltip: _t(
                             'Question actions',
@@ -316,12 +341,24 @@ class _QaForumPageState extends State<QaForumPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(_t('Delete this question?', 'Padam soalan ini?')),
+        title: Text(
+          question.mode == 'linked'
+              ? _t(
+                  'Remove this question from your list?',
+                  'Buang soalan ini daripada senarai anda?',
+                )
+              : _t('Delete this question?', 'Padam soalan ini?'),
+        ),
         content: Text(
-          _t(
-            'This will also remove every answer to it. This action cannot be undone.',
-            'Ini juga akan memadam setiap jawapan kepadanya. Tindakan ini tidak boleh dibatalkan.',
-          ),
+          question.mode == 'linked'
+              ? _t(
+                  'This shared thread stays available to other students. It will be hidden from your forum list.',
+                  'Benang kongsi ini masih tersedia untuk murid lain. Ia akan disembunyikan daripada senarai forum anda.',
+                )
+              : _t(
+                  'This will also remove every answer to it. This action cannot be undone.',
+                  'Ini juga akan memadam setiap jawapan kepadanya. Tindakan ini tidak boleh dibatalkan.',
+                ),
         ),
         actions: [
           TextButton(

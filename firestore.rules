@@ -258,6 +258,14 @@ service cloud.firestore {
       allow update: if false;
     }
 
+    // Per-student removal of a canonical linked thread from the student's own
+    // forum list. The marker is server-owned via the delete callable; the
+    // shared discussion document itself is never deleted.
+    match /forumQuestionDeletions/{deletionId} {
+      allow read: if isStudent() && resource.data.studentId == request.auth.uid;
+      allow write: if false;
+    }
+
     match /forumHelpfulMarks/{markId} {
       allow read, write: if false;
     }

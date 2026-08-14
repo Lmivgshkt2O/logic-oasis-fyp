@@ -147,3 +147,12 @@ and `supersedesReleaseId` release 5. It was promoted in the Firestore Emulator
 registry with a local deployment attestation; release 5 remains preserved as
 `superseded`. The authoritative forum function inventory grew to eleven
 entries with the two author-delete callables.
+
+A follow-up runtime change (same day) let students also remove a canonical
+linked thread from their own forum list: a per-student
+`forumQuestionDeletions` marker hides the shared discussion for that student
+while the canonical thread and other students' answers stay intact. The
+immutable successor `forum-controlled-demo-nb-v1-release-7` was published
+under CPython 3.11.9 with the same model artifacts, code revision
+`5cb68d79a5f235309d583140eb8ce2b5079fbd623f2f1846969be4645ca7b223`,
+superseding release 6, and promoted in the Firestore Emulator registry.

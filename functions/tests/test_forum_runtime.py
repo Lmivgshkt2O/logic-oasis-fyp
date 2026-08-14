@@ -1420,7 +1420,9 @@ class ForumDeletionTests(unittest.TestCase):
         gateway = ForumRuntimeGateway(database)
 
         with patch("forum_runtime.firestore.transactional", lambda function: function):
-            result = gateway.delete_question(question_id="q1", actor_id="student-a")
+            result = gateway.delete_question(
+                question_id="q1", actor_id="student-a", now=now,
+            )
 
         self.assertEqual(2, result["deletedAnswerCount"])
         for key in (
@@ -1436,7 +1438,7 @@ class ForumDeletionTests(unittest.TestCase):
         self.assertIn(("forumAiRuns", "run1"), database.rows)
         self.assertIn(("forumAiRuns", "run2"), database.rows)
 
-    def test_delete_question_denies_foreign_authors_linked_threads_and_missing(self):
+    def test_delete_question_denies_foreign_authors_and_hides_linked_from_viewer(self):
         now = self.NOW
         database = _Database({
             ("forumQuestions", "q1"): {
@@ -1447,20 +1449,39 @@ class ForumDeletionTests(unittest.TestCase):
             ("forumQuestions", "linked_bank_q1_v1"): {
                 "mode": "linked", "sourceQuestionId": "bank_q1",
             },
+            ("forumAnswers", "linked-a1"): {
+                "questionId": "linked_bank_q1_v1", "authorId": "student-b",
+                "mode": "linked", "selectedOption": 2,
+                "explanation": "I regrouped the ones and tens.",
+            },
         })
         gateway = ForumRuntimeGateway(database)
 
         with patch("forum_runtime.firestore.transactional", lambda function: function):
             with self.assertRaisesRegex(ForumRuntimeError, "question author"):
-                gateway.delete_question(question_id="q1", actor_id="student-b")
-            with self.assertRaisesRegex(ForumRuntimeError, "linked discussions"):
                 gateway.delete_question(
-                    question_id="linked_bank_q1_v1", actor_id="student-a",
+                    question_id="q1", actor_id="student-b", now=now,
                 )
+            result = gateway.delete_question(
+                question_id="linked_bank_q1_v1", actor_id="student-a", now=now,
+            )
             with self.assertRaisesRegex(ForumRuntimeError, "not found"):
-                gateway.delete_question(question_id="missing", actor_id="student-a")
+                gateway.delete_question(
+                    question_id="missing", actor_id="student-a", now=now,
+                )
 
         self.assertIn(("forumQuestions", "q1"), database.rows)
+        self.assertTrue(result["deleted"])
+        self.assertEqual(0, result["deletedAnswerCount"])
+        self.assertEqual("viewer", result["scope"])
+        # The canonical shared thread and other students' answers stay intact.
+        self.assertIn(("forumQuestions", "linked_bank_q1_v1"), database.rows)
+        self.assertIn(("forumAnswers", "linked-a1"), database.rows)
+        marker = database.rows[
+            ("forumQuestionDeletions", "student-a_linked_bank_q1_v1")
+        ]
+        self.assertEqual("student-a", marker["studentId"])
+        self.assertEqual("linked_bank_q1_v1", marker["questionId"])
 
 
 class ForumCompositeRuntimeTests(unittest.TestCase):

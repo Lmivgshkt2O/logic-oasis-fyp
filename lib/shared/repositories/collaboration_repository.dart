@@ -79,6 +79,20 @@ class CollaborationRepository {
             .toSet(),
       );
 
+  /// Canonical linked threads this student removed from their own forum list.
+  /// Free-form questions are hard-deleted server-side, so this set only ever
+  /// contains shared linked discussion IDs.
+  Stream<Set<String>> watchDeletedQuestionIds(String studentId) => _firestore
+      .collection('forumQuestionDeletions')
+      .where('studentId', isEqualTo: studentId)
+      .snapshots()
+      .map(
+        (snapshot) => snapshot.docs
+            .map((doc) => doc.data()['questionId'] as String? ?? '')
+            .where((id) => id.isNotEmpty)
+            .toSet(),
+      );
+
   Stream<List<ForumAnswer>> watchAnswers(String questionId) => _firestore
       .collection('forumAnswers')
       .where('questionId', isEqualTo: questionId)

@@ -1135,13 +1135,18 @@ class ForumRuntimeGateway:
 
         return delete_answer(self.database.transaction())
 
-    def delete_question(self, *, question_id: str, actor_id: str) -> dict[str, Any]:
-        """Remove the author's own free-form question and its answer thread.
+    def delete_question(
+        self, *, question_id: str, actor_id: str, now: datetime,
+    ) -> dict[str, Any]:
+        """Remove a question the student can see from their own forum view.
 
-        Deleting a question removes the whole thread, so every answer and its
-        AI job/feedback projections are removed in the same transaction while
-        the immutable inference runs remain preserved for audit. Canonical
-        linked discussions are server-owned and cannot be deleted.
+        Free-form questions are owned by their author: deleting one removes
+        the whole thread, so every answer and its AI job/feedback projections
+        are removed in the same transaction while the immutable inference runs
+        remain preserved for audit. Canonical linked discussions are shared
+        server content that other students also open, so a student may only
+        remove one from their own list via a deterministic per-student marker;
+        the canonical thread and everyone else's answers stay intact.
         """
         question_id = _document_id(question_id)
         question_ref = self.database.collection("forumQuestions").document(
@@ -1158,10 +1163,20 @@ class ForumRuntimeGateway:
                 raise ForumRuntimeError("not-found", "Question not found.")
             data = question.to_dict()
             if data.get("mode") == FORUM_MODE_LINKED:
-                raise ForumRuntimeError(
-                    "failed-precondition",
-                    "Canonical linked discussions cannot be deleted.",
-                )
+                marker_ref = self.database.collection(
+                    "forumQuestionDeletions"
+                ).document(f"{actor_id}_{question_id}")
+                transaction.set(marker_ref, {
+                    "studentId": actor_id,
+                    "questionId": question_id,
+                    "deletedAt": now,
+                })
+                return {
+                    "questionId": question_id,
+                    "deleted": True,
+                    "deletedAnswerCount": 0,
+                    "scope": "viewer",
+                }
             if _required(data, "authorId") != actor_id:
                 raise ForumRuntimeError(
                     "permission-denied",
