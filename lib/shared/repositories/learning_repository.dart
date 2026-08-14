@@ -1,8 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:logic_oasis/shared/models/ai_diagnosis.dart';
-import 'package:logic_oasis/shared/models/adaptive_assignment.dart';
 import 'package:logic_oasis/shared/models/forum_participation_summary.dart';
 import 'package:logic_oasis/shared/models/parent_dashboard_snapshot.dart';
+import 'package:logic_oasis/shared/models/parent_practice_summary.dart';
 import 'package:logic_oasis/shared/models/quiz_attempt.dart';
 import 'package:logic_oasis/shared/models/topic.dart';
 import 'package:logic_oasis/shared/models/trusted_subtopic_progress.dart';
@@ -311,102 +310,116 @@ class LearningRepository {
     required List<Topic> topics,
   }) async {
     final normalizedYearLevel = yearLevel.clamp(4, 6);
-    // Parents are intentionally unable to read raw quiz attempts and raw AI
-    // runs. Compose the dashboard entirely from the bounded U8 projections.
-    final results = await Future.wait<Object>([
-      _firestore
-          .collection('studentAiStatuses')
-          .where('studentId', isEqualTo: studentId)
-          .get(const GetOptions(source: Source.server)),
-      _firestore
-          .collection('subtopicMastery')
-          .where('studentId', isEqualTo: studentId)
-          .where('yearLevel', isEqualTo: normalizedYearLevel)
-          .get(const GetOptions(source: Source.server)),
-      _firestore
-          .collection('adaptiveAssignments')
-          .where('studentId', isEqualTo: studentId)
-          .get(const GetOptions(source: Source.server)),
-      _firestore
-          .collection('forumParticipationSummaries')
-          .doc(studentId)
-          .get(const GetOptions(source: Source.server)),
-    ]);
-    final statusSnapshot = results[0] as QuerySnapshot<Map<String, dynamic>>;
-    final masterySnapshot = results[1] as QuerySnapshot<Map<String, dynamic>>;
-    final assignmentSnapshot =
-        results[2] as QuerySnapshot<Map<String, dynamic>>;
-    final forumSnapshot = results[3] as DocumentSnapshot<Map<String, dynamic>>;
-    final masteryByAttempt = <String, Map<String, dynamic>>{};
-    for (final document in masterySnapshot.docs) {
-      final data = document.data();
-      final attemptId = data['lastSourceAttemptId'];
-      if (attemptId is String && attemptId.isNotEmpty) {
-        masteryByAttempt[attemptId] = data;
-      }
-    }
-    final assignmentsByAttempt = <String, AdaptiveAssignment>{};
-    for (final document in assignmentSnapshot.docs) {
-      final data = document.data();
-      final attemptId = data['sourceAttemptId'];
-      if (attemptId is! String || attemptId.isEmpty) continue;
-      try {
-        assignmentsByAttempt[attemptId] = AdaptiveAssignment.fromFirestoreData(
-          document.id,
-          data,
-        );
-      } on FormatException {
-        // A malformed projection is ignored rather than turned into advice.
-      }
-    }
-    final aiDiagnoses =
-        statusSnapshot.docs
-            .map(
-              (document) => AiDiagnosis.fromSafeProjection(
-                document.id,
-                document.data(),
-                mastery: masteryByAttempt[document.id],
-                assignment: assignmentsByAttempt[document.id],
-              ),
-            )
-            .whereType<AiDiagnosis>()
-            .where(
-              (diagnosis) =>
-                  diagnosis.yearLevel == null ||
-                  diagnosis.yearLevel == normalizedYearLevel,
-            )
-            .toList()
-          ..sort(
-            (a, b) =>
-                b.sourceAttemptSequence.compareTo(a.sourceAttemptSequence),
-          );
-    final masteryRecordCount = masterySnapshot.docs.length;
-
+    // Parents read only their selected child's declared projections: safe
+    // mastery records, the exact weekly practice document, and the count-only
+    // Mutual Aid document. U14 never queries attempts, responses, AI jobs,
+    // AI runs, adaptive assignments, or forum content. Each non-auth
+    // projection resolves independently; permission denial, revocation, or a
+    // selected-child identity mismatch clears the whole snapshot.
+    final mastery = await _fetchSafeMastery(studentId, normalizedYearLevel);
+    final practice = await _fetchPracticeSummary(studentId);
+    final mutualAid = await _fetchForumSummary(studentId);
     return ParentDashboardSnapshot(
-      attempts: const <QuizAttempt>[],
-      masteryRecordCount: masteryRecordCount,
-      aiDiagnoses: _latestDiagnosisPerTopic(aiDiagnoses),
-      forumParticipationSummary:
-          forumSnapshot.exists && forumSnapshot.data() != null
-          ? ForumParticipationSummary.fromFirestore(
-              studentId,
-              forumSnapshot.data()!,
-            )
-          : null,
+      mastery: mastery,
+      practiceSummary: practice,
+      forumParticipationSummary: mutualAid,
     );
   }
 
-  List<AiDiagnosis> _latestDiagnosisPerTopic(List<AiDiagnosis> diagnoses) {
-    final latestByTopic = <String, AiDiagnosis>{};
-    for (final diagnosis in diagnoses) {
-      final topicId = diagnosis.topicId;
-      if (topicId.isEmpty) continue;
-      final existing = latestByTopic[topicId];
-      if (existing == null || diagnosis.isNewerThan(existing)) {
-        latestByTopic[topicId] = diagnosis;
+  Future<List<TrustedSubtopicProgress>?> _fetchSafeMastery(
+    String studentId,
+    int yearLevel,
+  ) async {
+    try {
+      final snapshot = await _firestore
+          .collection('subtopicMastery')
+          .where('studentId', isEqualTo: studentId)
+          .where('yearLevel', isEqualTo: yearLevel)
+          .get(const GetOptions(source: Source.server));
+      final records = <TrustedSubtopicProgress>[];
+      for (final document in snapshot.docs) {
+        try {
+          records.add(TrustedSubtopicProgress.fromFirestore(document.data()));
+        } on FormatException {
+          // A malformed projection is omitted rather than turned into advice.
+        }
       }
+      return records;
+    } on FirebaseException catch (error) {
+      _throwIfPermissionDenied(error);
+      return null;
+    } catch (_) {
+      return null;
     }
-    return latestByTopic.values.toList(growable: false);
+  }
+
+  Future<ParentPracticeSummary?> _fetchPracticeSummary(String studentId) async {
+    try {
+      final document = await _firestore
+          .collection('parentPracticeSummaries')
+          .doc(studentId)
+          .get(const GetOptions(source: Source.server));
+      if (!document.exists) return null;
+      final data = document.data();
+      if (data == null) return null;
+      _requireProjectionIdentity(data, studentId);
+      try {
+        return ParentPracticeSummary.fromFirestore(studentId, data);
+      } on FormatException {
+        return null;
+      }
+    } on ParentDashboardAuthException {
+      rethrow;
+    } on FirebaseException catch (error) {
+      _throwIfPermissionDenied(error);
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<ForumParticipationSummary?> _fetchForumSummary(
+    String studentId,
+  ) async {
+    try {
+      final document = await _firestore
+          .collection('forumParticipationSummaries')
+          .doc(studentId)
+          .get(const GetOptions(source: Source.server));
+      if (!document.exists) return null;
+      final data = document.data();
+      if (data == null) return null;
+      _requireProjectionIdentity(data, studentId);
+      try {
+        return ForumParticipationSummary.fromFirestore(studentId, data);
+      } on FormatException {
+        return null;
+      }
+    } on ParentDashboardAuthException {
+      rethrow;
+    } on FirebaseException catch (error) {
+      _throwIfPermissionDenied(error);
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  void _requireProjectionIdentity(Map<String, dynamic> data, String studentId) {
+    final stored = data['studentId'];
+    if (stored is! String || stored != studentId) {
+      throw const ParentDashboardAuthException(
+        'The selected child projection does not belong to the selected child.',
+      );
+    }
+  }
+
+  void _throwIfPermissionDenied(FirebaseException error) {
+    if (error.code == 'permission-denied') {
+      throw const ParentDashboardAuthException(
+        'Parent access to this child was revoked or denied.',
+      );
+    }
   }
 
   static List<QuizAttempt> _latestFirst(List<QuizAttempt> attempts) {

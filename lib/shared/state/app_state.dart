@@ -132,8 +132,10 @@ class AppState extends ChangeNotifier {
       title: 'Whole Numbers and Operations',
       titleBm: 'Nombor Bulat dan Operasi',
       yearLevel: 5,
-      area: 'Whole numbers up to 1 000 000: read, write, compare, round, and operate.',
-      areaBm: 'Nombor bulat hingga 1 000 000: kenal, tulis, banding, bundar dan operasi.',
+      area:
+          'Whole numbers up to 1 000 000: read, write, compare, round, and operate.',
+      areaBm:
+          'Nombor bulat hingga 1 000 000: kenal, tulis, banding, bundar dan operasi.',
     ),
     _placeholderTopic(
       id: 'fractions_decimals_percentages_y5',
@@ -196,8 +198,10 @@ class AppState extends ChangeNotifier {
       title: 'Whole Numbers and Operations',
       titleBm: 'Nombor Bulat dan Operasi',
       yearLevel: 6,
-      area: 'Whole numbers up to 10 000 000: read, write, compare, and operate.',
-      areaBm: 'Nombor bulat hingga 10 000 000: kenal, tulis, banding dan operasi.',
+      area:
+          'Whole numbers up to 10 000 000: read, write, compare, and operate.',
+      areaBm:
+          'Nombor bulat hingga 10 000 000: kenal, tulis, banding dan operasi.',
     ),
     _placeholderTopic(
       id: 'fractions_decimals_percentages_y6',
@@ -274,9 +278,6 @@ class AppState extends ChangeNotifier {
   bool isSavingQuizToFirebase = false;
   bool lastQuizSavedToFirebase = false;
   String? quizSaveMessage;
-  bool isLoadingParentDashboard = false;
-  bool loadedParentDashboardFromFirebase = false;
-  String? parentDashboardMessage;
   bool isLoadingOasisProgress = false;
   bool loadedOasisProgressFromFirebase = false;
   String? oasisProgressMessage;
@@ -297,7 +298,8 @@ class AppState extends ChangeNotifier {
   final Set<String> _unlockedSubtopicIds = <String>{};
   final Map<String, List<String>> _recentQuestionIdsBySubtopic =
       <String, List<String>>{};
-  StreamSubscription<List<TrustedSubtopicProgress>>? _trustedProgressSubscription;
+  StreamSubscription<List<TrustedSubtopicProgress>>?
+  _trustedProgressSubscription;
   final List<AiDiagnosis> aiDiagnoses = <AiDiagnosis>[];
   final List<OasisArea> oasisAreas = [
     const OasisArea(
@@ -815,7 +817,6 @@ class AppState extends ChangeNotifier {
     unawaited(saveAppSession());
     if (persistQuizResults) {
       unawaited(loadOasisProgressFromFirebase());
-      unawaited(loadParentDashboardFromFirebase());
       if (!yearChanged) {
         unawaited(refreshTrustedProgress());
       }
@@ -1033,8 +1034,7 @@ class AppState extends ChangeNotifier {
               evidenceLevel: record.evidenceLevel,
               recommendedLearningAction: record.recommendedLearningAction,
               recommendationBasis: record.recommendationBasis,
-              recommendationTargetTopicId:
-                  record.recommendationTargetTopicId,
+              recommendationTargetTopicId: record.recommendationTargetTopicId,
               recommendationTargetSubtopicId:
                   record.recommendationTargetSubtopicId,
               projectionStatus: record.projectionStatus,
@@ -1258,60 +1258,6 @@ class AppState extends ChangeNotifier {
       );
     } finally {
       isSavingQuizToFirebase = false;
-      notifyListeners();
-    }
-  }
-
-  Future<void> loadParentDashboardFromFirebase() async {
-    if (isLoadingParentDashboard) return;
-
-    isLoadingParentDashboard = true;
-    parentDashboardMessage = null;
-    notifyListeners();
-
-    try {
-      final repository = _learningRepository ?? LearningRepository();
-      final snapshot = await repository.fetchParentDashboardSnapshot(
-        studentId: currentStudentId,
-        yearLevel: yearLevel,
-        topics: topics,
-      );
-
-      if (snapshot.attempts.isEmpty &&
-          snapshot.masteryRecordCount == 0 &&
-          snapshot.aiDiagnoses.isEmpty) {
-        loadedParentDashboardFromFirebase = false;
-        parentDashboardMessage = t(
-          'Using local parent dashboard until Firestore has learning data.',
-          'Menggunakan papan pemuka ibu bapa setempat sehingga Firestore mempunyai data pembelajaran.',
-        );
-      } else {
-        if (snapshot.attempts.isNotEmpty) {
-          attempts
-            ..clear()
-            ..addAll(snapshot.attempts);
-          _applyAttemptProgressToTopics();
-          _recordUnlockedProgression();
-          unawaited(saveAppSession());
-        }
-        aiDiagnoses
-          ..clear()
-          ..addAll(snapshot.aiDiagnoses);
-        _applyAiTopicMastery();
-        loadedParentDashboardFromFirebase = true;
-        parentDashboardMessage = t(
-          'Loaded parent dashboard from Firebase: ${snapshot.attempts.length} attempts, ${snapshot.masteryRecordCount} mastery records, ${snapshot.aiDiagnoses.length} AI diagnoses.',
-          'Memuat papan pemuka ibu bapa daripada Firebase: ${snapshot.attempts.length} cubaan, ${snapshot.masteryRecordCount} rekod penguasaan, ${snapshot.aiDiagnoses.length} diagnosis AI.',
-        );
-      }
-    } catch (_) {
-      loadedParentDashboardFromFirebase = false;
-      parentDashboardMessage = t(
-        'Firebase parent dashboard unavailable. Using local summary.',
-        'Papan pemuka ibu bapa Firebase tidak tersedia. Menggunakan ringkasan setempat.',
-      );
-    } finally {
-      isLoadingParentDashboard = false;
       notifyListeners();
     }
   }
@@ -1806,21 +1752,6 @@ class AppState extends ChangeNotifier {
     return currentYearAttempts
         .where((attempt) => attempt.topicId == topicId)
         .length;
-  }
-
-  void _applyAiTopicMastery() {
-    for (final diagnosis in _latestAiDiagnosesForCurrentYear()) {
-      final topicIndex = topics.indexWhere(
-        (topic) => topic.id == diagnosis.topicId,
-      );
-      if (topicIndex == -1) continue;
-
-      final topic = topics[topicIndex];
-      topics[topicIndex] = topic.copyWith(
-        progress: diagnosis.bktMasteryProbability.clamp(0.0, 1.0),
-        mastery: diagnosis.finalMasteryLabel,
-      );
-    }
   }
 
   List<AiDiagnosis> _latestAiDiagnosesForCurrentYear() {

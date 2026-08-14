@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:logic_oasis/app/theme.dart';
-import 'package:logic_oasis/features/parent_dashboard/parent_dashboard_time.dart';
 import 'package:logic_oasis/l10n/app_localizations.dart';
-import 'package:logic_oasis/shared/models/ai_diagnosis.dart';
 import 'package:logic_oasis/shared/models/linked_child_context.dart';
 import 'package:logic_oasis/shared/models/parent_dashboard_snapshot.dart';
 import 'package:logic_oasis/shared/repositories/learning_repository.dart';
@@ -10,8 +8,6 @@ import 'package:logic_oasis/shared/services/parent_link_context_service.dart';
 import 'package:logic_oasis/shared/services/parent_firebase_session.dart';
 import 'package:logic_oasis/shared/state/app_state.dart';
 import 'package:logic_oasis/shared/widgets/logic_oasis_figma_components.dart';
-import 'package:logic_oasis/shared/widgets/metric_card.dart';
-import 'package:logic_oasis/shared/widgets/recommendation_box.dart';
 import 'package:logic_oasis/shared/widgets/section_card.dart';
 
 typedef ParentDashboardLoader =
@@ -94,6 +90,12 @@ class _ParentDashboardPageState extends State<ParentDashboardPage> {
         _isLoading = false;
         _message = null;
       });
+    } on ParentDashboardAuthException {
+      if (!mounted || child.studentId != _selectedChild?.studentId) return;
+      setState(() {
+        _isLoading = false;
+        _message = 'This learner link is no longer active. Please reconnect.';
+      });
     } catch (_) {
       if (!mounted || child.studentId != _selectedChild?.studentId) return;
       setState(() {
@@ -168,13 +170,6 @@ class _ParentDashboardContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
-    final diagnoses = snapshot?.aiDiagnoses ?? const <AiDiagnosis>[];
-    final aiDiagnosis = diagnoses.isEmpty ? null : diagnoses.first;
-    final story = _ParentLearningStory.fromSafeProjection(
-      state,
-      child: selectedChild,
-      diagnosis: aiDiagnosis,
-    );
 
     return LogicOasisScaffold(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
@@ -219,144 +214,26 @@ class _ParentDashboardContent extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 18),
-        _ParentInsightSummary(
-          story: story,
-          focusLabel: state.t('Focus', 'Fokus'),
-          meaningLabel: state.t('Meaning', 'Maksud'),
-        ),
-        const SizedBox(height: 16),
         SectionCard(
           title: state.t(
             'Safe learning boundary',
             'Sempadan pembelajaran selamat',
           ),
           icon: Icons.verified_user_outlined,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                state.t(
-                  'This dashboard uses only protected status, mastery, assignment, and count-only participation projections.',
-                  'Papan pemuka ini menggunakan hanya unjuran status, penguasaan, tugasan dan penyertaan kiraan sahaja yang dilindungi.',
-                ),
-                style: theme.textTheme.bodyMedium,
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: MetricCard(
-                icon: Icons.trending_up,
-                label: state.t('Safe updates', 'Kemas kini selamat'),
-                value: '${diagnoses.length}',
-                color: LogicOasisTheme.leaf,
-              ),
+          child: Text(
+            state.t(
+              'This dashboard uses only protected mastery, practice, and count-only participation projections.',
+              'Papan pemuka ini menggunakan hanya unjuran penguasaan, latihan dan penyertaan kiraan sahaja yang dilindungi.',
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: MetricCard(
-                icon: Icons.history,
-                label: state.t('Mastery records', 'Rekod penguasaan'),
-                value: '${snapshot?.masteryRecordCount ?? 0}',
-                color: LogicOasisTheme.clay,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        SectionCard(
-          title: state.t('Latest safe analysis', 'Analisis selamat terkini'),
-          icon: Icons.history_outlined,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (aiDiagnosis == null)
-                Text(
-                  state.t(
-                    'No safe analysis is available yet. It will appear after a linked learner completes a server-validated quiz.',
-                    'Belum ada analisis selamat. Ia akan dipaparkan selepas pelajar yang dipautkan melengkapkan kuiz yang disahkan pelayan.',
-                  ),
-                )
-              else ...[
-                Text(aiDiagnosis.childFacingStatus),
-                const SizedBox(height: 12),
-                _AiDiagnosisDetails(
-                  diagnosis: aiDiagnosis,
-                  isBahasaMelayu: state.isBahasaMelayu,
-                ),
-              ],
-            ],
+            style: theme.textTheme.bodyMedium,
           ),
         ),
-        const SizedBox(height: 16),
-        SectionCard(
-          title: l10n.predictionSummary,
-          icon: Icons.lightbulb_outline,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                aiDiagnosis == null
-                    ? state.t(
-                        'Advice is updating',
-                        'Nasihat sedang dikemas kini',
-                      )
-                    : aiDiagnosis.finalMasteryLabel,
-                style: theme.textTheme.titleMedium,
-              ),
-              const SizedBox(height: 8),
-              RecommendationBox(
-                text:
-                    aiDiagnosis?.recommendedAction ??
-                    state.t(
-                      'Complete one short server-validated practice to prepare safe advice.',
-                      'Lengkapkan satu latihan ringkas yang disahkan pelayan untuk menyediakan nasihat selamat.',
-                    ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        SectionCard(
-          title: l10n.collaborationNote,
-          icon: Icons.groups_outlined,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _ParentActionStep(
-                icon: Icons.schedule_outlined,
-                title: state.t('Tonight', 'Malam ini'),
-                body: story.tonightAction,
-              ),
-              const SizedBox(height: 12),
-              _ParentActionStep(
-                icon: Icons.chat_bubble_outline,
-                title: state.t('Ask gently', 'Tanya dengan lembut'),
-                body: story.conversationPrompt,
-              ),
-              const SizedBox(height: 12),
-              _ParentActionStep(
-                icon: Icons.flag_outlined,
-                title: state.t('This week', 'Minggu ini'),
-                body: story.weekGoal,
-              ),
-            ],
-          ),
-        ),
-        if (snapshot?.forumParticipationSummary != null) ...[
+        if (selectedChild != null) ...[
           const SizedBox(height: 16),
           SectionCard(
-            title: state.t('Participation summary', 'Ringkasan penyertaan'),
-            icon: Icons.forum_outlined,
-            child: Text(
-              state.t(
-                '${snapshot!.forumParticipationSummary!.questionsPostedCount} questions, ${snapshot!.forumParticipationSummary!.answersSubmittedCount} answers, and ${snapshot!.forumParticipationSummary!.helpfulReceivedCount} helpful marks.',
-                '${snapshot!.forumParticipationSummary!.questionsPostedCount} soalan, ${snapshot!.forumParticipationSummary!.answersSubmittedCount} jawapan dan ${snapshot!.forumParticipationSummary!.helpfulReceivedCount} tanda membantu.',
-              ),
-            ),
+            title: state.t('Learning map', 'Peta pembelajaran'),
+            icon: Icons.map_outlined,
+            child: _ParentInterimProgressMap(state: state, snapshot: snapshot),
           ),
         ],
       ],
@@ -364,211 +241,87 @@ class _ParentDashboardContent extends StatelessWidget {
   }
 }
 
-class _ParentLearningStory {
-  const _ParentLearningStory({
-    required this.status,
-    required this.statusDetail,
-    required this.priority,
-    required this.parentMeaning,
-    required this.tonightAction,
-    required this.conversationPrompt,
-    required this.weekGoal,
-    required this.statusColor,
-    required this.statusIcon,
+/// Interim parent-safe summary of the three typed card inputs. U5 replaces
+/// this with the approved Progress Map; this interim view never exposes
+/// attempts, AI/model details, or raw maps.
+class _ParentInterimProgressMap extends StatelessWidget {
+  const _ParentInterimProgressMap({
+    required this.state,
+    required this.snapshot,
   });
 
-  final String status;
-  final String statusDetail;
-  final String priority;
-  final String parentMeaning;
-  final String tonightAction;
-  final String conversationPrompt;
-  final String weekGoal;
-  final Color statusColor;
-  final IconData statusIcon;
-
-  factory _ParentLearningStory.fromSafeProjection(
-    AppState state, {
-    required LinkedChildContext? child,
-    required AiDiagnosis? diagnosis,
-  }) {
-    final learnerName =
-        child?.displayName ??
-        state.t('your linked learner', 'pelajar yang dipautkan');
-    if (diagnosis == null) {
-      return _ParentLearningStory(
-        status: state.t(
-          'Waiting for safe updates',
-          'Menunggu kemas kini selamat',
-        ),
-        statusDetail: state.t(
-          'Complete one server-validated quiz for $learnerName to prepare a protected learning update.',
-          'Lengkapkan satu kuiz yang disahkan pelayan untuk $learnerName bagi menyediakan kemas kini pembelajaran terlindung.',
-        ),
-        priority: state.t(
-          'First focus: one short practice.',
-          'Fokus pertama: satu latihan ringkas.',
-        ),
-        parentMeaning: state.t(
-          'No local or seeded quiz history is used in this parent view.',
-          'Tiada sejarah kuiz setempat atau benih digunakan dalam paparan ibu bapa ini.',
-        ),
-        tonightAction: state.t(
-          'Encourage one short practice without pressure.',
-          'Galakkan satu latihan ringkas tanpa tekanan.',
-        ),
-        conversationPrompt: state.t(
-          'Which part would feel good to practise together?',
-          'Bahagian mana yang sesuai untuk dilatih bersama?',
-        ),
-        weekGoal: state.t(
-          'Wait for the first safe update before drawing conclusions.',
-          'Tunggu kemas kini selamat pertama sebelum membuat kesimpulan.',
-        ),
-        statusColor: LogicOasisTheme.water,
-        statusIcon: Icons.hourglass_top_outlined,
-      );
-    }
-    final masteryPercent = (diagnosis.bktMasteryProbability * 100).round();
-    return _ParentLearningStory(
-      status: state.t('Practice focus ready', 'Fokus latihan sedia'),
-      statusDetail: state.t(
-        'The latest protected update for $learnerName shows $masteryPercent% current mastery.',
-        'Kemas kini terlindung terkini untuk $learnerName menunjukkan $masteryPercent% penguasaan semasa.',
-      ),
-      priority: state.t(
-        'Follow the assigned next practice.',
-        'Ikut latihan seterusnya yang ditugaskan.',
-      ),
-      parentMeaning: state.t(
-        'This advice comes only from a compatible server projection. Low evidence remains preliminary.',
-        'Nasihat ini datang hanya daripada unjuran pelayan yang serasi. Bukti rendah kekal sebagai awal.',
-      ),
-      tonightAction: diagnosis.recommendedAction,
-      conversationPrompt: state.t(
-        'Which step should we practise slowly together?',
-        'Langkah mana yang patut kita latih perlahan-lahan bersama?',
-      ),
-      weekGoal: state.t(
-        'Complete two focused practices and compare the next safe update.',
-        'Lengkapkan dua latihan berfokus dan bandingkan kemas kini selamat seterusnya.',
-      ),
-      statusColor: LogicOasisTheme.water,
-      statusIcon: Icons.psychology_alt_outlined,
-    );
-  }
-}
-
-class _ParentInsightSummary extends StatelessWidget {
-  const _ParentInsightSummary({
-    required this.story,
-    required this.focusLabel,
-    required this.meaningLabel,
-  });
-
-  final _ParentLearningStory story;
-  final String focusLabel;
-  final String meaningLabel;
+  final AppState state;
+  final ParentDashboardSnapshot? snapshot;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final mastery = snapshot?.mastery;
+    final practice = snapshot?.practiceSummary;
+    final mutualAid = snapshot?.forumParticipationSummary;
 
-    return SoftCard(
-      padding: const EdgeInsets.all(16),
-      color: Color.alphaBlend(
-        story.statusColor.withValues(alpha: 0.09),
-        LogicOasisTheme.cream,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(story.statusIcon, color: story.statusColor, size: 26),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(story.status, style: theme.textTheme.titleLarge),
-                    const SizedBox(height: 4),
-                    Text(story.statusDetail),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          _InsightLine(
-            icon: Icons.center_focus_strong_outlined,
-            label: focusLabel,
-            text: story.priority,
-          ),
-          const SizedBox(height: 10),
-          _InsightLine(
-            icon: Icons.psychology_alt_outlined,
-            label: meaningLabel,
-            text: story.parentMeaning,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _InsightLine extends StatelessWidget {
-  const _InsightLine({
-    required this.icon,
-    required this.label,
-    required this.text,
-  });
-
-  final IconData icon;
-  final String label;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Row(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 18, color: LogicOasisTheme.deepLeaf),
-        const SizedBox(width: 8),
-        Expanded(
-          child: RichText(
-            text: TextSpan(
-              style: theme.textTheme.bodyMedium,
-              children: [
-                TextSpan(
-                  text: '$label: ',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: LogicOasisTheme.ink,
-                    fontWeight: FontWeight.w800,
-                  ),
+        _InterimMapRow(
+          icon: Icons.psychology_outlined,
+          label: state.t('Understanding', 'Pemahaman'),
+          body: mastery == null
+              ? state.t(
+                  'Learning evidence is temporarily unavailable.',
+                  'Bukti pembelajaran tidak tersedia buat sementara waktu.',
+                )
+              : mastery.isEmpty
+              ? state.t(
+                  'More learning evidence is needed before a focus can be named.',
+                  'Lebih banyak bukti pembelajaran diperlukan sebelum fokus dapat dinamakan.',
+                )
+              : state.t(
+                  '${mastery.length} learning records are ready.',
+                  '${mastery.length} rekod pembelajaran sudah sedia.',
                 ),
-                TextSpan(text: text),
-              ],
-            ),
-          ),
+        ),
+        const SizedBox(height: 10),
+        _InterimMapRow(
+          icon: Icons.task_alt_outlined,
+          label: state.t('Practice effort', 'Usaha latihan'),
+          body: practice == null
+              ? state.t(
+                  'Practice effort is unavailable this week.',
+                  'Usaha latihan tidak tersedia minggu ini.',
+                )
+              : state.t(
+                  'This week: ${practice.completedPracticeCount} completed practices across ${practice.activeDayCount} active days.',
+                  'Minggu ini: ${practice.completedPracticeCount} latihan lengkap sepanjang ${practice.activeDayCount} hari aktif.',
+                ),
+        ),
+        const SizedBox(height: 10),
+        _InterimMapRow(
+          icon: Icons.forum_outlined,
+          label: state.t('Mutual aid', 'Saling membantu'),
+          body: mutualAid == null
+              ? state.t(
+                  'Participation summary is unavailable this week.',
+                  'Ringkasan penyertaan tidak tersedia minggu ini.',
+                )
+              : state.t(
+                  'This week: ${mutualAid.questionsPostedCount} questions, ${mutualAid.answersSubmittedCount} replies, ${mutualAid.acceptedAnswersCount} accepted answers, ${mutualAid.helpfulReceivedCount} helpful marks.',
+                  'Minggu ini: ${mutualAid.questionsPostedCount} soalan, ${mutualAid.answersSubmittedCount} jawapan, ${mutualAid.acceptedAnswersCount} jawapan diterima, ${mutualAid.helpfulReceivedCount} tanda membantu.',
+                ),
         ),
       ],
     );
   }
 }
 
-class _ParentActionStep extends StatelessWidget {
-  const _ParentActionStep({
+class _InterimMapRow extends StatelessWidget {
+  const _InterimMapRow({
     required this.icon,
-    required this.title,
+    required this.label,
     required this.body,
   });
 
   final IconData icon;
-  final String title;
+  final String label;
   final String body;
 
   @override
@@ -578,119 +331,25 @@ class _ParentActionStep extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, color: LogicOasisTheme.leaf, size: 21),
+        Icon(icon, size: 20, color: LogicOasisTheme.deepLeaf),
         const SizedBox(width: 10),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: theme.textTheme.titleMedium),
-              const SizedBox(height: 3),
-              Text(body),
+              Text(
+                label,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: LogicOasisTheme.ink,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(body, style: theme.textTheme.bodyMedium),
             ],
           ),
         ),
       ],
-    );
-  }
-}
-
-class _AiDiagnosisDetails extends StatelessWidget {
-  const _AiDiagnosisDetails({
-    required this.diagnosis,
-    required this.isBahasaMelayu,
-  });
-
-  final AiDiagnosis diagnosis;
-  final bool isBahasaMelayu;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final masteryText = (diagnosis.bktMasteryProbability * 100).round();
-
-    return SoftCard(
-      padding: const EdgeInsets.all(12),
-      color: LogicOasisTheme.mint,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            isBahasaMelayu
-                ? 'Kemas kini pembelajaran selamat'
-                : 'Safe learning update',
-            style: theme.textTheme.titleMedium,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            isBahasaMelayu
-                ? 'Status pelayan: ${diagnosis.attemptsCount.clamp(0, 999)} pemerhatian pembelajaran.'
-                : 'Server status: ${diagnosis.attemptsCount.clamp(0, 999)} learning observations.',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: LogicOasisTheme.ink,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            isBahasaMelayu
-                ? 'Tahap pembelajaran: ${diagnosis.finalMasteryLabel}. Penguasaan semasa: $masteryText%.'
-                : 'Learning status: ${diagnosis.finalMasteryLabel}. Current mastery: $masteryText%.',
-            style: theme.textTheme.bodyMedium,
-          ),
-          if (diagnosis.evidenceLevel != null) ...[
-            const SizedBox(height: 6),
-            Text(
-              isBahasaMelayu
-                  ? 'Tahap bukti: ${diagnosis.evidenceLevel}.'
-                  : 'Evidence level: ${diagnosis.evidenceLevel}.',
-              style: theme.textTheme.bodySmall,
-            ),
-          ],
-          if (diagnosis.usesControlledDemonstrationModel) ...[
-            const SizedBox(height: 6),
-            Text(
-              isBahasaMelayu
-                  ? 'Cadangan AI sokongan ini berdasarkan model demonstrasi terkawal dan belum disahkan untuk penggunaan dunia sebenar.'
-                  : 'This supportive AI recommendation is based on a controlled demonstration model and is not real-world validated.',
-              style: theme.textTheme.bodySmall,
-            ),
-          ],
-          if (diagnosis.createdAt.millisecondsSinceEpoch > 0) ...[
-            const SizedBox(height: 6),
-            Text(
-              isBahasaMelayu
-                  ? 'Dikemas kini: ${formatAiUpdatedAt(diagnosis.createdAt)}'
-                  : 'Updated: ${formatAiUpdatedAt(diagnosis.createdAt)}',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: LogicOasisTheme.ink,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-          if (diagnosis.explanationReasons.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              isBahasaMelayu
-                  ? 'Sebab sokongan: ${diagnosis.explanationReasons.take(3).join(', ')}'
-                  : 'Supportive reason: ${diagnosis.explanationReasons.take(3).join(', ')}',
-              style: theme.textTheme.bodyMedium,
-            ),
-          ],
-          if (diagnosis.isFallback) ...[
-            const SizedBox(height: 8),
-            Text(
-              isBahasaMelayu
-                  ? 'Nasihat sandaran menggunakan kemajuan kuiz yang disahkan oleh pelayan.'
-                  : 'Fallback advice uses server-confirmed quiz progress.',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: LogicOasisTheme.deepLeaf,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ],
-      ),
     );
   }
 }

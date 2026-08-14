@@ -4,10 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:logic_oasis/features/parent_dashboard/parent_dashboard_page.dart';
 import 'package:logic_oasis/l10n/app_localizations.dart';
-import 'package:logic_oasis/shared/models/ai_diagnosis.dart';
 import 'package:logic_oasis/shared/models/forum_participation_summary.dart';
 import 'package:logic_oasis/shared/models/linked_child_context.dart';
 import 'package:logic_oasis/shared/models/parent_dashboard_snapshot.dart';
+import 'package:logic_oasis/shared/models/parent_practice_summary.dart';
+import 'package:logic_oasis/shared/models/trusted_subtopic_progress.dart';
 import 'package:logic_oasis/shared/services/parent_link_context_service.dart';
 import 'package:logic_oasis/shared/state/app_state.dart';
 
@@ -20,120 +21,142 @@ class _LinkedChildrenGateway implements ParentLinkedChildrenGateway {
   Future<List<LinkedChildContext>> loadLinkedChildren() async => children;
 }
 
+TrustedSubtopicProgress masteryRecord(String subtopicId) {
+  return TrustedSubtopicProgress(
+    studentId: 'student_safe',
+    topicId: 'whole_numbers_y4',
+    subtopicId: subtopicId,
+    yearLevel: 4,
+    completed: true,
+    masteryLevel: 'Moderate',
+    bestCorrectRate: 0.6,
+    attempted: true,
+    accessUnlocked: true,
+    masteryProbability: 0.55,
+    evidenceLevel: 'established',
+    observationCount: 2,
+    updatedAt: DateTime.utc(2026, 8, 1, 8),
+  );
+}
+
+ParentPracticeSummary practiceSummary() {
+  return ParentPracticeSummary(
+    schemaVersion: parentPracticeSummarySchemaVersion,
+    studentId: 'student_safe',
+    timezone: parentPracticeTimezone,
+    weekStart: DateTime.utc(2026, 8, 9, 16),
+    dailyCompletionCounts: const [1, 0, 0, 0, 2, 0, 0],
+    completedPracticeCount: 3,
+    activeDayCount: 2,
+    updatedAt: DateTime.utc(2026, 8, 11, 4),
+  );
+}
+
+ForumParticipationSummary mutualAidSummary() {
+  return const ForumParticipationSummary(
+    studentId: 'student_safe',
+    questionsPostedCount: 1,
+    answersSubmittedCount: 2,
+    acceptedAnswersCount: 1,
+    helpfulReceivedCount: 0,
+  );
+}
+
 void main() {
-  testWidgets(
-    'parent dashboard renders only the selected linked child snapshot',
-    (tester) async {
-      const child = LinkedChildContext(
-        studentId: 'student_safe',
-        displayName: 'Aiman',
-        yearLevel: 4,
-      );
-      const snapshot = ParentDashboardSnapshot(
-        attempts: const [],
-        masteryRecordCount: 1,
-        aiDiagnoses: const [
-          AiDiagnosis(
-            attemptId: 'attempt_safe',
-            studentId: 'student_safe',
-            sourceAttemptSequence: 1,
-            analysisState: 'completed',
-            displayCode: 'analysis_complete',
-            masteryProbability: .6,
-            evidenceLevel: 'preliminary',
-            modelEvidenceState: 'controlled_demonstration',
-            observationCount: 1,
-          ),
-        ],
-        forumParticipationSummary: const ForumParticipationSummary(
-          studentId: 'student_safe',
-          questionsPostedCount: 2,
-          answersSubmittedCount: 1,
-          acceptedAnswersCount: 0,
-          helpfulReceivedCount: 3,
+  testWidgets('parent dashboard renders only safe typed card inputs', (
+    tester,
+  ) async {
+    const child = LinkedChildContext(
+      studentId: 'student_safe',
+      displayName: 'Aiman',
+      yearLevel: 4,
+    );
+    final snapshot = ParentDashboardSnapshot(
+      mastery: [
+        masteryRecord('read_write_numbers'),
+        masteryRecord('place_digit_value'),
+      ],
+      practiceSummary: practiceSummary(),
+      forumParticipationSummary: mutualAidSummary(),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: ParentDashboardPage(
+          state: AppState(persistQuizResults: false),
+          linkedChildrenGateway: const _LinkedChildrenGateway([child]),
+          dashboardLoader: (_) async => snapshot,
         ),
-      );
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      await tester.pumpWidget(
-        MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: ParentDashboardPage(
-            state: AppState(persistQuizResults: false),
-            linkedChildrenGateway: const _LinkedChildrenGateway([child]),
-            dashboardLoader: (_) async => snapshot,
-          ),
+    expect(find.text('Safe learning updates for Aiman.'), findsOneWidget);
+    expect(find.text('2 learning records are ready.'), findsOneWidget);
+    expect(
+      find.text('This week: 3 completed practices across 2 active days.'),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        'This week: 1 questions, 2 replies, 1 accepted answers, '
+        '0 helpful marks.',
+      ),
+      findsOneWidget,
+    );
+    // No technical AI/model/server copy may reach the parent view.
+    expect(find.textContaining('controlled demonstration'), findsNothing);
+    expect(find.textContaining('Safe analysis'), findsNothing);
+    expect(find.textContaining('Server status'), findsNothing);
+    expect(find.textContaining('Fallback advice'), findsNothing);
+  });
+
+  testWidgets('unavailable cards stay distinct from recorded evidence', (
+    tester,
+  ) async {
+    const child = LinkedChildContext(
+      studentId: 'student_fallback',
+      displayName: 'Bela',
+      yearLevel: 5,
+    );
+    const snapshot = ParentDashboardSnapshot(
+      mastery: <TrustedSubtopicProgress>[],
+      practiceSummary: null,
+      forumParticipationSummary: null,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: ParentDashboardPage(
+          state: AppState(persistQuizResults: false),
+          linkedChildrenGateway: const _LinkedChildrenGateway([child]),
+          dashboardLoader: (_) async => snapshot,
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.text('Safe learning updates for Aiman.'), findsOneWidget);
-      expect(find.text('Practice focus ready'), findsOneWidget);
-      expect(
-        find.textContaining('controlled demonstration model'),
-        findsOneWidget,
-      );
-      expect(find.textContaining('not real-world validated'), findsOneWidget);
-      expect(
-        find.text('Fallback advice uses server-confirmed quiz progress.'),
-        findsNothing,
-      );
-      expect(
-        find.textContaining('2 questions, 1 answers, and 3 helpful marks.'),
-        findsOneWidget,
-      );
-      expect(find.textContaining('No quiz activity yet'), findsNothing);
-    },
-  );
-
-  testWidgets(
-    'parent dashboard shows fallback advice only for fallback state',
-    (tester) async {
-      const child = LinkedChildContext(
-        studentId: 'student_fallback',
-        displayName: 'Bela',
-        yearLevel: 5,
-      );
-      const snapshot = ParentDashboardSnapshot(
-        attempts: const [],
-        masteryRecordCount: 1,
-        aiDiagnoses: const [
-          AiDiagnosis(
-            attemptId: 'attempt_fallback',
-            studentId: 'student_fallback',
-            sourceAttemptSequence: 1,
-            analysisState: 'fallback',
-            displayCode: 'analysis_fallback',
-            masteryProbability: .6,
-            evidenceLevel: 'preliminary',
-            observationCount: 1,
-          ),
-        ],
-      );
-
-      await tester.pumpWidget(
-        MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: ParentDashboardPage(
-            state: AppState(persistQuizResults: false),
-            linkedChildrenGateway: const _LinkedChildrenGateway([child]),
-            dashboardLoader: (_) async => snapshot,
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(
-        find.text('Fallback advice uses server-confirmed quiz progress.'),
-        findsOneWidget,
-      );
-      expect(
-        find.textContaining('controlled demonstration model'),
-        findsNothing,
-      );
-    },
-  );
+    expect(
+      find.text(
+        'More learning evidence is needed before a focus can be named.',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Practice effort is unavailable this week.'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Participation summary is unavailable this week.'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Fallback advice'), findsNothing);
+    expect(find.textContaining('controlled demonstration'), findsNothing);
+  });
 
   testWidgets('unlinked account cannot fall back to local learner data', (
     tester,
@@ -154,10 +177,8 @@ void main() {
       find.text('No active linked learner is available for this account.'),
       findsOneWidget,
     );
-    expect(
-      find.textContaining('No safe analysis is available yet.'),
-      findsOneWidget,
-    );
+    expect(find.text('Learning map'), findsNothing);
+    expect(find.textContaining('Safe analysis'), findsNothing);
   });
 
   testWidgets('a stale child-load failure cannot replace a newer selection', (
@@ -175,9 +196,7 @@ void main() {
     );
     final firstLoad = Completer<ParentDashboardSnapshot>();
     const belaSnapshot = ParentDashboardSnapshot(
-      attempts: const [],
-      masteryRecordCount: 2,
-      aiDiagnoses: const [],
+      mastery: <TrustedSubtopicProgress>[],
     );
 
     await tester.pumpWidget(

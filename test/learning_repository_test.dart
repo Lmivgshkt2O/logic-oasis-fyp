@@ -1,7 +1,248 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:logic_oasis/shared/models/forum_participation_summary.dart';
+import 'package:logic_oasis/shared/models/parent_dashboard_snapshot.dart';
+import 'package:logic_oasis/shared/models/parent_practice_summary.dart';
 import 'package:logic_oasis/shared/models/quiz_attempt.dart';
+import 'package:logic_oasis/shared/models/trusted_subtopic_progress.dart';
 import 'package:logic_oasis/shared/repositories/learning_repository.dart';
+
+const parentStudentId = 'student_a';
+
+Map<String, dynamic> masteryData({String subtopicId = 'read_write_numbers'}) {
+  return {
+    'studentId': parentStudentId,
+    'topicId': 'whole_numbers_y4',
+    'subtopicId': subtopicId,
+    'yearLevel': 4,
+    'completed': true,
+    'masteryLevel': 'Moderate',
+    'bestCorrectRate': 0.6,
+    'attempted': true,
+    'accessUnlocked': true,
+    'masteryProbability': 0.55,
+    'evidenceLevel': 'established',
+    'observationCount': 3,
+    'updatedAt': Timestamp.fromDate(DateTime.utc(2026, 8, 1, 8)),
+  };
+}
+
+Map<String, dynamic> practiceData({String? student = parentStudentId}) {
+  return {
+    'schemaVersion': parentPracticeSummarySchemaVersion,
+    'studentId': student,
+    'timezone': parentPracticeTimezone,
+    'weekStart': Timestamp.fromDate(DateTime.utc(2026, 8, 9, 16)),
+    'dailyCompletionCounts': [1, 0, 0, 0, 2, 0, 0],
+    'completedPracticeCount': 3,
+    'activeDayCount': 2,
+    'updatedAt': Timestamp.fromDate(DateTime.utc(2026, 8, 11, 4)),
+  };
+}
+
+Map<String, dynamic> forumData({String? student = parentStudentId}) {
+  return {
+    'studentId': student,
+    'weekStart': Timestamp.fromDate(DateTime.utc(2026, 8, 9, 16)),
+    'questionsPostedCount': 1,
+    'answersSubmittedCount': 2,
+    'acceptedAnswersCount': 1,
+    'helpfulReceivedCount': 0,
+    'updatedAt': Timestamp.fromDate(DateTime.utc(2026, 8, 10, 3)),
+  };
+}
+
+class _FakeFirestore implements FirebaseFirestore {
+  _FakeFirestore(this.documents);
+
+  /// collection name -> document id -> raw map.
+  final Map<String, Map<String, Map<String, dynamic>>> documents;
+  final List<String> accessedCollections = [];
+
+  /// Key is a collection name (query reads) or `collection/doc` (document
+  /// reads). A value here is thrown when that read is attempted.
+  final Map<String, Object> readErrors = {};
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) {
+    if (invocation.memberName == #collection) {
+      final path = invocation.positionalArguments.single as String;
+      accessedCollections.add(path);
+      return _FakeCollectionReference(
+        path,
+        documents.putIfAbsent(path, () => <String, Map<String, dynamic>>{}),
+        readErrors,
+      );
+    }
+    return super.noSuchMethod(invocation);
+  }
+}
+
+// The Firestore interfaces are analyzer-sealed, so a focused test fake may
+// not implement them without a suppression; the fake is never shipped.
+// ignore: subtype_of_sealed_class
+class _FakeCollectionReference
+    implements CollectionReference<Map<String, dynamic>> {
+  _FakeCollectionReference(this.path, this.documents, this.readErrors);
+
+  final String path;
+  final Map<String, Map<String, dynamic>> documents;
+  final Map<String, Object> readErrors;
+
+  @override
+  _FakeDocumentReference doc([String? path]) {
+    return _FakeDocumentReference(this.path, path!, documents, readErrors);
+  }
+
+  @override
+  _FakeQuery where(
+    Object field, {
+    Object? isEqualTo,
+    Object? isNotEqualTo,
+    Object? isLessThan,
+    Object? isLessThanOrEqualTo,
+    Object? isGreaterThan,
+    Object? isGreaterThanOrEqualTo,
+    Object? arrayContains,
+    Iterable<Object?>? arrayContainsAny,
+    Iterable<Object?>? whereIn,
+    Iterable<Object?>? whereNotIn,
+    bool? isNull,
+  }) {
+    return _FakeQuery(path, documents, readErrors, [(field, isEqualTo)]);
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+// ignore: subtype_of_sealed_class
+class _FakeQuery implements Query<Map<String, dynamic>> {
+  _FakeQuery(this.path, this.documents, this.readErrors, this.conditions);
+
+  final String path;
+  final Map<String, Map<String, dynamic>> documents;
+  final Map<String, Object> readErrors;
+  final List<(Object, Object?)> conditions;
+
+  @override
+  _FakeQuery where(
+    Object field, {
+    Object? isEqualTo,
+    Object? isNotEqualTo,
+    Object? isLessThan,
+    Object? isLessThanOrEqualTo,
+    Object? isGreaterThan,
+    Object? isGreaterThanOrEqualTo,
+    Object? arrayContains,
+    Iterable<Object?>? arrayContainsAny,
+    Iterable<Object?>? whereIn,
+    Iterable<Object?>? whereNotIn,
+    bool? isNull,
+  }) {
+    return _FakeQuery(path, documents, readErrors, [
+      ...conditions,
+      (field, isEqualTo),
+    ]);
+  }
+
+  @override
+  Future<QuerySnapshot<Map<String, dynamic>>> get([GetOptions? options]) async {
+    final error = readErrors[path];
+    if (error != null) throw error;
+    final docs = documents.values
+        .where(
+          (data) => conditions.every(
+            (condition) => data[condition.$1 as String] == condition.$2,
+          ),
+        )
+        .map((data) => _FakeQueryDocumentSnapshot(data))
+        .toList(growable: false);
+    return _FakeQuerySnapshot(docs);
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _FakeQuerySnapshot implements QuerySnapshot<Map<String, dynamic>> {
+  _FakeQuerySnapshot(this.docs);
+
+  @override
+  final List<QueryDocumentSnapshot<Map<String, dynamic>>> docs;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+// ignore: subtype_of_sealed_class
+class _FakeQueryDocumentSnapshot
+    implements QueryDocumentSnapshot<Map<String, dynamic>> {
+  _FakeQueryDocumentSnapshot(this._raw);
+
+  final Map<String, dynamic> _raw;
+
+  @override
+  Map<String, dynamic> data() => _raw;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+// ignore: subtype_of_sealed_class
+class _FakeDocumentReference
+    implements DocumentReference<Map<String, dynamic>> {
+  _FakeDocumentReference(
+    this.collectionPath,
+    this.documentPath,
+    this.documents,
+    this.readErrors,
+  );
+
+  final String collectionPath;
+  final String documentPath;
+  final Map<String, Map<String, dynamic>> documents;
+  final Map<String, Object> readErrors;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) {
+    if (invocation.memberName == #get) {
+      final error = readErrors['$collectionPath/$documentPath'];
+      if (error != null) throw error;
+      return Future<DocumentSnapshot<Map<String, dynamic>>>.value(
+        _FakeDocumentSnapshot(documents[documentPath]),
+      );
+    }
+    return super.noSuchMethod(invocation);
+  }
+}
+
+// ignore: subtype_of_sealed_class
+class _FakeDocumentSnapshot implements DocumentSnapshot<Map<String, dynamic>> {
+  _FakeDocumentSnapshot(this._raw);
+
+  final Map<String, dynamic>? _raw;
+
+  @override
+  bool get exists => _raw != null;
+
+  @override
+  Map<String, dynamic>? data() => _raw;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+const forbiddenParentCollections = <String>[
+  'studentAiStatuses',
+  'adaptiveAssignments',
+  'quizAttempts',
+  'questionResponses',
+  'aiJobs',
+  'aiModelRuns',
+  'forumQuestions',
+  'forumAnswers',
+];
 
 void main() {
   final createdAt = DateTime(2026, 7, 2, 14, 5);
@@ -106,24 +347,27 @@ void main() {
     expect(payload['subtopicTitle'], 'Equivalent Fractions');
   });
 
-  test('subtopic mastery payload marks correct rate above 50 percent complete', () {
-    final payload = LearningRepository.buildSubtopicMasteryData(
-      studentId: 'student_aiman_y4',
-      attempt: attempt(
-        id: 'attempt_percentages',
-        topicId: 'percentages_y4',
-        subtopicId: 'percentage_meaning',
-        subtopicTitle: 'Meaning of Percentage',
-        score: 60,
-        correctCount: 3,
-        createdAt: createdAt,
-      ),
-    );
+  test(
+    'subtopic mastery payload marks correct rate above 50 percent complete',
+    () {
+      final payload = LearningRepository.buildSubtopicMasteryData(
+        studentId: 'student_aiman_y4',
+        attempt: attempt(
+          id: 'attempt_percentages',
+          topicId: 'percentages_y4',
+          subtopicId: 'percentage_meaning',
+          subtopicTitle: 'Meaning of Percentage',
+          score: 60,
+          correctCount: 3,
+          createdAt: createdAt,
+        ),
+      );
 
-    expect(payload['subtopicId'], 'percentage_meaning');
-    expect(payload['bestCorrectRate'], 0.6);
-    expect(payload['completed'], isTrue);
-  });
+      expect(payload['subtopicId'], 'percentage_meaning');
+      expect(payload['bestCorrectRate'], 0.6);
+      expect(payload['completed'], isTrue);
+    },
+  );
 
   test('subtopic mastery payload keeps best completion after weaker retry', () {
     final passed = attempt(
@@ -270,5 +514,164 @@ void main() {
     expect(payload['progress'], 0.2);
     expect(payload['attemptsCount'], 3);
     expect(payload['recentTrend'], 'declining');
+  });
+
+  group('fetchParentDashboardSnapshot safe assembly', () {
+    test(
+      'assembles only typed safe card inputs from the allowlisted reads',
+      () async {
+        final fake = _FakeFirestore({
+          'subtopicMastery': {
+            'a_read_write': masteryData(),
+            'a_place_value': masteryData(subtopicId: 'place_digit_value'),
+            // Malformed probability (> 1) must be omitted, not turned into
+            // advice.
+            'a_bad': {...masteryData(), 'masteryProbability': 7},
+          },
+          'parentPracticeSummaries': {parentStudentId: practiceData()},
+          'forumParticipationSummaries': {parentStudentId: forumData()},
+        });
+        final repository = LearningRepository(firestore: fake);
+
+        final snapshot = await repository.fetchParentDashboardSnapshot(
+          studentId: parentStudentId,
+          yearLevel: 4,
+          topics: const [],
+        );
+
+        expect(snapshot.mastery, hasLength(2));
+        expect(snapshot.mastery!.first, isA<TrustedSubtopicProgress>());
+        expect(snapshot.practiceSummary, isA<ParentPracticeSummary>());
+        expect(snapshot.practiceSummary?.completedPracticeCount, 3);
+        expect(
+          snapshot.forumParticipationSummary,
+          isA<ForumParticipationSummary>(),
+        );
+        expect(snapshot.forumParticipationSummary?.answersSubmittedCount, 2);
+        expect(
+          fake.accessedCollections,
+          containsAll(<String>[
+            'subtopicMastery',
+            'parentPracticeSummaries',
+            'forumParticipationSummaries',
+          ]),
+        );
+        for (final collection in forbiddenParentCollections) {
+          expect(fake.accessedCollections, isNot(contains(collection)));
+        }
+      },
+    );
+
+    test('missing practice or forum documents leave independent unavailable '
+        'cards while valid Understanding remains', () async {
+      final fake = _FakeFirestore({
+        'subtopicMastery': {'a_read_write': masteryData()},
+      });
+      final repository = LearningRepository(firestore: fake);
+
+      final snapshot = await repository.fetchParentDashboardSnapshot(
+        studentId: parentStudentId,
+        yearLevel: 4,
+        topics: const [],
+      );
+
+      expect(snapshot.mastery, hasLength(1));
+      expect(snapshot.practiceSummary, isNull);
+      expect(snapshot.forumParticipationSummary, isNull);
+    });
+
+    test('a non-auth read failure keeps the other cards available', () async {
+      final fake = _FakeFirestore({
+        'subtopicMastery': {'a_read_write': masteryData()},
+        'forumParticipationSummaries': {parentStudentId: forumData()},
+      });
+      fake.readErrors['parentPracticeSummaries/$parentStudentId'] =
+          FirebaseException(
+            code: 'unavailable',
+            message: 'network down',
+            plugin: 'cloud_firestore',
+          );
+      final repository = LearningRepository(firestore: fake);
+
+      final snapshot = await repository.fetchParentDashboardSnapshot(
+        studentId: parentStudentId,
+        yearLevel: 4,
+        topics: const [],
+      );
+
+      expect(snapshot.mastery, hasLength(1));
+      expect(snapshot.practiceSummary, isNull);
+      expect(snapshot.forumParticipationSummary, isNotNull);
+    });
+
+    test(
+      'permission denial clears the whole snapshot as an auth failure',
+      () async {
+        final fake = _FakeFirestore({
+          'subtopicMastery': {'a_read_write': masteryData()},
+          'parentPracticeSummaries': {parentStudentId: practiceData()},
+        });
+        fake.readErrors['forumParticipationSummaries/$parentStudentId'] =
+            FirebaseException(
+              code: 'permission-denied',
+              message: 'Missing or insufficient permissions.',
+              plugin: 'cloud_firestore',
+            );
+        final repository = LearningRepository(firestore: fake);
+
+        await expectLater(
+          repository.fetchParentDashboardSnapshot(
+            studentId: parentStudentId,
+            yearLevel: 4,
+            topics: const [],
+          ),
+          throwsA(isA<ParentDashboardAuthException>()),
+        );
+      },
+    );
+
+    test(
+      'a selected-child identity mismatch is a whole-snapshot auth failure',
+      () async {
+        final fake = _FakeFirestore({
+          'subtopicMastery': {'a_read_write': masteryData()},
+          'parentPracticeSummaries': {
+            parentStudentId: practiceData(student: 'other_student'),
+          },
+        });
+        final repository = LearningRepository(firestore: fake);
+
+        await expectLater(
+          repository.fetchParentDashboardSnapshot(
+            studentId: parentStudentId,
+            yearLevel: 4,
+            topics: const [],
+          ),
+          throwsA(isA<ParentDashboardAuthException>()),
+        );
+      },
+    );
+
+    test(
+      'a malformed practice document is unavailable, never advice',
+      () async {
+        final fake = _FakeFirestore({
+          'subtopicMastery': {'a_read_write': masteryData()},
+          'parentPracticeSummaries': {
+            parentStudentId: practiceData()..['schemaVersion'] = 'u13-legacy',
+          },
+        });
+        final repository = LearningRepository(firestore: fake);
+
+        final snapshot = await repository.fetchParentDashboardSnapshot(
+          studentId: parentStudentId,
+          yearLevel: 4,
+          topics: const [],
+        );
+
+        expect(snapshot.mastery, hasLength(1));
+        expect(snapshot.practiceSummary, isNull);
+      },
+    );
   });
 }
