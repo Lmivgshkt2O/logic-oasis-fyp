@@ -667,6 +667,7 @@ class ForumDiscussionPage extends StatefulWidget {
     this.answersStream,
     this.blockedStudentIdsStream,
     this.authorFeedbackStreamForAnswer,
+    this.returnOnLinkedSubmit = false,
   });
   final ForumQuestion question;
   final AppState state;
@@ -675,6 +676,9 @@ class ForumDiscussionPage extends StatefulWidget {
   final Stream<Set<String>>? blockedStudentIdsStream;
   final Stream<ForumAnswerFeedback> Function(String answerId)?
   authorFeedbackStreamForAnswer;
+  /// When the thread was opened from quiz review, returning the student to
+  /// the review card automatically after a successful linked submission.
+  final bool returnOnLinkedSubmit;
   @override
   State<ForumDiscussionPage> createState() => _AnswersPageState();
 }
@@ -685,6 +689,7 @@ class _AnswersPageState extends State<ForumDiscussionPage> {
   final _status = const ForumAiStatusService();
   final Set<String> _inFlight = {};
   StreamSubscription<Set<String>>? _blockedSubscription;
+  Timer? _returnTimer;
   Set<String> _blockedAuthors = const {};
   Object? _blockedError;
   String? _acceptedAnswerId;
@@ -730,6 +735,7 @@ class _AnswersPageState extends State<ForumDiscussionPage> {
     _answer.dispose();
     _explanation.dispose();
     _blockedSubscription?.cancel();
+    _returnTimer?.cancel();
     super.dispose();
   }
 
@@ -1047,6 +1053,12 @@ class _AnswersPageState extends State<ForumDiscussionPage> {
           'Jawapan telah dihantar dan menunggu semakan.',
         ),
       );
+      if (widget.returnOnLinkedSubmit) {
+        _returnTimer?.cancel();
+        _returnTimer = Timer(const Duration(seconds: 2), () {
+          if (mounted) Navigator.of(context).pop();
+        });
+      }
       return true;
     } catch (error) {
       _message(_friendlyError(error, widget.state));

@@ -70,6 +70,9 @@ class ResultPage extends StatelessWidget {
             state: AppState()
               ..language = isBahasaMelayu ? 'Bahasa Melayu' : 'English',
             repository: repository,
+            // Opened from quiz review: after a successful linked submission
+            // the student returns to the review card automatically.
+            returnOnLinkedSubmit: true,
           ),
         ),
       );

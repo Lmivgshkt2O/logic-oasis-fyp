@@ -1098,6 +1098,117 @@ void main() {
     expect(find.textContaining('queued for review'), findsOneWidget);
   });
 
+  testWidgets('linked submission from quiz review returns after two seconds', (
+    tester,
+  ) async {
+    final answers = StreamController<List<ForumAnswer>>();
+    addTearDown(answers.close);
+    final repository = _LinkedActionRepository();
+    const question = ForumQuestion(
+      id: 'linked_q1_v1',
+      authorId: '',
+      title: 'Which numeral shows twenty thousand and four?',
+      text: 'Which numeral shows twenty thousand and four?',
+      mode: 'linked',
+      options: ['20 004', '24 000', '20 400', '20 040'],
+      optionsBm: ['20 004', '24 000', '20 400', '20 040'],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: TextButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => ForumDiscussionPage(
+                      question: question,
+                      state: AppState(),
+                      repository: repository,
+                      answersStream: answers.stream,
+                      blockedStudentIdsStream: Stream.value(
+                        const <String>{},
+                      ),
+                      returnOnLinkedSubmit: true,
+                    ),
+                  ),
+                ),
+                child: const Text('Review results'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Review results'));
+    await tester.pump();
+    await tester.pump();
+    answers.add(const []);
+    await tester.pump();
+
+    await tester.tap(find.text('20 400'));
+    await tester.enterText(
+      find.byType(TextField).last,
+      'I compared the digits from left to right.',
+    );
+    await tester.ensureVisible(find.text('Submit answer'));
+    await tester.tap(find.text('Submit answer'));
+    await tester.pump();
+    expect(find.textContaining('queued for review'), findsWidgets);
+
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.text('Review results'), findsOneWidget);
+    expect(find.text('Answers'), findsNothing);
+  });
+
+  testWidgets('linked submission from the forum list stays on the thread', (
+    tester,
+  ) async {
+    final answers = StreamController<List<ForumAnswer>>();
+    addTearDown(answers.close);
+    final repository = _LinkedActionRepository();
+    const question = ForumQuestion(
+      id: 'linked_q1_v1',
+      authorId: '',
+      title: 'Which numeral shows twenty thousand and four?',
+      text: 'Which numeral shows twenty thousand and four?',
+      mode: 'linked',
+      options: ['20 004', '24 000', '20 400', '20 040'],
+      optionsBm: ['20 004', '24 000', '20 400', '20 040'],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ForumDiscussionPage(
+          question: question,
+          state: AppState(),
+          repository: repository,
+          answersStream: answers.stream,
+          blockedStudentIdsStream: Stream.value(const <String>{}),
+        ),
+      ),
+    );
+    await tester.pump();
+    answers.add(const []);
+    await tester.pump();
+
+    await tester.tap(find.text('20 400'));
+    await tester.enterText(
+      find.byType(TextField).last,
+      'I compared the digits from left to right.',
+    );
+    await tester.ensureVisible(find.text('Submit answer'));
+    await tester.tap(find.text('Submit answer'));
+    await tester.pump();
+    expect(find.textContaining('queued for review'), findsOneWidget);
+
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump();
+
+    expect(find.text('Answers'), findsOneWidget);
+  });
+
   testWidgets('linked composer uses Bahasa Melayu labels', (tester) async {
     final answers = StreamController<List<ForumAnswer>>();
     addTearDown(answers.close);
