@@ -55,7 +55,7 @@
   "reasoningArtifactSizeBytes": 50066,
   "reasoningModelType": "MultinomialNB",
   "reasoningModelVersion": "forum-controlled-demo-nb-v1",
-  "releaseId": "forum-controlled-demo-nb-v1-release-7",
+  "releaseId": "forum-controlled-demo-nb-v1-release-8",
   "releaseRationale": "Developer-released FYP1 controlled-demonstration model. Not evaluated on real learner forum responses.",
   "releaseScope": "fyp1_forum_controlled_demo",
   "releasedAt": "2026-08-14T00:00:00Z",
@@ -104,7 +104,7 @@
     "relevance.py": "842684b464dbe815f5877932a1816ea96e95b52d923c9ddf789099ccf2062a96"
   },
   "splitManifestSha256": "b07f4e9961e6bad3824f601000026d73df07b7e86a63293ee8956407f41db6cb",
-  "supersedesReleaseId": "forum-controlled-demo-nb-v1-release-6",
+  "supersedesReleaseId": null,
   "trainingDataProvenance": "expert_authored_controlled_demo",
   "vectorizerContract": {
     "abstentionPolicyVersion": "forum-advisory-policy-v1",
