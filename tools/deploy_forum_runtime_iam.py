@@ -65,13 +65,15 @@ def runtime_deploy_command(
         "--gen2", "--region", FUNCTION_REGION, "--project", PROJECT_ID,
         "--source", str(FUNCTIONS_ROOT),
         "--runtime", "python311", "--entry-point", function_name,
+        "--memory=512MiB",
         "--trigger-location", FUNCTION_REGION,
+        "--trigger-service-account", SERVICE_ACCOUNT,
         "--trigger-event-filters",
         f"type={MODEL_FUNCTION_EVENTS[function_name]},database=(default)",
         "--trigger-event-filters-path-pattern", "document=forumAnswers/{answerId}",
         "--retry", "--service-account", SERVICE_ACCOUNT,
         "--set-env-vars",
-        f"FORUM_MODEL_EVIDENCE_MODE={evidence_mode},FORUM_RUNTIME_CODE_REVISION={code_revision}",
+        f"FORUM_MODEL_EVIDENCE_MODE={evidence_mode},FORUM_RUNTIME_CODE_REVISION={code_revision},FUNCTION_SIGNATURE_TYPE=cloudevent",
     ]
 
 
@@ -140,6 +142,10 @@ def deploy_command(
     functions_root: Path | None = None,
 ) -> list[str]:
     source = functions_root or FUNCTIONS_ROOT
+    environment = (
+        f"FORUM_MODEL_EVIDENCE_MODE={evidence_mode},"
+        f"FORUM_RUNTIME_CODE_REVISION={code_revision}"
+    )
     command = [
         "gcloud", "functions", "deploy", str(entry["name"]),
         "--gen2", "--region", str(entry["region"]), "--project", PROJECT_ID,
@@ -148,18 +154,29 @@ def deploy_command(
         "--entry-point", str(entry["name"]),
         "--service-account", str(entry["serviceAccount"]),
         "--set-env-vars",
-        f"FORUM_MODEL_EVIDENCE_MODE={evidence_mode},FORUM_RUNTIME_CODE_REVISION={code_revision}",
+        environment,
     ]
     if entry["kind"] == "trigger":
+        # Firebase Python Gen2 handlers are CloudEvent functions: the
+        # framework must receive the single event argument, and Eventarc
+        # delivers through the dedicated runtime identity. The ML bundle needs
+        # more than the 256 MiB default.
         command.extend([
+            "--memory=512MiB",
             "--trigger-location", str(entry["region"]),
+            "--trigger-service-account", str(entry["serviceAccount"]),
             "--trigger-event-filters",
             f"type={entry['eventType']},database=(default)",
             "--trigger-event-filters-path-pattern",
             f"document={entry['document']}",
         ])
+        command[command.index("--set-env-vars") + 1] = (
+            f"{environment},FUNCTION_SIGNATURE_TYPE=cloudevent"
+        )
         if entry.get("retry") is True:
             command.append("--retry")
+    else:
+        command.append("--trigger-http")
     return command
 
 

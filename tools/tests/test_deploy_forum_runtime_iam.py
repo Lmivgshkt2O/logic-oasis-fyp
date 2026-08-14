@@ -142,6 +142,10 @@ class ForumRuntimeIamTests(unittest.TestCase):
         self.assertEqual(2, rendered.count("--retry"))
         self.assertEqual(11, rendered.count("--service-account"))
         self.assertEqual(3, rendered.count("--trigger-location"))
+        self.assertEqual(8, rendered.count("--trigger-http"))
+        self.assertEqual(3, rendered.count("--trigger-service-account"))
+        self.assertEqual(3, rendered.count("FUNCTION_SIGNATURE_TYPE=cloudevent"))
+        self.assertEqual(3, rendered.count("--memory=512MiB"))
 
     def test_inspection_and_attestation_require_the_full_matching_inventory(self):
         inspection = inspection_commands()

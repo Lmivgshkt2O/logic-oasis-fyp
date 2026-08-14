@@ -33,7 +33,7 @@ manifest, never from stale committed files:
    `forum-model-release-manifest-v2` with `pythonVersion 3.11.x`, the
    dependency-lock digest, and both component artifacts.
 
-## Function inventory (nine entries)
+## Function inventory (eleven entries)
 
 The authoritative inventory lives in
 `tools/forum_function_inventory.py` (`forum-function-inventory-v1`). Every
@@ -45,6 +45,8 @@ only the answer create/update triggers enable retry.
 | Callable | openOrCreateForumDiscussion | `openOrCreateForumDiscussion` |
 | Callable | submitLinkedForumAnswer | `submitLinkedForumAnswer` |
 | Callable | editLinkedForumAnswer | `editLinkedForumAnswer` |
+| Callable | deleteForumQuestion | `deleteForumQuestion` |
+| Callable | deleteForumAnswer | `deleteForumAnswer` |
 | Callable | markForumAnswerHelpful | `markForumAnswerHelpful` |
 | Callable | acceptForumAnswer | `acceptForumAnswer` |
 | Callable | reportForumContent | `reportForumContent` |
@@ -52,12 +54,36 @@ only the answer create/update triggers enable retry.
 | Trigger | processForumAnswer | forumAnswers created (retry) |
 | Trigger | reprocessForumAnswer | forumAnswers updated (retry) |
 
+## One-time IAM and Eventarc setup (observed 2026-08-14)
+
+- Create the dedicated runtime service account
+  `logic-oasis-forum-runtime@logic-oasis-fyp.iam.gserviceaccount.com` and bind
+  `roles/datastore.user` and `roles/logging.logWriter` on the project.
+- Grant the deployer `roles/iam.serviceAccountUser` on the runtime identity.
+- Grant `roles/eventarc.serviceAgent` to `service-<project>@gcp-sa-eventarc.iam.gserviceaccount.com`
+  and to `service-<project>@gcf-admin-robot.iam.gserviceaccount.com`, plus
+  `roles/cloudfunctions.serviceAgent` to the Cloud Functions service agent.
+- Grant `roles/eventarc.eventReceiver` and `roles/run.invoker` to the identity
+  used for Eventarc delivery (the dedicated runtime service account when
+  `--trigger-service-account` is used).
+
+## Deploy flags (observed working contract)
+
+- Callables deploy with `--trigger-http`.
+- Triggers deploy with `--memory=512MiB` (the scikit-learn bundle exceeds the
+  256 MiB default), `FUNCTION_SIGNATURE_TYPE=cloudevent` in the env vars
+  (Firebase Python handlers receive a single CloudEvent argument),
+  `--trigger-service-account <runtime-identity>`, the Eventarc event filters,
+  and `--retry` only for the answer create/update triggers.
+- `tools/deploy_forum_runtime_iam.py` emits these exact commands; run its
+  dry-run preflight first and apply each emitted command.
+
 ## Deploy-before-promote order
 
 1. **Preflight (read-only):** run the deploy helper's preflight with the
    operator account, evidence mode, and revision. Wrong project, operator,
    region, runtime, revision, or an unsafe operator identity aborts.
-2. **Deploy Firestore Rules**, then the full nine-entry forum inventory
+2. **Deploy Firestore Rules**, then the full eleven-entry forum inventory
    (dry-run first; apply only after explicit authorization).
 3. **Inspect every deployed entry** (`gcloud functions describe ... --format
    json`): region, runtime, service account, entry point, trigger, and

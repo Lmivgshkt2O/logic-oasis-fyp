@@ -177,3 +177,21 @@ identity remains contract-tested only. U10-R must supply approved real/external
 provenance, de-identification and retention controls, reviewer evidence,
 author-grouped evaluation where feasible, full class metrics and calibration,
 and a separately authorized cloud rollout before any `real_evaluated` claim.
+
+## U8 authorized cloud deployment — 2026-08-14
+
+The authorized controlled cloud rollout was executed per the runbook: preflight
+passed, the dedicated runtime identity and Eventarc delivery bindings were
+established, Firestore Rules and all 11 forum functions were deployed and
+inspected, the pre-promotion fallback was proven with fictional content, release
+`forum-controlled-demo-nb-v1-release-8` (revision
+`5cb68d79a5f235309d583140eb8ce2b5079fbd623f2f1846969be4645ca7b223`) was
+promoted with a live deployment attestation
+(`90f890c4c4ff431c5964373fbb01ec3e1bdad1bf8577b99b5032a80a94409d80`), and the
+controlled smoke matrix produced the expected verified/incorrect/may-be-
+irrelevant/needs-reasoning/free-form/edit-fencing outcomes under claim
+`controlled_demonstration_only`. Full details are in
+[u10-forum-cloud-deployment.md](u10-forum-cloud-deployment.md). The 24-hour
+observation window runs from `2026-08-14T13:10Z`; closure is confirmed only
+after that window reports zero integrity failures. The earlier paragraph above
+reflects the U6 state and remains historical.
