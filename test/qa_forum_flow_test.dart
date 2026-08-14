@@ -671,7 +671,7 @@ void main() {
               ),
           latestQuestionsStream: Stream.value(const [question]),
           blockedStudentIdsStream: blocked,
-          answersStreamForQuestion: (_) => Stream.value(const [answer]),
+          answersStreamForQuestion: (_) => Stream.value([answer]),
         ),
       ),
     );
@@ -719,7 +719,7 @@ void main() {
           blockedStudentIdsStream: Stream.value(
             const <String>{},
           ).asBroadcastStream(),
-          answersStreamForQuestion: (_) => Stream.value(const [answer]),
+          answersStreamForQuestion: (_) => Stream.value([answer]),
         ),
       ),
     );
@@ -752,6 +752,172 @@ void main() {
     expect(find.text('Forum S&J'), findsOneWidget);
     expect(find.text('Tanya soalan'), findsOneWidget);
     expect(find.text('Tapis soalan'), findsOneWidget);
+  });
+
+  testWidgets('linked question prompt switches to Bahasa Melayu', (
+    tester,
+  ) async {
+    final state = AppState()..language = 'Bahasa Melayu';
+    const question = ForumQuestion(
+      id: 'linked_q1_v1',
+      authorId: '',
+      title: 'Which numeral shows twenty thousand and four?',
+      text: 'Which numeral shows twenty thousand and four?',
+      mode: 'linked',
+      prompt: 'Which numeral shows twenty thousand and four?',
+      promptBm: 'Angka manakah menunjukkan dua puluh ribu empat?',
+      options: ['20 004', '24 000', '20 400', '20 040'],
+      optionsBm: ['20 004', '24 000', '20 400', '20 040'],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ForumDiscussionPage(
+          question: question,
+          state: state,
+          answersStream: Stream.value(const <ForumAnswer>[]),
+          blockedStudentIdsStream: Stream.value(const <String>{}),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Angka manakah menunjukkan dua puluh ribu empat?'), findsOneWidget);
+    expect(find.text('Which numeral shows twenty thousand and four?'), findsNothing);
+  });
+
+  testWidgets('question list shows the Bahasa Melayu prompt for linked threads', (
+    tester,
+  ) async {
+    final state = AppState()..language = 'Bahasa Melayu';
+    const question = ForumQuestion(
+      id: 'linked_q1_v1',
+      authorId: '',
+      title: 'Which numeral shows twenty thousand and four?',
+      text: 'Which numeral shows twenty thousand and four?',
+      mode: 'linked',
+      prompt: 'Which numeral shows twenty thousand and four?',
+      promptBm: 'Angka manakah menunjukkan dua puluh ribu empat?',
+      options: ['20 004', '24 000', '20 400', '20 040'],
+      optionsBm: ['20 004', '24 000', '20 400', '20 040'],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: QaForumPage(
+          state: state,
+          questionPager: ({required int limit, String? cursor}) async =>
+              const ForumQuestionPage(
+                questions: [question],
+                nextCursor: null,
+                hasMore: false,
+              ),
+          latestQuestionsStream: Stream.value(const [question]),
+          blockedStudentIdsStream: Stream.value(const <String>{}),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(
+      find.text('Angka manakah menunjukkan dua puluh ribu empat?'),
+      findsNWidgets(2),
+    );
+  });
+
+  testWidgets('author can delete their own answer after confirmation', (
+    tester,
+  ) async {
+    final repository = _ActionRepository();
+    const question = ForumQuestion(
+      id: 'question-delete-answer',
+      authorId: 'student-question-author',
+      title: 'How can I check this calculation?',
+      text: 'I want another student to review each calculation step.',
+    );
+    final answer = ForumAnswer(
+      id: 'answer-to-delete',
+      questionId: question.id,
+      authorId: AppState.demoStudentId,
+      text: 'I regrouped the values and checked the calculation.',
+      feedback: const ForumAnswerFeedback(
+        state: 'completed',
+        label: 'sufficient_reasoning',
+        message: 'The reasoning is clear.',
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: QaForumPage(
+          state: AppState(),
+          repository: repository,
+          questionPager: ({required int limit, String? cursor}) async =>
+              const ForumQuestionPage(
+                questions: [question],
+                nextCursor: null,
+                hasMore: false,
+              ),
+          latestQuestionsStream: Stream.value(const [question]),
+          blockedStudentIdsStream: Stream.value(
+            const <String>{},
+          ).asBroadcastStream(),
+          answersStreamForQuestion: (_) => Stream.value([answer]),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.tap(find.text(question.title));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.byTooltip('Answer actions'));
+    await tester.tap(find.byTooltip('Answer actions'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete answer'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete'));
+    await tester.pumpAndSettle();
+
+    expect(repository.deletedAnswerId, 'answer-to-delete');
+    expect(find.text('Answer deleted.'), findsOneWidget);
+  });
+
+  testWidgets('author can delete their own free-form question after confirmation', (
+    tester,
+  ) async {
+    final repository = _ActionRepository();
+    final question = ForumQuestion(
+      id: 'question-to-delete',
+      authorId: AppState.demoStudentId,
+      title: 'How do I regroup 46 plus 27?',
+      text: 'I want to check whether my regrouping order is correct.',
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: QaForumPage(
+          state: AppState(),
+          repository: repository,
+          questionPager: ({required int limit, String? cursor}) async =>
+              ForumQuestionPage(
+                questions: [question],
+                nextCursor: null,
+                hasMore: false,
+              ),
+          latestQuestionsStream: Stream.value([question]),
+          blockedStudentIdsStream: Stream.value(const <String>{}),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    await tester.ensureVisible(find.byTooltip('Question actions'));
+    await tester.tap(find.byTooltip('Question actions'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete question'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete'));
+    await tester.pumpAndSettle();
+
+    expect(repository.deletedQuestionId, 'question-to-delete');
   });
 
   testWidgets('linked discussion renders options, explanation, and validation', (
@@ -1386,6 +1552,8 @@ Future<void> _openAnswerActions(
 class _ActionRepository implements CollaborationRepository {
   bool edited = false;
   bool reported = false;
+  String? deletedAnswerId;
+  String? deletedQuestionId;
 
   @override
   Future<void> editAnswer({
@@ -1403,6 +1571,16 @@ class _ActionRepository implements CollaborationRepository {
     required String reason,
   }) async {
     reported = true;
+  }
+
+  @override
+  Future<void> deleteAnswer(String answerId) async {
+    deletedAnswerId = answerId;
+  }
+
+  @override
+  Future<void> deleteQuestion(String questionId) async {
+    deletedQuestionId = questionId;
   }
 
   @override

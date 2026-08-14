@@ -195,7 +195,11 @@ service cloud.firestore {
         request.resource.data.title.size() >= 8 && request.resource.data.title.size() <= 140 &&
         request.resource.data.text is string && request.resource.data.text.size() >= 20 &&
         request.resource.data.text.size() <= 3000 && request.resource.data.updatedAt == request.time;
-      allow delete: if false;
+      // The delete callable enforces the server-side cascade and canonical
+      // thread guards; Rules still require the question author and forbid
+      // deleting server-owned linked discussions directly.
+      allow delete: if isStudent() && resource.data.authorId == request.auth.uid &&
+        resource.data.get('mode', 'free_form') == 'free_form';
     }
 
     match /forumAnswers/{answerId} {
@@ -230,7 +234,9 @@ service cloud.firestore {
         request.resource.data.aiFeedback.message == 'Your revised answer is being reviewed.' &&
         request.resource.data.aiFeedback.revision == request.resource.data.revision &&
         request.resource.data.updatedAt == request.time;
-      allow delete: if false;
+      // The delete callable removes AI projections and enforces the accepted
+      // answer guard; Rules still require the answer author.
+      allow delete: if isStudent() && resource.data.authorId == request.auth.uid;
     }
 
     match /forumReports/{reportId} {

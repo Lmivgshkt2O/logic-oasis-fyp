@@ -8,7 +8,7 @@
   "candidateManifestSha256": "d1a7e47938b6ca6d95ea16cf03f9cdab84e8e6f906a20036755bd6e12acfd8d1",
   "catalogueSha256": "c896a2af1a2f796d60a570a9de35262bb88f14c019ca464f5981b1aa4350bffd",
   "claimLevel": "controlled_demonstration_only",
-  "codeRevision": "44772c4bf9e7071f43b2e9ce99a609220c9c579255c2e8ca7b3725bfe6e5414d",
+  "codeRevision": "8886c767c39ce13adb49994e05c3d6eafff5cdadfec51f8feb9f1b384fdf95f2",
   "codeRevisionKind": "sha256_bounded_release_sources_v1",
   "compositePolicy": {
     "correctness": "deterministic_protected_answer_key_v1",
@@ -30,8 +30,8 @@
   "dependencyLockFile": "forum-runtime-requirements.lock.txt",
   "dependencyLockSha256": "0067273f13fc463f830c49f4f91169a2dbf71c36246c7d2db2cba3e9e15c7006",
   "deploymentRuntimeHashes": {
-    "forum_runtime.py": "9b7e8117f5cb3e898bc7536a37d1c06300c48b106da8dae01f8331023461671a",
-    "main.py": "c4435a411aaa346c33c375a9f30b7f073dc46fe5498710cb88978ef15e12d27c"
+    "forum_runtime.py": "b39e13058ed677bd76dd3a2e8be0847fdda8515614c7edfbfc8e3ba858298f27",
+    "main.py": "a34204aa4b0549039fe54b21e8d3f3cf871cd860626044491893712c8d5e798b"
   },
   "deploymentScope": "controlled_demo",
   "deploymentState": "pending_cloud_deployment",
@@ -55,10 +55,10 @@
   "reasoningArtifactSizeBytes": 50066,
   "reasoningModelType": "MultinomialNB",
   "reasoningModelVersion": "forum-controlled-demo-nb-v1",
-  "releaseId": "forum-controlled-demo-nb-v1-release-5",
+  "releaseId": "forum-controlled-demo-nb-v1-release-6",
   "releaseRationale": "Developer-released FYP1 controlled-demonstration model. Not evaluated on real learner forum responses.",
   "releaseScope": "fyp1_forum_controlled_demo",
-  "releasedAt": "2026-08-13T00:00:00Z",
+  "releasedAt": "2026-08-14T00:00:00Z",
   "releasedBy": "developer",
   "relevanceAbstentionPolicyVersion": "forum-relevance-policy-v1",
   "relevanceArtifactSha256": "8df2fea527df9053f9c3c27c11ddbcc9441e7f16fa3ada305bf3f05df922a6e8",
@@ -104,7 +104,7 @@
     "relevance.py": "842684b464dbe815f5877932a1816ea96e95b52d923c9ddf789099ccf2062a96"
   },
   "splitManifestSha256": "b07f4e9961e6bad3824f601000026d73df07b7e86a63293ee8956407f41db6cb",
-  "supersedesReleaseId": null,
+  "supersedesReleaseId": "forum-controlled-demo-nb-v1-release-5",
   "trainingDataProvenance": "expert_authored_controlled_demo",
   "vectorizerContract": {
     "abstentionPolicyVersion": "forum-advisory-policy-v1",

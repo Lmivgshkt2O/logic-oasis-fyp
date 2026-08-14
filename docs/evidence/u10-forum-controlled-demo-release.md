@@ -130,3 +130,20 @@ Focused release, bundle-parity, promotion, and runtime tests validate these
 bindings. The retained full Emulator rehearsal remains release-2 evidence; a
 fresh release-4 Emulator or authorized cloud rehearsal is required before
 claiming deployment verification for this payload.
+
+## Post-manual-verification follow-up release — 2026-08-14
+
+Manual verification surfaced three product gaps that required runtime
+changes: linked discussions now count once per student in the parent
+count-only summary, authors can delete their own free-form question threads
+and answers (immutable runs preserved), and linked discussion prompts render
+their stored Bahasa Melayu snapshot when the app language is Malay. Because
+`forum_runtime.py` and `main.py` changed, the immutable successor
+`forum-controlled-demo-nb-v1-release-6` was published under CPython 3.11.9
+with the same model artifacts (reasoning `6081fd60…`, relevance `8df2fea5…`),
+code revision
+`8886c767c39ce13adb49994e05c3d6eafff5cdadfec51f8feb9f1b384fdf95f2`,
+and `supersedesReleaseId` release 5. It was promoted in the Firestore Emulator
+registry with a local deployment attestation; release 5 remains preserved as
+`superseded`. The authoritative forum function inventory grew to eleven
+entries with the two author-delete callables.

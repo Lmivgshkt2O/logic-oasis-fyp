@@ -66,8 +66,8 @@ class ForumRuntimeIamTests(unittest.TestCase):
         for endpoint in (main.processForumQuestion, main.processForumAnswer, main.reprocessForumAnswer):
             self.assertEqual(SERVICE_ACCOUNT, endpoint.__firebase_endpoint__.serviceAccountEmail)
 
-    def test_authoritative_inventory_is_nine_entries_with_one_identity(self):
-        self.assertEqual(9, len(FORUM_FUNCTION_INVENTORY))
+    def test_authoritative_inventory_is_eleven_entries_with_one_identity(self):
+        self.assertEqual(11, len(FORUM_FUNCTION_INVENTORY))
         names = [entry["name"] for entry in FORUM_FUNCTION_INVENTORY]
         self.assertEqual(len(names), len(set(names)))
         self.assertEqual(
@@ -96,7 +96,7 @@ class ForumRuntimeIamTests(unittest.TestCase):
             evidence_mode="controlled_demo", code_revision=revision,
         )
         self.assertTrue(all(check["ok"] for check in checks))
-        self.assertEqual(9, checks[-1]["entryCount"])
+        self.assertEqual(11, checks[-1]["entryCount"])
 
         for project in ("other-project", ""):
             with self.subTest(project=project), self.assertRaises(ValueError):
@@ -130,22 +130,22 @@ class ForumRuntimeIamTests(unittest.TestCase):
                     evidence_mode="controlled_demo", code_revision=invalid,
                 )
 
-    def test_deploy_commands_cover_all_nine_and_retry_only_two(self):
+    def test_deploy_commands_cover_all_eleven_and_retry_only_two(self):
         revision = "a" * 64
         deploy = deploy_commands(
             evidence_mode="controlled_demo", code_revision=revision,
         )
-        self.assertEqual(9, len(deploy))
+        self.assertEqual(11, len(deploy))
         rendered = "\n".join(" ".join(command) for command in deploy)
         for entry in FORUM_FUNCTION_INVENTORY:
             self.assertIn(entry["name"], rendered)
         self.assertEqual(2, rendered.count("--retry"))
-        self.assertEqual(9, rendered.count("--service-account"))
+        self.assertEqual(11, rendered.count("--service-account"))
         self.assertEqual(3, rendered.count("--trigger-location"))
 
     def test_inspection_and_attestation_require_the_full_matching_inventory(self):
         inspection = inspection_commands()
-        self.assertEqual(9, len(inspection))
+        self.assertEqual(11, len(inspection))
         revision = "a" * 64
         manifest = {"releaseId": "forum-controlled-demo-nb-v1-release-5", "codeRevision": revision}
         observed = {
@@ -163,7 +163,7 @@ class ForumRuntimeIamTests(unittest.TestCase):
             attested_at="2026-08-13T00:00:00Z",
         )
         self.assertEqual("deployed", attestation["deploymentState"])
-        self.assertEqual(9, attestation["observedFunctionCount"])
+        self.assertEqual(11, attestation["observedFunctionCount"])
         self.assertRegex(attestation["attestationSha256"], r"^[0-9a-f]{64}$")
 
         with self.assertRaises(ValueError):

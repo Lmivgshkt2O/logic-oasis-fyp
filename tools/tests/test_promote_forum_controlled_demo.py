@@ -14,7 +14,10 @@ from promote_controlled_demo_model import (
     promote_forum_controlled_demo_model,
     revoke_forum_controlled_demo_model,
 )
-from forum_function_inventory import forum_inventory_digest
+from forum_function_inventory import (
+    forum_inventory_digest,
+    validate_forum_function_inventory,
+)
 from tools.tests.test_controlled_demo_registry_contract import Database
 
 
@@ -34,7 +37,7 @@ def deployment_attestation(document: dict[str, object]) -> dict[str, object]:
         "releaseId": document["releaseId"],
         "codeRevision": document["codeRevision"],
         "functionInventorySha256": forum_inventory_digest(),
-        "observedFunctionCount": 9,
+        "observedFunctionCount": len(validate_forum_function_inventory()),
         "attestedAt": "2026-08-13T00:00:00Z",
     }
     payload["attestationSha256"] = sha256(
@@ -46,6 +49,9 @@ def deployment_attestation(document: dict[str, object]) -> dict[str, object]:
 class ForumControlledDemoPromotionTests(unittest.TestCase):
     def test_transaction_creates_one_immutable_active_forum_release(self):
         document = release_manifest()
+        # The bundled manifest now names its immutable predecessor; the
+        # first-rollout contract requires an empty registry and no supersede.
+        document["supersedesReleaseId"] = None
         database = Database()
         with patch(
             "firebase_admin.firestore.transactional",
@@ -186,7 +192,7 @@ class ForumControlledDemoPromotionTests(unittest.TestCase):
         with patch(
             "firebase_admin.firestore.transactional",
             lambda function: lambda transaction: function(transaction),
-        ), self.assertRaisesRegex(ValueError, "nine"):
+        ), self.assertRaisesRegex(ValueError, "authoritative forum inventory"):
             promote_forum_controlled_demo_model(
                 database, document, now=NOW,
                 deployment_attestation=incomplete,

@@ -23,7 +23,10 @@ from logic_oasis_ai.model_registry import (
     SHA256_PATTERN,
     controlled_demo_object_paths,
 )
-from forum_function_inventory import forum_inventory_digest
+from forum_function_inventory import (
+    forum_inventory_digest,
+    validate_forum_function_inventory,
+)
 
 
 CONTROLLED_VALUES = MappingProxyType({
@@ -248,8 +251,12 @@ def _validate_deployment_attestation(
         raise ValueError("deployment attestation revision does not match the manifest")
     if attestation.get("functionInventorySha256") != forum_inventory_digest():
         raise ValueError("deployment attestation inventory does not match the authoritative inventory")
-    if attestation.get("observedFunctionCount") != 9:
-        raise ValueError("deployment attestation must cover all nine forum functions")
+    if attestation.get("observedFunctionCount") != len(
+        validate_forum_function_inventory()
+    ):
+        raise ValueError(
+            "deployment attestation must cover the authoritative forum inventory"
+        )
     attested_at = attestation.get("attestedAt")
     if not isinstance(attested_at, str) or not attested_at.endswith("Z"):
         raise ValueError("deployment attestation timestamp must be UTC")

@@ -1262,6 +1262,24 @@ def _edit_linked_forum_answer(
     )
 
 
+def _delete_forum_question(
+    data: dict[str, Any], student_id: str,
+) -> dict[str, Any]:
+    return ForumRuntimeGateway(firestore_db()).delete_question(
+        question_id=_string(data, "questionId"),
+        actor_id=student_id,
+    )
+
+
+def _delete_forum_answer(
+    data: dict[str, Any], student_id: str,
+) -> dict[str, Any]:
+    return ForumRuntimeGateway(firestore_db()).delete_answer(
+        answer_id=_string(data, "answerId"),
+        actor_id=student_id,
+    )
+
+
 @https_fn.on_call(region=FUNCTION_REGION, service_account=FORUM_RUNTIME_SERVICE_ACCOUNT)
 def openOrCreateForumDiscussion(request: https_fn.CallableRequest) -> dict[str, Any]:
     return _forum_call(
@@ -1283,6 +1301,22 @@ def submitLinkedForumAnswer(request: https_fn.CallableRequest) -> dict[str, Any]
 def editLinkedForumAnswer(request: https_fn.CallableRequest) -> dict[str, Any]:
     return _forum_call(
         lambda student_id: _edit_linked_forum_answer(_data(request), student_id),
+        request,
+    )
+
+
+@https_fn.on_call(region=FUNCTION_REGION, service_account=FORUM_RUNTIME_SERVICE_ACCOUNT)
+def deleteForumQuestion(request: https_fn.CallableRequest) -> dict[str, Any]:
+    return _forum_call(
+        lambda student_id: _delete_forum_question(_data(request), student_id),
+        request,
+    )
+
+
+@https_fn.on_call(region=FUNCTION_REGION, service_account=FORUM_RUNTIME_SERVICE_ACCOUNT)
+def deleteForumAnswer(request: https_fn.CallableRequest) -> dict[str, Any]:
+    return _forum_call(
+        lambda student_id: _delete_forum_answer(_data(request), student_id),
         request,
     )
 

@@ -908,7 +908,19 @@ class ForumRuntimeGateway:
                 "created": True,
             }
 
-        return open_or_create(self.database.transaction())
+        result = open_or_create(self.database.transaction())
+        # A canonical linked discussion is shared server content, but each
+        # student who opens it from the Forum or quiz review is posting a
+        # thread of their own from the parent count-only perspective. The
+        # event identity is per student and per discussion, so reopening the
+        # same thread never double counts.
+        self._record_participation(
+            event_id=f"linked_question:{result['discussionId']}:{actor_id}",
+            student_id=actor_id,
+            field="questionsPostedCount",
+            occurred_at=now,
+        )
+        return result
 
     def submit_linked_answer(
         self,
@@ -1070,6 +1082,118 @@ class ForumRuntimeGateway:
             dict(private_payload),
             merge=True,
         )
+
+    def delete_answer(self, *, answer_id: str, actor_id: str) -> dict[str, Any]:
+        """Remove the author's own answer and its AI projections.
+
+        The immutable inference run record is deliberately preserved for
+        audit; only the public answer and its job/feedback projections are
+        removed. An accepted answer cannot be deleted because the question
+        thread still points at it.
+        """
+        answer_id = _document_id(answer_id)
+        answer_ref = self.database.collection("forumAnswers").document(answer_id)
+
+        @firestore.transactional
+        def delete_answer(transaction: Any) -> dict[str, Any]:
+            answer = _transaction_snapshot(transaction, answer_ref) or _MissingSnapshot()
+            if not answer.exists:
+                raise ForumRuntimeError("not-found", "Answer not found.")
+            data = answer.to_dict()
+            if _required(data, "authorId") != actor_id:
+                raise ForumRuntimeError(
+                    "permission-denied",
+                    "Only the answer author may delete this answer.",
+                )
+            question_id = data.get("questionId")
+            if isinstance(question_id, str) and question_id:
+                question_ref = self.database.collection(
+                    "forumQuestions"
+                ).document(question_id)
+                question = (
+                    _transaction_snapshot(transaction, question_ref)
+                    or _MissingSnapshot()
+                )
+                if (
+                    question.exists
+                    and question.to_dict().get("acceptedAnswerId") == answer_id
+                ):
+                    raise ForumRuntimeError(
+                        "failed-precondition",
+                        "An accepted answer cannot be deleted.",
+                    )
+            transaction.delete(answer_ref)
+            transaction.delete(
+                self.database.collection("forumAiJobs").document(answer_id)
+            )
+            transaction.delete(
+                self.database.collection(
+                    FORUM_PRIVATE_FEEDBACK_COLLECTION
+                ).document(answer_id)
+            )
+            return {"answerId": answer_id, "deleted": True}
+
+        return delete_answer(self.database.transaction())
+
+    def delete_question(self, *, question_id: str, actor_id: str) -> dict[str, Any]:
+        """Remove the author's own free-form question and its answer thread.
+
+        Deleting a question removes the whole thread, so every answer and its
+        AI job/feedback projections are removed in the same transaction while
+        the immutable inference runs remain preserved for audit. Canonical
+        linked discussions are server-owned and cannot be deleted.
+        """
+        question_id = _document_id(question_id)
+        question_ref = self.database.collection("forumQuestions").document(
+            question_id
+        )
+
+        @firestore.transactional
+        def delete_question(transaction: Any) -> dict[str, Any]:
+            question = (
+                _transaction_snapshot(transaction, question_ref)
+                or _MissingSnapshot()
+            )
+            if not question.exists:
+                raise ForumRuntimeError("not-found", "Question not found.")
+            data = question.to_dict()
+            if data.get("mode") == FORUM_MODE_LINKED:
+                raise ForumRuntimeError(
+                    "failed-precondition",
+                    "Canonical linked discussions cannot be deleted.",
+                )
+            if _required(data, "authorId") != actor_id:
+                raise ForumRuntimeError(
+                    "permission-denied",
+                    "Only the question author may delete this question.",
+                )
+            answer_query = self.database.collection("forumAnswers").where(
+                "questionId", "==", question_id,
+            )
+            answer_ids = [
+                snapshot.id
+                for snapshot in _transaction_snapshots(transaction, answer_query)
+            ]
+            for answer_id in answer_ids:
+                transaction.delete(
+                    self.database.collection("forumAnswers").document(answer_id)
+                )
+                transaction.delete(
+                    self.database.collection("forumAiJobs").document(answer_id)
+                )
+                transaction.delete(
+                    self.database.collection(
+                        FORUM_PRIVATE_FEEDBACK_COLLECTION
+                    ).document(answer_id)
+                )
+            transaction.delete(question_ref)
+            return {
+                "questionId": question_id,
+                "deleted": True,
+                "deletedAnswerCount": len(answer_ids),
+            }
+
+        return delete_question(self.database.transaction())
 
     def _resolve_linked_correctness(
         self, data: Mapping[str, Any],

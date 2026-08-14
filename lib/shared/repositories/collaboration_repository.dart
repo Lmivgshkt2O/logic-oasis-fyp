@@ -204,6 +204,18 @@ class CollaborationRepository {
     return data['revision'] as int? ?? 1;
   }
 
+  /// Author-only removal of a free-form question and its whole answer thread.
+  /// The server cascades answers and their AI projections; immutable runs
+  /// are preserved for audit.
+  Future<void> deleteQuestion(String questionId) => _functions
+      .httpsCallable('deleteForumQuestion')
+      .call({'questionId': questionId});
+
+  /// Author-only removal of one answer and its AI projections.
+  Future<void> deleteAnswer(String answerId) => _functions
+      .httpsCallable('deleteForumAnswer')
+      .call({'answerId': answerId});
+
   Future<void> acceptAnswer(String answerId) => _functions
       .httpsCallable('acceptForumAnswer')
       .call({'answerId': answerId});

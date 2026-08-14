@@ -1,4 +1,4 @@
-"""Authoritative, versioned nine-entry forum function inventory.
+"""Authoritative, versioned eleven-entry forum function inventory.
 
 Deployment, post-deploy inspection, promotion attestation, and evidence all
 share this single inventory. Every entry uses ``asia-southeast1`` and the
@@ -24,6 +24,8 @@ CALLABLES = (
     "openOrCreateForumDiscussion",
     "submitLinkedForumAnswer",
     "editLinkedForumAnswer",
+    "deleteForumQuestion",
+    "deleteForumAnswer",
     "markForumAnswerHelpful",
     "acceptForumAnswer",
     "reportForumContent",
@@ -76,8 +78,8 @@ def validate_forum_function_inventory(
 ) -> tuple[Mapping[str, Any], ...]:
     entries = tuple(inventory or FORUM_FUNCTION_INVENTORY)
     names = [str(entry["name"]) for entry in entries]
-    if len(entries) != 9 or len(names) != len(set(names)):
-        raise ValueError("forum inventory must contain exactly nine unique functions")
+    if len(entries) != 11 or len(names) != len(set(names)):
+        raise ValueError("forum inventory must contain exactly eleven unique functions")
     if {str(entry["kind"]) for entry in entries} != {"callable", "trigger"}:
         raise ValueError("forum inventory must contain callables and triggers")
     for entry in entries:

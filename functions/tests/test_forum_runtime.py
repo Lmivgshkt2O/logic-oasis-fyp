@@ -117,6 +117,11 @@ class _Transaction:
             raise RuntimeError("already exists")
         self.database.rows[key] = dict(values)
 
+    def delete(self, reference):
+        key = (reference.collection, reference.identifier)
+        if key in self.database.rows:
+            del self.database.rows[key]
+
 
 class _Database:
     def __init__(self, rows):
@@ -1211,6 +1216,35 @@ class ForumLinkedDiscussionTests(unittest.TestCase):
 
         self.assertEqual({}, database.rows)
 
+    def test_open_or_create_linked_discussion_records_questions_posted_once_per_student(self):
+        now = self.NOW
+        database = _Database(_linked_source())
+        gateway = ForumRuntimeGateway(database)
+
+        with patch("forum_runtime.firestore.transactional", lambda function: function):
+            gateway.open_or_create_linked_discussion(
+                question_id="bank_q1", actor_id="student-a", now=now,
+            )
+            gateway.open_or_create_linked_discussion(
+                question_id="bank_q1", actor_id="student-a", now=now,
+            )
+            gateway.open_or_create_linked_discussion(
+                question_id="bank_q1", actor_id="student-b", now=now,
+            )
+
+        self.assertEqual(
+            1,
+            database.rows[("forumParticipationSummaries", "student-a")][
+                "questionsPostedCount"
+            ],
+        )
+        self.assertEqual(
+            1,
+            database.rows[("forumParticipationSummaries", "student-b")][
+                "questionsPostedCount"
+            ],
+        )
+
     def test_linked_discussions_have_no_accept_owner_and_cannot_be_reported(self):
         now = self.NOW
         database = _Database({
@@ -1286,6 +1320,147 @@ class ForumLinkedDiscussionTests(unittest.TestCase):
         self.assertEqual(SUFFICIENT, feedback["label"])
         self.assertEqual(0.9, feedback["probability"])
         self.assertEqual(public_answer["aiRunId"], feedback["logicalInferenceId"])
+
+
+class ForumDeletionTests(unittest.TestCase):
+    NOW = datetime(2026, 8, 13, 9, 0, tzinfo=timezone.utc)
+
+    def test_delete_answer_removes_own_answer_and_ai_projections_but_preserves_run(self):
+        now = self.NOW
+        database = _Database({
+            ("forumAnswers", "a1"): {
+                "questionId": "q1", "authorId": "student-a", "mode": "free_form",
+                "text": "I regrouped the tens and ones.", "revision": 1,
+            },
+            ("forumQuestions", "q1"): {
+                "authorId": "student-b",
+                "title": "How do you add 46 and 27?",
+                "text": "What is 46 + 27? Show your working.",
+            },
+            ("forumAiJobs", "a1"): {
+                "state": "completed", "modelVersion": "forum-controlled-demo-nb-v1",
+            },
+            ("forumAiFeedback", "a1"): {"state": "completed", "label": "verified"},
+            ("forumAiRuns", "run1"): {"state": "completed", "answerId": "a1"},
+        })
+        gateway = ForumRuntimeGateway(database)
+
+        with patch("forum_runtime.firestore.transactional", lambda function: function):
+            result = gateway.delete_answer(answer_id="a1", actor_id="student-a")
+
+        self.assertTrue(result["deleted"])
+        self.assertNotIn(("forumAnswers", "a1"), database.rows)
+        self.assertNotIn(("forumAiJobs", "a1"), database.rows)
+        self.assertNotIn(("forumAiFeedback", "a1"), database.rows)
+        self.assertIn(("forumAiRuns", "run1"), database.rows)
+
+    def test_delete_answer_denies_foreign_authors_and_missing_answers(self):
+        now = self.NOW
+        database = _Database({
+            ("forumAnswers", "a1"): {"questionId": "q1", "authorId": "student-a"},
+        })
+        gateway = ForumRuntimeGateway(database)
+
+        with patch("forum_runtime.firestore.transactional", lambda function: function):
+            with self.assertRaisesRegex(ForumRuntimeError, "answer author"):
+                gateway.delete_answer(answer_id="a1", actor_id="student-b")
+            with self.assertRaisesRegex(ForumRuntimeError, "not found"):
+                gateway.delete_answer(answer_id="missing", actor_id="student-a")
+
+        self.assertIn(("forumAnswers", "a1"), database.rows)
+
+    def test_delete_answer_rejects_accepted_answers_and_allows_linked_answers(self):
+        now = self.NOW
+        database = _Database({
+            ("forumAnswers", "accepted"): {
+                "questionId": "q1", "authorId": "student-a", "acceptedAt": now,
+            },
+            ("forumQuestions", "q1"): {
+                "authorId": "student-b", "acceptedAnswerId": "accepted",
+            },
+            ("forumAnswers", "linked-a1"): {
+                "questionId": "linked_bank_q1_v1", "authorId": "student-a",
+                "mode": "linked", "selectedOption": 2,
+                "explanation": "I regrouped the ones and tens.",
+            },
+        })
+        gateway = ForumRuntimeGateway(database)
+
+        with patch("forum_runtime.firestore.transactional", lambda function: function):
+            with self.assertRaisesRegex(ForumRuntimeError, "accepted answer"):
+                gateway.delete_answer(answer_id="accepted", actor_id="student-a")
+            result = gateway.delete_answer(
+                answer_id="linked-a1", actor_id="student-a",
+            )
+
+        self.assertTrue(result["deleted"])
+        self.assertNotIn(("forumAnswers", "linked-a1"), database.rows)
+
+    def test_delete_question_cascades_answers_and_ai_projections_but_preserves_runs(self):
+        now = self.NOW
+        database = _Database({
+            ("forumQuestions", "q1"): {
+                "authorId": "student-a",
+                "title": "How do you add 46 and 27?",
+                "text": "What is 46 + 27? Show your working.",
+            },
+            ("forumAnswers", "a1"): {
+                "questionId": "q1", "authorId": "student-b", "text": "I regrouped the ones.",
+            },
+            ("forumAnswers", "a2"): {
+                "questionId": "q1", "authorId": "student-c", "text": "I added the tens first.",
+            },
+            ("forumAiJobs", "a1"): {"state": "completed"},
+            ("forumAiJobs", "a2"): {"state": "completed"},
+            ("forumAiFeedback", "a1"): {"state": "completed"},
+            ("forumAiFeedback", "a2"): {"state": "completed"},
+            ("forumAiRuns", "run1"): {"state": "completed", "answerId": "a1"},
+            ("forumAiRuns", "run2"): {"state": "completed", "answerId": "a2"},
+        })
+        gateway = ForumRuntimeGateway(database)
+
+        with patch("forum_runtime.firestore.transactional", lambda function: function):
+            result = gateway.delete_question(question_id="q1", actor_id="student-a")
+
+        self.assertEqual(2, result["deletedAnswerCount"])
+        for key in (
+            ("forumQuestions", "q1"),
+            ("forumAnswers", "a1"),
+            ("forumAnswers", "a2"),
+            ("forumAiJobs", "a1"),
+            ("forumAiJobs", "a2"),
+            ("forumAiFeedback", "a1"),
+            ("forumAiFeedback", "a2"),
+        ):
+            self.assertNotIn(key, database.rows)
+        self.assertIn(("forumAiRuns", "run1"), database.rows)
+        self.assertIn(("forumAiRuns", "run2"), database.rows)
+
+    def test_delete_question_denies_foreign_authors_linked_threads_and_missing(self):
+        now = self.NOW
+        database = _Database({
+            ("forumQuestions", "q1"): {
+                "authorId": "student-a",
+                "title": "How do you add 46 and 27?",
+                "text": "What is 46 + 27?",
+            },
+            ("forumQuestions", "linked_bank_q1_v1"): {
+                "mode": "linked", "sourceQuestionId": "bank_q1",
+            },
+        })
+        gateway = ForumRuntimeGateway(database)
+
+        with patch("forum_runtime.firestore.transactional", lambda function: function):
+            with self.assertRaisesRegex(ForumRuntimeError, "question author"):
+                gateway.delete_question(question_id="q1", actor_id="student-b")
+            with self.assertRaisesRegex(ForumRuntimeError, "linked discussions"):
+                gateway.delete_question(
+                    question_id="linked_bank_q1_v1", actor_id="student-a",
+                )
+            with self.assertRaisesRegex(ForumRuntimeError, "not found"):
+                gateway.delete_question(question_id="missing", actor_id="student-a")
+
+        self.assertIn(("forumQuestions", "q1"), database.rows)
 
 
 class ForumCompositeRuntimeTests(unittest.TestCase):

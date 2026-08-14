@@ -130,12 +130,32 @@ class _RowsCollection:
             identifier = f"auto_{self.database._auto_ids[self.name]}"
         return _RowsReference(self.database, self.name, identifier)
 
+    def where(self, field, operator, value):
+        return _RowsQuery(self.database, self.name, [(field, operator, value)])
+
+
+class _RowsQuery:
+    def __init__(self, database, collection, filters):
+        self.database = database
+        self.collection = collection
+        self.filters = filters
+
 
 class _RowsTransaction:
     def __init__(self, database):
         self.database = database
 
     def get(self, reference):
+        if isinstance(reference, _RowsQuery):
+            return iter([
+                _RowsSnapshot(data, identifier)
+                for (collection, identifier), data in self.database.rows.items()
+                if collection == reference.collection and all(
+                    data.get(field) == value
+                    for field, operator, value in reference.filters
+                    if operator == "=="
+                )
+            ])
         return _RowsSnapshot(
             self.database.rows.get((reference.collection, reference.id)),
             reference.id,
@@ -156,6 +176,11 @@ class _RowsTransaction:
         if key in self.database.rows:
             raise RuntimeError("already exists")
         self.database.rows[key] = dict(values)
+
+    def delete(self, reference):
+        key = (reference.collection, reference.id)
+        if key in self.database.rows:
+            del self.database.rows[key]
 
 
 class _RowsDatabase:
@@ -307,6 +332,56 @@ class LinkedForumCallableTests(unittest.TestCase):
                     "explanation": "A revised explanation for the peer.",
                 },
             )
+        self.assertEqual(
+            raised.exception.code, https_fn.FunctionsErrorCode.PERMISSION_DENIED,
+        )
+
+    def test_delete_forum_answer_removes_own_answer_and_maps_validation_errors(self):
+        rows = _linked_rows()
+        rows[("forumQuestions", "linked_bank_q1_v1")] = {
+            "mode": "linked", "sourceQuestionId": "bank_q1",
+        }
+        rows[("forumAnswers", "a1")] = {
+            "questionId": "linked_bank_q1_v1", "authorId": "student-1",
+            "mode": "linked", "selectedOption": 0,
+            "explanation": "I compared the digits carefully.", "revision": 1,
+        }
+        result = self._call("_delete_forum_answer", rows, {"answerId": "a1"})
+        self.assertTrue(result["deleted"])
+        self.assertNotIn(("forumAnswers", "a1"), rows)
+
+        for payload in (None, {}, {"answerId": 42}):
+            with self.subTest(payload=payload):
+                with self.assertRaises(https_fn.HttpsError) as raised:
+                    self._call("_delete_forum_answer", rows, payload)
+                self.assertEqual(
+                    raised.exception.code,
+                    https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+                )
+
+    def test_delete_forum_question_removes_own_thread_and_denies_foreign_author(self):
+        rows = _linked_rows()
+        rows[("forumQuestions", "q1")] = {
+            "authorId": "student-1",
+            "title": "How do you add 46 and 27?",
+            "text": "What is 46 + 27? Show your working.",
+        }
+        rows[("forumAnswers", "a1")] = {
+            "questionId": "q1", "authorId": "student-2", "text": "I regrouped the ones.",
+        }
+        result = self._call("_delete_forum_question", rows, {"questionId": "q1"})
+        self.assertTrue(result["deleted"])
+        self.assertEqual(1, result["deletedAnswerCount"])
+        self.assertNotIn(("forumQuestions", "q1"), rows)
+        self.assertNotIn(("forumAnswers", "a1"), rows)
+
+        rows[("forumQuestions", "q2")] = {
+            "authorId": "student-2",
+            "title": "How do you subtract 46 from 100?",
+            "text": "What is 100 minus 46? Show your working.",
+        }
+        with self.assertRaises(https_fn.HttpsError) as raised:
+            self._call("_delete_forum_question", rows, {"questionId": "q2"})
         self.assertEqual(
             raised.exception.code, https_fn.FunctionsErrorCode.PERMISSION_DENIED,
         )

@@ -56,6 +56,7 @@ class _QaForumPageState extends State<QaForumPage> {
   Set<String> _blockedAuthors = const {};
   Object? _blockedError;
   bool _postingQuestion = false;
+  String? _deleting;
   List<ForumQuestion> _questions = const [];
   String? _nextCursor;
   bool _hasMore = false;
@@ -213,15 +214,45 @@ class _QaForumPageState extends State<QaForumPage> {
             itemBuilder: (context, index) {
               if (index == questions.length) return _pagingFooter();
               final question = questions[index];
+              final localizedPrompt =
+                  widget.state.isBahasaMelayu &&
+                      (question.promptBm?.isNotEmpty ?? false)
+                  ? question.promptBm!
+                  : null;
               return Card(
                 child: ListTile(
-                  title: Text(question.title),
+                  title: Text(localizedPrompt ?? question.title),
                   subtitle: Text(
-                    question.text,
+                    localizedPrompt ?? question.text,
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  trailing: const Icon(Icons.chevron_right),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (question.authorId ==
+                              widget.state.currentStudentId &&
+                          question.mode != 'linked')
+                        PopupMenuButton<_QuestionAction>(
+                          tooltip: _t(
+                            'Question actions',
+                            'Tindakan soalan',
+                          ),
+                          enabled: _deleting != question.id,
+                          onSelected: (action) =>
+                              _questionAction(question, action),
+                          itemBuilder: (_) => [
+                            PopupMenuItem(
+                              value: _QuestionAction.delete,
+                              child: Text(
+                                _t('Delete question', 'Padam soalan'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      const Icon(Icons.chevron_right),
+                    ],
+                  ),
                   onTap: () => _openAnswers(context, question),
                 ),
               );
@@ -275,6 +306,46 @@ class _QaForumPageState extends State<QaForumPage> {
     final pager =
         widget.questionPager ?? _repo.loadForumQuestions;
     return pager(limit: QaForumPage.pageSize, cursor: cursor);
+  }
+
+  Future<void> _questionAction(
+    ForumQuestion question,
+    _QuestionAction action,
+  ) async {
+    if (action != _QuestionAction.delete) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(_t('Delete this question?', 'Padam soalan ini?')),
+        content: Text(
+          _t(
+            'This will also remove every answer to it. This action cannot be undone.',
+            'Ini juga akan memadam setiap jawapan kepadanya. Tindakan ini tidak boleh dibatalkan.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(_t('Cancel', 'Batal')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(_t('Delete', 'Padam')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _deleting = question.id);
+    try {
+      await _repo.deleteQuestion(question.id);
+      _showMessage(_t('Question deleted.', 'Soalan telah dipadam.'));
+      await _refresh();
+    } catch (error) {
+      _showMessage(_friendlyError(error, widget.state));
+    } finally {
+      if (mounted) setState(() => _deleting = null);
+    }
   }
 
   Future<void> _refresh() async {
@@ -635,12 +706,26 @@ class _AnswersPageState extends State<ForumDiscussionPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                widget.question.title,
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 6),
-              Text(widget.question.text),
+              Builder(builder: (context) {
+                final promptBm =
+                    widget.state.isBahasaMelayu &&
+                        (widget.question.promptBm?.isNotEmpty ?? false)
+                    ? widget.question.promptBm!
+                    : null;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      promptBm ?? widget.question.title,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    if (promptBm == null) ...[
+                      const SizedBox(height: 6),
+                      Text(widget.question.text),
+                    ],
+                  ],
+                );
+              }),
             ],
           ),
         ),
@@ -797,13 +882,22 @@ class _AnswersPageState extends State<ForumDiscussionPage> {
                                   itemBuilder: (_) => [
                                     if (answer.authorId ==
                                             widget.state.currentStudentId &&
-                                        answer.acceptedAt == null)
+                                        answer.acceptedAt == null &&
+                                        effectiveAcceptedAnswerId !=
+                                            answer.id) ...[
                                       PopupMenuItem(
                                         value: _AnswerAction.edit,
                                         child: Text(
                                           _t('Edit answer', 'Edit jawapan'),
                                         ),
                                       ),
+                                      PopupMenuItem(
+                                        value: _AnswerAction.delete,
+                                        child: Text(
+                                          _t('Delete answer', 'Padam jawapan'),
+                                        ),
+                                      ),
+                                    ],
                                     if (answer.authorId !=
                                         widget.state.currentStudentId) ...[
                                       PopupMenuItem(
@@ -977,6 +1071,10 @@ class _AnswersPageState extends State<ForumDiscussionPage> {
   }
 
   Future<void> _answerAction(_AnswerAction action, ForumAnswer answer) async {
+    if (action == _AnswerAction.delete) {
+      await _confirmDeleteAnswer(answer);
+      return;
+    }
     if (action == _AnswerAction.block) {
       final blocked = await _runAction(
         'block:${answer.authorId}',
@@ -1034,6 +1132,37 @@ class _AnswersPageState extends State<ForumDiscussionPage> {
     );
   }
 
+  Future<void> _confirmDeleteAnswer(ForumAnswer answer) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(_t('Delete this answer?', 'Padam jawapan ini?')),
+        content: Text(
+          _t(
+            'Your answer and its AI review will be removed. This action cannot be undone.',
+            'Jawapan anda dan semakan AI akan dipadam. Tindakan ini tidak boleh dibatalkan.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(_t('Cancel', 'Batal')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(_t('Delete', 'Padam')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await _runAction(
+      'delete:${answer.id}',
+      () => _repo.deleteAnswer(answer.id),
+      _t('Answer deleted.', 'Jawapan telah dipadam.'),
+    );
+  }
+
   void _message(String message) {
     if (mounted)
       ScaffoldMessenger.of(
@@ -1042,7 +1171,9 @@ class _AnswersPageState extends State<ForumDiscussionPage> {
   }
 }
 
-enum _AnswerAction { edit, report, block }
+enum _AnswerAction { edit, report, block, delete }
+
+enum _QuestionAction { delete }
 
 class _AnswerActionDialog extends StatefulWidget {
   const _AnswerActionDialog({
