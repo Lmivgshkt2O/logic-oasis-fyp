@@ -316,9 +316,14 @@ class LearningRepository {
     // AI runs, adaptive assignments, or forum content. Each non-auth
     // projection resolves independently; permission denial, revocation, or a
     // selected-child identity mismatch clears the whole snapshot.
-    final mastery = await _fetchSafeMastery(studentId, normalizedYearLevel);
-    final practice = await _fetchPracticeSummary(studentId);
-    final mutualAid = await _fetchForumSummary(studentId);
+    final results = await Future.wait<Object?>([
+      _fetchSafeMastery(studentId, normalizedYearLevel),
+      _fetchPracticeSummary(studentId),
+      _fetchForumSummary(studentId),
+    ]);
+    final mastery = results[0] as List<TrustedSubtopicProgress>?;
+    final practice = results[1] as ParentPracticeSummary?;
+    final mutualAid = results[2] as ForumParticipationSummary?;
     return ParentDashboardSnapshot(
       mastery: mastery,
       practiceSummary: practice,

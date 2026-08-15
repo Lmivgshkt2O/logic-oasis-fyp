@@ -145,6 +145,9 @@ async function cleanup(uids, projectionIds) {
   const revokedParent = client(`revoked-parent-${stamp}`);
   const student = client(`student-${stamp}`);
 
+  let cleanupUids = [];
+  let cleanupProjectionIds = {};
+
   currentStep = 'register temporary emulator users';
   const [parentUid, unrelatedUid, revokedUid, studentUid] = await Promise.all([
     register(linkedParent, 'parent'),
@@ -152,6 +155,7 @@ async function cleanup(uids, projectionIds) {
     register(revokedParent, 'parent'),
     register(student, 'student'),
   ]);
+  cleanupUids = [parentUid, unrelatedUid, revokedUid, studentUid];
 
   currentStep = 'seed parent links and safe projections';
   const otherStudentUid = 'other_student_uid';
@@ -350,23 +354,21 @@ async function cleanup(uids, projectionIds) {
     parentDoc(revokedParent.db, 'subtopicMastery', `m_${studentUid}_read_write`));
 
   currentStep = 'cleanup';
-  await cleanup(
-    [parentUid, unrelatedUid, revokedUid, studentUid],
-    {
-      parentLinks: [
-        `${parentUid}_${studentUid}`,
-        `${unrelatedUid}_${studentUid}`,
-        `${revokedUid}_${studentUid}`,
-      ],
-      subtopicMastery: [
-        `m_${studentUid}_read_write`,
-        `m_${studentUid}_place_value`,
-        'm_other_child',
-      ],
-      practice: [studentUid, otherStudentUid],
-      forum: [studentUid, otherStudentUid],
-    },
-  );
+  cleanupProjectionIds = {
+    parentLinks: [
+      `${parentUid}_${studentUid}`,
+      `${unrelatedUid}_${studentUid}`,
+      `${revokedUid}_${studentUid}`,
+    ],
+    subtopicMastery: [
+      `m_${studentUid}_read_write`,
+      `m_${studentUid}_place_value`,
+      'm_other_child',
+    ],
+    practice: [studentUid, otherStudentUid],
+    forum: [studentUid, otherStudentUid],
+  };
+  await cleanup(cleanupUids, cleanupProjectionIds);
 
   console.log(JSON.stringify({
     status: 'passed',
@@ -386,5 +388,6 @@ async function cleanup(uids, projectionIds) {
     errorType: error.name || 'Error',
     message: error.message || String(error),
   }, null, 2));
+  await cleanup(cleanupUids, cleanupProjectionIds);
   process.exitCode = 1;
 });

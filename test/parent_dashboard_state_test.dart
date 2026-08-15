@@ -179,6 +179,30 @@ void main() {
 
   group('ParentDashboardState races', () {
     test(
+      'disposing while a child load is pending ignores the late completion',
+      () async {
+        final loader = _ControllableLoader();
+        final state = ParentDashboardState(
+          gateway: _Gateway(() async => const [childA]),
+          loaderFactory: loaderFactory(loader),
+        );
+        final notifications = <ParentDashboardPhase>[];
+        state.addListener(() => notifications.add(state.phase));
+
+        unawaited(state.loadLinkedChildren());
+        await settle();
+        expect(state.phase, ParentDashboardPhase.loadingChild);
+
+        state.dispose();
+        loader.pending.single.complete(fullSnapshot());
+        await settle();
+
+        // Completing after dispose must neither notify nor mutate state.
+        expect(notifications, isNot(contains(ParentDashboardPhase.readyAll)));
+      },
+    );
+
+    test(
       'switching children clears A and late A results cannot overwrite B',
       () async {
         final loader = _ControllableLoader();

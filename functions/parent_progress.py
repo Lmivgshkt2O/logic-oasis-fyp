@@ -227,6 +227,11 @@ def initialize_practice_week(
     stored_week = malaysia_week_start(existing["weekStart"])
     if stored_week == current_week:
         return None
+    if current_week < stored_week:
+        raise ParentPracticeError(
+            "failed-precondition",
+            "Stored practice summary is newer than the activation week.",
+        )
     previous_total = (
         _validated_total(existing, counts)
         if current_week - stored_week == timedelta(days=PARENT_PRACTICE_WEEK_DAYS)

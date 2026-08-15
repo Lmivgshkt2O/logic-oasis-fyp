@@ -270,6 +270,28 @@ class ParentProgressTests(unittest.TestCase):
                 updated_at=now,
             )
 
+    def test_initialize_practice_week_rejects_a_stored_future_week(self) -> None:
+        now = datetime(2026, 8, 12, 4, tzinfo=timezone.utc)
+        future = {
+            "schemaVersion": PARENT_PRACTICE_SUMMARY_SCHEMA_VERSION,
+            "studentId": STUDENT_ID,
+            "timezone": PARENT_PRACTICE_TIMEZONE,
+            "weekStart": week_start_of_monday_2026_08_10() + timedelta(days=7),
+            "dailyCompletionCounts": [0, 0, 0, 0, 0, 0, 0],
+            "completedPracticeCount": 0,
+            "activeDayCount": 0,
+        }
+
+        with self.assertRaises(ParentPracticeError) as raised:
+            initialize_practice_week(
+                future,
+                student_id=STUDENT_ID,
+                now=now,
+                updated_at=now,
+            )
+
+        self.assertEqual("failed-precondition", raised.exception.code)
+
 
 if __name__ == "__main__":
     unittest.main()

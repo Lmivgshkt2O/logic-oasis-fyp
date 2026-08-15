@@ -373,6 +373,7 @@ class _WeeklyGlanceCard extends StatelessWidget {
       'glance_no_practice_yet' => l10n.glanceNoPracticeYet,
       'glance_mutual_aid_recorded' => l10n.glanceMutualAidRecorded,
       'glance_no_mutual_aid_yet' => l10n.glanceNoMutualAidYet,
+      'glance_no_data_yet' => l10n.glanceNoDataYet,
       _ => l10n.glanceNoDataYet,
     };
   }
@@ -403,6 +404,7 @@ class _WeeklyGlanceCard extends StatelessWidget {
       'glance_no_practice_yet' => l10n.glanceNoPracticeYetSupport,
       'glance_mutual_aid_recorded' => l10n.glanceMutualAidRecordedSupport,
       'glance_no_mutual_aid_yet' => l10n.glanceNoMutualAidYetSupport,
+      'glance_no_data_yet' => l10n.glanceNoDataYetSupport,
       _ => l10n.glanceNoDataYetSupport,
     };
   }

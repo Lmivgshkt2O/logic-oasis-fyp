@@ -49,6 +49,7 @@ class ParentDashboardState extends ChangeNotifier {
   ParentCardKind? _retryingCard;
   int _linksGeneration = 0;
   int _requestGeneration = 0;
+  bool _disposed = false;
 
   ParentDashboardPhase get phase => _phase;
   List<LinkedChildContext> get children => _children;
@@ -62,6 +63,12 @@ class ParentDashboardState extends ChangeNotifier {
       _phase == ParentDashboardPhase.readyPartial ||
       _phase == ParentDashboardPhase.retryingCard;
 
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+
   /// Loads (or reloads) the active linked children. On a reload the previously
   /// selected child is kept when still present; otherwise the first remaining
   /// active child is chosen explicitly. Removed or revoked children never
@@ -71,7 +78,7 @@ class ParentDashboardState extends ChangeNotifier {
     _phase = ParentDashboardPhase.loadingLinks;
     _message = null;
     _clearChildView();
-    notifyListeners();
+    _notify();
     try {
       final children = await _gateway.loadLinkedChildren();
       if (generation != _linksGeneration) return;
@@ -81,7 +88,7 @@ class ParentDashboardState extends ChangeNotifier {
         _selectedChild = null;
         _phase = ParentDashboardPhase.noActiveChild;
         _message = 'No active linked learner is available for this account.';
-        notifyListeners();
+        _notify();
         return;
       }
       final next = children.firstWhere(
@@ -90,18 +97,18 @@ class ParentDashboardState extends ChangeNotifier {
       );
       _selectedChild = next;
       _phase = ParentDashboardPhase.loadingChild;
-      notifyListeners();
+      _notify();
       await _loadChild(next, ++_requestGeneration);
     } on ParentLinkContextException catch (error) {
       if (generation != _linksGeneration) return;
       _phase = ParentDashboardPhase.linkError;
       _message = error.message;
-      notifyListeners();
+      _notify();
     } catch (_) {
       if (generation != _linksGeneration) return;
       _phase = ParentDashboardPhase.linkError;
       _message = 'Linked learner updates are temporarily unavailable.';
-      notifyListeners();
+      _notify();
     }
   }
 
@@ -112,7 +119,7 @@ class ParentDashboardState extends ChangeNotifier {
     _selectedChild = child;
     _phase = ParentDashboardPhase.loadingChild;
     _clearChildView();
-    notifyListeners();
+    _notify();
     await _loadChild(child, ++_requestGeneration);
   }
 
@@ -125,7 +132,7 @@ class ParentDashboardState extends ChangeNotifier {
     }
     _phase = ParentDashboardPhase.loadingChild;
     _clearChildView();
-    notifyListeners();
+    _notify();
     await _loadChild(child, ++_requestGeneration);
   }
 
@@ -139,7 +146,7 @@ class ParentDashboardState extends ChangeNotifier {
     _phase = ParentDashboardPhase.retryingCard;
     _retryingCard = kind;
     _message = null;
-    notifyListeners();
+    _notify();
     await _loadChild(child, ++_requestGeneration, cardRetry: true);
   }
 
@@ -161,7 +168,7 @@ class ParentDashboardState extends ChangeNotifier {
       _phase = _allCardsAvailable(snapshot)
           ? ParentDashboardPhase.readyAll
           : ParentDashboardPhase.readyPartial;
-      notifyListeners();
+      _notify();
     } on ParentDashboardAuthException {
       if (generation != _requestGeneration ||
           child.studentId != _selectedChild?.studentId) {
@@ -171,7 +178,7 @@ class ParentDashboardState extends ChangeNotifier {
       _retryingCard = null;
       _message = 'This learner link is no longer active. Please reconnect.';
       _phase = ParentDashboardPhase.childError;
-      notifyListeners();
+      _notify();
     } catch (_) {
       if (generation != _requestGeneration ||
           child.studentId != _selectedChild?.studentId) {
@@ -180,15 +187,20 @@ class ParentDashboardState extends ChangeNotifier {
       if (cardRetry && _snapshot != null) {
         _retryingCard = null;
         _phase = ParentDashboardPhase.readyPartial;
-        notifyListeners();
+        _notify();
         return;
       }
       _snapshot = null;
       _retryingCard = null;
       _message = 'Safe learner updates are temporarily unavailable.';
       _phase = ParentDashboardPhase.childError;
-      notifyListeners();
+      _notify();
     }
+  }
+
+  void _notify() {
+    if (_disposed) return;
+    notifyListeners();
   }
 
   void _clearChildView() {
