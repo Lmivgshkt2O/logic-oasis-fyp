@@ -12,6 +12,10 @@ import 'package:logic_oasis/shared/models/trusted_subtopic_progress.dart';
 import 'package:logic_oasis/shared/services/parent_link_context_service.dart';
 import 'package:logic_oasis/shared/state/app_state.dart';
 
+/// Wednesday 2026-08-12 12:00 MYT, inside the same Malaysia week as the
+/// practice/forum fixtures (Monday 2026-08-10).
+final fixedNow = DateTime.utc(2026, 8, 12, 4);
+
 class _LinkedChildrenGateway implements ParentLinkedChildrenGateway {
   const _LinkedChildrenGateway(this.children);
 
@@ -45,7 +49,10 @@ class _MutableGateway implements ParentLinkedChildrenGateway {
   Future<List<LinkedChildContext>> loadLinkedChildren() => load();
 }
 
-TrustedSubtopicProgress masteryRecord(String subtopicId) {
+TrustedSubtopicProgress masteryRecord(
+  String subtopicId, {
+  double probability = 0.55,
+}) {
   return TrustedSubtopicProgress(
     studentId: 'student_safe',
     topicId: 'whole_numbers_y4',
@@ -56,38 +63,80 @@ TrustedSubtopicProgress masteryRecord(String subtopicId) {
     bestCorrectRate: 0.6,
     attempted: true,
     accessUnlocked: true,
-    masteryProbability: 0.55,
+    masteryProbability: probability,
     evidenceLevel: 'established',
     observationCount: 2,
     updatedAt: DateTime.utc(2026, 8, 1, 8),
   );
 }
 
-ParentPracticeSummary practiceSummary() {
+ParentPracticeSummary practiceSummary({
+  List<int> daily = const [1, 0, 0, 0, 2, 0, 0],
+  int? previousWeek,
+}) {
   return ParentPracticeSummary(
     schemaVersion: parentPracticeSummarySchemaVersion,
     studentId: 'student_safe',
     timezone: parentPracticeTimezone,
     weekStart: DateTime.utc(2026, 8, 9, 16),
-    dailyCompletionCounts: const [1, 0, 0, 0, 2, 0, 0],
-    completedPracticeCount: 3,
-    activeDayCount: 2,
+    dailyCompletionCounts: daily,
+    completedPracticeCount: daily.fold(0, (sum, value) => sum + value),
+    activeDayCount: daily.where((value) => value > 0).length,
+    previousWeekCompletedPracticeCount: previousWeek,
     updatedAt: DateTime.utc(2026, 8, 11, 4),
   );
 }
 
-ForumParticipationSummary mutualAidSummary() {
-  return const ForumParticipationSummary(
+ForumParticipationSummary mutualAidSummary({
+  int questions = 1,
+  int answers = 2,
+  int accepted = 1,
+  int helpful = 0,
+}) {
+  return ForumParticipationSummary(
     studentId: 'student_safe',
-    questionsPostedCount: 1,
-    answersSubmittedCount: 2,
-    acceptedAnswersCount: 1,
-    helpfulReceivedCount: 0,
+    questionsPostedCount: questions,
+    answersSubmittedCount: answers,
+    acceptedAnswersCount: accepted,
+    helpfulReceivedCount: helpful,
+    weekStart: DateTime.utc(2026, 8, 9, 16),
+    lastParticipationAt: DateTime.utc(2026, 8, 10, 3),
+    updatedAt: DateTime.utc(2026, 8, 10, 3),
   );
 }
 
+ParentDashboardSnapshot fullSnapshot() {
+  return ParentDashboardSnapshot(
+    mastery: [
+      masteryRecord('read_write_numbers', probability: 0.4),
+      masteryRecord('place_digit_value', probability: 0.9),
+    ],
+    practiceSummary: practiceSummary(),
+    forumParticipationSummary: mutualAidSummary(),
+  );
+}
+
+String demoSubtopicTitle(String subtopicId, {bool isBahasaMelayu = false}) {
+  final state = AppState(persistQuizResults: false);
+  final topic = state.topics.firstWhere(
+    (topic) => topic.id == 'whole_numbers_y4',
+  );
+  final subtopic = topic.subtopics.firstWhere(
+    (subtopic) => subtopic.id == subtopicId,
+  );
+  return isBahasaMelayu ? subtopic.titleBm : subtopic.title;
+}
+
+String demoTopicTitle({bool isBahasaMelayu = false}) {
+  final state = AppState(persistQuizResults: false);
+  final topic = state.topics.firstWhere(
+    (topic) => topic.id == 'whole_numbers_y4',
+  );
+  return isBahasaMelayu ? topic.titleBm : topic.title;
+}
+
 void main() {
-  testWidgets('parent dashboard renders only safe typed card inputs', (
+  testWidgets('parent dashboard renders the approved Progress Map', (
     tester,
   ) async {
     const child = LinkedChildContext(
@@ -95,14 +144,6 @@ void main() {
       displayName: 'Aiman',
       yearLevel: 4,
     );
-    final snapshot = ParentDashboardSnapshot(
-      mastery: [
-        masteryRecord('read_write_numbers'),
-        masteryRecord('place_digit_value'),
-      ],
-      practiceSummary: practiceSummary(),
-      forumParticipationSummary: mutualAidSummary(),
-    );
 
     await tester.pumpWidget(
       MaterialApp(
@@ -111,44 +152,143 @@ void main() {
         home: ParentDashboardPage(
           state: AppState(persistQuizResults: false),
           linkedChildrenGateway: const _LinkedChildrenGateway([child]),
-          dashboardLoader: (_) async => snapshot,
+          dashboardLoader: (_) async => fullSnapshot(),
+          clock: () => fixedNow,
         ),
       ),
     );
     await tester.pumpAndSettle();
 
+    // Header identifies the child and the protected-activity boundary.
     expect(find.text('Safe learning updates for Aiman.'), findsOneWidget);
-    expect(find.text('2 learning records are ready.'), findsOneWidget);
-    expect(
-      find.text('This week: 3 completed practices across 2 active days.'),
-      findsOneWidget,
-    );
+    expect(find.textContaining('Updated: 11/8/2026'), findsOneWidget);
+
+    // Weekly glance truthfully mentions focus, practice, and Mutual Aid.
+    expect(find.text('A steady week with a clear focus.'), findsOneWidget);
     expect(
       find.text(
-        'This week: 1 questions, 2 replies, 1 accepted answers, '
-        '0 helpful marks.',
+        '${demoSubtopicTitle('read_write_numbers')} is the focus, with '
+        'practice and Mutual Aid activity this week.',
       ),
       findsOneWidget,
     );
+
+    // Understanding card: focus, qualitative status, evidence, strength, step.
+    expect(find.text('Understanding'), findsOneWidget);
+    expect(find.text('Learning snapshot'), findsOneWidget);
+    expect(find.text('Topic: ${demoTopicTitle()}'), findsOneWidget);
+    expect(
+      find.text('Focus: ${demoSubtopicTitle('read_write_numbers')}'),
+      findsOneWidget,
+    );
+    expect(find.text('Growing'), findsOneWidget);
+    expect(
+      find.text('Based on 2 trusted learning observations.'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Strength: ${demoSubtopicTitle('place_digit_value')}'),
+      findsOneWidget,
+    );
+    expect(find.text('Parent next step'), findsOneWidget);
+    expect(
+      find.text(
+        'Practise ${demoSubtopicTitle('read_write_numbers')} together this '
+        'week.',
+      ),
+      findsOneWidget,
+    );
+
+    // Practice Effort: weekly total, active days, Mon-Sun rhythm.
+    expect(find.text('Practice Effort'), findsOneWidget);
+    expect(
+      find.text('3 practices completed this week across 2 active days'),
+      findsOneWidget,
+    );
+    expect(find.text('Mon'), findsOneWidget);
+    expect(find.text('Fri'), findsOneWidget);
+
+    // Mutual Aid: count-only timeline rows for nonzero events.
+    expect(find.text('Mutual Aid'), findsOneWidget);
+    expect(find.text('1 question asked'), findsOneWidget);
+    expect(find.text('2 replies · 1 accepted'), findsOneWidget);
+    expect(find.textContaining('helpful marks'), findsNothing);
+
+    // One action and its matching conversation starter.
+    expect(find.text('A gentle question to ask'), findsOneWidget);
+    expect(
+      find.text(
+        'What part of ${demoSubtopicTitle('read_write_numbers')} should we '
+        'look at together?',
+      ),
+      findsOneWidget,
+    );
+
     // No technical AI/model/server copy may reach the parent view.
     expect(find.textContaining('controlled demonstration'), findsNothing);
     expect(find.textContaining('Safe analysis'), findsNothing);
     expect(find.textContaining('Server status'), findsNothing);
-    expect(find.textContaining('Fallback advice'), findsNothing);
   });
 
-  testWidgets('unavailable cards stay distinct from recorded evidence', (
+  testWidgets(
+    'insufficient Understanding, unavailable cards, and zero activity are '
+    'distinct states',
+    (tester) async {
+      const child = LinkedChildContext(
+        studentId: 'student_safe',
+        displayName: 'Aiman',
+        yearLevel: 4,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: ParentDashboardPage(
+            state: AppState(persistQuizResults: false),
+            linkedChildrenGateway: const _LinkedChildrenGateway([child]),
+            dashboardLoader: (_) async => const ParentDashboardSnapshot(
+              mastery: <TrustedSubtopicProgress>[],
+              practiceSummary: null,
+              forumParticipationSummary: null,
+            ),
+            clock: () => fixedNow,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'More recent learning evidence is needed before a focus can be '
+          'named.',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Practice effort is unavailable this week.'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Participation summary is unavailable this week.'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Learning evidence is still being collected.'),
+        findsOneWidget,
+      );
+      // No supported action or conversation starter without evidence.
+      expect(find.text('A gentle question to ask'), findsNothing);
+    },
+  );
+
+  testWidgets('recorded zero activity stays distinct from unavailable', (
     tester,
   ) async {
     const child = LinkedChildContext(
-      studentId: 'student_fallback',
-      displayName: 'Bela',
-      yearLevel: 5,
-    );
-    const snapshot = ParentDashboardSnapshot(
-      mastery: <TrustedSubtopicProgress>[],
-      practiceSummary: null,
-      forumParticipationSummary: null,
+      studentId: 'student_safe',
+      displayName: 'Aiman',
+      yearLevel: 4,
     );
 
     await tester.pumpWidget(
@@ -158,28 +298,107 @@ void main() {
         home: ParentDashboardPage(
           state: AppState(persistQuizResults: false),
           linkedChildrenGateway: const _LinkedChildrenGateway([child]),
-          dashboardLoader: (_) async => snapshot,
+          dashboardLoader: (_) async => ParentDashboardSnapshot(
+            mastery: const [],
+            practiceSummary: practiceSummary(
+              daily: const [0, 0, 0, 0, 0, 0, 0],
+            ),
+            forumParticipationSummary: mutualAidSummary(
+              questions: 0,
+              answers: 0,
+              accepted: 0,
+              helpful: 0,
+            ),
+          ),
+          clock: () => fixedNow,
         ),
       ),
     );
     await tester.pumpAndSettle();
 
     expect(
+      find.text('No practice completed yet this week across 0 active days'),
+      findsOneWidget,
+    );
+    expect(find.text('No Mutual Aid moments yet this week.'), findsOneWidget);
+    expect(
+      find.text('Shall we do one short practice together this week?'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('prior-week comparison appears only with a valid prior total', (
+    tester,
+  ) async {
+    const child = LinkedChildContext(
+      studentId: 'student_safe',
+      displayName: 'Aiman',
+      yearLevel: 4,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: ParentDashboardPage(
+          state: AppState(persistQuizResults: false),
+          linkedChildrenGateway: const _LinkedChildrenGateway([child]),
+          dashboardLoader: (_) async => ParentDashboardSnapshot(
+            mastery: const [],
+            practiceSummary: practiceSummary(previousWeek: 1),
+          ),
+          clock: () => fixedNow,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Compared with 1 practice last week.'), findsOneWidget);
+    expect(find.text('Practice improved by 2 this week.'), findsOneWidget);
+    expect(find.text('Compared with 2 practices last week.'), findsNothing);
+  });
+
+  testWidgets('Bahasa Melayu renders titles, plurals, and day labels', (
+    tester,
+  ) async {
+    const child = LinkedChildContext(
+      studentId: 'student_safe',
+      displayName: 'Aiman',
+      yearLevel: 4,
+    );
+    final state = AppState(persistQuizResults: false)
+      ..language = 'Bahasa Melayu';
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        locale: const Locale('ms'),
+        home: ParentDashboardPage(
+          state: state,
+          linkedChildrenGateway: const _LinkedChildrenGateway([child]),
+          dashboardLoader: (_) async => fullSnapshot(),
+          clock: () => fixedNow,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Pemahaman'), findsOneWidget);
+    expect(find.text('Usaha Latihan'), findsOneWidget);
+    expect(find.text('Saling Membantu'), findsOneWidget);
+    expect(
+      find.text('3 latihan disiapkan minggu ini sepanjang 2 hari aktif'),
+      findsOneWidget,
+    );
+    expect(find.text('Isn'), findsOneWidget);
+    expect(find.text('Soalan ringkas untuk ditanya'), findsOneWidget);
+    expect(
       find.text(
-        'More learning evidence is needed before a focus can be named.',
+        'Fokus: ${demoSubtopicTitle('read_write_numbers', isBahasaMelayu: true)}',
       ),
       findsOneWidget,
     );
-    expect(
-      find.text('Practice effort is unavailable this week.'),
-      findsOneWidget,
-    );
-    expect(
-      find.text('Participation summary is unavailable this week.'),
-      findsOneWidget,
-    );
-    expect(find.textContaining('Fallback advice'), findsNothing);
-    expect(find.textContaining('controlled demonstration'), findsNothing);
   });
 
   testWidgets('unlinked account cannot fall back to local learner data', (
@@ -201,8 +420,7 @@ void main() {
       find.text('No active linked learner is available for this account.'),
       findsOneWidget,
     );
-    expect(find.text('Learning map'), findsNothing);
-    expect(find.textContaining('Safe analysis'), findsNothing);
+    expect(find.text('Understanding'), findsNothing);
   });
 
   testWidgets('a stale child-load failure cannot replace a newer selection', (
@@ -233,6 +451,7 @@ void main() {
           dashboardLoader: (child) => child.studentId == childA.studentId
               ? firstLoad.future
               : Future.value(belaSnapshot),
+          clock: () => fixedNow,
         ),
       ),
     );
@@ -243,8 +462,6 @@ void main() {
     );
     await tester.ensureVisible(childSelector);
     await tester.tap(childSelector);
-    // The first child's snapshot intentionally remains pending, so the loading
-    // indicator never settles. Advance only the dropdown's entrance animation.
     await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.text('Bela (Year 5)').last);
     await tester.pump();
@@ -277,13 +494,7 @@ void main() {
       mastery: <TrustedSubtopicProgress>[],
     );
     final aimanSnapshot = ParentDashboardSnapshot(
-      mastery: [
-        masteryRecord('read_write_numbers'),
-        masteryRecord('place_digit_value'),
-        masteryRecord('compare_order_numbers'),
-        masteryRecord('odd_even_numbers'),
-        masteryRecord('number_patterns'),
-      ],
+      mastery: [masteryRecord('read_write_numbers', probability: 0.4)],
     );
 
     await tester.pumpWidget(
@@ -296,6 +507,7 @@ void main() {
           dashboardLoader: (child) => child.studentId == childA.studentId
               ? firstLoad.future
               : Future.value(belaSnapshot),
+          clock: () => fixedNow,
         ),
       ),
     );
@@ -315,10 +527,14 @@ void main() {
     await tester.pump();
 
     expect(find.text('Safe learning updates for Bela.'), findsOneWidget);
-    expect(find.text('5 learning records are ready.'), findsNothing);
+    expect(
+      find.text('Focus: ${demoSubtopicTitle('read_write_numbers')}'),
+      findsNothing,
+    );
     expect(
       find.text(
-        'More learning evidence is needed before a focus can be named.',
+        'More recent learning evidence is needed before a focus can be '
+        'named.',
       ),
       findsOneWidget,
     );
@@ -333,11 +549,6 @@ void main() {
       yearLevel: 4,
     );
     final gate = _DelayedGateway(const [child]);
-    final snapshot = ParentDashboardSnapshot(
-      mastery: [masteryRecord('read_write_numbers')],
-      practiceSummary: practiceSummary(),
-      forumParticipationSummary: mutualAidSummary(),
-    );
 
     await tester.pumpWidget(
       MaterialApp(
@@ -346,7 +557,8 @@ void main() {
         home: ParentDashboardPage(
           state: AppState(persistQuizResults: false),
           linkedChildrenGateway: gate,
-          dashboardLoader: (_) async => snapshot,
+          dashboardLoader: (_) async => fullSnapshot(),
+          clock: () => fixedNow,
         ),
       ),
     );
@@ -358,7 +570,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Loading linked learners…'), findsNothing);
-    expect(find.text('1 learning records are ready.'), findsOneWidget);
+    expect(find.text('Understanding'), findsOneWidget);
   });
 
   testWidgets('link error is distinct and retry reloads linked children', (
@@ -376,11 +588,6 @@ void main() {
       }
       return const [child];
     });
-    final snapshot = ParentDashboardSnapshot(
-      mastery: [masteryRecord('read_write_numbers')],
-      practiceSummary: practiceSummary(),
-      forumParticipationSummary: mutualAidSummary(),
-    );
 
     await tester.pumpWidget(
       MaterialApp(
@@ -389,21 +596,22 @@ void main() {
         home: ParentDashboardPage(
           state: AppState(persistQuizResults: false),
           linkedChildrenGateway: gate,
-          dashboardLoader: (_) async => snapshot,
+          dashboardLoader: (_) async => fullSnapshot(),
+          clock: () => fixedNow,
         ),
       ),
     );
     await tester.pumpAndSettle();
 
     expect(find.text('Link context unavailable.'), findsOneWidget);
-    expect(find.text('Learning map'), findsNothing);
+    expect(find.text('Understanding'), findsNothing);
 
     fail = false;
     await tester.tap(find.text('Retry'));
     await tester.pumpAndSettle();
 
     expect(find.text('Safe learning updates for Aiman.'), findsOneWidget);
-    expect(find.text('Learning map'), findsOneWidget);
+    expect(find.text('Understanding'), findsOneWidget);
   });
 
   testWidgets('revocation clears the child view with a reconnect message', (
@@ -433,7 +641,7 @@ void main() {
       find.text('This learner link is no longer active. Please reconnect.'),
       findsOneWidget,
     );
-    expect(find.text('Learning map'), findsNothing);
+    expect(find.text('Understanding'), findsNothing);
     expect(find.text('Safe learning updates for Aiman.'), findsOneWidget);
   });
 
@@ -446,13 +654,9 @@ void main() {
     var calls = 0;
     final retryLoader = Completer<ParentDashboardSnapshot>();
     final partial = ParentDashboardSnapshot(
-      mastery: [masteryRecord('read_write_numbers')],
+      mastery: [masteryRecord('read_write_numbers', probability: 0.4)],
     );
-    final full = ParentDashboardSnapshot(
-      mastery: [masteryRecord('read_write_numbers')],
-      practiceSummary: practiceSummary(),
-      forumParticipationSummary: mutualAidSummary(),
-    );
+    final full = fullSnapshot();
 
     await tester.pumpWidget(
       MaterialApp(
@@ -463,6 +667,7 @@ void main() {
           linkedChildrenGateway: const _LinkedChildrenGateway([child]),
           dashboardLoader: (child) =>
               calls++ == 0 ? Future.value(partial) : retryLoader.future,
+          clock: () => fixedNow,
         ),
       ),
     );
@@ -482,7 +687,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.text('This week: 3 completed practices across 2 active days.'),
+      find.text('3 practices completed this week across 2 active days'),
       findsOneWidget,
     );
     expect(
