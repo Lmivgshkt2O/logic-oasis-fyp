@@ -1,17 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:logic_oasis/app/theme.dart';
+import 'package:logic_oasis/features/parent_dashboard/parent_dashboard_state.dart';
 import 'package:logic_oasis/l10n/app_localizations.dart';
 import 'package:logic_oasis/shared/models/linked_child_context.dart';
-import 'package:logic_oasis/shared/models/parent_dashboard_snapshot.dart';
 import 'package:logic_oasis/shared/repositories/learning_repository.dart';
-import 'package:logic_oasis/shared/services/parent_link_context_service.dart';
 import 'package:logic_oasis/shared/services/parent_firebase_session.dart';
+import 'package:logic_oasis/shared/services/parent_link_context_service.dart';
 import 'package:logic_oasis/shared/state/app_state.dart';
 import 'package:logic_oasis/shared/widgets/logic_oasis_figma_components.dart';
 import 'package:logic_oasis/shared/widgets/section_card.dart';
-
-typedef ParentDashboardLoader =
-    Future<ParentDashboardSnapshot> Function(LinkedChildContext child);
 
 class ParentDashboardPage extends StatefulWidget {
   const ParentDashboardPage({
@@ -30,82 +27,27 @@ class ParentDashboardPage extends StatefulWidget {
 }
 
 class _ParentDashboardPageState extends State<ParentDashboardPage> {
-  late final ParentLinkedChildrenGateway _linkedChildrenGateway;
-  List<LinkedChildContext> _children = const [];
-  LinkedChildContext? _selectedChild;
-  ParentDashboardSnapshot? _snapshot;
-  bool _isLoading = true;
-  String? _message;
+  late final ParentDashboardState _dashboardState;
+  late final Listenable _listenable;
 
   @override
   void initState() {
     super.initState();
-    _linkedChildrenGateway =
-        widget.linkedChildrenGateway ?? ParentLinkedChildrenService();
-    _loadLinkedChildren();
+    _dashboardState = ParentDashboardState(
+      gateway: widget.linkedChildrenGateway ?? ParentLinkedChildrenService(),
+      loaderFactory: _loaderFactory,
+    );
+    _listenable = Listenable.merge([widget.state, _dashboardState]);
+    _dashboardState.loadLinkedChildren();
   }
 
-  Future<void> _loadLinkedChildren() async {
-    setState(() {
-      _isLoading = true;
-      _message = null;
-    });
-    try {
-      final children = await _linkedChildrenGateway.loadLinkedChildren();
-      if (!mounted) return;
-      setState(() {
-        _children = children;
-        _selectedChild = children.isEmpty ? null : children.first;
-      });
-      if (_selectedChild != null) {
-        await _loadSelectedChild();
-      } else if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _message = 'No active linked learner is available for this account.';
-        });
-      }
-    } on ParentLinkContextException catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-        _message = error.message;
-      });
-    }
+  @override
+  void dispose() {
+    _dashboardState.dispose();
+    super.dispose();
   }
 
-  Future<void> _loadSelectedChild() async {
-    final child = _selectedChild;
-    if (child == null) return;
-    setState(() {
-      _isLoading = true;
-      _message = null;
-    });
-    try {
-      final loader = await _dashboardLoader();
-      final snapshot = await loader(child);
-      if (!mounted || child.studentId != _selectedChild?.studentId) return;
-      setState(() {
-        _snapshot = snapshot;
-        _isLoading = false;
-        _message = null;
-      });
-    } on ParentDashboardAuthException {
-      if (!mounted || child.studentId != _selectedChild?.studentId) return;
-      setState(() {
-        _isLoading = false;
-        _message = 'This learner link is no longer active. Please reconnect.';
-      });
-    } catch (_) {
-      if (!mounted || child.studentId != _selectedChild?.studentId) return;
-      setState(() {
-        _isLoading = false;
-        _message = 'Safe learner updates are temporarily unavailable.';
-      });
-    }
-  }
-
-  Future<ParentDashboardLoader> _dashboardLoader() async {
+  Future<ParentDashboardLoader> _loaderFactory() async {
     final provided = widget.dashboardLoader;
     if (provided != null) return provided;
     // Use the named parent Firebase app so Rules evaluate the parent identity,
@@ -122,25 +64,17 @@ class _ParentDashboardPageState extends State<ParentDashboardPage> {
   }
 
   void _selectChild(LinkedChildContext? child) {
-    if (child == null || child.studentId == _selectedChild?.studentId) return;
-    setState(() {
-      _selectedChild = child;
-      _snapshot = null;
-    });
-    _loadSelectedChild();
+    if (child == null) return;
+    _dashboardState.selectChild(child);
   }
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: widget.state,
+      animation: _listenable,
       builder: (context, _) => _ParentDashboardContent(
         state: widget.state,
-        children: _children,
-        selectedChild: _selectedChild,
-        snapshot: _snapshot,
-        isLoading: _isLoading,
-        message: _message,
+        dashboard: _dashboardState,
         onChildSelected: _selectChild,
       ),
     );
@@ -150,26 +84,20 @@ class _ParentDashboardPageState extends State<ParentDashboardPage> {
 class _ParentDashboardContent extends StatelessWidget {
   const _ParentDashboardContent({
     required this.state,
-    required this.children,
-    required this.selectedChild,
-    required this.snapshot,
-    required this.isLoading,
-    required this.message,
+    required this.dashboard,
     required this.onChildSelected,
   });
 
   final AppState state;
-  final List<LinkedChildContext> children;
-  final LinkedChildContext? selectedChild;
-  final ParentDashboardSnapshot? snapshot;
-  final bool isLoading;
-  final String? message;
+  final ParentDashboardState dashboard;
   final ValueChanged<LinkedChildContext?> onChildSelected;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
+    final selectedChild = dashboard.selectedChild;
+    final phase = dashboard.phase;
 
     return LogicOasisScaffold(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
@@ -183,17 +111,17 @@ class _ParentDashboardContent extends StatelessWidget {
                   'Log masuk dengan akaun ibu bapa yang dipautkan untuk melihat kemas kini pembelajaran selamat.',
                 )
               : state.t(
-                  'Safe learning updates for ${selectedChild!.displayName}.',
-                  'Kemas kini pembelajaran selamat untuk ${selectedChild!.displayName}.',
+                  'Safe learning updates for ${selectedChild.displayName}.',
+                  'Kemas kini pembelajaran selamat untuk ${selectedChild.displayName}.',
                 ),
           style: theme.textTheme.bodyLarge,
         ),
-        if (children.length > 1) ...[
+        if (dashboard.children.length > 1) ...[
           const SizedBox(height: 14),
           DropdownButtonFormField<LinkedChildContext>(
             initialValue: selectedChild,
             decoration: const InputDecoration(labelText: 'Linked learner'),
-            items: children
+            items: dashboard.children
                 .map(
                   (child) => DropdownMenuItem(
                     value: child,
@@ -206,63 +134,97 @@ class _ParentDashboardContent extends StatelessWidget {
             onChanged: onChildSelected,
           ),
         ],
-        if (isLoading || message != null) ...[
+        if (_showStatusBanner(phase)) ...[
           const SizedBox(height: 14),
           _ParentDashboardSafeStatusBanner(
-            isLoading: isLoading,
-            message: message,
+            loading:
+                phase == ParentDashboardPhase.loadingLinks ||
+                phase == ParentDashboardPhase.loadingChild,
+            text: _statusText(phase, dashboard.message),
+            onRetry: switch (phase) {
+              ParentDashboardPhase.linkError => dashboard.loadLinkedChildren,
+              ParentDashboardPhase.childError => dashboard.retryCurrentChild,
+              _ => null,
+            },
           ),
         ],
-        const SizedBox(height: 18),
-        SectionCard(
-          title: state.t(
-            'Safe learning boundary',
-            'Sempadan pembelajaran selamat',
-          ),
-          icon: Icons.verified_user_outlined,
-          child: Text(
-            state.t(
-              'This dashboard uses only protected mastery, practice, and count-only participation projections.',
-              'Papan pemuka ini menggunakan hanya unjuran penguasaan, latihan dan penyertaan kiraan sahaja yang dilindungi.',
+        if (selectedChild != null && dashboard.isReady) ...[
+          const SizedBox(height: 18),
+          SectionCard(
+            title: state.t(
+              'Safe learning boundary',
+              'Sempadan pembelajaran selamat',
             ),
-            style: theme.textTheme.bodyMedium,
+            icon: Icons.verified_user_outlined,
+            child: Text(
+              state.t(
+                'This dashboard uses only protected mastery, practice, and count-only participation projections.',
+                'Papan pemuka ini menggunakan hanya unjuran penguasaan, latihan dan penyertaan kiraan sahaja yang dilindungi.',
+              ),
+              style: theme.textTheme.bodyMedium,
+            ),
           ),
-        ),
-        if (selectedChild != null) ...[
           const SizedBox(height: 16),
           SectionCard(
             title: state.t('Learning map', 'Peta pembelajaran'),
             icon: Icons.map_outlined,
-            child: _ParentInterimProgressMap(state: state, snapshot: snapshot),
+            child: _ParentInterimProgressMap(
+              state: state,
+              dashboard: dashboard,
+            ),
           ),
         ],
       ],
     );
   }
+
+  static bool _showStatusBanner(ParentDashboardPhase phase) =>
+      phase == ParentDashboardPhase.loadingLinks ||
+      phase == ParentDashboardPhase.loadingChild ||
+      phase == ParentDashboardPhase.linkError ||
+      phase == ParentDashboardPhase.childError ||
+      phase == ParentDashboardPhase.noActiveChild;
+
+  static String _statusText(ParentDashboardPhase phase, String? message) {
+    if (phase == ParentDashboardPhase.loadingLinks) {
+      return 'Loading linked learners…';
+    }
+    if (phase == ParentDashboardPhase.loadingChild) {
+      return 'Loading linked learner updates…';
+    }
+    return message ?? '';
+  }
 }
 
 /// Interim parent-safe summary of the three typed card inputs. U5 replaces
 /// this with the approved Progress Map; this interim view never exposes
-/// attempts, AI/model details, or raw maps.
+/// attempts, AI/model details, or raw maps. A card-level retry marks only the
+/// retried card as loading and keeps the other cards' committed data.
 class _ParentInterimProgressMap extends StatelessWidget {
   const _ParentInterimProgressMap({
     required this.state,
-    required this.snapshot,
+    required this.dashboard,
   });
 
   final AppState state;
-  final ParentDashboardSnapshot? snapshot;
+  final ParentDashboardState dashboard;
 
   @override
   Widget build(BuildContext context) {
+    final snapshot = dashboard.snapshot;
     final mastery = snapshot?.mastery;
     final practice = snapshot?.practiceSummary;
     final mutualAid = snapshot?.forumParticipationSummary;
+    final retrying = dashboard.retryingCard;
+    final canRetry =
+        dashboard.phase == ParentDashboardPhase.readyPartial ||
+        dashboard.phase == ParentDashboardPhase.retryingCard;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _InterimMapRow(
+        _cardRow(
+          kind: ParentCardKind.understanding,
           icon: Icons.psychology_outlined,
           label: state.t('Understanding', 'Pemahaman'),
           body: mastery == null
@@ -279,9 +241,13 @@ class _ParentInterimProgressMap extends StatelessWidget {
                   '${mastery.length} learning records are ready.',
                   '${mastery.length} rekod pembelajaran sudah sedia.',
                 ),
+          unavailable: mastery == null,
+          retrying: retrying == ParentCardKind.understanding,
+          canRetry: canRetry && mastery == null,
         ),
         const SizedBox(height: 10),
-        _InterimMapRow(
+        _cardRow(
+          kind: ParentCardKind.practice,
           icon: Icons.task_alt_outlined,
           label: state.t('Practice effort', 'Usaha latihan'),
           body: practice == null
@@ -293,9 +259,13 @@ class _ParentInterimProgressMap extends StatelessWidget {
                   'This week: ${practice.completedPracticeCount} completed practices across ${practice.activeDayCount} active days.',
                   'Minggu ini: ${practice.completedPracticeCount} latihan lengkap sepanjang ${practice.activeDayCount} hari aktif.',
                 ),
+          unavailable: practice == null,
+          retrying: retrying == ParentCardKind.practice,
+          canRetry: canRetry && practice == null,
         ),
         const SizedBox(height: 10),
-        _InterimMapRow(
+        _cardRow(
+          kind: ParentCardKind.mutualAid,
           icon: Icons.forum_outlined,
           label: state.t('Mutual aid', 'Saling membantu'),
           body: mutualAid == null
@@ -307,8 +277,39 @@ class _ParentInterimProgressMap extends StatelessWidget {
                   'This week: ${mutualAid.questionsPostedCount} questions, ${mutualAid.answersSubmittedCount} replies, ${mutualAid.acceptedAnswersCount} accepted answers, ${mutualAid.helpfulReceivedCount} helpful marks.',
                   'Minggu ini: ${mutualAid.questionsPostedCount} soalan, ${mutualAid.answersSubmittedCount} jawapan, ${mutualAid.acceptedAnswersCount} jawapan diterima, ${mutualAid.helpfulReceivedCount} tanda membantu.',
                 ),
+          unavailable: mutualAid == null,
+          retrying: retrying == ParentCardKind.mutualAid,
+          canRetry: canRetry && mutualAid == null,
         ),
       ],
+    );
+  }
+
+  Widget _cardRow({
+    required ParentCardKind kind,
+    required IconData icon,
+    required String label,
+    required String body,
+    required bool unavailable,
+    required bool retrying,
+    required bool canRetry,
+  }) {
+    return _InterimMapRow(
+      icon: icon,
+      label: label,
+      body: body,
+      trailing: retrying
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : canRetry
+          ? TextButton(
+              onPressed: () => dashboard.retryCard(kind),
+              child: const Text('Retry'),
+            )
+          : null,
     );
   }
 }
@@ -318,11 +319,13 @@ class _InterimMapRow extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.body,
+    this.trailing,
   });
 
   final IconData icon;
   final String label;
   final String body;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -349,6 +352,7 @@ class _InterimMapRow extends StatelessWidget {
             ],
           ),
         ),
+        if (trailing != null) ...[const SizedBox(width: 8), trailing!],
       ],
     );
   }
@@ -356,30 +360,33 @@ class _InterimMapRow extends StatelessWidget {
 
 class _ParentDashboardSafeStatusBanner extends StatelessWidget {
   const _ParentDashboardSafeStatusBanner({
-    required this.isLoading,
-    required this.message,
+    required this.loading,
+    required this.text,
+    this.onRetry,
   });
 
-  final bool isLoading;
-  final String? message;
+  final bool loading;
+  final String text;
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
-    final text = isLoading ? 'Loading linked learner updates…' : message ?? '';
     return SoftCard(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      color: isLoading ? LogicOasisTheme.mint : LogicOasisTheme.sand,
+      color: loading ? LogicOasisTheme.mint : LogicOasisTheme.sand,
       child: Row(
         children: [
           SizedBox(
             width: 20,
             height: 20,
-            child: isLoading
+            child: loading
                 ? const CircularProgressIndicator(strokeWidth: 2.4)
                 : const Icon(Icons.cloud_off_outlined, size: 20),
           ),
           const SizedBox(width: 10),
           Expanded(child: Text(text)),
+          if (!loading && onRetry != null)
+            TextButton(onPressed: onRetry, child: const Text('Retry')),
         ],
       ),
     );

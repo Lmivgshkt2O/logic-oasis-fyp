@@ -21,6 +21,30 @@ class _LinkedChildrenGateway implements ParentLinkedChildrenGateway {
   Future<List<LinkedChildContext>> loadLinkedChildren() async => children;
 }
 
+class _DelayedGateway implements ParentLinkedChildrenGateway {
+  _DelayedGateway(this.children);
+
+  final List<LinkedChildContext> children;
+  final Completer<void> _gate = Completer<void>();
+
+  void complete() => _gate.complete();
+
+  @override
+  Future<List<LinkedChildContext>> loadLinkedChildren() async {
+    await _gate.future;
+    return children;
+  }
+}
+
+class _MutableGateway implements ParentLinkedChildrenGateway {
+  _MutableGateway(this.load);
+
+  Future<List<LinkedChildContext>> Function() load;
+
+  @override
+  Future<List<LinkedChildContext>> loadLinkedChildren() => load();
+}
+
 TrustedSubtopicProgress masteryRecord(String subtopicId) {
   return TrustedSubtopicProgress(
     studentId: 'student_safe',
@@ -233,5 +257,238 @@ void main() {
       find.text('Safe learner updates are temporarily unavailable.'),
       findsNothing,
     );
+  });
+
+  testWidgets('a stale child-load success cannot replace a newer selection', (
+    tester,
+  ) async {
+    const childA = LinkedChildContext(
+      studentId: 'student_a',
+      displayName: 'Aiman',
+      yearLevel: 4,
+    );
+    const childB = LinkedChildContext(
+      studentId: 'student_b',
+      displayName: 'Bela',
+      yearLevel: 5,
+    );
+    final firstLoad = Completer<ParentDashboardSnapshot>();
+    const belaSnapshot = ParentDashboardSnapshot(
+      mastery: <TrustedSubtopicProgress>[],
+    );
+    final aimanSnapshot = ParentDashboardSnapshot(
+      mastery: [
+        masteryRecord('read_write_numbers'),
+        masteryRecord('place_digit_value'),
+        masteryRecord('compare_order_numbers'),
+        masteryRecord('odd_even_numbers'),
+        masteryRecord('number_patterns'),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: ParentDashboardPage(
+          state: AppState(persistQuizResults: false),
+          linkedChildrenGateway: const _LinkedChildrenGateway([childA, childB]),
+          dashboardLoader: (child) => child.studentId == childA.studentId
+              ? firstLoad.future
+              : Future.value(belaSnapshot),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final childSelector = find.byType(
+      DropdownButtonFormField<LinkedChildContext>,
+    );
+    await tester.ensureVisible(childSelector);
+    await tester.tap(childSelector);
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.text('Bela (Year 5)').last);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    firstLoad.complete(aimanSnapshot);
+    await tester.pump();
+
+    expect(find.text('Safe learning updates for Bela.'), findsOneWidget);
+    expect(find.text('5 learning records are ready.'), findsNothing);
+    expect(
+      find.text(
+        'More learning evidence is needed before a focus can be named.',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('initial links loading banner is distinct from child loading', (
+    tester,
+  ) async {
+    const child = LinkedChildContext(
+      studentId: 'student_safe',
+      displayName: 'Aiman',
+      yearLevel: 4,
+    );
+    final gate = _DelayedGateway(const [child]);
+    final snapshot = ParentDashboardSnapshot(
+      mastery: [masteryRecord('read_write_numbers')],
+      practiceSummary: practiceSummary(),
+      forumParticipationSummary: mutualAidSummary(),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: ParentDashboardPage(
+          state: AppState(persistQuizResults: false),
+          linkedChildrenGateway: gate,
+          dashboardLoader: (_) async => snapshot,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Loading linked learners…'), findsOneWidget);
+
+    gate.complete();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Loading linked learners…'), findsNothing);
+    expect(find.text('1 learning records are ready.'), findsOneWidget);
+  });
+
+  testWidgets('link error is distinct and retry reloads linked children', (
+    tester,
+  ) async {
+    const child = LinkedChildContext(
+      studentId: 'student_safe',
+      displayName: 'Aiman',
+      yearLevel: 4,
+    );
+    var fail = true;
+    final gate = _MutableGateway(() async {
+      if (fail) {
+        throw const ParentLinkContextException('Link context unavailable.');
+      }
+      return const [child];
+    });
+    final snapshot = ParentDashboardSnapshot(
+      mastery: [masteryRecord('read_write_numbers')],
+      practiceSummary: practiceSummary(),
+      forumParticipationSummary: mutualAidSummary(),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: ParentDashboardPage(
+          state: AppState(persistQuizResults: false),
+          linkedChildrenGateway: gate,
+          dashboardLoader: (_) async => snapshot,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Link context unavailable.'), findsOneWidget);
+    expect(find.text('Learning map'), findsNothing);
+
+    fail = false;
+    await tester.tap(find.text('Retry'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Safe learning updates for Aiman.'), findsOneWidget);
+    expect(find.text('Learning map'), findsOneWidget);
+  });
+
+  testWidgets('revocation clears the child view with a reconnect message', (
+    tester,
+  ) async {
+    const child = LinkedChildContext(
+      studentId: 'student_safe',
+      displayName: 'Aiman',
+      yearLevel: 4,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: ParentDashboardPage(
+          state: AppState(persistQuizResults: false),
+          linkedChildrenGateway: const _LinkedChildrenGateway([child]),
+          dashboardLoader: (_) async =>
+              throw const ParentDashboardAuthException('revoked'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('This learner link is no longer active. Please reconnect.'),
+      findsOneWidget,
+    );
+    expect(find.text('Learning map'), findsNothing);
+    expect(find.text('Safe learning updates for Aiman.'), findsOneWidget);
+  });
+
+  testWidgets('card retry reloads only the retried card', (tester) async {
+    const child = LinkedChildContext(
+      studentId: 'student_safe',
+      displayName: 'Aiman',
+      yearLevel: 4,
+    );
+    var calls = 0;
+    final retryLoader = Completer<ParentDashboardSnapshot>();
+    final partial = ParentDashboardSnapshot(
+      mastery: [masteryRecord('read_write_numbers')],
+    );
+    final full = ParentDashboardSnapshot(
+      mastery: [masteryRecord('read_write_numbers')],
+      practiceSummary: practiceSummary(),
+      forumParticipationSummary: mutualAidSummary(),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: ParentDashboardPage(
+          state: AppState(persistQuizResults: false),
+          linkedChildrenGateway: const _LinkedChildrenGateway([child]),
+          dashboardLoader: (child) =>
+              calls++ == 0 ? Future.value(partial) : retryLoader.future,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Practice effort is unavailable this week.'),
+      findsOneWidget,
+    );
+    expect(find.text('Retry'), findsNWidgets(2));
+
+    await tester.tap(find.widgetWithText(TextButton, 'Retry').first);
+    await tester.pump();
+    expect(find.byType(CircularProgressIndicator), findsWidgets);
+
+    retryLoader.complete(full);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('This week: 3 completed practices across 2 active days.'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Practice effort is unavailable this week.'),
+      findsNothing,
+    );
+    expect(find.text('Retry'), findsNothing);
   });
 }
