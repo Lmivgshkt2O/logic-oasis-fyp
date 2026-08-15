@@ -4,10 +4,12 @@ Date: 2026-08-15
 
 Branch: `codex/feat-u14-parent-evidence-progress-map`
 
-Environment: Windows with Flutter/Dart, the Firebase Emulator Suite (Auth on
-9099, Firestore on 8080), and the project's Python 3.11 Functions runtime.
-Only temporary, disposable identities and sanitized fixtures were used; no
-real student, parent, supervisor, or production-learning data was touched.
+Environment: Windows with Flutter/Dart, a Pixel 6 Android emulator, the
+Firebase Emulator Suite (Auth on 9099, Firestore on 8080, Functions on 5001),
+and the project's Python 3.11 Functions runtime (operator params in the
+gitignored `functions/.env.logic-oasis-fyp`). Only temporary, disposable
+identities and sanitized fixtures were used; no real student, parent,
+supervisor, or production-learning data was touched.
 
 Scope: canonical FYP1 unit U14 (parent Progress Map) - the approved screen
 (weekly glance, Understanding, Practice Effort, Mutual Aid, one action and its
@@ -18,9 +20,9 @@ availability/retry/revocation state.
 
 | Gate | Command | Result |
 |---|---|---|
-| Flutter full suite | `flutter test` | 229 passed |
+| Flutter full suite | `flutter test` | 231 passed |
 | Flutter analyzer | `flutter analyze` | No issues |
-| Functions suite | `python -m unittest discover -s functions/tests -t .` | 225 passed |
+| Functions suite | `python -m unittest discover -s functions/tests -t .` | 226 passed |
 | Tools/release suite | `python -m unittest tools.tests.*` | 43 passed |
 
 The focused model, repository, state, widget, localization, accessibility, and
@@ -96,14 +98,13 @@ What this proves:
   temporary user, profile, link, projection, and raw fixture was deleted.
 
 The `getLinkedChildren` callable context (linked/unrelated/revoked parent
-visibility) is covered by the U9 controlled live verification
-(`docs/evidence/2026-07-19-u9-controlled-live-verification.md`), which ran the
-same boundary against the deployed callable. When the Functions emulator is
-included in a run, the operator provides the functions params through the
-gitignored `functions/.env.logic-oasis-fyp` file (per
-`functions/.env.logic-oasis-fyp.example`); the U14 emulator flow runs the
-Auth + Firestore matrix so the Rules boundary is proven without requiring
-production token-verification endpoints.
+visibility) is additionally exercised live in this record: the Android
+rehearsal below signs the linked parent in through the Auth emulator and calls
+`getLinkedChildren` against the Functions emulator, which returns the active
+linked child. The deployed-callable context from the U9 controlled live
+verification (`docs/evidence/2026-07-19-u9-controlled-live-verification.md`)
+remains the production-boundary reference. The Rules matrix itself is proven
+by the Auth + Firestore flow above.
 
 ## UI state captures
 
@@ -122,17 +123,53 @@ supervisor record.
 
 ![insufficient](2026-08-15-u14-screenshots/insufficient.png)
 
-Live capture commands (manual emulator rehearsal):
+Live capture commands (automated Android rehearsal against the emulators):
 
 ```powershell
-firebase.cmd emulators:start --only auth,firestore
-flutter run -d chrome --dart-define=USE_FIREBASE_EMULATORS=true
+firebase.cmd emulators:start --only auth,firestore,functions
+node tools/seed_parent_dashboard_live.js --state full
+flutter drive --driver=test_driver/u14_live_capture.dart `
+  --target=integration_test/u14_live_capture_test.dart `
+  --dart-define=USE_FIREBASE_EMULATORS=true `
+  --dart-define=U14_STATE=full -d emulator-5554
 ```
 
-Sign in as the linked parent through Settings -> Parent Dashboard and capture
-the four states as `screenshots/live-full.png`, `live-partial.png`,
-`live-zero.png`, and `live-insufficient.png` (files, not the temporary
-clipboard image).
+The rehearsal seeds the approved fixtures with
+`tools/seed_parent_dashboard_live.js` (linked parent
+`parent-live@example.test`, an active link to the student profile, and the
+four-state projections), then drives the real app on the Android emulator:
+Login page -> "Parent Dashboard" button -> parent email/password sign-in -> the
+Progress Map. Each run asserts the state's exact copy in the live widget tree
+before capturing, so the PNGs are text-accurate evidence:
+
+![live-full](2026-08-15-u14-screenshots/live-full.png)
+
+![live-partial](2026-08-15-u14-screenshots/live-partial.png)
+
+![live-zero](2026-08-15-u14-screenshots/live-zero.png)
+
+![live-insufficient](2026-08-15-u14-screenshots/live-insufficient.png)
+
+Bonus availability captures (AE7):
+
+![live-card-missing](2026-08-15-u14-screenshots/live-card-missing.png)
+
+![live-revoked](2026-08-15-u14-screenshots/live-revoked.png)
+
+Verification per state (all runs passed):
+
+- full: glance "A steady week with a clear focus", Learning snapshot, "3
+  practices completed this week", prior-week comparison, Mutual Aid counts.
+- partial: Learning snapshot and practice totals with no prior-week comparison
+  sentence.
+- zero: "No practice completed yet this week", "No Mutual Aid moments yet this
+  week", and the insufficient-Understanding message.
+- insufficient: "More recent learning evidence is needed" with Practice and
+  Mutual Aid unavailable.
+- card-missing: Understanding and Practice remain visible while Mutual Aid is
+  unavailable with a retry (one-card partial availability, AE7).
+- revoked: the link revocation leaves no active child, so the page shows the
+  no-active-linked-learner state (AE7 auth boundary).
 
 ## Accessibility checks
 
@@ -147,11 +184,15 @@ clipboard image).
 
 ## Limitations
 
-- Widget-rendered captures use the test font; live screenshots from the
-  emulator rehearsal are required for text-accurate evidence.
-- The U14 emulator flow runs Auth + Firestore; the Functions callable context
-  is cited from the U9 live verification because Python admin token
-  verification against the Auth emulator is not part of this environment.
+- Widget-rendered goldens use the test font at 430x1800; the live captures use
+  the real device font and a 1080x2400 screen, so pixel parity with the goldens
+  is not expected. Content parity is asserted in-app before each capture.
+- The Android runtime logs benign `INVALID_REFRESH_TOKEN` warnings from the
+  Google Play services auth component; the rehearsal itself proves the Auth,
+  Firestore, and Functions emulator paths (sign-in, projection reads, and
+  `getLinkedChildren` all succeed against the emulators).
+- Bahasa Melayu and 200% text scale are verified by the localization and
+  accessibility widget gates, not re-captured live in this rehearsal.
 - No production or real learner data was used; fixtures were sanitized and
   deleted after the run.
 
