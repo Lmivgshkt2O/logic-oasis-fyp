@@ -156,3 +156,23 @@ immutable successor `forum-controlled-demo-nb-v1-release-7` was published
 under CPython 3.11.9 with the same model artifacts, code revision
 `5cb68d79a5f235309d583140eb8ce2b5079fbd623f2f1846969be4645ca7b223`,
 superseding release 6, and promoted in the Firestore Emulator registry.
+
+## U14 parent Practice projection release - 2026-08-15
+
+U14's implementation unit U2 adds a server-owned weekly Practice Effort
+projection (`parentPracticeSummaries/{studentId}`) that is created or rolled
+inside the trusted quiz-finalization transaction in `functions/main.py`.
+Because the forum release-integrity gate binds the complete `main.py` hash
+and folds it into `codeRevision`
+(`sha256_bounded_release_sources_v1`), the immutable successor
+`forum-controlled-demo-nb-v1-release-9` was published under CPython 3.11.9
+with the unchanged approved model artifacts (reasoning `6081fd60...`,
+relevance `8df2fea5...`), code revision
+`5bd2716bb53506fedcc0596de2b55ee8c96f2eeec48e766e849946ad7228d4b4`, and
+`supersedesReleaseId` release 8. This release exists because of a non-model
+shared-runtime change; `deploymentState` remains `pending_cloud_deployment`.
+Release 9 was not deployed or promoted to the cloud; a later rollout must
+deploy the exact revision, attest it, and then supersede active release 8
+according to the cloud runbook. The complete Functions, release-integrity,
+bundle-parity, parent-link, and quiz-finalization suites pass against the
+new manifest.

@@ -54,6 +54,12 @@ class ParentLinkRulesContractTests(unittest.TestCase):
         self.assertIn("allow write: if false;", rules)
         self.assertIn("match /aiModelRuns/{runId}", rules)
 
+    def test_u14_practice_summary_uses_the_exact_child_read_boundary(self) -> None:
+        rules = (REPOSITORY / "firestore.rules").read_text(encoding="utf-8")
+        self.assertIn("match /parentPracticeSummaries/{studentId}", rules)
+        self.assertIn("allow read: if ownsOrActiveLinkedParent(studentId);", rules)
+        self.assertIn("allow write: if false;", rules)
+
     def test_u9_iam_manifest_grants_only_declared_runtime_roles(self) -> None:
         tools_root = REPOSITORY / "tools"
         sys.path.insert(0, str(tools_root))

@@ -12,6 +12,11 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import parent_link_invitation as invitations
+from parent_progress import (
+    PARENT_PRACTICE_SUMMARY_SCHEMA_VERSION,
+    PARENT_PRACTICE_TIMEZONE,
+    malaysia_week_start,
+)
 
 
 class _Ref:
@@ -32,6 +37,9 @@ class _Ref:
             raise ValueError("missing")
         self.data.update(data)
 
+    def set(self, data: dict) -> None:
+        self.data = dict(data)
+
 
 class _Collection:
     def __init__(self) -> None:
@@ -48,6 +56,9 @@ class _Transaction:
 
     def update(self, ref: _Ref, data: dict) -> None:
         ref.update(data)
+
+    def set(self, ref: _Ref, data: dict) -> None:
+        ref.set(data)
 
 
 class _Database:
@@ -151,6 +162,81 @@ class ParentLinkInvitationTests(unittest.TestCase):
             )
         self.assertEqual(resent[0][1], invitation_id)
         self.assertEqual(len(self.database.collection("parentLinkInvitations").refs), 1)
+
+    def test_acceptance_initializes_a_zero_current_week_summary(self) -> None:
+        _, sent = self._create()
+        _, invitation_id, verifier = sent[0]
+        with patch.object(invitations.firestore, "transactional", lambda function: function):
+            invitations.accept_parent_link_invitation(
+                {"invitationId": invitation_id, "verifier": verifier},
+                self.parent,
+                self.database,
+                email_hmac_key=self.key,
+                now=self.now,
+            )
+        practice = self.database.collection("parentPracticeSummaries").document("student_uid").data
+        self.assertEqual(PARENT_PRACTICE_SUMMARY_SCHEMA_VERSION, practice["schemaVersion"])
+        self.assertEqual("student_uid", practice["studentId"])
+        self.assertEqual(PARENT_PRACTICE_TIMEZONE, practice["timezone"])
+        self.assertEqual(malaysia_week_start(self.now), practice["weekStart"])
+        self.assertEqual([0, 0, 0, 0, 0, 0, 0], practice["dailyCompletionCounts"])
+        self.assertEqual(0, practice["completedPracticeCount"])
+        self.assertEqual(0, practice["activeDayCount"])
+        self.assertNotIn("previousWeekCompletedPracticeCount", practice)
+        self.assertNotIn("lastPracticeAt", practice)
+
+    def test_acceptance_preserves_an_existing_current_week_summary(self) -> None:
+        _, sent = self._create()
+        _, invitation_id, verifier = sent[0]
+        existing = {
+            "schemaVersion": PARENT_PRACTICE_SUMMARY_SCHEMA_VERSION,
+            "studentId": "student_uid",
+            "timezone": PARENT_PRACTICE_TIMEZONE,
+            "weekStart": malaysia_week_start(self.now),
+            "dailyCompletionCounts": [0, 1, 0, 0, 0, 0, 0],
+            "completedPracticeCount": 1,
+            "activeDayCount": 1,
+        }
+        self.database.collection("parentPracticeSummaries").document("student_uid").data = existing
+        with patch.object(invitations.firestore, "transactional", lambda function: function):
+            invitations.accept_parent_link_invitation(
+                {"invitationId": invitation_id, "verifier": verifier},
+                self.parent,
+                self.database,
+                email_hmac_key=self.key,
+                now=self.now,
+            )
+        self.assertIs(
+            existing,
+            self.database.collection("parentPracticeSummaries").document("student_uid").data,
+        )
+
+    def test_acceptance_fails_closed_on_malformed_summary(self) -> None:
+        _, sent = self._create()
+        _, invitation_id, verifier = sent[0]
+        self.database.collection("parentPracticeSummaries").document("student_uid").data = {
+            "schemaVersion": PARENT_PRACTICE_SUMMARY_SCHEMA_VERSION,
+            "studentId": "student_uid",
+            "timezone": PARENT_PRACTICE_TIMEZONE,
+            "weekStart": malaysia_week_start(self.now),
+            "dailyCompletionCounts": [0, 0, 0, 0, 0, 0],
+            "completedPracticeCount": 0,
+            "activeDayCount": 0,
+        }
+        with patch.object(invitations.firestore, "transactional", lambda function: function):
+            with self.assertRaisesRegex(invitations.ParentInvitationError, "day counts"):
+                invitations.accept_parent_link_invitation(
+                    {"invitationId": invitation_id, "verifier": verifier},
+                    self.parent,
+                    self.database,
+                    email_hmac_key=self.key,
+                    now=self.now,
+                )
+        self.assertIsNone(
+            self.database.collection("parentLinks").document(
+                f"{self.parent.uid}_{'student_uid'}"
+            ).data
+        )
 
 
 if __name__ == "__main__":

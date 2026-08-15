@@ -102,10 +102,7 @@ void main() {
       state.recommendedAiDiagnosis!.topicId,
       'fractions_decimals_percentages_y4',
     );
-    expect(
-      state.weakTopicInsight.topicId,
-      'fractions_decimals_percentages_y4',
-    );
+    expect(state.weakTopicInsight.topicId, 'fractions_decimals_percentages_y4');
     expect(state.weakTopicInsight.reason, contains('Grey Box AI'));
     expect(
       state.recommendedMission.topicId,
@@ -397,6 +394,19 @@ void main() {
     );
   });
 
+  test('legacy parent dashboard loader cannot populate parent evidence', () {
+    final state = AppState(persistQuizResults: true);
+    // U14 U3 retires AppState.loadParentDashboardFromFirebase: the student
+    // state must not own a parent-shaped loader with a raw/local attempt
+    // fallback that could be mistaken for parent evidence. Only
+    // LearningRepository.fetchParentDashboardSnapshot produces parent
+    // snapshots, from allowlisted safe projections.
+    expect(
+      () => (state as dynamic).loadParentDashboardFromFirebase(),
+      throwsA(isA<NoSuchMethodError>()),
+    );
+  });
+
   test(
     'switching authenticated students clears prior in-memory progression',
     () {
@@ -624,10 +634,7 @@ void main() {
       totalQuestions: 10,
     );
 
-    expect(
-      state.latestAttempt!.topicId,
-      'fractions_decimals_percentages_y4',
-    );
+    expect(state.latestAttempt!.topicId, 'fractions_decimals_percentages_y4');
     expect(state.latestAttempt!.score, 30);
     expect(
       state.attempts.where((attempt) => attempt.topicId == 'whole_numbers_y4'),
@@ -701,30 +708,32 @@ void main() {
     expect(state.repairOasisArea('missing_area'), isFalse);
   });
 
-  test('Year 4 local topics follow the textbook structure without duplicates',
-      () {
-    final state = AppState();
-    final year4 = state.topics
-        .where((topic) => topic.yearLevel == 4)
-        .toList();
-    expect(year4, hasLength(8));
-    expect(
-      year4.map((topic) => topic.id),
-      containsAll(<String>[
-        'whole_numbers_y4',
-        'fractions_decimals_percentages_y4',
-        'money_y4',
-        'time_y4',
-        'length_mass_volume_y4',
-        'space_y4',
-        'coordinates_ratio_proportion_y4',
-        'data_handling_y4',
-      ]),
-    );
-    expect(year4.map((topic) => topic.id), isNot(contains('fractions_y4')));
-    expect(year4.map((topic) => topic.id), isNot(contains('decimals_y4')));
-    expect(year4.map((topic) => topic.id), isNot(contains('percentages_y4')));
-  });
+  test(
+    'Year 4 local topics follow the textbook structure without duplicates',
+    () {
+      final state = AppState();
+      final year4 = state.topics
+          .where((topic) => topic.yearLevel == 4)
+          .toList();
+      expect(year4, hasLength(8));
+      expect(
+        year4.map((topic) => topic.id),
+        containsAll(<String>[
+          'whole_numbers_y4',
+          'fractions_decimals_percentages_y4',
+          'money_y4',
+          'time_y4',
+          'length_mass_volume_y4',
+          'space_y4',
+          'coordinates_ratio_proportion_y4',
+          'data_handling_y4',
+        ]),
+      );
+      expect(year4.map((topic) => topic.id), isNot(contains('fractions_y4')));
+      expect(year4.map((topic) => topic.id), isNot(contains('decimals_y4')));
+      expect(year4.map((topic) => topic.id), isNot(contains('percentages_y4')));
+    },
+  );
 
   test('first topic of each year unlocks independently', () {
     final state = AppState();

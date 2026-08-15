@@ -87,9 +87,9 @@ The backend layer is in `lib/shared/repositories/`.
 
 | Repository | Main responsibility |
 |---|---|
-| `auth_repository.dart` | Student login/register, Google sign-in, remembered profile, parent account setup, parent password check, parent password reset, student profile update. |
+| `auth_repository.dart` | Student login/register, Google sign-in, remembered profile, parent sign-in in the isolated parent session, and student profile update. Prototype parent-password/OTP flows are retired. |
 | `topic_repository.dart` | Loads topics, questions, and subtopics from Firestore, then converts them into `Topic`, `Subtopic`, and `QuizQuestion` models. |
-| `learning_repository.dart` | Saves quiz attempts, topic mastery, subtopic mastery, oasis progress, and fetches parent dashboard snapshots with AI diagnosis records. |
+| `learning_repository.dart` | Saves quiz attempts, topic mastery, subtopic mastery, oasis progress, and fetches the parent dashboard's safe projection snapshot (mastery, practice, Mutual Aid). |
 
 The app uses Firebase Auth for student authentication and Firestore for app data. SharedPreferences is used for local session preferences such as selected tab, language, reminders, accessibility mode, screen time limit, unlocked progression, claimed mission rewards, and locally saved attempts.
 
@@ -107,9 +107,9 @@ Core models live in `lib/shared/models/`.
 | `quiz_reward.dart` | Stores the reward output after a quiz: score, earned crystals, previous/new mastery, and encouragement text. |
 | `oasis_area.dart` | Represents each repairable oasis area, including cost, resource type, progress, marker position, and restoration image paths. |
 | `recommended_mission.dart` | Represents the Home mission card, progress toward mission completion, and reward claim status. |
-| `weak_topic_insight.dart` | Represents a rule-based weak-topic summary for parent dashboard fallback. |
+| `weak_topic_insight.dart` | Represents a rule-based weak-topic summary for the learner's Home fallback (not a parent dashboard surface). |
 | `ai_diagnosis.dart` | Parses AI model run data from Firestore, including BKT probability, XGBoost prediction, SHAP reasons, confidence, and recommendation. |
-| `parent_dashboard_snapshot.dart` | Groups parent dashboard data fetched from Firestore. |
+| `parent_dashboard_snapshot.dart` | Groups the selected child's typed safe card inputs (mastery, practice, Mutual Aid). |
 
 ## 5. Authentication and Entry Flow
 
@@ -143,7 +143,9 @@ After login/register, `LogicOasisApp` calls `AppState.updateSignedInStudent()`. 
 - `studentName`
 - `yearLevel`
 
-Then it saves the session and starts Firebase loads for oasis progress and parent dashboard data.
+Then it saves the session and starts Firebase loads for oasis progress and
+trusted mastery. The parent dashboard loads only through the isolated parent
+session; `AppState` no longer hydrates a parent-shaped snapshot.
 
 ## 6. Home Feature
 
@@ -535,77 +537,48 @@ If year level changes, `AppState` resets topics for the new year and reloads top
 
 ### Parent Access
 
-Parent access starts from Settings.
+Parent access starts from Settings and uses a separate Firebase-authenticated
+parent session (`ParentFirebaseSession`), so the learner stays signed in on the
+default app while the parent signs in through an isolated named app.
 
-The related pages are:
+The relationship is server-owned and cannot be self-granted:
 
-- `lib/features/settings/parent_link_page.dart`
-- `lib/features/settings/parent_auth_page.dart`
-- `lib/features/settings/parent_password_reset_page.dart`
-
-`AuthRepository.fetchLinkedParentAccount()` checks whether the student profile has a linked parent account.
-
-If no parent is linked, `ParentLinkPage` can register one. `AuthRepository.registerLinkedParentAccount()` creates or merges a `parentAccounts/{parentId}` document, stores a prototype `passwordKey`, adds the student ID, and updates the student `users/{uid}` document with parent link fields.
-
-`ParentAuthPage` verifies the parent password through `AuthRepository.authenticateLinkedParent()`.
-
-Password reset uses a prototype OTP flow. `sendParentResetOtp()` writes fixed OTP `246810`; `resetLinkedParentPassword()` checks the OTP and updates the password key.
+- A student invites a parent email through `createParentLinkInvitation`
+  (callable). The parent verifies the emailed link and accepts through
+  `acceptParentLinkInvitation`, which creates
+  `parentLinks/{parentId}_{studentId}` with `status: active` (canonical U12).
+- Protected administrator flows (`manageParentLink` / `revokeParentLink`)
+  create and revoke audited links with supervisor approval.
+- Prototype parent-password and OTP flows are retired; parent sign-in is
+  Firebase Auth (`signInParent`) in the isolated parent app.
 
 ### Parent Dashboard Frontend
 
-Parent dashboard is implemented in `lib/features/parent_dashboard/parent_dashboard_page.dart`.
-
-It loads Firebase data in `initState()` by calling `state.loadParentDashboardFromFirebase()`.
-
-It displays:
-
-- Parent summary.
-- Learning story summary.
-- Overall restoration.
-- Average score.
-- Latest quiz score.
-- Recent activity.
-- Weak-topic prediction.
-- AI diagnosis details when available.
-- Suggested action.
-- Parent action steps.
+The dashboard is implemented in
+`lib/features/parent_dashboard/parent_dashboard_page.dart` and is driven by
+`ParentDashboardState` (explicit phases plus request generations) and the pure
+`deriveParentProgressMap` view-model policy. It displays the approved Progress
+Map in semantic order: weekly glance, Understanding, Practice Effort, Mutual
+Aid, and one conversation starter. It never shows raw attempts, forum text,
+AI/model/server details, or technical copy, and it is localized in English and
+Bahasa Melayu.
 
 ### Parent Dashboard Backend
 
-`AppState.loadParentDashboardFromFirebase()` calls `LearningRepository.fetchParentDashboardSnapshot()`.
+`LearningRepository.fetchParentDashboardSnapshot()` reads only the selected
+child's safe projections:
 
-That repository fetches:
+- `subtopicMastery` (U8-safe records with evidence level, observations, and
+  freshness)
+- `parentPracticeSummaries/{studentId}` (U14 server-owned current-week rhythm)
+- `forumParticipationSummaries/{studentId}` (U10 count-only Mutual Aid)
 
-- `quizAttempts` for the student.
-- `topicMastery` for the student.
-- `aiModelRuns` for the student.
-
-It filters records by current year level and keeps only the latest AI diagnosis per topic.
-
-`AppState` then merges the snapshot into local attempts and `aiDiagnoses`.
-
-### Weak Topic and AI Logic
-
-If AI diagnosis exists, `recommendedAiDiagnosis` prioritizes it using `AiDiagnosis.priorityScore`, which combines weakness probability and mastery gap.
-
-If AI data is missing, the app uses rule-based weak-topic insight from quiz attempts. The fallback logic looks at average scores and attempt counts to build a parent-friendly weakness reason and recommendation.
-
-AI diagnosis data is parsed by `AiDiagnosis.fromFirestore()`. It supports:
-
-- `modelName`
-- `xgboostPrediction`
-- `weaknessProbability`
-- `confidence`
-- `shapReasons`
-- `shapDetails`
-- BKT parameters
-- `bktMasteryProbability`
-- `finalMasteryLabel`
-- `recommendedAction`
-- `attemptsCount`
-- `createdAt`
-
-The Flutter app currently only displays stored AI records. BKT updates, XGBoost inference/training, and SHAP explanation run outside the client through manual or seeded paths.
+Each non-auth projection resolves independently; permission denial, revocation,
+or identity mismatch clears the whole child view. The legacy
+`AppState.loadParentDashboardFromFirebase` path was retired so raw/local
+attempt fallback can never become parent evidence. Learner-facing AI
+recommendations (`recommendedAiDiagnosis`, rule-based weak-topic insight) are
+unchanged and remain separate from the parent Progress Map.
 
 ## 14. Localization and Accessibility
 
@@ -652,7 +625,7 @@ The main reusable UI file is `lib/shared/widgets/logic_oasis_figma_components.da
 - `ProgressBar`
 - topic/oasis illustration helpers
 
-Older shared widgets still exist, such as `MetricCard`, `SectionCard`, and `RecommendationBox`. These are still used by quiz/result/parent dashboard pages.
+Older shared widgets still exist, such as `MetricCard`, `SectionCard`, and `RecommendationBox`. These are still used by quiz/result pages; the parent Progress Map uses its own approved cards.
 
 ## 16. Local Fallback Data
 
@@ -683,7 +656,9 @@ The current code directly uses these collections:
 | `topicMastery` | `LearningRepository` | Aggregated topic progress/mastery. |
 | `subtopicMastery` | `LearningRepository` | Aggregated subtopic progress/mastery. |
 | `oasisProgress` | `LearningRepository` | Crystals, mutual aid energy, preferences, and repaired area progress. |
-| `aiModelRuns` | `LearningRepository` | Seeded/offline AI diagnosis output for parent dashboard and recommendations. |
+| `aiModelRuns` | `LearningRepository` | Seeded/offline AI diagnosis output for learner-facing recommendations (not a parent dashboard source). |
+| `parentPracticeSummaries` | `LearningRepository` (parent session) | Server-owned current-week practice rhythm for the parent Progress Map. |
+| `forumParticipationSummaries` | `LearningRepository` (parent session) | U10 count-only Mutual Aid projection for the parent Progress Map. |
 
 ## 18. End-to-End Learning Loop
 
@@ -711,7 +686,7 @@ This loop is the most important feature relationship in the app. Most future cha
 
 These are not blockers for understanding the app, but developers should know them:
 
-- Parent authentication is prototype-level and uses a stored password key, not production Firebase parent auth.
+- Parent authentication uses Firebase Auth in an isolated parent session with server-owned `parentLinks`; prototype password keys and OTP flows are retired.
 - Mission reminders are a stored preference, not real scheduled notifications.
 - The Flutter client only displays stored AI records; the current BKT/XGBoost/SHAP path is manual or seeded rather than client-run or automatically triggered.
 - Restoration progress loading currently contains test/demo reset behavior that should be removed or isolated.

@@ -11,7 +11,14 @@ if str(FUNCTIONS_ROOT) not in sys.path:
     sys.path.insert(0, str(FUNCTIONS_ROOT))
 
 import main
+from parent_progress import (
+    PARENT_PRACTICE_SUMMARY_SCHEMA_VERSION,
+    PARENT_PRACTICE_TIMEZONE,
+    malaysia_week_start,
+    malaysia_weekday_index,
+)
 from functions.quiz_session import response_document_id
+from quiz_session import QuizSessionError
 from functions.tests.test_start_quiz_session_adaptive import (
     Database,
     STUDENT_ID,
@@ -147,6 +154,7 @@ class QuizFinalizeReviewTests(unittest.TestCase):
             "questionResponses": response_data,
             "studentSubtopicSequenceStates": {},
             "subtopicMastery": {},
+            "parentPracticeSummaries": {},
         })
 
     def _finalize(self) -> dict:
@@ -184,6 +192,68 @@ class QuizFinalizeReviewTests(unittest.TestCase):
         second = self._finalize()
         self.assertEqual(first["reviewItems"], second["reviewItems"])
         self.assertEqual(first["attemptId"], second["attemptId"])
+
+    def test_finalize_writes_the_current_week_practice_summary(self) -> None:
+        before = datetime.now(timezone.utc)
+        self._finalize()
+        practice = self.database.collections["parentPracticeSummaries"][STUDENT_ID]
+        expected_week = malaysia_week_start(before)
+        expected_weekday = malaysia_weekday_index(before)
+
+        self.assertEqual(PARENT_PRACTICE_SUMMARY_SCHEMA_VERSION, practice["schemaVersion"])
+        self.assertEqual(STUDENT_ID, practice["studentId"])
+        self.assertEqual(PARENT_PRACTICE_TIMEZONE, practice["timezone"])
+        self.assertEqual(expected_week, practice["weekStart"])
+        daily = [0] * 7
+        daily[expected_weekday] = 1
+        self.assertEqual(daily, practice["dailyCompletionCounts"])
+        self.assertEqual(1, practice["completedPracticeCount"])
+        self.assertEqual(1, practice["activeDayCount"])
+        self.assertNotIn("previousWeekCompletedPracticeCount", practice)
+        self.assertIn("updatedAt", practice)
+
+    def test_duplicate_finalization_does_not_increment_practice_twice(self) -> None:
+        self._finalize()
+        self._finalize()
+        practice = self.database.collections["parentPracticeSummaries"][STUDENT_ID]
+        self.assertEqual(1, practice["completedPracticeCount"])
+
+    def test_finalize_rolls_the_weekly_summary_and_carries_the_prior_total(
+        self,
+    ) -> None:
+        before = datetime.now(timezone.utc)
+        previous_week = malaysia_week_start(before) - timedelta(days=7)
+        self.database.collections["parentPracticeSummaries"][STUDENT_ID] = {
+            "schemaVersion": PARENT_PRACTICE_SUMMARY_SCHEMA_VERSION,
+            "studentId": STUDENT_ID,
+            "timezone": PARENT_PRACTICE_TIMEZONE,
+            "weekStart": previous_week,
+            "dailyCompletionCounts": [2, 0, 0, 0, 1, 0, 0],
+            "completedPracticeCount": 3,
+            "activeDayCount": 2,
+        }
+
+        self._finalize()
+
+        practice = self.database.collections["parentPracticeSummaries"][STUDENT_ID]
+        self.assertEqual(malaysia_week_start(before), practice["weekStart"])
+        self.assertEqual(3, practice["previousWeekCompletedPracticeCount"])
+        self.assertEqual(1, practice["completedPracticeCount"])
+
+    def test_finalize_fails_closed_on_malformed_practice_summary(self) -> None:
+        before = datetime.now(timezone.utc)
+        self.database.collections["parentPracticeSummaries"][STUDENT_ID] = {
+            "schemaVersion": PARENT_PRACTICE_SUMMARY_SCHEMA_VERSION,
+            "studentId": STUDENT_ID,
+            "timezone": PARENT_PRACTICE_TIMEZONE,
+            "weekStart": malaysia_week_start(before),
+            "dailyCompletionCounts": [-1, 0, 0, 0, 0, 0, 0],
+            "completedPracticeCount": -1,
+            "activeDayCount": 1,
+        }
+
+        with self.assertRaisesRegex(QuizSessionError, "Practice summary"):
+            self._finalize()
 
     def test_missing_review_focus_fails_closed(self) -> None:
         wrong_ref = self.database.collections["questionResponses"][
