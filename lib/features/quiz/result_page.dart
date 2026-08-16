@@ -128,7 +128,7 @@ class ResultPage extends StatelessWidget {
                     icon: Icons.diamond_outlined,
                     label: l10n.crystals,
                     value: '+${reward!.earnedCrystals}',
-                    color: LogicOasisTheme.water,
+                    color: LogicOasisTheme.of(context).water,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -137,7 +137,7 @@ class ResultPage extends StatelessWidget {
                     icon: Icons.construction_outlined,
                     label: l10n.repairReady,
                     value: l10n.home,
-                    color: LogicOasisTheme.clay,
+                    color: LogicOasisTheme.of(context).reward,
                   ),
                 ),
               ],
@@ -269,6 +269,7 @@ class _ReviewCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
     final type = item.localizedType(isBahasaMelayu);
     return Semantics(
       container: true,
@@ -282,15 +283,15 @@ class _ReviewCard extends StatelessWidget {
             alignment: Alignment.center,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: const Color(0xFFFFF0CC),
-              border: Border.all(color: const Color(0xFFF0D8A8)),
+              color: oasis.reward.withValues(alpha: .15),
+              border: Border.all(color: oasis.outline),
             ),
             child: Text(
               '${item.sequenceIndex + 1}',
               style: const TextStyle(
-                color: LogicOasisTheme.clay,
+                color: OasisSemanticTheme.continuedPracticeText,
                 fontSize: 13,
-                fontWeight: FontWeight.w900,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ),
@@ -310,8 +311,8 @@ class _ReviewCard extends StatelessWidget {
                   Text(
                     type,
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: LogicOasisTheme.clay,
-                      fontWeight: FontWeight.w800,
+                      color: oasis.secondaryInk,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ],
@@ -538,8 +539,8 @@ class _NextPracticePanel extends StatelessWidget {
               Text(
                 l10n.basedOnQuizProgress,
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: LogicOasisTheme.clay,
-                  fontWeight: FontWeight.w800,
+                  color: OasisSemanticTheme.continuedPracticeText,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
               const SizedBox(height: 6),

@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:logic_oasis/app/logic_oasis_design.dart';
+import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/features/quiz/result_page.dart';
 import 'package:logic_oasis/features/quiz/quiz_page.dart';
 import 'package:logic_oasis/shared/models/next_learning_action.dart';
@@ -242,6 +242,8 @@ class _TopicProgressSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
     final subtopics = state.subtopicsForTopic(topic);
     final completed = subtopics.where((subtopic) => subtopic.isComplete).length;
     return SoftCard(
@@ -252,9 +254,9 @@ class _TopicProgressSummary extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.route_rounded,
-                color: LogicOasisDesign.forest,
+                color: oasis.forest,
                 size: 20,
               ),
               const SizedBox(width: 8),
@@ -264,7 +266,7 @@ class _TopicProgressSummary extends StatelessWidget {
                     '$completed of ${subtopics.length} subtopics completed',
                     '$completed daripada ${subtopics.length} subtopik selesai',
                   ),
-                  style: Theme.of(context).textTheme.titleMedium,
+                  style: theme.textTheme.titleMedium,
                 ),
               ),
             ],
@@ -272,7 +274,6 @@ class _TopicProgressSummary extends StatelessWidget {
           const SizedBox(height: 10),
           ProgressBar(
             value: topic.progress,
-            color: LogicOasisDesign.leaf,
             height: 7,
           ),
         ],
@@ -296,6 +297,8 @@ class _SubtopicCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
     final unlocked = state.isSubtopicUnlocked(topic, subtopic);
     final lockedReason = state.lockedReasonForSubtopic(topic, subtopic);
     // A client-side question preview alone is not sufficient for the U3
@@ -312,6 +315,7 @@ class _SubtopicCard extends StatelessWidget {
       subtopic,
       unlocked: unlocked,
       isBahasaMelayu: state.isBahasaMelayu,
+      oasis: oasis,
     );
     final description =
         lockedReason ??
@@ -343,10 +347,8 @@ class _SubtopicCard extends StatelessWidget {
                           subtopic.localizedTitle(state.isBahasaMelayu),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: LogicOasisDesign.ink,
+                          style: theme.textTheme.titleMedium?.copyWith(
                             fontSize: 17,
-                            fontWeight: FontWeight.w900,
                           ),
                         ),
                       ),
@@ -355,8 +357,8 @@ class _SubtopicCard extends StatelessWidget {
                             ? Icons.play_arrow_rounded
                             : Icons.lock_outline_rounded,
                         color: canStart
-                            ? LogicOasisDesign.forest
-                            : const Color(0xFF8C7A61),
+                            ? oasis.forest
+                            : oasis.neutral,
                       ),
                     ],
                   ),
@@ -365,10 +367,10 @@ class _SubtopicCard extends StatelessWidget {
                     description,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: LogicOasisDesign.body,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: oasis.secondaryInk,
                       fontSize: 12.5,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -388,19 +390,21 @@ class _SubtopicCard extends StatelessWidget {
                           const SizedBox(width: 8),
                           Text(
                             status.percentageLabel!,
-                            style: const TextStyle(
-                              color: LogicOasisDesign.body,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: oasis.secondaryInk,
                               fontSize: 12,
-                              fontWeight: FontWeight.w900,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ],
                         const SizedBox(width: 10),
-                        StatusChip(
-                          label: status.label,
-                          icon: status.icon,
-                          color: status.color,
-                          background: status.background,
+                        Flexible(
+                          child: StatusChip(
+                            label: status.label,
+                            icon: status.icon,
+                            color: status.color,
+                            background: status.background,
+                          ),
                         ),
                       ],
                     ),
@@ -423,6 +427,7 @@ class _SubtopicStatus {
     required this.label,
     required this.color,
     required this.background,
+    required this.progressColor,
     this.icon,
     this.progress = 0,
     this.percentageLabel,
@@ -432,9 +437,9 @@ class _SubtopicStatus {
   final String label;
   final Color color;
   final Color background;
+  final Color progressColor;
   final String? icon;
   final double progress;
-  final Color progressColor = LogicOasisDesign.leaf;
   final String? percentageLabel;
   final String progressSemanticsLabel;
 
@@ -442,12 +447,14 @@ class _SubtopicStatus {
     Subtopic subtopic, {
     required bool unlocked,
     required bool isBahasaMelayu,
+    required OasisSemanticTheme oasis,
   }) {
     if (!unlocked) {
-      return const _SubtopicStatus(
+      return _SubtopicStatus(
         label: 'Lock',
-        color: Color(0xFF8C7A61),
-        background: Color(0xFFF1E8D7),
+        color: oasis.neutral,
+        background: oasis.groupedSurface,
+        progressColor: oasis.neutral,
         icon: 'lock_outline',
         progressSemanticsLabel: 'Locked',
       );
@@ -459,8 +466,9 @@ class _SubtopicStatus {
               : subtopic.mastery;
       return _SubtopicStatus(
         label: label,
-        color: const Color(0xFFB96E00),
-        background: const Color(0xFFFFF0CC),
+        color: OasisSemanticTheme.continuedPracticeText,
+        background: oasis.reward.withValues(alpha: .15),
+        progressColor: oasis.leaf,
         progressSemanticsLabel: label,
       );
     }
@@ -470,8 +478,9 @@ class _SubtopicStatus {
           : 'Preparing mastery…';
       return _SubtopicStatus(
         label: label,
-        color: const Color(0xFFB96E00),
-        background: const Color(0xFFFFF0CC),
+        color: OasisSemanticTheme.continuedPracticeText,
+        background: oasis.reward.withValues(alpha: .15),
+        progressColor: oasis.leaf,
         progressSemanticsLabel: label,
       );
     }
@@ -482,9 +491,10 @@ class _SubtopicStatus {
           : 'Quiz progress $percent%';
       return _SubtopicStatus(
         label: label,
-        color: const Color(0xFFB96E00),
-        background: const Color(0xFFFFF0CC),
+        color: OasisSemanticTheme.continuedPracticeText,
+        background: oasis.reward.withValues(alpha: .15),
         progress: subtopic.bestCorrectRate ?? 0,
+        progressColor: oasis.leaf,
         progressSemanticsLabel: label,
       );
     }
@@ -501,20 +511,22 @@ class _SubtopicStatus {
       return _SubtopicStatus(
         label: statusLabel,
         color: ready
-            ? LogicOasisDesign.forest
-            : const Color(0xFFB96E00),
+            ? oasis.forest
+            : OasisSemanticTheme.continuedPracticeText,
         background: ready
-            ? const Color(0xFFE3F5DB)
-            : const Color(0xFFFFF0CC),
+            ? oasis.mint
+            : oasis.reward.withValues(alpha: .15),
         progress: masteryProbability,
+        progressColor: ready ? oasis.leaf : oasis.reward,
         percentageLabel: percentageLabel,
         progressSemanticsLabel: '$percentageLabel, $statusLabel',
       );
     }
     return _SubtopicStatus(
       label: subtopic.mastery,
-      color: const Color(0xFFB96E00),
-      background: const Color(0xFFFFF0CC),
+      color: OasisSemanticTheme.continuedPracticeText,
+      background: oasis.reward.withValues(alpha: .15),
+      progressColor: oasis.leaf,
       progressSemanticsLabel: subtopic.mastery,
     );
   }
@@ -528,21 +540,22 @@ class _SubtopicStepBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final oasis = LogicOasisTheme.of(context);
     return Container(
       width: 46,
       height: 46,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: unlocked ? const Color(0xFFE3F5DB) : const Color(0xFFF1E8D7),
-        border: Border.all(color: LogicOasisDesign.line),
+        color: unlocked ? oasis.mint : oasis.groupedSurface,
+        border: Border.all(color: oasis.outline),
       ),
       child: Text(
         '$order',
         style: TextStyle(
-          color: unlocked ? LogicOasisDesign.forest : const Color(0xFF8C7A61),
+          color: unlocked ? oasis.forest : oasis.neutral,
           fontSize: 18,
-          fontWeight: FontWeight.w900,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );
@@ -554,16 +567,17 @@ class _SubtopicHeaderIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final oasis = LogicOasisTheme.of(context);
     return Container(
       width: 58,
       height: 58,
       decoration: BoxDecoration(
-        color: const Color(0xFFE3F5DB),
+        color: oasis.mint,
         borderRadius: BorderRadius.circular(17),
       ),
-      child: const Icon(
+      child: Icon(
         Icons.account_tree_rounded,
-        color: LogicOasisDesign.forest,
+        color: oasis.forest,
         size: 30,
       ),
     );

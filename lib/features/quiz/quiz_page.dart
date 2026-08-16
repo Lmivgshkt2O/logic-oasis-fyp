@@ -327,7 +327,7 @@ class _OptionFeedback extends StatelessWidget {
             Text(
               reviewFocus!,
               style: theme.textTheme.bodySmall?.copyWith(
-                color: LogicOasisTheme.clay,
+                color: LogicOasisTheme.of(context).coral,
               ),
             ),
           ],

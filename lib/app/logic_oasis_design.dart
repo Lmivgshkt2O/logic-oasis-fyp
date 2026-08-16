@@ -29,6 +29,7 @@ class LogicOasisDesign {
   static const forumViolet = Color(0xFF7E4FC6);
   static const outlineQuiet = Color(0xFFDCE8E1);
   static const neutralQuiet = Color(0xFF9AA8A0);
+  static const statusContinued = Color(0xFF8F5E00);
 
   // Eye Protecting theme: lower luminance, lower saturation, quieter shadows,
   // while preserving text contrast and the botanical identity.

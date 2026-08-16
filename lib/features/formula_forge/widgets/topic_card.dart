@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:logic_oasis/app/logic_oasis_design.dart';
+import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/shared/models/topic.dart';
 import 'package:logic_oasis/shared/widgets/logic_oasis_figma_components.dart';
 
@@ -19,9 +20,11 @@ class TopicCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
     final locked = onStart == null;
     final style = _TopicVisualStyle.fromTopic(topic);
-    final status = _statusFor(topic, locked);
+    final status = _statusFor(topic, locked, oasis);
     final subtitle = locked && lockedReason != null
         ? lockedReason!
         : _restorationSubtitle(topic);
@@ -33,7 +36,6 @@ class TopicCard extends StatelessWidget {
       opacity: locked ? .74 : 1,
       child: SoftCard(
         onTap: onStart,
-        color: const Color(0xFFFFFDF4),
         child: Row(
           children: [
             TopicThumbnail(topicId: topic.id),
@@ -50,10 +52,8 @@ class TopicCard extends StatelessWidget {
                           topic.localizedTitle(isBahasaMelayu),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: LogicOasisDesign.ink,
+                          style: theme.textTheme.headlineSmall?.copyWith(
                             fontSize: 20,
-                            fontWeight: FontWeight.w900,
                             height: 1.05,
                           ),
                         ),
@@ -62,7 +62,7 @@ class TopicCard extends StatelessWidget {
                         locked
                             ? Icons.lock_outline_rounded
                             : Icons.chevron_right_rounded,
-                        color: const Color(0xFF85745C),
+                        color: oasis.secondaryInk,
                         size: 24,
                       ),
                     ],
@@ -72,8 +72,8 @@ class TopicCard extends StatelessWidget {
                     subtitle,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: LogicOasisDesign.body,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: oasis.secondaryInk,
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
@@ -84,11 +84,11 @@ class TopicCard extends StatelessWidget {
                     children: [
                       Text(
                         '${(topic.progress * 100).round()}%',
-                        style: TextStyle(
-                      color: style.accent,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
-                    ),
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: style.accent,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
@@ -101,10 +101,12 @@ class TopicCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 10),
-                  Row(
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       _MasteryPill(label: masteryLabel, color: style.accent),
-                      const Spacer(),
                       StatusChip(
                         label: status.label,
                         icon: status.icon,
@@ -130,36 +132,40 @@ class TopicCard extends StatelessWidget {
     return topic.localizedArea(isBahasaMelayu);
   }
 
-  _TopicStatus _statusFor(Topic topic, bool locked) {
+  _TopicStatus _statusFor(
+    Topic topic,
+    bool locked,
+    OasisSemanticTheme oasis,
+  ) {
     if (locked) {
-      return const _TopicStatus(
+      return _TopicStatus(
         label: 'Locked',
         icon: 'lock_outline',
-        color: Color(0xFF8C7A61),
-        background: Color(0xFFF1E8D7),
+        color: oasis.neutral,
+        background: oasis.groupedSurface,
       );
     }
     if (topic.progress >= .7 || topic.mastery == 'Strong') {
-      return const _TopicStatus(
+      return _TopicStatus(
         label: 'Doing Great',
         icon: 'check',
-        color: LogicOasisDesign.forest,
-        background: Color(0xFFE3F5DB),
+        color: oasis.forest,
+        background: oasis.mint,
       );
     }
     if (topic.progress < .35 || topic.mastery == 'Weak') {
-      return const _TopicStatus(
+      return _TopicStatus(
         label: 'Needs Help',
         icon: 'warning',
-        color: Color(0xFFD84D45),
-        background: Color(0xFFFFE8E0),
+        color: oasis.coral,
+        background: oasis.coral.withValues(alpha: .12),
       );
     }
-    return const _TopicStatus(
+    return _TopicStatus(
       label: 'Keep Practicing',
       icon: 'star',
-      color: Color(0xFFB96E00),
-      background: Color(0xFFFFF0CC),
+      color: OasisSemanticTheme.continuedPracticeText,
+      background: oasis.reward.withValues(alpha: .15),
     );
   }
 }
@@ -172,12 +178,13 @@ class _MasteryPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final oasis = LogicOasisTheme.of(context);
     final displayLabel = label.trim().isEmpty ? 'Mastery' : label;
     return Container(
       constraints: const BoxConstraints(maxWidth: 92),
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF8EC),
+        color: oasis.groupedSurface,
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: color.withValues(alpha: .18)),
       ),
@@ -188,7 +195,7 @@ class _MasteryPill extends StatelessWidget {
         style: TextStyle(
           color: color,
           fontSize: 11.5,
-          fontWeight: FontWeight.w900,
+          fontWeight: FontWeight.w600,
           height: 1,
         ),
       ),
@@ -217,14 +224,14 @@ class _TopicVisualStyle {
 
   static _TopicVisualStyle fromTopic(Topic topic) {
     if (topic.id.startsWith('fractions')) {
-      return const _TopicVisualStyle(accent: LogicOasisDesign.leaf);
+      return const _TopicVisualStyle(accent: LogicOasisDesign.leafAccent);
     }
     if (topic.id.startsWith('decimals')) {
-      return const _TopicVisualStyle(accent: Color(0xFF35ABC1));
+      return const _TopicVisualStyle(accent: LogicOasisDesign.waterAccent);
     }
     if (topic.id.startsWith('percentages')) {
-      return const _TopicVisualStyle(accent: LogicOasisDesign.purple);
+      return const _TopicVisualStyle(accent: LogicOasisDesign.forumViolet);
     }
-    return const _TopicVisualStyle(accent: Color(0xFFE9A924));
+    return const _TopicVisualStyle(accent: LogicOasisDesign.statusContinued);
   }
 }

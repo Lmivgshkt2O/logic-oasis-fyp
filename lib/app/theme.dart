@@ -203,6 +203,13 @@ class OasisSemanticTheme extends ThemeExtension<OasisSemanticTheme> {
     ),
   };
 
+  /// Readable dark amber for continued-practice status text and accents.
+  ///
+  /// The reward gold is reserved for fills and highlights; this darker shade
+  /// keeps the amber meaning while meeting contrast on white/botanical
+  /// surfaces for text and icons.
+  static const Color continuedPracticeText = LogicOasisDesign.statusContinued;
+
   @override
   OasisSemanticTheme copyWith({
     Color? canvas,
