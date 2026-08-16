@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:logic_oasis/app/logic_oasis_design.dart';
 import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/l10n/app_localizations.dart';
 import 'package:logic_oasis/shared/models/ai_diagnosis.dart';
@@ -246,22 +247,22 @@ class _ParentDashboardContent extends StatelessWidget {
         const SizedBox(height: 16),
         Row(
           children: [
-            Expanded(
-              child: MetricCard(
-                icon: Icons.trending_up,
-                label: state.t('Safe updates', 'Kemas kini selamat'),
-                value: '${diagnoses.length}',
-                color: LogicOasisTheme.leaf,
-              ),
+        Expanded(
+          child: MetricCard(
+            icon: Icons.trending_up,
+            label: state.t('Safe updates', 'Kemas kini selamat'),
+            value: '${diagnoses.length}',
+            color: LogicOasisTheme.of(context).leaf,
+          ),
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: MetricCard(
-                icon: Icons.history,
-                label: state.t('Mastery records', 'Rekod penguasaan'),
-                value: '${snapshot?.masteryRecordCount ?? 0}',
-                color: LogicOasisTheme.clay,
-              ),
+          child: MetricCard(
+            icon: Icons.history,
+            label: state.t('Mastery records', 'Rekod penguasaan'),
+            value: '${snapshot?.masteryRecordCount ?? 0}',
+            color: LogicOasisTheme.of(context).reward,
+          ),
             ),
           ],
         ),
@@ -424,7 +425,7 @@ class _ParentLearningStory {
           'Wait for the first safe update before drawing conclusions.',
           'Tunggu kemas kini selamat pertama sebelum membuat kesimpulan.',
         ),
-        statusColor: LogicOasisTheme.water,
+        statusColor: LogicOasisDesign.waterAccent,
         statusIcon: Icons.hourglass_top_outlined,
       );
     }
@@ -452,7 +453,7 @@ class _ParentLearningStory {
         'Complete two focused practices and compare the next safe update.',
         'Lengkapkan dua latihan berfokus dan bandingkan kemas kini selamat seterusnya.',
       ),
-      statusColor: LogicOasisTheme.water,
+      statusColor: LogicOasisDesign.waterAccent,
       statusIcon: Icons.psychology_alt_outlined,
     );
   }
@@ -472,12 +473,13 @@ class _ParentInsightSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
 
     return SoftCard(
       padding: const EdgeInsets.all(16),
       color: Color.alphaBlend(
         story.statusColor.withValues(alpha: 0.09),
-        LogicOasisTheme.cream,
+        oasis.surface,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -531,11 +533,12 @@ class _InsightLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 18, color: LogicOasisTheme.deepLeaf),
+        Icon(icon, size: 18, color: oasis.forest),
         const SizedBox(width: 8),
         Expanded(
           child: RichText(
@@ -545,8 +548,8 @@ class _InsightLine extends StatelessWidget {
                 TextSpan(
                   text: '$label: ',
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: LogicOasisTheme.ink,
-                    fontWeight: FontWeight.w800,
+                    color: oasis.primaryInk,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 TextSpan(text: text),
@@ -573,11 +576,12 @@ class _ParentActionStep extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, color: LogicOasisTheme.leaf, size: 21),
+        Icon(icon, color: oasis.leaf, size: 21),
         const SizedBox(width: 10),
         Expanded(
           child: Column(
@@ -606,11 +610,12 @@ class _AiDiagnosisDetails extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
     final masteryText = (diagnosis.bktMasteryProbability * 100).round();
 
     return SoftCard(
       padding: const EdgeInsets.all(12),
-      color: LogicOasisTheme.mint,
+      color: oasis.mint,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -626,7 +631,7 @@ class _AiDiagnosisDetails extends StatelessWidget {
                 ? 'Status pelayan: ${diagnosis.attemptsCount.clamp(0, 999)} pemerhatian pembelajaran.'
                 : 'Server status: ${diagnosis.attemptsCount.clamp(0, 999)} learning observations.',
             style: theme.textTheme.bodyMedium?.copyWith(
-              color: LogicOasisTheme.ink,
+              color: oasis.primaryInk,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -662,7 +667,7 @@ class _AiDiagnosisDetails extends StatelessWidget {
                   ? 'Dikemas kini: ${formatAiUpdatedAt(diagnosis.createdAt)}'
                   : 'Updated: ${formatAiUpdatedAt(diagnosis.createdAt)}',
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: LogicOasisTheme.ink,
+                color: oasis.primaryInk,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -683,7 +688,7 @@ class _AiDiagnosisDetails extends StatelessWidget {
                   ? 'Nasihat sandaran menggunakan kemajuan kuiz yang disahkan oleh pelayan.'
                   : 'Fallback advice uses server-confirmed quiz progress.',
               style: theme.textTheme.bodySmall?.copyWith(
-                color: LogicOasisTheme.deepLeaf,
+                color: oasis.forest,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -726,10 +731,11 @@ class _ParentDashboardSafeStatusBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final oasis = LogicOasisTheme.of(context);
     final text = isLoading ? 'Loading linked learner updates…' : message ?? '';
     return SoftCard(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      color: isLoading ? LogicOasisTheme.mint : LogicOasisTheme.sand,
+      color: isLoading ? oasis.mint : oasis.groupedSurface,
       child: Row(
         children: [
           SizedBox(

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:logic_oasis/app/logic_oasis_design.dart';
 import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/features/onboarding/register_page.dart';
 import 'package:logic_oasis/shared/repositories/auth_repository.dart';
@@ -145,14 +144,15 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
 
     return Scaffold(
       body: DecoratedBox(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [LogicOasisDesign.page, LogicOasisDesign.pageWarm],
+            colors: [oasis.canvas, oasis.groupedSurface],
           ),
         ),
         child: SafeArea(
@@ -167,11 +167,11 @@ class _LoginPageState extends State<LoginPage> {
                   width: 62,
                   height: 62,
                   decoration: BoxDecoration(
-                    color: LogicOasisTheme.mint,
+                    color: oasis.mint,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: LogicOasisTheme.line),
+                    border: Border.all(color: oasis.outline),
                   ),
-                  child: const Icon(Icons.spa, color: LogicOasisTheme.leaf),
+                  child: Icon(Icons.spa, color: oasis.leaf),
                 ),
               ),
               const SizedBox(height: 24),
@@ -336,19 +336,21 @@ class _InfoBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: LogicOasisDesign.mintLight,
+        color: oasis.mint,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFCFE3D7)),
-        boxShadow: LogicOasisDesign.softShadow,
+        border: Border.all(color: oasis.outline),
+        boxShadow: oasis.softShadow,
       ),
       child: Text(
         message,
-        style: const TextStyle(
-          color: Color(0xFF315C48),
-          fontWeight: FontWeight.w800,
+        style: theme.textTheme.bodyMedium?.copyWith(
+          color: oasis.primaryInk,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );
@@ -362,19 +364,21 @@ class _ErrorBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFEDEA),
+        color: oasis.coral.withValues(alpha: .10),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2A39B)),
-        boxShadow: LogicOasisDesign.softShadow,
+        border: Border.all(color: oasis.coral),
+        boxShadow: oasis.softShadow,
       ),
       child: Text(
         message,
-        style: const TextStyle(
-          color: Color(0xFF9A2F24),
-          fontWeight: FontWeight.w800,
+        style: theme.textTheme.bodyMedium?.copyWith(
+          color: oasis.coral,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );
