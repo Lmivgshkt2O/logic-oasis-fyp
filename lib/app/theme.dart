@@ -287,18 +287,12 @@ class LogicOasisTheme {
   // Back-compatible palette aliases used by existing pages and shared
   // widgets. They are intentionally preserved until consumers migrate to
   // semantic roles (reachability scan runs before any removal).
-  static const ink = LogicOasisDesign.ink;
-  static const bodyInk = LogicOasisDesign.body;
   static const leaf = LogicOasisDesign.leaf;
-  static const deepLeaf = LogicOasisDesign.forest;
   static const mint = LogicOasisDesign.mintLight;
-  static const sand = LogicOasisDesign.sand;
   static const clay = LogicOasisDesign.orange;
   static const water = LogicOasisDesign.water;
   static const sky = LogicOasisDesign.sky;
   static const line = LogicOasisDesign.line;
-  static const cream = LogicOasisDesign.cream;
-  static const page = LogicOasisDesign.page;
 
   /// Resolves the active Oasis semantic roles from [context].
   static OasisSemanticTheme of(BuildContext context) {

@@ -154,7 +154,7 @@ class _CelebrationPainter extends CustomPainter {
         center,
         glowRadius,
         Paint()
-          ..color = LogicOasisDesign.yellow.withValues(alpha: glowOpacity)
+          ..color = LogicOasisDesign.rewardGold.withValues(alpha: glowOpacity)
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 20),
       );
     }
@@ -195,7 +195,7 @@ class _CelebrationPainter extends CustomPainter {
         center,
         ringRadius,
         Paint()
-          ..color = LogicOasisDesign.leaf.withValues(alpha: ringOpacity)
+          ..color = LogicOasisDesign.leafAccent.withValues(alpha: ringOpacity)
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2.5,
       );

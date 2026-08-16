@@ -5,7 +5,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:logic_oasis/app/logic_oasis_design.dart';
+import 'package:logic_oasis/app/logic_oasis_shell.dart';
 import 'package:logic_oasis/app/theme.dart';
+import 'package:logic_oasis/l10n/app_localizations.dart';
 import 'package:logic_oasis/shared/state/app_state.dart';
 import 'package:logic_oasis/shared/state/app_state_scope.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -337,6 +339,185 @@ void main() {
           );
         }
       }
+    });
+  });
+
+  group('accessibility guidelines', () {
+    for (final (label, theme) in [
+      ('default', LogicOasisTheme.light()),
+      ('eye protecting', LogicOasisTheme.eyeComfort()),
+    ]) {
+      testWidgets('$label theme meets tap-target and text-contrast guidelines', (
+        tester,
+      ) async {
+        final semanticsHandle = tester.ensureSemantics();
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: theme,
+            home: Scaffold(
+              body: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Sample heading', style: theme.textTheme.headlineMedium),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Readable body copy under the Living Canopy theme.',
+                      style: theme.textTheme.bodyLarge,
+                    ),
+                    const SizedBox(height: 16),
+                    FilledButton.icon(
+                      onPressed: () {},
+                      icon: const Icon(Icons.check),
+                      label: const Text('Primary action'),
+                    ),
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: () {},
+                      icon: const Icon(Icons.arrow_forward),
+                      label: const Text('Secondary action'),
+                    ),
+                    const SizedBox(height: 8),
+                    IconButton(
+                      tooltip: 'Icon action',
+                      onPressed: () {},
+                      icon: const Icon(Icons.settings_outlined),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+
+        expect(tester, meetsGuideline(androidTapTargetGuideline));
+        expect(tester, meetsGuideline(iOSTapTargetGuideline));
+        expect(tester, meetsGuideline(labeledTapTargetGuideline));
+        expect(tester, meetsGuideline(textContrastGuideline));
+        semanticsHandle.dispose();
+      });
+    }
+  });
+
+  group('portrait and localization matrix', () {
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+    });
+
+    for (final (width, theme, label) in [
+      (320, LogicOasisTheme.light(), '320 default'),
+      (360, LogicOasisTheme.light(), '360 default'),
+      (412, LogicOasisTheme.light(), '412 default'),
+      (412, LogicOasisTheme.eyeComfort(), '412 eye protecting'),
+    ]) {
+      testWidgets('$label portrait renders without overflow', (tester) async {
+        tester.view.physicalSize = Size(width.toDouble(), 800);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        final state = AppState();
+        await tester.pumpWidget(
+          AppStateScope(
+            state: state,
+            child: MaterialApp(
+              theme: theme,
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: LogicOasisShell(onLogout: () {}),
+            ),
+          ),
+        );
+
+        expect(find.text('Home'), findsOneWidget);
+        expect(find.text('Q&A Forum'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  });
+
+  group('state-invariance gate', () {
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+    });
+
+    testWidgets('Eye Protecting transition preserves every functional value', (
+      tester,
+    ) async {
+      final state = AppState()
+        ..switchYear(5)
+        ..language = 'Bahasa Melayu'
+        ..accessibilityMode = true;
+
+      await tester.pumpWidget(
+        AppStateScope(
+          state: state,
+          child: Builder(
+            builder: (context) {
+              final watched = AppStateScope.watch(context);
+              return MaterialApp(
+                theme: watched.eyeComfortMode
+                    ? LogicOasisTheme.eyeComfort()
+                    : LogicOasisTheme.light(),
+                themeAnimationStyle: AnimationStyle(
+                  duration: LogicOasisMotion.themeTransitionFor(context),
+                  curve: LogicOasisMotion.themeTransitionCurve,
+                ),
+                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                home: LogicOasisShell(onLogout: () {}),
+              );
+            },
+          ),
+        ),
+      );
+
+      final captured = (
+        tab: state.selectedTab,
+        year: state.yearLevel,
+        locale: state.language,
+        largerText: state.accessibilityMode,
+        restoration: state.restorationProgress,
+        crystals: state.crystals,
+        energy: state.mutualAidEnergy,
+        streak: state.currentYearAttempts.length,
+        progress: state.oasisAreas.map((area) => area.progress).toList(),
+      );
+
+      state.updateEyeComfortMode(true);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 175));
+      expect(state.selectedTab, captured.tab);
+      expect(state.yearLevel, captured.year);
+      expect(state.language, captured.locale);
+      expect(state.accessibilityMode, captured.largerText);
+      expect(state.restorationProgress, captured.restoration);
+      expect(state.crystals, captured.crystals);
+      expect(state.mutualAidEnergy, captured.energy);
+      expect(state.currentYearAttempts.length, captured.streak);
+      expect(
+        state.oasisAreas.map((area) => area.progress),
+        orderedEquals(captured.progress),
+      );
+
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(state.selectedTab, captured.tab);
+      expect(state.yearLevel, captured.year);
+      expect(state.language, captured.locale);
+      expect(state.accessibilityMode, captured.largerText);
+      expect(state.restorationProgress, captured.restoration);
+      expect(state.crystals, captured.crystals);
+      expect(state.mutualAidEnergy, captured.energy);
+      expect(state.currentYearAttempts.length, captured.streak);
+      expect(
+        state.oasisAreas.map((area) => area.progress),
+        orderedEquals(captured.progress),
+      );
+      expect(state.eyeComfortMode, isTrue);
+      expect(tester.takeException(), isNull);
     });
   });
 }

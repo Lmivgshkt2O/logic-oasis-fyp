@@ -397,7 +397,7 @@ class StatusChip extends StatelessWidget {
               style: TextStyle(
                 color: color,
                 fontSize: 11,
-                fontWeight: FontWeight.w900,
+                fontWeight: FontWeight.w700,
                 height: 1,
               ),
             ),
@@ -884,7 +884,7 @@ class _RepairDetailSheet extends StatelessWidget {
                                   style: TextStyle(
                                     color: resourceColor,
                                     fontSize: 12,
-                                    fontWeight: FontWeight.w800,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               const SizedBox(height: 2),
@@ -1194,6 +1194,8 @@ class SettingsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -1216,10 +1218,8 @@ class SettingsRow extends StatelessWidget {
                         label,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: LogicOasisDesign.ink,
+                        style: theme.textTheme.titleMedium?.copyWith(
                           fontSize: 14,
-                          fontWeight: FontWeight.w900,
                         ),
                       ),
                     ),
@@ -1235,10 +1235,10 @@ class SettingsRow extends StatelessWidget {
                               value!,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: LogicOasisDesign.body,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: oasis.secondaryInk,
                                 fontSize: 12.5,
-                                fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                             if (progress != null) ...[
@@ -1248,7 +1248,6 @@ class SettingsRow extends StatelessWidget {
                                 child: ProgressBar(
                                   value: progress!,
                                   height: 5,
-                                  color: LogicOasisDesign.leaf,
                                 ),
                               ),
                             ],
@@ -1260,9 +1259,9 @@ class SettingsRow extends StatelessWidget {
                     if (trailingSwitch != null)
                       _MiniSwitch(value: trailingSwitch!)
                     else
-                      const Icon(
+                      Icon(
                         Icons.chevron_right_rounded,
-                        color: Color(0xFF8C7A61),
+                        color: oasis.secondaryInk,
                         size: 24,
                       ),
                   ],
@@ -1270,9 +1269,9 @@ class SettingsRow extends StatelessWidget {
               ),
             ),
             if (showDivider)
-              const Padding(
-                padding: EdgeInsets.only(left: 62, right: 14),
-                child: Divider(height: 1, color: Color(0xFFEDE3D0)),
+              Padding(
+                padding: const EdgeInsets.only(left: 62, right: 14),
+                child: Divider(height: 1, color: oasis.outline),
               ),
           ],
         ),
@@ -1705,13 +1704,14 @@ class _MiniSwitch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final oasis = LogicOasisTheme.of(context);
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
       width: 46,
       height: 28,
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: value ? LogicOasisDesign.leaf : const Color(0xFFD8D4CA),
+        color: value ? oasis.leaf : oasis.outline,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Align(
@@ -1796,375 +1796,6 @@ class _HeroTitleBlock extends StatelessWidget {
       ],
     );
   }
-}
-
-class _SproutPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final pot = Paint()..color = const Color(0xFFC69252);
-    final leaf = Paint()..color = const Color(0xFF74C85D);
-    final stem = Paint()
-      ..color = LogicOasisDesign.forest
-      ..strokeWidth = 3
-      ..strokeCap = StrokeCap.round;
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(
-          size.width * .31,
-          size.height * .58,
-          size.width * .38,
-          size.height * .22,
-        ),
-        Radius.circular(size.width * .05),
-      ),
-      pot,
-    );
-    canvas.drawLine(
-      Offset(size.width * .5, size.height * .61),
-      Offset(size.width * .5, size.height * .35),
-      stem,
-    );
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: Offset(size.width * .38, size.height * .34),
-        width: size.width * .3,
-        height: size.height * .17,
-      ),
-      leaf,
-    );
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: Offset(size.width * .62, size.height * .33),
-        width: size.width * .3,
-        height: size.height * .17,
-      ),
-      leaf,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _LowPolyOasisPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final bg = Paint()
-      ..shader = const LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [Color(0xFFD7F5ED), Color(0xFFEAF7D8)],
-      ).createShader(Offset.zero & size);
-    canvas.drawRect(Offset.zero & size, bg);
-
-    _mountain(canvas, size, Offset(size.width * .1, size.height * .36), .9);
-    _mountain(canvas, size, Offset(size.width * .72, size.height * .3), .6);
-    _sand(canvas, size);
-    _water(canvas, size);
-    _building(canvas, size, Offset(size.width * .13, size.height * .42), .95);
-    _tower(canvas, size, Offset(size.width * .66, size.height * .36), .86);
-    _bridge(canvas, size);
-    _market(canvas, size);
-    _crystal(canvas, size, Offset(size.width * .78, size.height * .73), .9);
-    _palm(canvas, size, Offset(size.width * .28, size.height * .39), 1.0);
-    _palm(canvas, size, Offset(size.width * .81, size.height * .45), .72);
-    _garden(canvas, size);
-    _pathDots(canvas, size);
-    _sparkles(canvas, size);
-  }
-
-  void _mountain(Canvas canvas, Size size, Offset base, double scale) {
-    final p = Path()
-      ..moveTo(base.dx, base.dy + 64 * scale)
-      ..lineTo(base.dx + 58 * scale, base.dy)
-      ..lineTo(base.dx + 118 * scale, base.dy + 64 * scale)
-      ..close();
-    canvas.drawPath(p, Paint()..color = const Color(0xFFF6DFB0));
-  }
-
-  void _sand(Canvas canvas, Size size) {
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: Offset(size.width * .52, size.height * .73),
-        width: size.width * .84,
-        height: size.height * .28,
-      ),
-      Paint()..color = const Color(0xFFF0D093),
-    );
-  }
-
-  void _water(Canvas canvas, Size size) {
-    final water = Paint()..color = const Color(0xFF58CDD1);
-    final canal = Path()
-      ..moveTo(size.width * .38, size.height * .36)
-      ..cubicTo(
-        size.width * .58,
-        size.height * .4,
-        size.width * .35,
-        size.height * .64,
-        size.width * .52,
-        size.height * .76,
-      )
-      ..cubicTo(
-        size.width * .62,
-        size.height * .84,
-        size.width * .76,
-        size.height * .82,
-        size.width * .88,
-        size.height * .9,
-      )
-      ..lineTo(size.width, size.height)
-      ..lineTo(size.width * .42, size.height)
-      ..cubicTo(
-        size.width * .36,
-        size.height * .86,
-        size.width * .18,
-        size.height * .76,
-        size.width * .24,
-        size.height * .62,
-      )
-      ..cubicTo(
-        size.width * .29,
-        size.height * .51,
-        size.width * .2,
-        size.height * .42,
-        size.width * .38,
-        size.height * .36,
-      )
-      ..close();
-    canvas.drawPath(canal, water);
-    final highlight = Paint()
-      ..color = Colors.white.withValues(alpha: .42)
-      ..strokeWidth = 2
-      ..strokeCap = StrokeCap.round;
-    for (var i = 0; i < 4; i += 1) {
-      canvas.drawLine(
-        Offset(size.width * (.45 + i * .08), size.height * (.57 + i * .04)),
-        Offset(size.width * (.52 + i * .08), size.height * (.55 + i * .04)),
-        highlight,
-      );
-    }
-  }
-
-  void _building(Canvas canvas, Size size, Offset origin, double scale) {
-    final paint = Paint()..color = const Color(0xFFE9C487);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(origin.dx, origin.dy, 62 * scale, 96 * scale),
-        Radius.circular(10 * scale),
-      ),
-      paint,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(
-          origin.dx + 24 * scale,
-          origin.dy + 57 * scale,
-          18 * scale,
-          39 * scale,
-        ),
-        Radius.circular(9 * scale),
-      ),
-      Paint()..color = const Color(0xFF9B754B),
-    );
-    canvas.drawRect(
-      Rect.fromLTWH(
-        origin.dx + 8 * scale,
-        origin.dy - 6 * scale,
-        46 * scale,
-        16 * scale,
-      ),
-      Paint()..color = const Color(0xFFF3D99F),
-    );
-  }
-
-  void _tower(Canvas canvas, Size size, Offset origin, double scale) {
-    canvas.drawPath(
-      Path()
-        ..moveTo(origin.dx, origin.dy + 26 * scale)
-        ..lineTo(origin.dx + 64 * scale, origin.dy)
-        ..lineTo(origin.dx + 112 * scale, origin.dy + 28 * scale)
-        ..lineTo(origin.dx + 98 * scale, origin.dy + 46 * scale)
-        ..lineTo(origin.dx + 13 * scale, origin.dy + 46 * scale)
-        ..close(),
-      Paint()..color = const Color(0xFFF7D9A1),
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(
-          origin.dx + 22 * scale,
-          origin.dy + 38 * scale,
-          76 * scale,
-          88 * scale,
-        ),
-        Radius.circular(12 * scale),
-      ),
-      Paint()..color = const Color(0xFFE7C083),
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(
-          origin.dx + 50 * scale,
-          origin.dy + 78 * scale,
-          24 * scale,
-          48 * scale,
-        ),
-        Radius.circular(12 * scale),
-      ),
-      Paint()..color = const Color(0xFF93724F),
-    );
-  }
-
-  void _bridge(Canvas canvas, Size size) {
-    final deck = Paint()
-      ..color = const Color(0xFFC6965F)
-      ..strokeWidth = 12
-      ..strokeCap = StrokeCap.round;
-    canvas.drawArc(
-      Rect.fromLTWH(
-        size.width * .43,
-        size.height * .62,
-        size.width * .25,
-        size.height * .13,
-      ),
-      math.pi,
-      math.pi,
-      false,
-      deck,
-    );
-    final rail = Paint()
-      ..color = const Color(0xFF8F704B)
-      ..strokeWidth = 2
-      ..strokeCap = StrokeCap.round;
-    for (var i = 0; i < 4; i += 1) {
-      final x = size.width * (.46 + i * .055);
-      canvas.drawLine(
-        Offset(x, size.height * .6),
-        Offset(x, size.height * .68),
-        rail,
-      );
-    }
-  }
-
-  void _market(Canvas canvas, Size size) {
-    final base = Rect.fromLTWH(
-      size.width * .68,
-      size.height * .58,
-      size.width * .17,
-      size.height * .1,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(base, const Radius.circular(7)),
-      Paint()..color = const Color(0xFFE0B36F),
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(base.left - 4, base.top - 15, base.width + 8, 22),
-        const Radius.circular(6),
-      ),
-      Paint()..color = LogicOasisDesign.orange,
-    );
-    for (final x in [.72, .77, .82]) {
-      canvas.drawCircle(
-        Offset(size.width * x, size.height * .66),
-        4,
-        Paint()..color = LogicOasisDesign.yellow,
-      );
-    }
-  }
-
-  void _crystal(Canvas canvas, Size size, Offset center, double scale) {
-    final path = Path()
-      ..moveTo(center.dx, center.dy - 28 * scale)
-      ..lineTo(center.dx + 18 * scale, center.dy)
-      ..lineTo(center.dx + 9 * scale, center.dy + 32 * scale)
-      ..lineTo(center.dx - 12 * scale, center.dy + 32 * scale)
-      ..lineTo(center.dx - 18 * scale, center.dy)
-      ..close();
-    canvas.drawPath(path, Paint()..color = const Color(0xFF35BCD2));
-    canvas.drawLine(
-      Offset(center.dx, center.dy - 20 * scale),
-      Offset(center.dx - 5 * scale, center.dy + 22 * scale),
-      Paint()
-        ..color = Colors.white.withValues(alpha: .55)
-        ..strokeWidth = 2,
-    );
-  }
-
-  void _palm(Canvas canvas, Size size, Offset base, double scale) {
-    final trunk = Paint()
-      ..color = const Color(0xFF9F7444)
-      ..strokeWidth = 9 * scale
-      ..strokeCap = StrokeCap.round;
-    canvas.drawLine(
-      base,
-      Offset(base.dx + 9 * scale, base.dy + 77 * scale),
-      trunk,
-    );
-    final leaf = Paint()..color = const Color(0xFF62B75E);
-    for (final angle in [-.9, -.45, 0.0, .45, .9]) {
-      canvas.save();
-      canvas.translate(base.dx, base.dy);
-      canvas.rotate(angle);
-      canvas.drawOval(
-        Rect.fromCenter(
-          center: Offset(18 * scale, 0),
-          width: 44 * scale,
-          height: 14 * scale,
-        ),
-        leaf,
-      );
-      canvas.restore();
-    }
-  }
-
-  void _garden(Canvas canvas, Size size) {
-    final green = Paint()..color = const Color(0xFF5FBF65);
-    for (final o in [
-      Offset(size.width * .18, size.height * .74),
-      Offset(size.width * .22, size.height * .79),
-      Offset(size.width * .32, size.height * .77),
-      Offset(size.width * .84, size.height * .67),
-    ]) {
-      canvas.drawPath(
-        Path()
-          ..moveTo(o.dx, o.dy - 8)
-          ..lineTo(o.dx + 8, o.dy)
-          ..lineTo(o.dx, o.dy + 8)
-          ..lineTo(o.dx - 8, o.dy)
-          ..close(),
-        green,
-      );
-    }
-  }
-
-  void _pathDots(Canvas canvas, Size size) {
-    final paint = Paint()..color = const Color(0xFFBCA57D);
-    for (var i = 0; i < 8; i += 1) {
-      canvas.drawCircle(
-        Offset(
-          size.width * (.32 + i * .055),
-          size.height * (.84 - (i % 2) * .02),
-        ),
-        4,
-        paint,
-      );
-    }
-  }
-
-  void _sparkles(Canvas canvas, Size size) {
-    final p = Paint()..color = const Color(0xFFF5CA56);
-    for (final o in [
-      Offset(size.width * .34, size.height * .55),
-      Offset(size.width * .55, size.height * .48),
-      Offset(size.width * .74, size.height * .58),
-    ]) {
-      canvas.drawCircle(o, 3, p);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _TopicThumbnailPainter extends CustomPainter {

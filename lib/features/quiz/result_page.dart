@@ -303,7 +303,7 @@ class _ReviewCard extends StatelessWidget {
                 Text(
                   item.localizedPrompt(isBahasaMelayu),
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 if (type.isNotEmpty) ...[
