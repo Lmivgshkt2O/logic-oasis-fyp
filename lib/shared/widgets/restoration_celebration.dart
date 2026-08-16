@@ -21,9 +21,15 @@ class RestorationCelebration extends StatefulWidget {
     Overlay.of(context).insert(entry);
 
     // Auto-remove after the animation completes.
-    Future.delayed(const Duration(milliseconds: 1800), () {
+    final reducedMotion = MediaQuery.disableAnimationsOf(context);
+    Future.delayed(
+      reducedMotion
+          ? const Duration(milliseconds: 600)
+          : const Duration(milliseconds: 1800),
+      () {
       if (entry.mounted) entry.remove();
-    });
+      },
+    );
     return entry;
   }
 
@@ -63,18 +69,28 @@ class _RestorationCelebrationState extends State<RestorationCelebration>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Reduced-motion preference shortens the nonessential sparkle burst; the
+    // snackbar still carries the repair feedback.
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _controller.duration = const Duration(milliseconds: 450);
+    }
+  }
+
+  @override
   void dispose() {
     _controller.dispose();
     super.dispose();
   }
 
   static const _particleColors = [
-    Color(0xFFFFD33D), // gold
-    Color(0xFF50D2D7), // water/crystal
-    Color(0xFF37BD61), // leaf green
-    Color(0xFFFF9D3B), // orange
-    Color(0xFFFFF4DD), // cream sparkle
-    Color(0xFF7F70C8), // purple
+    Color(0xFFF1C84A), // reward gold
+    Color(0xFF5BC8CE), // water
+    Color(0xFF48A979), // leaf
+    Color(0xFF7E4FC6), // forum violet accent
+    Color(0xFFFFFFFF), // white sparkle
+    Color(0xFFDFF4E8), // mint sparkle
   ];
 
   @override
@@ -228,16 +244,24 @@ class _InlineRestorationSparkleState extends State<InlineRestorationSparkle>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _controller.duration = const Duration(milliseconds: 400);
+    }
+  }
+
+  @override
   void dispose() {
     _controller.dispose();
     super.dispose();
   }
 
   static const _colors = [
-    Color(0xFFFFD33D),
-    Color(0xFF50D2D7),
-    Color(0xFF37BD61),
-    Color(0xFFFFF4DD),
+    Color(0xFFF1C84A),
+    Color(0xFF5BC8CE),
+    Color(0xFF48A979),
+    Color(0xFFFFFFFF),
   ];
 
   @override

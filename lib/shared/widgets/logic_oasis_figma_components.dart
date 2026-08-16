@@ -432,6 +432,8 @@ class MissionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -439,7 +441,6 @@ class MissionCard extends StatelessWidget {
         const SizedBox(height: 8),
         SoftCard(
           onTap: onTap,
-          color: const Color(0xFFFFFEF6),
           padding: const EdgeInsets.all(12),
           radius: 20,
           child: Row(
@@ -455,8 +456,8 @@ class MissionCard extends StatelessWidget {
                         Flexible(
                           child: StatusChip(
                             label: topicLabel,
-                            color: LogicOasisDesign.forest,
-                            background: const Color(0xFFDFF4D7),
+                            color: oasis.forest,
+                            background: oasis.mint,
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -465,10 +466,10 @@ class MissionCard extends StatelessWidget {
                             durationLabel,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: LogicOasisDesign.body,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: oasis.secondaryInk,
                               fontSize: 12,
-                              fontWeight: FontWeight.w700,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ),
@@ -479,10 +480,8 @@ class MissionCard extends StatelessWidget {
                       title,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: LogicOasisDesign.ink,
+                      style: theme.textTheme.titleMedium?.copyWith(
                         fontSize: 15,
-                        fontWeight: FontWeight.w900,
                         height: 1.05,
                       ),
                     ),
@@ -491,10 +490,10 @@ class MissionCard extends StatelessWidget {
                       rewardLabel,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: LogicOasisDesign.body,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: oasis.secondaryInk,
                         fontSize: 11.5,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 10),
@@ -503,17 +502,15 @@ class MissionCard extends StatelessWidget {
                         Expanded(
                           child: ProgressBar(
                             value: progress,
-                            color: LogicOasisDesign.leaf,
                             height: 6,
                           ),
                         ),
                         const SizedBox(width: 8),
                         Text(
                           progressLabel,
-                          style: const TextStyle(
-                            color: LogicOasisDesign.forest,
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: oasis.forest,
                             fontSize: 12,
-                            fontWeight: FontWeight.w900,
                           ),
                         ),
                       ],
@@ -574,12 +571,13 @@ class OasisHeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final oasis = LogicOasisTheme.of(context);
     final markerAreas = _heroAreas();
 
     return SoftCard(
       padding: EdgeInsets.zero,
       radius: 20,
-      color: const Color(0xFFDDF3E8),
+      color: oasis.mint,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(20),
         child: SizedBox(
@@ -650,35 +648,42 @@ class OasisHeroCard extends StatelessWidget {
                 bottom: 0,
                 child: Container(
                   padding: const EdgeInsets.fromLTRB(12, 9, 12, 10),
-                  decoration: const BoxDecoration(color: Color(0xFFFFFDF4)),
+                  decoration: BoxDecoration(
+                    color: oasis.surface.withValues(alpha: 0.92),
+                  ),
                   child: Row(
                     children: [
-                      const AppSvgIcon(
+                      AppSvgIcon(
                         'repair_marker',
-                        color: Color(0xFF8A7659),
+                        color: oasis.secondaryInk,
                         size: 16,
                       ),
                       const SizedBox(width: 7),
-                      const Expanded(
+                      Expanded(
                         child: Text(
                           'Tap markers to restore your oasis',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: LogicOasisDesign.body,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                          ),
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(
+                                color: oasis.secondaryInk,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
                         ),
                       ),
                       const SizedBox(width: 8),
                       Text(
                         '${(progress * 100).round()}%',
-                        style: const TextStyle(
-                          color: LogicOasisDesign.forest,
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w900,
-                        ),
+                        style: Theme.of(context)
+                            .textTheme
+                            .labelMedium
+                            ?.copyWith(
+                              color: oasis.forest,
+                              fontSize: 12.5,
+                            ),
                       ),
                     ],
                   ),
@@ -791,12 +796,14 @@ class _RepairDetailSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
     final resourceIcon = area.resource == OasisResource.crystals
         ? 'stat_crystal'
         : 'stat_energy';
     final resourceColor = area.resource == OasisResource.crystals
-        ? LogicOasisDesign.water
-        : LogicOasisDesign.orange;
+        ? oasis.water
+        : oasis.reward;
     final resourceLabel = _resourceLabel(area.resource, l10n);
     final hasImage = area.currentImage.isNotEmpty;
 
@@ -865,10 +872,8 @@ class _RepairDetailSheet extends StatelessWidget {
                             children: [
                               Text(
                                 area.localizedTitle(isBahasaMelayu),
-                                style: const TextStyle(
-                                  color: LogicOasisDesign.ink,
+                                style: theme.textTheme.headlineSmall?.copyWith(
                                   fontSize: 20,
-                                  fontWeight: FontWeight.w900,
                                 ),
                               ),
                               const SizedBox(height: 2),
@@ -885,8 +890,8 @@ class _RepairDetailSheet extends StatelessWidget {
                               const SizedBox(height: 2),
                               Text(
                                 area.localizedDescription(isBahasaMelayu),
-                                style: const TextStyle(
-                                  color: LogicOasisDesign.body,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: oasis.secondaryInk,
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -905,10 +910,10 @@ class _RepairDetailSheet extends StatelessWidget {
                     const SizedBox(height: 8),
                     Text(
                       l10n.restoredPercent((area.progress * 100).round()),
-                      style: const TextStyle(
-                        color: LogicOasisDesign.body,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: oasis.secondaryInk,
                         fontSize: 13,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 18),
@@ -930,7 +935,7 @@ class _RepairDetailSheet extends StatelessWidget {
                             icon: Icons.handyman_rounded,
                             label: l10n.repairCost,
                             value: '${area.repairCost}',
-                            color: LogicOasisDesign.leaf,
+                            color: oasis.leaf,
                           ),
                         ),
                       ],
@@ -980,12 +985,14 @@ class _SheetMetric extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFFEF6),
+        color: oasis.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFF0E5D1)),
+        border: Border.all(color: oasis.outline),
       ),
       child: Row(
         children: [
@@ -997,18 +1004,18 @@ class _SheetMetric extends StatelessWidget {
               children: [
                 Text(
                   value,
-                  style: const TextStyle(
-                    color: LogicOasisDesign.ink,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: oasis.primaryInk,
                     fontSize: 16,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 Text(
                   label,
-                  style: const TextStyle(
-                    color: LogicOasisDesign.body,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: oasis.secondaryInk,
                     fontSize: 12,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
@@ -1062,6 +1069,7 @@ class _RepairMarkerState extends State<RepairMarker>
 
   @override
   Widget build(BuildContext context) {
+    final oasis = LogicOasisTheme.of(context);
     // Determine marker appearance based on area progress.
     final isComplete = widget.progress >= 1.0;
     final isRepairing = widget.progress > 0 && widget.progress < 1.0;
@@ -1071,21 +1079,23 @@ class _RepairMarkerState extends State<RepairMarker>
     final Color labelBgColor;
 
     if (isComplete) {
-      markerColor = LogicOasisDesign.leaf;
+      markerColor = oasis.leaf;
       markerIcon = Icons.check_rounded;
-      labelBgColor = const Color(0xFFD4F5D0);
+      labelBgColor = oasis.mint;
     } else if (isRepairing) {
-      markerColor = const Color(0xFFE8A92E); // amber
+      markerColor = oasis.reward;
       markerIcon = Icons.construction_rounded;
-      labelBgColor = const Color(0xFFFFF3D6);
+      labelBgColor = oasis.reward.withValues(alpha: .18);
     } else {
-      markerColor = LogicOasisDesign.orange;
+      markerColor = oasis.coral;
       markerIcon = Icons.add_rounded;
-      labelBgColor = const Color(0xFFEAF8D6);
+      labelBgColor = oasis.coral.withValues(alpha: .12);
     }
 
     // Pulse animation: active for recommended + repairing, off for completed.
-    final shouldPulse = !isComplete && (widget.recommended || isRepairing);
+    final reducedMotion = MediaQuery.disableAnimationsOf(context);
+    final shouldPulse =
+        !isComplete && !reducedMotion && (widget.recommended || isRepairing);
 
     return AnimatedBuilder(
       animation: controller,
@@ -1140,10 +1150,10 @@ class _RepairMarkerState extends State<RepairMarker>
                           widget.label,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: LogicOasisDesign.forest,
+                          style: TextStyle(
+                            color: oasis.forest,
                             fontSize: 9,
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.w700,
                             height: 1,
                           ),
                         ),
@@ -1427,7 +1437,20 @@ class _LowPolyOasisSceneState extends State<LowPolyOasisScene>
     _shimmerController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 3200),
-    )..repeat();
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // The shimmer is nonessential ambience; reduced-motion preference keeps
+    // the scene static while progress glows and markers still convey state.
+    final reducedMotion = MediaQuery.disableAnimationsOf(context);
+    if (reducedMotion && _shimmerController.isAnimating) {
+      _shimmerController.stop();
+    } else if (!reducedMotion && !_shimmerController.isAnimating) {
+      _shimmerController.repeat();
+    }
   }
 
   @override
@@ -1720,19 +1743,20 @@ class _SectionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
     return Row(
       children: [
-        const Icon(Icons.eco_rounded, color: LogicOasisDesign.leaf, size: 16),
+        Icon(Icons.eco_rounded, color: oasis.leaf, size: 16),
         const SizedBox(width: 5),
         Flexible(
           child: Text(
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Color(0xFF74664E),
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: oasis.secondaryInk,
               fontSize: 13,
-              fontWeight: FontWeight.w900,
               letterSpacing: .2,
             ),
           ),
@@ -1747,23 +1771,24 @@ class _HeroTitleBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Column(
+    final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'Logic Oasis',
-          style: TextStyle(
-            color: LogicOasisDesign.forest,
+          style: theme.textTheme.headlineSmall?.copyWith(
+            color: oasis.primaryInk,
             fontSize: 28,
-            fontWeight: FontWeight.w900,
             height: 1.02,
           ),
         ),
-        SizedBox(height: 5),
+        const SizedBox(height: 5),
         Text(
           'Learn. Restore. Grow together.',
-          style: TextStyle(
-            color: LogicOasisDesign.ink,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: oasis.secondaryInk,
             fontSize: 14,
             fontWeight: FontWeight.w600,
           ),

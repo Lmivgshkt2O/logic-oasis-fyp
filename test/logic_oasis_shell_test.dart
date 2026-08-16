@@ -140,6 +140,92 @@ void main() {
     expect(selectedForge.style?.color, LogicOasisDesign.forestAction);
     semanticsHandle.dispose();
   });
+
+  testWidgets('Home keeps required information under the Living Canopy theme', (
+    tester,
+  ) async {
+    final state = AppState();
+    await _pumpShell(tester, state);
+
+    expect(find.text('Good morning,'), findsOneWidget);
+    expect(find.text('Crystals'), findsOneWidget);
+    expect(find.text('Energy'), findsOneWidget);
+    expect(find.text('Day Streak'), findsOneWidget);
+    expect(find.text('Tap markers to restore your oasis'), findsOneWidget);
+    expect(find.text("TODAY'S MISSION"), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('hero remains the dominant Home focus at portrait widths', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    final state = AppState();
+    await _pumpShell(tester, state);
+
+    final heroSize = tester.getSize(find.byType(OasisHeroCard));
+    final missionSize = tester.getSize(find.byType(MissionCard));
+    expect(heroSize.height, greaterThan(missionSize.height * 1.6));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('repair marker opens the sheet and reaches the repair callback', (
+    tester,
+  ) async {
+    final state = AppState();
+    await _pumpShell(tester, state);
+
+    expect(state.crystals, 124);
+    await tester.tap(find.text('Fix Bridge'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.text('Fraction Bridge'), findsOneWidget);
+    await tester.tap(find.text('Repair with Math Crystals'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+
+    expect(state.crystals, 94);
+    final bridge = state.oasisAreas.firstWhere(
+      (area) => area.id == 'fraction_bridge',
+    );
+    expect(bridge.progress, 0.5);
+
+    // Flush celebration overlay and snackbar timers before the test ends.
+    await tester.pump(const Duration(seconds: 5));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Eye Protecting toggle leaves Home scene state unchanged', (
+    tester,
+  ) async {
+    final state = AppState();
+    await _pumpShell(tester, state);
+
+    final crystalsBefore = state.crystals;
+    final energyBefore = state.mutualAidEnergy;
+    final progressBefore = state.oasisAreas.map((area) => area.progress).toList();
+
+    state.updateEyeComfortMode(true);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(state.crystals, crystalsBefore);
+    expect(state.mutualAidEnergy, energyBefore);
+    expect(
+      state.oasisAreas.map((area) => area.progress),
+      orderedEquals(progressBefore),
+    );
+    expect(state.eyeComfortMode, isTrue);
+    expect(state.selectedTab, 0);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 class _ShellPager {
