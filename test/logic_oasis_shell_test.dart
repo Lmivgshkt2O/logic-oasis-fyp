@@ -4,6 +4,8 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:logic_oasis/app/logic_oasis_design.dart';
+import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/app/logic_oasis_shell.dart';
 import 'package:logic_oasis/features/collaboration/qa_forum/qa_forum_page.dart';
 import 'package:logic_oasis/l10n/app_localizations.dart';
@@ -94,6 +96,50 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('navigation labels stay visible at small width and enlarged text', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1.0;
+    tester.platformDispatcher.textScaleFactorTestValue = 1.3;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      tester.platformDispatcher.clearTextScaleFactorTestValue();
+    });
+
+    final state = AppState();
+    await _pumpShell(tester, state);
+
+    expect(find.text('Home'), findsOneWidget);
+    expect(find.text('Forge'), findsOneWidget);
+    expect(find.text('Q&A Forum'), findsOneWidget);
+    expect(find.text('Settings'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('selected navigation uses forest plus a non-colour cue', (
+    tester,
+  ) async {
+    final semanticsHandle = tester.ensureSemantics();
+
+    final state = AppState();
+    await _pumpShell(tester, state);
+
+    final selectedHome = tester.widget<Text>(find.text('Home'));
+    expect(selectedHome.style?.color, LogicOasisDesign.forestAction);
+
+    final homeNode = tester.getSemantics(find.text('Home'));
+    expect(homeNode.label, 'Home');
+    expect(homeNode.flagsCollection.hasSelectedState, isTrue);
+
+    await tester.tap(find.text('Forge'));
+    await tester.pump();
+    final selectedForge = tester.widget<Text>(find.text('Forge'));
+    expect(selectedForge.style?.color, LogicOasisDesign.forestAction);
+    semanticsHandle.dispose();
+  });
 }
 
 class _ShellPager {
@@ -125,6 +171,7 @@ Future<void> _pumpShell(
     AppStateScope(
       state: state,
       child: MaterialApp(
+        theme: LogicOasisTheme.light(),
         supportedLocales: AppLocalizations.supportedLocales,
         localizationsDelegates: const [
           AppLocalizations.delegate,

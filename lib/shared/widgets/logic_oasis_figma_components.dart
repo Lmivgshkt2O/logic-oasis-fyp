@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:logic_oasis/app/logic_oasis_design.dart';
+import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/l10n/app_localizations.dart';
 import 'package:logic_oasis/shared/models/oasis_area.dart';
 import 'package:logic_oasis/shared/widgets/restoration_celebration.dart';
@@ -101,15 +102,16 @@ class LogicOasisScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final oasis = LogicOasisTheme.of(context);
     return Material(
       color: Colors.transparent,
       child: SizedBox.expand(
         child: DecoratedBox(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [LogicOasisDesign.page, LogicOasisDesign.pageWarm],
+              colors: [oasis.canvas, oasis.groupedSurface],
             ),
           ),
           child: SafeArea(
@@ -144,6 +146,7 @@ class LogicHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -157,10 +160,8 @@ class LogicHeader extends StatelessWidget {
                 title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: LogicOasisDesign.forest,
+                style: theme.textTheme.headlineSmall?.copyWith(
                   fontSize: 28,
-                  fontWeight: FontWeight.w900,
                   height: 1.05,
                 ),
               ),
@@ -169,8 +170,7 @@ class LogicHeader extends StatelessWidget {
                 subtitle,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: LogicOasisDesign.body,
+                style: theme.textTheme.bodyLarge?.copyWith(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                   height: 1.18,
@@ -190,28 +190,29 @@ class SoftCard extends StatelessWidget {
     super.key,
     required this.child,
     this.padding = const EdgeInsets.all(20),
-    this.color = LogicOasisDesign.card,
-    this.radius = 24,
+    this.color,
+    this.radius = 20,
     this.onTap,
   });
 
   final Widget child;
   final EdgeInsets padding;
-  final Color color;
+  final Color? color;
   final double radius;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
+    final oasis = LogicOasisTheme.of(context);
     final card = AnimatedContainer(
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
       padding: padding,
       decoration: BoxDecoration(
-        color: color,
+        color: color ?? oasis.surface,
         borderRadius: BorderRadius.circular(radius),
-        border: Border.all(color: const Color(0xFFF0E5D1)),
-        boxShadow: LogicOasisDesign.softShadow,
+        border: Border.all(color: oasis.outline),
+        boxShadow: oasis.softShadow,
       ),
       child: child,
     );
@@ -233,15 +234,16 @@ class SoftIconButton extends StatelessWidget {
     super.key,
     required this.icon,
     this.onTap,
-    this.color = LogicOasisDesign.card,
+    this.color,
   });
 
   final String icon;
   final VoidCallback? onTap;
-  final Color color;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
+    final oasis = LogicOasisTheme.of(context);
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -251,12 +253,16 @@ class SoftIconButton extends StatelessWidget {
           width: 48,
           height: 48,
           decoration: BoxDecoration(
-            color: color,
+            color: color ?? oasis.surface,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFF0E5D1)),
-            boxShadow: LogicOasisDesign.softShadow,
+            border: Border.all(color: oasis.outline),
+            boxShadow: oasis.softShadow,
           ),
-          child: AppSvgIcon(icon, color: const Color(0xFF7D6C55), size: 24),
+          child: AppSvgIcon(
+            icon,
+            color: oasis.secondaryInk,
+            size: 24,
+          ),
         ),
       ),
     );
@@ -270,11 +276,12 @@ class SproutAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final oasis = LogicOasisTheme.of(context);
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: const Color(0xFFDDF5E7),
+        color: oasis.mint,
         borderRadius: BorderRadius.circular(size * .28),
       ),
       child: ClipRRect(
@@ -303,6 +310,8 @@ class StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final oasis = LogicOasisTheme.of(context);
+    final theme = Theme.of(context);
     return SoftCard(
       padding: EdgeInsets.symmetric(
         horizontal: compact ? 8 : 10,
@@ -320,10 +329,10 @@ class StatCard extends StatelessWidget {
               fit: BoxFit.scaleDown,
               child: Text(
                 value,
-                style: const TextStyle(
-                  color: LogicOasisDesign.ink,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: oasis.primaryInk,
                   fontSize: 18,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w700,
                   height: 1,
                 ),
               ),
@@ -334,8 +343,8 @@ class StatCard extends StatelessWidget {
               child: Text(
                 label,
                 maxLines: 1,
-                style: const TextStyle(
-                  color: LogicOasisDesign.body,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: oasis.secondaryInk,
                   fontSize: 11.5,
                   fontWeight: FontWeight.w700,
                   height: 1,
@@ -443,10 +452,12 @@ class MissionCard extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        StatusChip(
-                          label: topicLabel,
-                          color: LogicOasisDesign.forest,
-                          background: const Color(0xFFDFF4D7),
+                        Flexible(
+                          child: StatusChip(
+                            label: topicLabel,
+                            color: LogicOasisDesign.forest,
+                            background: const Color(0xFFDFF4D7),
+                          ),
                         ),
                         const SizedBox(width: 8),
                         Flexible(
@@ -1274,6 +1285,7 @@ class BottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final oasis = LogicOasisTheme.of(context);
     return SafeArea(
       top: false,
       child: Container(
@@ -1281,10 +1293,10 @@ class BottomNavBar extends StatelessWidget {
         margin: const EdgeInsets.fromLTRB(24, 0, 24, 12),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
-          color: const Color(0xFFFFFEF6),
+          color: oasis.surface,
           borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: const Color(0xFFF0E5D1)),
-          boxShadow: LogicOasisDesign.softShadow,
+          border: Border.all(color: oasis.outline),
+          boxShadow: oasis.softShadow,
         ),
         child: Row(
           children: [
@@ -1315,22 +1327,23 @@ class ProgressBar extends StatelessWidget {
     super.key,
     required this.value,
     this.height = 7,
-    this.color = LogicOasisDesign.leaf,
+    this.color,
   });
 
   final double value;
   final double height;
-  final Color color;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
+    final oasis = LogicOasisTheme.of(context);
     return ClipRRect(
       borderRadius: BorderRadius.circular(999),
       child: LinearProgressIndicator(
         value: value.clamp(0.0, 1.0).toDouble(),
         minHeight: height,
-        backgroundColor: const Color(0xFFE5DFCF),
-        color: color,
+        backgroundColor: oasis.outline,
+        color: color ?? oasis.leaf,
       ),
     );
   }
@@ -1584,37 +1597,57 @@ class _BottomNavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? LogicOasisDesign.forest : const Color(0xFF806F59);
+    final oasis = LogicOasisTheme.of(context);
+    final color = selected ? oasis.forest : oasis.secondaryInk;
     return Material(
       color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOutCubic,
-          height: 60,
-          decoration: BoxDecoration(
-            color: selected ? const Color(0xFFE0F4D6) : Colors.transparent,
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              AppSvgIcon(data.icon, color: color, size: selected ? 25 : 23),
-              const SizedBox(height: 4),
-              Text(
-                data.label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 11.5,
-                  fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
-                  height: 1,
-                ),
+      child: Semantics(
+        selected: selected,
+        button: true,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+            height: 60,
+            decoration: BoxDecoration(
+              color: selected ? oasis.mint : Colors.transparent,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  AppSvgIcon(data.icon, color: color, size: selected ? 25 : 23),
+                  const SizedBox(height: 4),
+                  Text(
+                    data.label,
+                    maxLines: 1,
+                    softWrap: false,
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 11.5,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                      height: 1,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOutCubic,
+                    width: selected ? 22 : 0,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: oasis.forest,
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -1691,13 +1724,17 @@ class _SectionLabel extends StatelessWidget {
       children: [
         const Icon(Icons.eco_rounded, color: LogicOasisDesign.leaf, size: 16),
         const SizedBox(width: 5),
-        Text(
-          label,
-          style: const TextStyle(
-            color: Color(0xFF74664E),
-            fontSize: 13,
-            fontWeight: FontWeight.w900,
-            letterSpacing: .2,
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0xFF74664E),
+              fontSize: 13,
+              fontWeight: FontWeight.w900,
+              letterSpacing: .2,
+            ),
           ),
         ),
       ],

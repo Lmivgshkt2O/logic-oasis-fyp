@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/features/collaboration/qa_forum/qa_forum_page.dart';
 import 'package:logic_oasis/features/formula_forge/subtopic_page.dart';
 import 'package:logic_oasis/features/quiz/quiz_page.dart';
@@ -313,7 +314,7 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: QuizPage(
@@ -343,7 +344,7 @@ void main() {
     addTearDown(tester.view.reset);
     final repository = _IntegrationDiscussRepository();
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: QuizPage(
@@ -374,7 +375,7 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Builder(
@@ -427,7 +428,7 @@ void main() {
       ..add(_topic('topic-1', 'Topic One', <Subtopic>[_subtopic('s1')]));
     final service = _NavigatingQuizSessionService();
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: SubtopicPage(
@@ -460,7 +461,7 @@ void main() {
       );
     final service = _NavigatingQuizSessionService();
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: SubtopicPage(
@@ -497,7 +498,7 @@ void main() {
         ]);
       final service = _NavigatingQuizSessionService();
       await tester.pumpWidget(
-        MaterialApp(
+        MaterialApp(theme: LogicOasisTheme.light(),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: SubtopicPage(
@@ -532,7 +533,7 @@ void main() {
         ..add(_topic('topic-1', 'Topic One', <Subtopic>[_subtopic('s1')]));
       final service = _NavigatingQuizSessionService();
       await tester.pumpWidget(
-        MaterialApp(
+        MaterialApp(theme: LogicOasisTheme.light(),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Builder(

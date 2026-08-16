@@ -18,6 +18,7 @@ class SectionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
 
     return SoftCard(
       padding: const EdgeInsets.all(16),
@@ -27,7 +28,7 @@ class SectionCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(icon, color: LogicOasisTheme.leaf),
+              Icon(icon, color: oasis.leaf),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(

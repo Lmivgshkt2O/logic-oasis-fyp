@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/features/settings/parent_access_page.dart';
 import 'package:logic_oasis/shared/repositories/auth_repository.dart';
 import 'package:logic_oasis/shared/state/app_state.dart';
@@ -9,7 +10,7 @@ void main() {
     'parent access starts with a Firebase sign-in gate, not registration',
     (tester) async {
       await tester.pumpWidget(
-        MaterialApp(
+        MaterialApp(theme: LogicOasisTheme.light(),
           home: ParentAccessPage(
             state: AppState(persistQuizResults: false),
             onReturnToStudentLogin: () {},
@@ -37,7 +38,7 @@ void main() {
     var returnedToStudentLogin = false;
 
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         home: ParentAccessPage(
           state: AppState(persistQuizResults: false),
           onReturnToStudentLogin: () => returnedToStudentLogin = true,
@@ -73,7 +74,7 @@ void main() {
     var returnedToStudentLogin = false;
 
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         home: ParentAccessPage(
           state: AppState(persistQuizResults: false),
           onReturnToStudentLogin: () => returnedToStudentLogin = true,

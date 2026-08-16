@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_core_platform_interface/test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/features/onboarding/login_page.dart';
 import 'package:logic_oasis/features/onboarding/plot_intro_page.dart';
 import 'package:logic_oasis/features/onboarding/register_page.dart';
@@ -39,7 +40,9 @@ void main() {
   });
 
   testWidgets('register page shows student account fields', (tester) async {
-    await tester.pumpWidget(const MaterialApp(home: RegisterPage()));
+    await tester.pumpWidget(
+      MaterialApp(theme: LogicOasisTheme.light(), home: const RegisterPage()),
+    );
 
     expect(find.text('New student account'), findsOneWidget);
     expect(find.text('Student name'), findsOneWidget);
@@ -53,6 +56,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       MaterialApp(
+        theme: LogicOasisTheme.light(),
         home: LoginPage(onLogin: (_) {}, onParentAccess: () {}),
       ),
     );
@@ -83,7 +87,9 @@ void main() {
   testWidgets('login account creation opens the registration form', (
     tester,
   ) async {
-    await tester.pumpWidget(MaterialApp(home: LoginPage(onLogin: (_) {})));
+    await tester.pumpWidget(
+      MaterialApp(theme: LogicOasisTheme.light(), home: LoginPage(onLogin: (_) {})),
+    );
     await tester.pump();
 
     await tester.tap(find.text('Create new student profile'));
@@ -96,7 +102,9 @@ void main() {
   testWidgets('login password visibility toggle reveals then hides the password', (
     tester,
   ) async {
-    await tester.pumpWidget(MaterialApp(home: LoginPage(onLogin: (_) {})));
+    await tester.pumpWidget(
+      MaterialApp(theme: LogicOasisTheme.light(), home: LoginPage(onLogin: (_) {})),
+    );
     await tester.pump();
 
     TextField passwordField() {
@@ -127,7 +135,9 @@ void main() {
   testWidgets('register page exposes year selection, safety guidance, and back navigation', (
     tester,
   ) async {
-    await tester.pumpWidget(const MaterialApp(home: RegisterPage()));
+    await tester.pumpWidget(
+      MaterialApp(theme: LogicOasisTheme.light(), home: const RegisterPage()),
+    );
 
     expect(find.text('Year level'), findsOneWidget);
     expect(find.text('Year 4'), findsOneWidget);

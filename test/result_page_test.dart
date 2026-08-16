@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/features/collaboration/qa_forum/qa_forum_page.dart';
 import 'package:logic_oasis/features/quiz/result_page.dart';
 import 'package:logic_oasis/l10n/app_localizations.dart';
@@ -35,7 +36,7 @@ Widget _resultPage({
   QuizReward? reward,
   CollaborationRepository? forumRepository,
 }) {
-  return MaterialApp(
+  return MaterialApp(theme: LogicOasisTheme.light(),
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     locale: isBahasaMelayu ? const Locale('ms') : const Locale('en'),
@@ -108,7 +109,7 @@ void main() {
   ) async {
     NextLearningAction? returnedAction;
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Builder(

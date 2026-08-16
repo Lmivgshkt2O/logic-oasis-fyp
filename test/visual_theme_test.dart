@@ -6,6 +6,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:logic_oasis/app/logic_oasis_design.dart';
 import 'package:logic_oasis/app/theme.dart';
+import 'package:logic_oasis/shared/state/app_state.dart';
+import 'package:logic_oasis/shared/state/app_state_scope.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -175,6 +178,100 @@ void main() {
         await resolve(reduced: true),
         LogicOasisMotion.themeTransitionReduced,
       );
+    });
+  });
+
+  group('app-level theme ownership', () {
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+    });
+
+    Widget appHarness(AppState state) {
+      return AppStateScope(
+        state: state,
+        child: Builder(
+          builder: (context) {
+            final watched = AppStateScope.watch(context);
+            return MaterialApp(
+              theme: watched.eyeComfortMode
+                  ? LogicOasisTheme.eyeComfort()
+                  : LogicOasisTheme.light(),
+              themeAnimationStyle: AnimationStyle(
+                duration: LogicOasisMotion.themeTransitionFor(context),
+                curve: LogicOasisMotion.themeTransitionCurve,
+              ),
+              home: Scaffold(
+                body: Builder(
+                  builder: (context) {
+                    final oasis = LogicOasisTheme.of(context);
+                    return ColoredBox(
+                      color: oasis.canvas,
+                      child: const SizedBox.expand(),
+                    );
+                  },
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    }
+
+    Color canvasColor(WidgetTester tester) {
+      return tester.widget<ColoredBox>(find.byType(ColoredBox)).color;
+    }
+
+    testWidgets('comfort toggle animates presentation without changing state', (
+      tester,
+    ) async {
+      final state = AppState();
+      await tester.pumpWidget(appHarness(state));
+
+      final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
+      expect(app.themeAnimationStyle?.duration,
+          LogicOasisMotion.themeTransition);
+
+      final start = canvasColor(tester);
+      expect(start, OasisSemanticTheme.defaults().canvas);
+
+      state.updateEyeComfortMode(true);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 175));
+      final mid = canvasColor(tester);
+      await tester.pump(const Duration(milliseconds: 200));
+      final end = canvasColor(tester);
+
+      expect(mid, isNot(start));
+      expect(mid, isNot(OasisSemanticTheme.comfort().canvas));
+      expect(end, OasisSemanticTheme.comfort().canvas);
+      expect(state.eyeComfortMode, isTrue);
+      expect(state.selectedTab, 0);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('reduced motion switches the comfort theme near-instantly', (
+      tester,
+    ) async {
+      final state = AppState();
+      await tester.pumpWidget(
+        MediaQuery(
+          data: const MediaQueryData(disableAnimations: true),
+          child: appHarness(state),
+        ),
+      );
+
+      final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
+      expect(app.themeAnimationStyle?.duration,
+          LogicOasisMotion.themeTransitionReduced);
+
+      state.updateEyeComfortMode(true);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(canvasColor(tester), OasisSemanticTheme.comfort().canvas);
+      expect(state.eyeComfortMode, isTrue);
+      expect(state.selectedTab, 0);
+      expect(tester.takeException(), isNull);
     });
   });
 
