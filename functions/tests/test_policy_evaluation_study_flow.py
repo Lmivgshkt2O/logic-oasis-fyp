@@ -15,8 +15,8 @@ if str(ROOT / "functions") not in sys.path:
 import ai_runtime
 import policy_evaluation as evaluation
 from ai_runtime import RuntimeBundle, process_finalized_attempt
-from test_ai_runtime import MemoryGateway, trusted_attempt, trusted_responses
-from test_policy_evaluation_enrollment import (
+from functions.tests.test_ai_runtime import MemoryGateway, trusted_attempt, trusted_responses
+from functions.tests.test_policy_evaluation_enrollment import (
     EXPIRE_FUTURE,
     NOW,
     _Db,
@@ -141,4 +141,3 @@ class PolicyEvaluationStudyFlowTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
