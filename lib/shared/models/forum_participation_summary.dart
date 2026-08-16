@@ -28,18 +28,34 @@ class ForumParticipationSummary {
     String studentId,
     Map<String, dynamic> data,
   ) {
+    final storedStudentId = data['studentId'];
+    if (storedStudentId is! String ||
+        storedStudentId.isEmpty ||
+        storedStudentId != studentId) {
+      throw const FormatException(
+        'Forum participation summary child mismatch.',
+      );
+    }
     int count(String field) {
       final value = data[field];
-      if (value is int && value >= 0) return value;
       if (value is num && value >= 0 && value == value.roundToDouble()) {
         return value.toInt();
       }
-      return 0;
+      throw FormatException('Invalid forum participation count: $field');
     }
 
-    DateTime? timestamp(String field) {
+    DateTime? optionalTimestamp(String field) {
       final value = data[field];
-      return value is Timestamp ? value.toDate() : null;
+      if (value == null) return null;
+      if (value is Timestamp) return value.toDate().toUtc();
+      throw FormatException('Invalid forum participation timestamp: $field');
+    }
+
+    final weekStart = data['weekStart'];
+    if (weekStart is! Timestamp) {
+      throw const FormatException(
+        'Forum participation summary needs weekStart.',
+      );
     }
 
     return ForumParticipationSummary(
@@ -48,9 +64,9 @@ class ForumParticipationSummary {
       answersSubmittedCount: count('answersSubmittedCount'),
       acceptedAnswersCount: count('acceptedAnswersCount'),
       helpfulReceivedCount: count('helpfulReceivedCount'),
-      weekStart: timestamp('weekStart'),
-      lastParticipationAt: timestamp('lastParticipationAt'),
-      updatedAt: timestamp('updatedAt'),
+      weekStart: weekStart.toDate().toUtc(),
+      lastParticipationAt: optionalTimestamp('lastParticipationAt'),
+      updatedAt: optionalTimestamp('updatedAt'),
     );
   }
 }

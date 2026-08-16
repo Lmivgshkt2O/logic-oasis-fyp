@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 /// A bounded, server-owned learning projection. It deliberately excludes raw
 /// responses, answer keys, and any AI/model evidence.
 class TrustedSubtopicProgress {
@@ -19,6 +21,8 @@ class TrustedSubtopicProgress {
     this.recommendationTargetSubtopicId,
     this.projectionStatus,
     this.lastCorrectRate,
+    this.observationCount,
+    this.updatedAt,
   });
 
   final String studentId;
@@ -38,6 +42,12 @@ class TrustedSubtopicProgress {
   final String? recommendationTargetSubtopicId;
   final String? projectionStatus;
   final double? lastCorrectRate;
+
+  /// Number of trusted finalized observations behind the projection.
+  final int? observationCount;
+
+  /// Server-owned projection timestamp, absent on legacy documents.
+  final DateTime? updatedAt;
 
   factory TrustedSubtopicProgress.fromFirestore(Map<String, dynamic> data) {
     final studentId = data['studentId'];
@@ -66,8 +76,7 @@ class TrustedSubtopicProgress {
       masteryLevel: _requiredMasteryLevel(masteryLevel, masteryLevels),
       bestCorrectRate: _requiredRate(rate),
       attempted: data['attempted'] is bool ? data['attempted'] as bool : false,
-      accessUnlocked:
-          data['accessUnlocked'] is bool
+      accessUnlocked: data['accessUnlocked'] is bool
           ? data['accessUnlocked'] as bool
           : false,
       masteryProbability: _optionalRate(data['masteryProbability']),
@@ -84,6 +93,8 @@ class TrustedSubtopicProgress {
       ),
       projectionStatus: _optionalString(data['projectionStatus']),
       lastCorrectRate: _optionalRate(data['lastCorrectRate']),
+      observationCount: _optionalObservationCount(data['observationCount']),
+      updatedAt: _optionalUpdatedAt(data['updatedAt']),
     );
   }
 
@@ -122,5 +133,19 @@ class TrustedSubtopicProgress {
     if (value == null) return null;
     if (value is String && value.isNotEmpty) return value;
     throw const FormatException('Invalid trusted progress field.');
+  }
+
+  static int? _optionalObservationCount(Object? value) {
+    if (value == null) return null;
+    if (value is num && value >= 0 && value == value.roundToDouble()) {
+      return value.toInt();
+    }
+    throw const FormatException('Invalid trusted progress observation count.');
+  }
+
+  static DateTime? _optionalUpdatedAt(Object? value) {
+    if (value == null) return null;
+    if (value is Timestamp) return value.toDate().toUtc();
+    throw const FormatException('Invalid trusted progress updated timestamp.');
   }
 }

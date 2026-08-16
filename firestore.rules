@@ -172,6 +172,13 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // U14 server-owned weekly practice projection. Active linked parents read
+    // the exact child's document; clients can never write or enumerate it.
+    match /parentPracticeSummaries/{studentId} {
+      allow read: if ownsOrActiveLinkedParent(studentId);
+      allow write: if false;
+    }
+
     // U10's peer forum is a student-only surface.  Parents read only the
     // count-only summary above, never posts, identities, moderation, AI jobs,
     // or AI runs.  Server triggers/callables stamp derived state using Admin.

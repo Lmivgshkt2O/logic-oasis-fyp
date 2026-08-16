@@ -10,6 +10,12 @@ canonical_plan: docs/plans/2026-08-01-001-feat-u10-forum-production-closure-plan
 
 **Purpose:** This is the developer-facing Firestore schema for Logic Oasis. It records the implemented trusted-content, secure-quiz, parent-link, adaptive-AI, and U10 forum boundaries plus future migration expectations.
 
+**Authority:** The canonical FYP1 executable plan
+(`docs/plans/2026-07-05-001-feat-fyp1-prototype-development-plan(2)(1).md`) and
+the approved U14 parent Progress Map plan remain the product and sequencing
+authority. This schema document reconciles to them; where wording differs, the
+canonical plan and enforced code/rules win.
+
 The U10 closure addendum below is authoritative for forum records. Older
 `Target FYP1` forum sketches remain historical design context only where they
 conflict with that addendum.
@@ -68,7 +74,14 @@ erDiagram
 | `parentAccounts/{parentId}` | Current prototype transitional record | Existing parent ID | Prototype parent metadata only; never store plaintext password | Treat as transitional. Do not extend it as a production authentication design. | Replace unsafe prototype credential handling with authenticated UID plus `parentLinks` checks when U9 is secured. |
 | `rememberedProfiles/{uid}` | Current prototype convenience record | Auth `uid` | Minimal display preference only, such as `displayName`, `yearLevel`, `updatedAt` | Owner only | Never store passwords, tokens, parent access secrets, trusted learning fields, or role grants. |
 
-**Parent boundary:** Production-grade parent authentication remains deferred in the canonical plan. FYP1 parent-dashboard access still requires an authenticated UID and an approved parent-student link; a client-visible prototype password is not a durable database-security design.
+**Parent boundary:** Parent access uses Firebase Auth in an isolated parent
+   session plus a server-owned, approved `parentLinks/{parentId}_{studentId}`
+   record; prototype parent-password/OTP records are retired. A linked parent
+   reads only the selected child's safe projections: `subtopicMastery`,
+   `parentPracticeSummaries/{studentId}` (U14 current-week rhythm), and
+   `forumParticipationSummaries/{studentId}` (U10 count-only). Raw attempts,
+   responses, answer keys, AI jobs/runs, SHAP, forum content, model registry,
+   and parent-link documents remain denied.
 
 ## 4. Curriculum and Trusted Content
 
@@ -103,7 +116,7 @@ startQuizSession
 |---|---|---|---|---|
 | `quizSessions/{sessionId}` | Target FYP1 | Server-generated session ID | `studentId`, `assignmentId`, `bankId`, `questionIds`, `contentVersion`, `status`, `validatedResponseCount`, `expectedResponseCount`, `startedAt`, `expiresAt`, `finalizedAt`, `attemptId` | Callable Functions create/transition states. Client direct reads/writes denied; safe state is returned by callable responses. |
 | `questionResponses/{responseId}` | Target FYP1 | Deterministic session/question or idempotency identity | `sessionId`, `attemptId` after finalization, `studentId`, `questionId`, `skillId`, `bankId`, `selectedIndex`, `serverIsCorrect`, `validationStatus`, `responseTimeMs`, `hintCount`, `sequenceIndex`, `idempotencyKey`, `createdAt` | Callable Functions write once. Client direct reads/writes denied. A second sealed answer is rejected. |
-| `quizAttempts/{attemptId}` | Current prototype -> Target FYP1 | Server-generated finalized attempt ID | `studentId`, `sessionId`, `topicId`, `subtopicId`, `bankId`, `difficultyLevel`, `contentVersion`, `validationStatus`, `processingStatus`, `trustedScore`, `trustedCorrectCount`, `responseCount`, `responseIds`, `reviewItems` (per missed question: `questionId`, `sequenceIndex`, `questionText`, `questionTextBm`, `questionType`, `questionTypeBm`, `reviewFocus`, `reviewFocusBm`), `startedAt`, `finalizedAt`, `dataSource`, `deviceSessionId` | Backend creates once. Student reads own; linked parent reads only a safe dashboard projection or authorized attempt summary. Client writes denied. `reviewItems` are answer-free and list only missed questions in quiz order. |
+| `quizAttempts/{attemptId}` | Current prototype -> Target FYP1 | Server-generated finalized attempt ID | `studentId`, `sessionId`, `topicId`, `subtopicId`, `bankId`, `difficultyLevel`, `contentVersion`, `validationStatus`, `processingStatus`, `trustedScore`, `trustedCorrectCount`, `responseCount`, `responseIds`, `reviewItems` (per missed question: `questionId`, `sequenceIndex`, `questionText`, `questionTextBm`, `questionType`, `questionTypeBm`, `reviewFocus`, `reviewFocusBm`), `startedAt`, `finalizedAt`, `dataSource`, `deviceSessionId` | Backend creates once. Student reads own; linked parents never read raw attempts (U14 reads only safe projections). Client writes denied. `reviewItems` are answer-free and list only missed questions in quiz order. |
 | `quizAttemptTelemetry/{telemetryId}` | Optional target only if needed | Generated ID | Untrusted UI timing/device telemetry, `studentId`, `sessionId`, `createdAt` | Client may submit only through a restricted validated path. Never use as correctness, score, reward, or model truth without server validation. |
 
 ### U3 invariants
@@ -203,7 +216,7 @@ The approved Stage 3 reservation does not change FYP1 database implementation. T
 | Safe curriculum (`topics`, `subtopics`, `questions`, `questionBanks`) | Authenticated read | Denied | Controlled seed/deployment | Questions never include answer keys. |
 | Answer keys, sessions, responses | Denied | Denied | Callable Functions only | Emulator denies direct access even to the owning student. |
 | Content approval manifest (`contentSourceManifest`) | Denied | Denied | Controlled seed/deployment only | Material checksums, locators, digests, and reviewer identities never cross the client boundary. |
-| Final attempts and safe mastery/status/assignment projections | Owner/authorized parent safe view | Denied | Backend only | Student cannot forge correctness, score, evidence state, mastery, or next bank. |
+| Safe mastery, practice, and Mutual Aid projections (`subtopicMastery`, `parentPracticeSummaries`, `forumParticipationSummaries`) | Owner or exact linked parent | Denied | Backend only | Student cannot forge correctness, score, evidence state, mastery, practice rhythm, or participation counts. |
 | Raw AI jobs/runs and model registry | Denied | Denied | Runtime or privileged promotion only | Raw features, SHAP values, errors, hashes, paths, release metadata, and registry state never cross the client boundary. |
 | User profile and preferences | Owner only | Restricted safe fields only | Server validates identity/role fields | Foreign UID access denied; role/link escalation denied. |
 | Parent links | Linked parties may read | Denied | Approved server/admin flow | No self-linking or cross-student access. |
@@ -212,7 +225,12 @@ The approved Stage 3 reservation does not change FYP1 database implementation. T
 | Wallet, ledger, world, restoration | Owner read of projection | Denied | Backend commands only | Reconcile balances, events, level, and revision; reject duplicate source IDs. |
 | Configuration and model registry | Read only where needed | Denied | Controlled deployment/promotion only | Client cannot activate policy/model/configuration. |
 
-`firestore.rules` is the enforcement layer. Firebase Emulator tests must prove owner isolation, parent-link access, answer-key denial, direct trusted-write denial, and no access to another student's records.
+`firestore.rules` is the enforcement layer. Firebase Emulator tests must prove
+owner isolation, exact linked-parent projection reads, answer-key denial,
+direct trusted-write denial, collection/list enumeration denial, and no access
+to another student's records. The U14 authenticated emulator flow
+(`tools/run_parent_dashboard_emulator_flow.js`) exercises the exact-child read
+matrix and every denied path.
 
 ## 11. Required Query Indexes
 
@@ -290,6 +308,7 @@ The implemented student forum uses these collections and identities:
 | `forumParticipationAggregateClaims/{claimId}` | idempotent aggregation claim |
 | `forumParticipationWeeklySummaries/{studentId_week}` | server-owned Malaysia-week materialization |
 | `forumParticipationSummaries/{studentId}` | current count-only student/linked-parent projection |
+| `parentPracticeSummaries/{studentId}` | U14 server-owned current-week rhythm; one current week plus one optional prior total, no raw identifiers |
 | `forumAiJobs/{answerId}` | mutable lease/fencing job for the latest answer revision |
 | `forumAiRuns/{logicalInferenceId}` | immutable revision/text/model/artifact/policy/claim-level result |
 | `modelRegistry/{releaseId}` | forum-scoped immutable release bindings with controlled lifecycle pointer |
