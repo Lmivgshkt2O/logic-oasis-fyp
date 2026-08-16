@@ -25,6 +25,9 @@ class SettingsPage extends StatelessWidget {
     final oasis = LogicOasisTheme.of(context);
 
     return LogicOasisScaffold(
+      // Quiet teal/botanical atmosphere for the Settings canvas while keeping
+      // the existing feature icon/colour differentiation.
+      topTint: const Color(0xFFDFF1EA),
       children: [
         LogicHeader(
           title: l10n.settings,
@@ -727,6 +730,7 @@ class _FigmaProfileCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final oasis = LogicOasisTheme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     return SoftCard(
       onTap: onTap,
       color: oasis.mint,
@@ -794,7 +798,7 @@ class _FigmaProfileCard extends StatelessWidget {
                   icon: 'stat_crystal',
                   iconColor: oasis.water,
                   value: '$crystals',
-                  label: 'Crystals',
+                  label: l10n.crystals,
                 ),
               ),
               const SizedBox(width: 10),
@@ -804,7 +808,7 @@ class _FigmaProfileCard extends StatelessWidget {
                   icon: 'stat_energy',
                   iconColor: oasis.reward,
                   value: '$energy',
-                  label: 'Energy',
+                  label: l10n.energy,
                 ),
               ),
               const SizedBox(width: 10),
@@ -814,7 +818,7 @@ class _FigmaProfileCard extends StatelessWidget {
                   icon: 'stat_streak',
                   iconColor: oasis.leaf,
                   value: '$streak',
-                  label: 'Day Streak',
+                  label: l10n.dayStreak,
                 ),
               ),
             ],

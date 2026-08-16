@@ -25,7 +25,10 @@ void main() {
         expect(oasis, isNotNull, reason: '$label theme missing extension');
         expect(oasis!.isComfort, isComfort);
 
+        expect(oasis.topCanvas, isNot(oasis.canvas));
         expect(oasis.canvas, isNot(oasis.surface));
+        expect(oasis.canvas, isNot(oasis.lowerCanvas));
+        expect(oasis.surface, isNot(oasis.quietSurface));
         expect(oasis.surface, isNot(oasis.groupedSurface));
         expect(oasis.primaryInk, isNot(oasis.secondaryInk));
         expect(oasis.forest, isNot(oasis.water));
@@ -57,7 +60,10 @@ void main() {
 
       final mid = a.lerp(b, 0.5);
       expect(mid, isNotNull);
+      expect(mid.topCanvas, Color.lerp(a.topCanvas, b.topCanvas, 0.5));
       expect(mid.canvas, Color.lerp(a.canvas, b.canvas, 0.5));
+      expect(mid.lowerCanvas, Color.lerp(a.lowerCanvas, b.lowerCanvas, 0.5));
+      expect(mid.quietSurface, Color.lerp(a.quietSurface, b.quietSurface, 0.5));
       expect(mid.primaryInk, Color.lerp(a.primaryInk, b.primaryInk, 0.5));
       expect(mid.softShadow, hasLength(a.softShadow.length));
 

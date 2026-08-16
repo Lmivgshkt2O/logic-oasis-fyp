@@ -95,10 +95,16 @@ class LogicOasisScaffold extends StatelessWidget {
     super.key,
     required this.children,
     this.padding = const EdgeInsets.fromLTRB(24, 24, 24, 120),
+    this.topTint,
   });
 
   final List<Widget> children;
   final EdgeInsets padding;
+
+  /// Optional feature-identity tint blended into the very top of the layered
+  /// botanical canvas (Home aqua, Forge mint, Settings teal). The tint stays
+  /// restrained so the page accent system remains the primary identity.
+  final Color? topTint;
 
   @override
   Widget build(BuildContext context) {
@@ -111,7 +117,11 @@ class LogicOasisScaffold extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [oasis.canvas, oasis.groupedSurface],
+              colors: [
+                topTint ?? oasis.topCanvas,
+                oasis.canvas,
+                oasis.lowerCanvas,
+              ],
             ),
           ),
           child: SafeArea(
@@ -661,7 +671,9 @@ class OasisHeroCard extends StatelessWidget {
                       const SizedBox(width: 7),
                       Expanded(
                         child: Text(
-                          'Tap markers to restore your oasis',
+                          AppLocalizations.of(
+                            context,
+                          )!.tapMarkersToRestoreOasis,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(context)
@@ -1216,10 +1228,11 @@ class SettingsRow extends StatelessWidget {
                     Expanded(
                       child: Text(
                         label,
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontSize: 14,
+                          height: 1.15,
                         ),
                       ),
                     ),
@@ -1227,31 +1240,34 @@ class SettingsRow extends StatelessWidget {
                       const SizedBox(width: 8),
                       Flexible(
                         flex: 0,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              value!,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: oasis.secondaryInk,
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            if (progress != null) ...[
-                              const SizedBox(height: 5),
-                              SizedBox(
-                                width: 52,
-                                child: ProgressBar(
-                                  value: progress!,
-                                  height: 5,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 150),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                value!,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: oasis.secondaryInk,
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
+                              if (progress != null) ...[
+                                const SizedBox(height: 5),
+                                SizedBox(
+                                  width: 52,
+                                  child: ProgressBar(
+                                    value: progress!,
+                                    height: 5,
+                                  ),
+                                ),
+                              ],
                             ],
-                          ],
+                          ),
                         ),
                       ),
                     ],

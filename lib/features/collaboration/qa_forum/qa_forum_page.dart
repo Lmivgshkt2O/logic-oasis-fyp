@@ -158,7 +158,23 @@ class _QaForumPageState extends State<QaForumPage> {
         icon: const Icon(Icons.add_comment_outlined),
         label: Text(_t('Ask a question', 'Tanya soalan')),
       ),
-      body: _buildQuestionList(context),
+      body: DecoratedBox(
+        // Restrained lavender atmosphere near the header/search region so the
+        // list page reads as part of the shared system while violet stays the
+        // restrained identity accent.
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              const Color(0xFFEEE8F8),
+              oasis.canvas,
+              oasis.lowerCanvas,
+            ],
+          ),
+        ),
+        child: _buildQuestionList(context),
+      ),
     );
   }
 
@@ -474,6 +490,8 @@ class _QaForumPageState extends State<QaForumPage> {
       controller: _filter,
       onChanged: (_) => _onFilterChanged(),
       decoration: InputDecoration(
+        // Tie the search field to the Forum accent with a faint lavender fill.
+        fillColor: LogicOasisTheme.of(context).violet.withValues(alpha: .05),
         prefixIcon: Icon(
           Icons.search,
           color: LogicOasisTheme.of(context).violet,

@@ -19,6 +19,9 @@ class FormulaForgePage extends StatelessWidget {
     return AnimatedBuilder(
       animation: state,
       builder: (context, _) => LogicOasisScaffold(
+        // Faint mint/emerald atmosphere around the Forge header and year
+        // selector; topic cards and mastery/status content stay unchanged.
+        topTint: const Color(0xFFE1F3E7),
         children: [
         LogicHeader(
           leading: const _ForgeVillageIcon(),

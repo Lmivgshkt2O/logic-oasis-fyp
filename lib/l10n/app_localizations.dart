@@ -560,6 +560,24 @@ abstract class AppLocalizations {
   /// **'Crystals'**
   String get crystals;
 
+  /// No description provided for @energy.
+  ///
+  /// In en, this message translates to:
+  /// **'Energy'**
+  String get energy;
+
+  /// No description provided for @dayStreak.
+  ///
+  /// In en, this message translates to:
+  /// **'Day Streak'**
+  String get dayStreak;
+
+  /// No description provided for @tapMarkersToRestoreOasis.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap markers to restore your oasis'**
+  String get tapMarkersToRestoreOasis;
+
   /// No description provided for @repairReady.
   ///
   /// In en, this message translates to:

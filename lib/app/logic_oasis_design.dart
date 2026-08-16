@@ -12,9 +12,16 @@ class LogicOasisDesign {
   // ---------------------------------------------------------------------------
 
   // Default theme.
-  static const canvas = Color(0xFFF2F7F1);
-  static const surface = Color(0xFFFFFFFF);
-  static const groupedSurface = Color(0xFFEDF5F0);
+  // Layered Living Canopy canvas: a very subtle misty-top → soft-middle →
+  // slightly deeper lower page gradient adds atmospheric depth without
+  // saturation. Primary surfaces are a soft botanical white instead of pure
+  // white so cards read as part of the canopy rather than floating panels.
+  static const topCanvas = Color(0xFFF5F9F6);
+  static const canvas = Color(0xFFEDF5F1);
+  static const lowerCanvas = Color(0xFFE7F0EC);
+  static const surface = Color(0xFFFBFDFC);
+  static const quietSurface = Color(0xFFF3F8F5);
+  static const groupedSurface = Color(0xFFEAF3EE);
   static const primaryInk = Color(0xFF17352B);
   static const secondaryInk = Color(0xFF587067);
   static const forestAction = Color(0xFF176B4D);
@@ -27,15 +34,18 @@ class LogicOasisDesign {
   // surfaces while staying within their agreed colour families.
   static const coralDanger = Color(0xFFBF4238);
   static const forumViolet = Color(0xFF7E4FC6);
-  static const outlineQuiet = Color(0xFFDCE8E1);
+  static const outlineQuiet = Color(0xFFD8E6DF);
   static const neutralQuiet = Color(0xFF9AA8A0);
   static const statusContinued = Color(0xFF8F5E00);
 
   // Eye Protecting theme: lower luminance, lower saturation, quieter shadows,
   // while preserving text contrast and the botanical identity.
-  static const comfortCanvas = Color(0xFFE9F1EB);
-  static const comfortSurface = Color(0xFFF5FAF6);
-  static const comfortGroupedSurface = Color(0xFFE3EDE6);
+  static const comfortTopCanvas = Color(0xFFE8EFEA);
+  static const comfortCanvas = Color(0xFFE1EAE4);
+  static const comfortLowerCanvas = Color(0xFFDCE6DF);
+  static const comfortSurface = Color(0xFFEEF4EF);
+  static const comfortQuietSurface = Color(0xFFE7EEE8);
+  static const comfortGroupedSurface = Color(0xFFDCE7DF);
   static const comfortPrimaryInk = Color(0xFF142F26);
   static const comfortSecondaryInk = Color(0xFF4E655C);
   static const comfortForest = Color(0xFF146246);
@@ -46,7 +56,7 @@ class LogicOasisDesign {
   static const comfortSand = Color(0xFFC7A55F);
   static const comfortCoral = Color(0xFFAE3B32);
   static const comfortViolet = Color(0xFF7145B5);
-  static const comfortOutline = Color(0xFFD2DFD7);
+  static const comfortOutline = Color(0xFFCBD9D0);
   static const comfortNeutral = Color(0xFF8C9A92);
 
   // ---------------------------------------------------------------------------

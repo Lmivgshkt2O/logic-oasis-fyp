@@ -226,6 +226,39 @@ void main() {
     expect(state.selectedTab, 0);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('page content clears the floating bottom navigation', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 780);
+    tester.view.devicePixelRatio = 1.0;
+    tester.platformDispatcher.textScaleFactorTestValue = 1.3;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      tester.platformDispatcher.clearTextScaleFactorTestValue();
+    });
+
+    final state = AppState();
+    await _pumpShell(tester, state);
+
+    for (var tab = 0; tab < 4; tab++) {
+      state.changeTab(tab);
+      await tester.pump();
+      final scrollables = find.byType(Scrollable);
+      if (scrollables.evaluate().isNotEmpty) {
+        await tester.drag(scrollables.first, const Offset(0, -900));
+        await tester.pump();
+      }
+      expect(tester.takeException(), isNull);
+    }
+
+    // Bottom navigation remains visible and complete after scrolling.
+    expect(find.text('Home'), findsWidgets);
+    expect(find.text('Forge'), findsWidgets);
+    expect(find.text('Q&A Forum'), findsOneWidget);
+    expect(find.text('Settings'), findsWidgets);
+  });
 }
 
 class _ShellPager {

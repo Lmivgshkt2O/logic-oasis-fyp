@@ -14,7 +14,11 @@ class HomePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final oasis = LogicOasisTheme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     return LogicOasisScaffold(
+      // Faint forest+water atmosphere behind the Oasis focal region; the
+      // scene itself keeps its desert/dry-world colours.
+      topTint: const Color(0xFFDDF2EF),
       children: [
         Row(
           children: [
@@ -61,7 +65,7 @@ class HomePage extends StatelessWidget {
                 icon: 'stat_crystal',
                 iconColor: oasis.water,
                 value: '${state.crystals}',
-                label: 'Crystals',
+                label: l10n.crystals,
               ),
             ),
             const SizedBox(width: 12),
@@ -71,7 +75,7 @@ class HomePage extends StatelessWidget {
                 icon: 'stat_energy',
                 iconColor: oasis.reward,
                 value: '${state.mutualAidEnergy}',
-                label: 'Energy',
+                label: l10n.energy,
               ),
             ),
             const SizedBox(width: 12),
@@ -81,7 +85,7 @@ class HomePage extends StatelessWidget {
                 icon: 'stat_streak',
                 iconColor: oasis.leaf,
                 value: '${state.currentYearAttempts.length}',
-                label: 'Day Streak',
+                label: l10n.dayStreak,
               ),
             ),
           ],

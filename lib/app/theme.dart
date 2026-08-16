@@ -30,8 +30,11 @@ class OasisStatusCue {
 @immutable
 class OasisSemanticTheme extends ThemeExtension<OasisSemanticTheme> {
   const OasisSemanticTheme({
+    required this.topCanvas,
     required this.canvas,
+    required this.lowerCanvas,
     required this.surface,
+    required this.quietSurface,
     required this.groupedSurface,
     required this.primaryInk,
     required this.secondaryInk,
@@ -53,8 +56,11 @@ class OasisSemanticTheme extends ThemeExtension<OasisSemanticTheme> {
   /// Default Living Canopy presentation.
   factory OasisSemanticTheme.defaults() {
     return const OasisSemanticTheme(
+      topCanvas: LogicOasisDesign.topCanvas,
       canvas: LogicOasisDesign.canvas,
+      lowerCanvas: LogicOasisDesign.lowerCanvas,
       surface: LogicOasisDesign.surface,
+      quietSurface: LogicOasisDesign.quietSurface,
       groupedSurface: LogicOasisDesign.groupedSurface,
       primaryInk: LogicOasisDesign.primaryInk,
       secondaryInk: LogicOasisDesign.secondaryInk,
@@ -89,8 +95,11 @@ class OasisSemanticTheme extends ThemeExtension<OasisSemanticTheme> {
   /// Low-glare Eye Protecting presentation.
   factory OasisSemanticTheme.comfort() {
     return const OasisSemanticTheme(
+      topCanvas: LogicOasisDesign.comfortTopCanvas,
       canvas: LogicOasisDesign.comfortCanvas,
+      lowerCanvas: LogicOasisDesign.comfortLowerCanvas,
       surface: LogicOasisDesign.comfortSurface,
+      quietSurface: LogicOasisDesign.comfortQuietSurface,
       groupedSurface: LogicOasisDesign.comfortGroupedSurface,
       primaryInk: LogicOasisDesign.comfortPrimaryInk,
       secondaryInk: LogicOasisDesign.comfortSecondaryInk,
@@ -122,11 +131,20 @@ class OasisSemanticTheme extends ThemeExtension<OasisSemanticTheme> {
     );
   }
 
+  /// Misty botanical tone at the very top of the page background.
+  final Color topCanvas;
+
   /// Cool botanical neutral for page and shell backgrounds.
   final Color canvas;
 
+  /// Slightly deeper botanical tone at the bottom of the page background.
+  final Color lowerCanvas;
+
   /// White or lightly botanical surface for primary cards, forms, and sheets.
   final Color surface;
+
+  /// Low-emphasis botanical surface for quiet content areas.
+  final Color quietSurface;
 
   /// Quiet grouped surface for settings groups and secondary panels.
   final Color groupedSurface;
@@ -212,8 +230,11 @@ class OasisSemanticTheme extends ThemeExtension<OasisSemanticTheme> {
 
   @override
   OasisSemanticTheme copyWith({
+    Color? topCanvas,
     Color? canvas,
+    Color? lowerCanvas,
     Color? surface,
+    Color? quietSurface,
     Color? groupedSurface,
     Color? primaryInk,
     Color? secondaryInk,
@@ -232,8 +253,11 @@ class OasisSemanticTheme extends ThemeExtension<OasisSemanticTheme> {
     bool? isComfort,
   }) {
     return OasisSemanticTheme(
+      topCanvas: topCanvas ?? this.topCanvas,
       canvas: canvas ?? this.canvas,
+      lowerCanvas: lowerCanvas ?? this.lowerCanvas,
       surface: surface ?? this.surface,
+      quietSurface: quietSurface ?? this.quietSurface,
       groupedSurface: groupedSurface ?? this.groupedSurface,
       primaryInk: primaryInk ?? this.primaryInk,
       secondaryInk: secondaryInk ?? this.secondaryInk,
@@ -257,8 +281,11 @@ class OasisSemanticTheme extends ThemeExtension<OasisSemanticTheme> {
   OasisSemanticTheme lerp(covariant OasisSemanticTheme? other, double t) {
     if (other == null) return this;
     return OasisSemanticTheme(
+      topCanvas: Color.lerp(topCanvas, other.topCanvas, t)!,
       canvas: Color.lerp(canvas, other.canvas, t)!,
+      lowerCanvas: Color.lerp(lowerCanvas, other.lowerCanvas, t)!,
       surface: Color.lerp(surface, other.surface, t)!,
+      quietSurface: Color.lerp(quietSurface, other.quietSurface, t)!,
       groupedSurface: Color.lerp(groupedSurface, other.groupedSurface, t)!,
       primaryInk: Color.lerp(primaryInk, other.primaryInk, t)!,
       secondaryInk: Color.lerp(secondaryInk, other.secondaryInk, t)!,

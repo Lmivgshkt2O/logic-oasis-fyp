@@ -92,7 +92,7 @@ class _RegisterPageState extends State<RegisterPage> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [oasis.canvas, oasis.groupedSurface],
+            colors: [oasis.topCanvas, oasis.canvas, oasis.lowerCanvas],
           ),
         ),
         child: SafeArea(
