@@ -42,6 +42,16 @@ void main() {
       }
     });
 
+    test('Eye Protecting canvas stays visibly lower-glare than the default', () {
+      final defaults = OasisSemanticTheme.defaults();
+      final comfort = OasisSemanticTheme.comfort();
+      expect(_luminance(comfort.canvas), lessThan(_luminance(defaults.canvas)));
+      expect(
+        _luminance(comfort.surface),
+        lessThan(_luminance(defaults.surface)),
+      );
+    });
+
     test('extension lerp is non-null at endpoints and midpoint', () {
       final a = OasisSemanticTheme.defaults();
       final b = OasisSemanticTheme.comfort();

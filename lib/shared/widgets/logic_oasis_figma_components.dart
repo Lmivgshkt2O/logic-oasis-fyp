@@ -323,6 +323,9 @@ class StatCard extends StatelessWidget {
     final oasis = LogicOasisTheme.of(context);
     final theme = Theme.of(context);
     return SoftCard(
+      // Supporting stat/resource cards sit on the quiet botanical surface so
+      // they read as calm supporting content rather than primary cards.
+      color: oasis.quietSurface,
       padding: EdgeInsets.symmetric(
         horizontal: compact ? 8 : 10,
         vertical: compact ? 10 : 12,
@@ -1002,7 +1005,7 @@ class _SheetMetric extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: oasis.surface,
+        color: oasis.quietSurface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: oasis.outline),
       ),
