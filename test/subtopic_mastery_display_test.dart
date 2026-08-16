@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/features/formula_forge/subtopic_page.dart';
 import 'package:logic_oasis/shared/models/trusted_subtopic_progress.dart';
 import 'package:logic_oasis/shared/state/app_state.dart';
@@ -42,7 +43,7 @@ void main() {
 
   Future<void> pumpSubtopicPage(WidgetTester tester) async {
     await tester.pumpWidget(
-      MaterialApp(home: SubtopicPage(state: state, topic: currentTopic())),
+      MaterialApp(theme: LogicOasisTheme.light(), home: SubtopicPage(state: state, topic: currentTopic())),
     );
     await tester.pumpAndSettle();
   }

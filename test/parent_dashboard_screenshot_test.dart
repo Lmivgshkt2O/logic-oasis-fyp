@@ -3,6 +3,7 @@
 // are supplemented by the live emulator rehearsal screenshots.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/features/parent_dashboard/parent_dashboard_page.dart';
 import 'package:logic_oasis/l10n/app_localizations.dart';
 import 'package:logic_oasis/shared/models/forum_participation_summary.dart';
@@ -90,7 +91,7 @@ Future<void> pumpState(
   await tester.binding.setSurfaceSize(const Size(430, 1800));
   addTearDown(() => tester.binding.setSurfaceSize(null));
   await tester.pumpWidget(
-    MaterialApp(
+    MaterialApp(theme: LogicOasisTheme.light(),
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: ParentDashboardPage(

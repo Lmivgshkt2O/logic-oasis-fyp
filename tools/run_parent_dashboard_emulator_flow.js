@@ -104,6 +104,11 @@ function malaysiaWeekStartUtc(date) {
   return new Date(monday.getTime() - 8 * 3600 * 1000);
 }
 
+// Module-scope cleanup state so the error handler can still remove fixtures
+// when the flow fails before the in-run declarations are initialized.
+let cleanupUids = [];
+let cleanupProjectionIds = {};
+
 async function cleanup(uids, projectionIds) {
   for (const uid of uids) {
     try {
@@ -144,9 +149,6 @@ async function cleanup(uids, projectionIds) {
   const unrelatedParent = client(`unrelated-parent-${stamp}`);
   const revokedParent = client(`revoked-parent-${stamp}`);
   const student = client(`student-${stamp}`);
-
-  let cleanupUids = [];
-  let cleanupProjectionIds = {};
 
   currentStep = 'register temporary emulator users';
   const [parentUid, unrelatedUid, revokedUid, studentUid] = await Promise.all([

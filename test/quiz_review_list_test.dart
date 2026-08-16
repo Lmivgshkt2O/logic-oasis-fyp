@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/features/quiz/result_page.dart';
 import 'package:logic_oasis/l10n/app_localizations.dart';
 import 'package:logic_oasis/shared/models/adaptive_assignment.dart';
@@ -49,7 +50,7 @@ Widget _resultPage({
   required bool isBahasaMelayu,
   AiDiagnosis? aiDiagnosis,
 }) {
-  return MaterialApp(
+  return MaterialApp(theme: LogicOasisTheme.light(),
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     locale: isBahasaMelayu ? const Locale('ms') : null,

@@ -272,6 +272,16 @@ class AppLocalizationsMs extends AppLocalizations {
   String get crystals => 'Kristal';
 
   @override
+  String get energy => 'Tenaga';
+
+  @override
+  String get dayStreak => 'Rekod Harian';
+
+  @override
+  String get tapMarkersToRestoreOasis =>
+      'Ketuk penanda untuk memulihkan oasis anda';
+
+  @override
   String get repairReady => 'Sedia Baiki';
 
   @override

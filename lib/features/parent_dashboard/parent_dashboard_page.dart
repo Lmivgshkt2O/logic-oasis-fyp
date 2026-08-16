@@ -214,11 +214,12 @@ class _ParentUpdatedLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
     final timestamp = _latestUsedTimestamp(viewModel);
     if (timestamp == null) return const SizedBox.shrink();
     return Text(
       l10n.parentDashboardUpdated(formatAiUpdatedAt(timestamp)),
-      style: theme.textTheme.bodySmall?.copyWith(color: LogicOasisTheme.ink),
+      style: theme.textTheme.bodySmall?.copyWith(color: oasis.secondaryInk),
     );
   }
 
@@ -334,6 +335,7 @@ class _WeeklyGlanceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
     final headline = _headline(l10n, glance.key);
     final supporting = _supporting(l10n, glance.key, focusTitle);
     return Semantics(
@@ -342,7 +344,7 @@ class _WeeklyGlanceCard extends StatelessWidget {
       label: 'This week at a glance',
       child: SoftCard(
         padding: const EdgeInsets.all(16),
-        color: LogicOasisTheme.cream,
+        color: oasis.surface,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -434,19 +436,20 @@ class _UnderstandingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
     final isBm = state.isBahasaMelayu;
     if (retrying) {
       return _retryingSection(
         theme: theme,
         title: l10n.understandingCardTitle,
-        color: _warm(),
+        color: _warm(oasis),
       );
     }
     if (unavailable) {
       return _stateSection(
         theme: theme,
         title: l10n.understandingCardTitle,
-        color: _warm(),
+        color: _warm(oasis),
         icon: Icons.psychology_outlined,
         text: l10n.understandingUnavailable,
         canRetry: canRetry,
@@ -457,7 +460,7 @@ class _UnderstandingCard extends StatelessWidget {
       return _stateSection(
         theme: theme,
         title: l10n.understandingCardTitle,
-        color: _warm(),
+        color: _warm(oasis),
         icon: Icons.psychology_outlined,
         text: l10n.understandingInsufficient,
         canRetry: false,
@@ -475,7 +478,7 @@ class _UnderstandingCard extends StatelessWidget {
         : card.positiveSubtopicTitle;
     return _ProgressSection(
       title: l10n.understandingCardTitle,
-      color: _warm(),
+      color: _warm(oasis),
       icon: Icons.psychology_outlined,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -483,8 +486,8 @@ class _UnderstandingCard extends StatelessWidget {
           Text(
             l10n.learningSnapshotLabel,
             style: theme.textTheme.labelLarge?.copyWith(
-              color: LogicOasisTheme.ink,
-              fontWeight: FontWeight.w800,
+              color: oasis.primaryInk,
+              fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: 8),
@@ -512,11 +515,11 @@ class _UnderstandingCard extends StatelessWidget {
             const SizedBox(height: 8),
             Row(
               children: [
-                const ExcludeSemantics(
+                ExcludeSemantics(
                   child: Icon(
                     Icons.workspace_premium_outlined,
                     size: 18,
-                    color: LogicOasisTheme.deepLeaf,
+                    color: oasis.forest,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -531,13 +534,13 @@ class _UnderstandingCard extends StatelessWidget {
           ],
           if (action != null) ...[
             const SizedBox(height: 12),
-            const Divider(color: LogicOasisTheme.sand, height: 1),
+            Divider(color: oasis.outline, height: 1),
             const SizedBox(height: 10),
             Text(
               l10n.parentNextStep,
               style: theme.textTheme.labelLarge?.copyWith(
-                color: LogicOasisTheme.ink,
-                fontWeight: FontWeight.w800,
+                color: oasis.primaryInk,
+                fontWeight: FontWeight.w700,
               ),
             ),
             const SizedBox(height: 4),
@@ -551,9 +554,9 @@ class _UnderstandingCard extends StatelessWidget {
     );
   }
 
-  static Color _warm() => Color.alphaBlend(
-    LogicOasisTheme.clay.withValues(alpha: 0.10),
-    LogicOasisTheme.cream,
+  static Color _warm(OasisSemanticTheme oasis) => Color.alphaBlend(
+    oasis.forest.withValues(alpha: 0.08),
+    oasis.surface,
   );
 
   static String _bandLabel(AppLocalizations l10n, ParentMasteryBand band) {
@@ -602,18 +605,19 @@ class _PracticeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
     if (retrying) {
       return _retryingSection(
         theme: theme,
         title: l10n.practiceCardTitle,
-        color: _green(),
+        color: _green(oasis),
       );
     }
     if (card.status == ParentPracticeStatus.unavailable) {
       return _stateSection(
         theme: theme,
         title: l10n.practiceCardTitle,
-        color: _green(),
+        color: _green(oasis),
         icon: Icons.task_alt_outlined,
         text: l10n.practiceUnavailable,
         canRetry: canRetry,
@@ -631,7 +635,7 @@ class _PracticeCard extends StatelessWidget {
     ];
     return _ProgressSection(
       title: l10n.practiceCardTitle,
-      color: _green(),
+      color: _green(oasis),
       icon: Icons.task_alt_outlined,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -655,7 +659,7 @@ class _PracticeCard extends StatelessWidget {
                         Text(
                           dayLabels[index],
                           style: theme.textTheme.labelSmall?.copyWith(
-                            color: LogicOasisTheme.ink,
+                            color: oasis.secondaryInk,
                           ),
                         ),
                         const SizedBox(height: 2),
@@ -683,7 +687,7 @@ class _PracticeCard extends StatelessWidget {
             Text(
               l10n.practiceImproved(card.supportedDifference!),
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: LogicOasisTheme.deepLeaf,
+                color: oasis.forest,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -693,9 +697,9 @@ class _PracticeCard extends StatelessWidget {
     );
   }
 
-  static Color _green() => Color.alphaBlend(
-    LogicOasisTheme.leaf.withValues(alpha: 0.10),
-    LogicOasisTheme.cream,
+  static Color _green(OasisSemanticTheme oasis) => Color.alphaBlend(
+    oasis.leaf.withValues(alpha: 0.10),
+    oasis.surface,
   );
 }
 
@@ -717,18 +721,19 @@ class _MutualAidCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
     if (retrying) {
       return _retryingSection(
         theme: theme,
         title: l10n.mutualAidCardTitle,
-        color: _blue(),
+        color: _blue(oasis),
       );
     }
     if (card.status == ParentMutualAidStatus.unavailable) {
       return _stateSection(
         theme: theme,
         title: l10n.mutualAidCardTitle,
-        color: _blue(),
+        color: _blue(oasis),
         icon: Icons.forum_outlined,
         text: l10n.mutualAidUnavailable,
         canRetry: canRetry,
@@ -763,7 +768,7 @@ class _MutualAidCard extends StatelessWidget {
     }
     return _ProgressSection(
       title: l10n.mutualAidCardTitle,
-      color: _blue(),
+      color: _blue(oasis),
       icon: Icons.forum_outlined,
       child: rows.isEmpty
           ? Text(l10n.mutualAidZero, style: theme.textTheme.bodyMedium)
@@ -779,9 +784,9 @@ class _MutualAidCard extends StatelessWidget {
     );
   }
 
-  static Color _blue() => Color.alphaBlend(
-    LogicOasisTheme.water.withValues(alpha: 0.10),
-    LogicOasisTheme.cream,
+  static Color _blue(OasisSemanticTheme oasis) => Color.alphaBlend(
+    oasis.water.withValues(alpha: 0.10),
+    oasis.surface,
   );
 }
 
@@ -799,6 +804,7 @@ class _ConversationStarterCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
     final question = switch (starter.actionKind) {
       ParentActionKind.understandingFocus =>
         l10n.conversationUnderstandingFocus(focusTitle),
@@ -816,7 +822,7 @@ class _ConversationStarterCard extends StatelessWidget {
       label: l10n.conversationStarterTitle,
       child: SoftCard(
         padding: const EdgeInsets.all(16),
-        color: LogicOasisTheme.mint,
+        color: oasis.mint,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -849,6 +855,7 @@ class _ProgressSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
     return Semantics(
       container: true,
       header: true,
@@ -862,7 +869,7 @@ class _ProgressSection extends StatelessWidget {
             Row(
               children: [
                 ExcludeSemantics(
-                  child: Icon(icon, size: 20, color: LogicOasisTheme.ink),
+                  child: Icon(icon, size: 20, color: oasis.primaryInk),
                 ),
                 const SizedBox(width: 8),
                 Text(title, style: theme.textTheme.titleMedium),
@@ -885,16 +892,17 @@ class _StatusPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: LogicOasisTheme.sand,
+        color: oasis.groupedSurface,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         label,
         style: theme.textTheme.labelMedium?.copyWith(
-          color: LogicOasisTheme.ink,
+          color: oasis.primaryInk,
           fontWeight: FontWeight.w700,
         ),
       ),
@@ -911,10 +919,11 @@ class _TimelineRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
     return Row(
       children: [
         ExcludeSemantics(
-          child: Icon(icon, size: 18, color: LogicOasisTheme.water),
+          child: Icon(icon, size: 18, color: oasis.water),
         ),
         const SizedBox(width: 8),
         Expanded(child: Text(text, style: theme.textTheme.bodyMedium)),
@@ -936,9 +945,10 @@ class _ParentDashboardSafeStatusBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final oasis = LogicOasisTheme.of(context);
     return SoftCard(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      color: loading ? LogicOasisTheme.mint : LogicOasisTheme.sand,
+      color: loading ? oasis.mint : oasis.groupedSurface,
       child: Row(
         children: [
           SizedBox(

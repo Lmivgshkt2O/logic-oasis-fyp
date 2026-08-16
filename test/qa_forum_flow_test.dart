@@ -5,6 +5,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/features/collaboration/qa_forum/qa_forum_page.dart';
 import 'package:logic_oasis/shared/models/forum_answer.dart';
 import 'package:logic_oasis/shared/models/forum_question.dart';
@@ -176,7 +177,7 @@ void main() {
       optionsBm: ['20 004', '24 000', '20 400', '20 040'],
     );
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         home: ForumDiscussionPage(
           question: question,
           state: AppState(),
@@ -384,7 +385,7 @@ void main() {
     addTearDown(latest.close);
     addTearDown(blocked.close);
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         home: QaForumPage(
           state: AppState(),
           questionPager: pager.call,
@@ -466,7 +467,7 @@ void main() {
       questions.sublist(40, 55),
     ]);
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         home: QaForumPage(
           state: AppState(),
           questionPager: pager.call,
@@ -517,7 +518,7 @@ void main() {
     ])
       ..failOnce('1');
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         home: QaForumPage(
           state: AppState(),
           questionPager: pager.call,
@@ -562,7 +563,7 @@ void main() {
     final latest = StreamController<List<ForumQuestion>>();
     addTearDown(latest.close);
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         home: QaForumPage(
           state: AppState(),
           questionPager: pager.call,
@@ -614,7 +615,7 @@ void main() {
       questions.sublist(20, 40),
     ]);
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         home: QaForumPage(
           state: AppState(),
           questionPager: pager.call,
@@ -660,7 +661,7 @@ void main() {
       ),
     );
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         home: QaForumPage(
           state: AppState(),
           questionPager: ({required int limit, String? cursor}) async =>
@@ -706,7 +707,7 @@ void main() {
       ),
     );
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         home: QaForumPage(
           state: state,
           questionPager: ({required int limit, String? cursor}) async =>
@@ -734,7 +735,7 @@ void main() {
   ) async {
     final state = AppState()..language = 'Bahasa Melayu';
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         home: QaForumPage(
           state: state,
           questionPager: ({required int limit, String? cursor}) async =>
@@ -770,7 +771,7 @@ void main() {
       optionsBm: ['20 004', '24 000', '20 400', '20 040'],
     );
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         home: ForumDiscussionPage(
           question: question,
           state: state,
@@ -801,7 +802,7 @@ void main() {
       optionsBm: ['20 004', '24 000', '20 400', '20 040'],
     );
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         home: QaForumPage(
           state: state,
           questionPager: ({required int limit, String? cursor}) async =>
@@ -846,7 +847,7 @@ void main() {
       ),
     );
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         home: QaForumPage(
           state: AppState(),
           repository: repository,
@@ -891,7 +892,7 @@ void main() {
       text: 'I want to check whether my regrouping order is correct.',
     );
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         home: QaForumPage(
           state: AppState(),
           repository: repository,
@@ -936,7 +937,7 @@ void main() {
       optionsBm: ['20 004', '24 000', '20 400', '20 040'],
     );
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         home: QaForumPage(
           state: AppState(),
           repository: repository,
@@ -984,7 +985,7 @@ void main() {
       optionsBm: ['20 004', '24 000', '20 400', '20 040'],
     );
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         home: QaForumPage(
           state: AppState(),
           questionPager: ({required int limit, String? cursor}) async =>
@@ -1020,7 +1021,7 @@ void main() {
       optionsBm: ['20 004', '24 000', '20 400', '20 040'],
     );
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         home: ForumDiscussionPage(
           question: question,
           state: AppState(),
@@ -1062,7 +1063,7 @@ void main() {
       optionsBm: ['20 004', '24 000', '20 400', '20 040'],
     );
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         home: ForumDiscussionPage(
           question: question,
           state: AppState(),
@@ -1114,7 +1115,7 @@ void main() {
       optionsBm: ['20 004', '24 000', '20 400', '20 040'],
     );
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         home: Builder(
           builder: (context) => Scaffold(
             body: Center(
@@ -1179,7 +1180,7 @@ void main() {
       optionsBm: ['20 004', '24 000', '20 400', '20 040'],
     );
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         home: ForumDiscussionPage(
           question: question,
           state: AppState(),
@@ -1223,7 +1224,7 @@ void main() {
       optionsBm: ['20 004', '24 000', '20 400', '20 040'],
     );
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         home: ForumDiscussionPage(
           question: question,
           state: state,
@@ -1256,7 +1257,7 @@ void main() {
       optionsBm: ['20 004', '24 000', '20 400', '20 040'],
     );
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         home: ForumDiscussionPage(
           question: question,
           state: AppState(),
@@ -1315,7 +1316,7 @@ void main() {
       optionsBm: ['20 004', '24 000', '20 400', '20 040'],
     );
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         home: ForumDiscussionPage(
           question: question,
           state: AppState(),
@@ -1375,7 +1376,7 @@ void main() {
       optionsBm: ['20 004', '24 000', '20 400', '20 040'],
     );
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         home: ForumDiscussionPage(
           question: question,
           state: AppState(),
@@ -1471,7 +1472,7 @@ void main() {
       optionsBm: ['20 004', '24 000', '20 400', '20 040'],
     );
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         home: ForumDiscussionPage(
           question: question,
           state: AppState(),
@@ -1536,7 +1537,7 @@ void main() {
       feedback: feedback,
     );
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         home: QaForumPage(
           state: AppState(),
           questionPager: ({required int limit, String? cursor}) async =>
@@ -1582,7 +1583,7 @@ void main() {
     final blocked = StreamController<Set<String>>();
     addTearDown(blocked.close);
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         home: QaForumPage(
           state: AppState(),
           questionPager: ({required int limit, String? cursor}) async =>
@@ -1612,7 +1613,7 @@ void main() {
         code: 'permission-denied',
       );
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         home: QaForumPage(
           state: AppState(),
           questionPager: deniedPager.call,
@@ -1631,7 +1632,7 @@ void main() {
         code: 'unavailable',
       );
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         home: QaForumPage(
           key: const ValueKey('retryable-forum'),
           state: AppState(),
@@ -1722,7 +1723,7 @@ Future<void> _openAnswerActions(
     ),
   );
   await tester.pumpWidget(
-    MaterialApp(
+    MaterialApp(theme: LogicOasisTheme.light(),
       home: QaForumPage(
         state: AppState(),
         repository: repository,

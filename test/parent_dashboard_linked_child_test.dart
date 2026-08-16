@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/features/parent_dashboard/parent_dashboard_page.dart';
 import 'package:logic_oasis/l10n/app_localizations.dart';
 import 'package:logic_oasis/shared/models/forum_participation_summary.dart';
@@ -146,7 +147,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: ParentDashboardPage(
@@ -241,7 +242,7 @@ void main() {
       );
 
       await tester.pumpWidget(
-        MaterialApp(
+        MaterialApp(theme: LogicOasisTheme.light(),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: ParentDashboardPage(
@@ -292,7 +293,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: ParentDashboardPage(
@@ -337,7 +338,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: ParentDashboardPage(
@@ -370,7 +371,7 @@ void main() {
       ..language = 'Bahasa Melayu';
 
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         locale: const Locale('ms'),
@@ -405,7 +406,7 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: ParentDashboardPage(
@@ -442,7 +443,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: ParentDashboardPage(
@@ -498,7 +499,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: ParentDashboardPage(
@@ -551,7 +552,7 @@ void main() {
     final gate = _DelayedGateway(const [child]);
 
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: ParentDashboardPage(
@@ -590,7 +591,7 @@ void main() {
     });
 
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: ParentDashboardPage(
@@ -624,7 +625,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: ParentDashboardPage(
@@ -659,7 +660,7 @@ void main() {
     final full = fullSnapshot();
 
     await tester.pumpWidget(
-      MaterialApp(
+      MaterialApp(theme: LogicOasisTheme.light(),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: ParentDashboardPage(

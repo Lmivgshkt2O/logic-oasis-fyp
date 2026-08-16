@@ -17,6 +17,7 @@ class AttemptRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
     final l10n = AppLocalizations.of(context)!;
 
     return Row(
@@ -26,12 +27,12 @@ class AttemptRow extends StatelessWidget {
           width: 42,
           height: 42,
           decoration: BoxDecoration(
-            color: LogicOasisTheme.mint,
+            color: oasis.mint,
             borderRadius: BorderRadius.circular(8),
           ),
-          child: const Icon(
+          child: Icon(
             Icons.assignment_turned_in_outlined,
-            color: LogicOasisTheme.leaf,
+            color: oasis.leaf,
           ),
         ),
         const SizedBox(width: 12),

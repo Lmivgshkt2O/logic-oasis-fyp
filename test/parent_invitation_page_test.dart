@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/features/settings/parent_invitation_page.dart';
 import 'package:logic_oasis/shared/services/parent_link_invitation_service.dart';
 
 void main() {
   testWidgets('student invitation page never renders the submitted email', (tester) async {
     final gateway = _InvitationGateway();
-    await tester.pumpWidget(MaterialApp(home: ParentInvitationPage(service: gateway)));
+    await tester.pumpWidget(MaterialApp(theme: LogicOasisTheme.light(), home: ParentInvitationPage(service: gateway)));
 
     await tester.enterText(find.byType(TextFormField), 'parent@example.com');
     await tester.tap(find.text('Send secure invitation'));

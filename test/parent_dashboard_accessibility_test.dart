@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/features/parent_dashboard/parent_dashboard_page.dart';
 import 'package:logic_oasis/l10n/app_localizations.dart';
 import 'package:logic_oasis/shared/models/forum_participation_summary.dart';
@@ -101,7 +102,7 @@ List<String> _flattenLabels(SemanticsNode node) {
 
 Future<void> _pumpFullMap(WidgetTester tester) async {
   await tester.pumpWidget(
-    MaterialApp(
+    MaterialApp(theme: LogicOasisTheme.light(),
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: ParentDashboardPage(

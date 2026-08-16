@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:logic_oasis/app/logic_oasis_design.dart';
 import 'package:logic_oasis/app/logic_oasis_shell.dart';
 import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/features/parent_dashboard/parent_dashboard_page.dart';
@@ -151,7 +152,13 @@ class _LogicOasisAppState extends State<LogicOasisApp>
           return MaterialApp(
             title: 'Logic Oasis',
             debugShowCheckedModeBanner: false,
-            theme: LogicOasisTheme.light(),
+            theme: state.eyeComfortMode
+                ? LogicOasisTheme.eyeComfort()
+                : LogicOasisTheme.light(),
+            themeAnimationStyle: AnimationStyle(
+              duration: LogicOasisMotion.themeTransitionFor(context),
+              curve: LogicOasisMotion.themeTransitionCurve,
+            ),
             locale: state.locale,
             builder: (context, child) {
               final mediaQuery = MediaQuery.of(context);

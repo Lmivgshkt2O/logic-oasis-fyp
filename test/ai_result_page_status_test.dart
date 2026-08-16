@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/features/quiz/result_page.dart';
 import 'package:logic_oasis/l10n/app_localizations.dart';
 import 'package:logic_oasis/shared/models/ai_diagnosis.dart';
@@ -20,7 +21,7 @@ Widget _resultPage({
   String? attemptId,
   QuizReward? reward,
 }) {
-  return MaterialApp(
+  return MaterialApp(theme: LogicOasisTheme.light(),
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: ResultPage(

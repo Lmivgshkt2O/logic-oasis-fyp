@@ -14,6 +14,7 @@ class ProgressPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
     final insight = state.weakTopicInsight;
 
     return ListView(
@@ -33,7 +34,7 @@ class ProgressPage extends StatelessWidget {
                 icon: Icons.assignment_turned_in_outlined,
                 label: 'Quizzes',
                 value: '${state.completedQuizzes}',
-                color: LogicOasisTheme.leaf,
+                color: oasis.leaf,
               ),
             ),
             const SizedBox(width: 12),
@@ -42,7 +43,7 @@ class ProgressPage extends StatelessWidget {
                 icon: Icons.scoreboard_outlined,
                 label: 'Average',
                 value: '${state.averageScore}%',
-                color: LogicOasisTheme.water,
+                color: oasis.water,
               ),
             ),
           ],

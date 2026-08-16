@@ -4,6 +4,8 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:logic_oasis/app/logic_oasis_design.dart';
+import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/app/logic_oasis_shell.dart';
 import 'package:logic_oasis/features/collaboration/qa_forum/qa_forum_page.dart';
 import 'package:logic_oasis/l10n/app_localizations.dart';
@@ -94,6 +96,169 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('navigation labels stay visible at small width and enlarged text', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1.0;
+    tester.platformDispatcher.textScaleFactorTestValue = 1.3;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      tester.platformDispatcher.clearTextScaleFactorTestValue();
+    });
+
+    final state = AppState();
+    await _pumpShell(tester, state);
+
+    expect(find.text('Home'), findsOneWidget);
+    expect(find.text('Forge'), findsOneWidget);
+    expect(find.text('Q&A Forum'), findsOneWidget);
+    expect(find.text('Settings'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('selected navigation uses forest plus a non-colour cue', (
+    tester,
+  ) async {
+    final semanticsHandle = tester.ensureSemantics();
+
+    final state = AppState();
+    await _pumpShell(tester, state);
+
+    final selectedHome = tester.widget<Text>(find.text('Home'));
+    expect(selectedHome.style?.color, LogicOasisDesign.forestAction);
+
+    final homeNode = tester.getSemantics(find.text('Home'));
+    expect(homeNode.label, 'Home');
+    expect(homeNode.flagsCollection.hasSelectedState, isTrue);
+
+    await tester.tap(find.text('Forge'));
+    await tester.pump();
+    final selectedForge = tester.widget<Text>(find.text('Forge'));
+    expect(selectedForge.style?.color, LogicOasisDesign.forestAction);
+    semanticsHandle.dispose();
+  });
+
+  testWidgets('Home keeps required information under the Living Canopy theme', (
+    tester,
+  ) async {
+    final state = AppState();
+    await _pumpShell(tester, state);
+
+    expect(find.text('Good morning,'), findsOneWidget);
+    expect(find.text('Crystals'), findsOneWidget);
+    expect(find.text('Energy'), findsOneWidget);
+    expect(find.text('Day Streak'), findsOneWidget);
+    expect(find.text('Tap markers to restore your oasis'), findsOneWidget);
+    expect(find.text("TODAY'S MISSION"), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('hero remains the dominant Home focus at portrait widths', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    final state = AppState();
+    await _pumpShell(tester, state);
+
+    final heroSize = tester.getSize(find.byType(OasisHeroCard));
+    final missionSize = tester.getSize(find.byType(MissionCard));
+    expect(heroSize.height, greaterThan(missionSize.height * 1.6));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('repair marker opens the sheet and reaches the repair callback', (
+    tester,
+  ) async {
+    final state = AppState();
+    await _pumpShell(tester, state);
+
+    expect(state.crystals, 124);
+    await tester.tap(find.text('Fix Bridge'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.text('Fraction Bridge'), findsOneWidget);
+    await tester.tap(find.text('Repair with Math Crystals'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+
+    expect(state.crystals, 94);
+    final bridge = state.oasisAreas.firstWhere(
+      (area) => area.id == 'fraction_bridge',
+    );
+    expect(bridge.progress, 0.5);
+
+    // Flush celebration overlay and snackbar timers before the test ends.
+    await tester.pump(const Duration(seconds: 5));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Eye Protecting toggle leaves Home scene state unchanged', (
+    tester,
+  ) async {
+    final state = AppState();
+    await _pumpShell(tester, state);
+
+    final crystalsBefore = state.crystals;
+    final energyBefore = state.mutualAidEnergy;
+    final progressBefore = state.oasisAreas.map((area) => area.progress).toList();
+
+    state.updateEyeComfortMode(true);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(state.crystals, crystalsBefore);
+    expect(state.mutualAidEnergy, energyBefore);
+    expect(
+      state.oasisAreas.map((area) => area.progress),
+      orderedEquals(progressBefore),
+    );
+    expect(state.eyeComfortMode, isTrue);
+    expect(state.selectedTab, 0);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('page content clears the floating bottom navigation', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 780);
+    tester.view.devicePixelRatio = 1.0;
+    tester.platformDispatcher.textScaleFactorTestValue = 1.3;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      tester.platformDispatcher.clearTextScaleFactorTestValue();
+    });
+
+    final state = AppState();
+    await _pumpShell(tester, state);
+
+    for (var tab = 0; tab < 4; tab++) {
+      state.changeTab(tab);
+      await tester.pump();
+      final scrollables = find.byType(Scrollable);
+      if (scrollables.evaluate().isNotEmpty) {
+        await tester.drag(scrollables.first, const Offset(0, -900));
+        await tester.pump();
+      }
+      expect(tester.takeException(), isNull);
+    }
+
+    // Bottom navigation remains visible and complete after scrolling.
+    expect(find.text('Home'), findsWidgets);
+    expect(find.text('Forge'), findsWidgets);
+    expect(find.text('Q&A Forum'), findsOneWidget);
+    expect(find.text('Settings'), findsWidgets);
+  });
 }
 
 class _ShellPager {
@@ -125,6 +290,7 @@ Future<void> _pumpShell(
     AppStateScope(
       state: state,
       child: MaterialApp(
+        theme: LogicOasisTheme.light(),
         supportedLocales: AppLocalizations.supportedLocales,
         localizationsDelegates: const [
           AppLocalizations.delegate,

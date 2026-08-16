@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:logic_oasis/app/logic_oasis_design.dart';
+import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/l10n/app_localizations.dart';
 import 'package:logic_oasis/shared/models/recommended_mission.dart';
 import 'package:logic_oasis/shared/state/app_state.dart';
@@ -12,7 +12,13 @@ class HomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     return LogicOasisScaffold(
+      // Faint forest+water atmosphere behind the Oasis focal region; the
+      // scene itself keeps its desert/dry-world colours.
+      topTint: const Color(0xFFDDF2EF),
       children: [
         Row(
           children: [
@@ -22,12 +28,12 @@ class HomePage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Good morning,',
-                    style: TextStyle(
-                      color: LogicOasisDesign.body,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: oasis.secondaryInk,
                       fontSize: 15,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -35,12 +41,7 @@ class HomePage extends StatelessWidget {
                     '${state.studentName} *',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: LogicOasisDesign.ink,
-                      fontSize: 24,
-                      fontWeight: FontWeight.w900,
-                      height: 1.05,
-                    ),
+                    style: theme.textTheme.headlineMedium,
                   ),
                 ],
               ),
@@ -62,9 +63,9 @@ class HomePage extends StatelessWidget {
               child: StatCard(
                 compact: true,
                 icon: 'stat_crystal',
-                iconColor: const Color(0xFF36BFE2),
+                iconColor: oasis.water,
                 value: '${state.crystals}',
-                label: 'Crystals',
+                label: l10n.crystals,
               ),
             ),
             const SizedBox(width: 12),
@@ -72,9 +73,9 @@ class HomePage extends StatelessWidget {
               child: StatCard(
                 compact: true,
                 icon: 'stat_energy',
-                iconColor: const Color(0xFFFFB92E),
+                iconColor: oasis.reward,
                 value: '${state.mutualAidEnergy}',
-                label: 'Energy',
+                label: l10n.energy,
               ),
             ),
             const SizedBox(width: 12),
@@ -82,9 +83,9 @@ class HomePage extends StatelessWidget {
               child: StatCard(
                 compact: true,
                 icon: 'stat_streak',
-                iconColor: const Color(0xFFFF6B4A),
+                iconColor: oasis.leaf,
                 value: '${state.currentYearAttempts.length}',
-                label: 'Day Streak',
+                label: l10n.dayStreak,
               ),
             ),
           ],

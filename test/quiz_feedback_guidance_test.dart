@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/features/quiz/quiz_page.dart';
 import 'package:logic_oasis/l10n/app_localizations.dart';
 import 'package:logic_oasis/shared/models/question_response.dart';
@@ -87,7 +88,7 @@ void main() {
     (tester) async {
       final service = _WrongAnswerService();
       await tester.pumpWidget(
-        MaterialApp(
+        MaterialApp(theme: LogicOasisTheme.light(),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: QuizPage(

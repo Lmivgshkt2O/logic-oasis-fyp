@@ -271,6 +271,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get crystals => 'Crystals';
 
   @override
+  String get energy => 'Energy';
+
+  @override
+  String get dayStreak => 'Day Streak';
+
+  @override
+  String get tapMarkersToRestoreOasis => 'Tap markers to restore your oasis';
+
+  @override
   String get repairReady => 'Repair Ready';
 
   @override

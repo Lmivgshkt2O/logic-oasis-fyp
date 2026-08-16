@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:logic_oasis/app/logic_oasis_design.dart';
 import 'package:logic_oasis/app/theme.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
@@ -139,24 +138,45 @@ class _QaForumPageState extends State<QaForumPage> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: Text(_t('Q&A Forum', 'Forum S&J')),
-      actions: [
-        IconButton(
-          tooltip: _t('Manage blocked students', 'Urus murid yang disekat'),
-          onPressed: _manageBlockedStudents,
-          icon: const Icon(Icons.block_outlined),
+  Widget build(BuildContext context) {
+    final oasis = LogicOasisTheme.of(context);
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(_t('Q&A Forum', 'Forum S&J')),
+        actions: [
+          IconButton(
+            tooltip: _t('Manage blocked students', 'Urus murid yang disekat'),
+            onPressed: _manageBlockedStudents,
+            icon: const Icon(Icons.block_outlined),
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _composeQuestion(context),
+        backgroundColor: oasis.violet,
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.add_comment_outlined),
+        label: Text(_t('Ask a question', 'Tanya soalan')),
+      ),
+      body: DecoratedBox(
+        // Restrained lavender atmosphere near the header/search region so the
+        // list page reads as part of the shared system while violet stays the
+        // restrained identity accent.
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              const Color(0xFFEEE8F8),
+              oasis.canvas,
+              oasis.lowerCanvas,
+            ],
+          ),
         ),
-      ],
-    ),
-    floatingActionButton: FloatingActionButton.extended(
-      onPressed: () => _composeQuestion(context),
-      icon: const Icon(Icons.add_comment_outlined),
-      label: Text(_t('Ask a question', 'Tanya soalan')),
-    ),
-    body: _buildQuestionList(context),
-  );
+        child: _buildQuestionList(context),
+      ),
+    );
+  }
 
   Widget _buildQuestionList(BuildContext context) {
     if (_blockedError != null) {
@@ -246,11 +266,15 @@ class _QaForumPageState extends State<QaForumPage> {
                   : null;
               return Card(
                 child: ListTile(
-                  title: Text(localizedPrompt ?? question.title),
+                  title: Text(
+                    localizedPrompt ?? question.title,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
                   subtitle: Text(
                     localizedPrompt ?? question.text,
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium,
                   ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -466,7 +490,12 @@ class _QaForumPageState extends State<QaForumPage> {
       controller: _filter,
       onChanged: (_) => _onFilterChanged(),
       decoration: InputDecoration(
-        prefixIcon: const Icon(Icons.search),
+        // Tie the search field to the Forum accent with a faint lavender fill.
+        fillColor: LogicOasisTheme.of(context).violet.withValues(alpha: .05),
+        prefixIcon: Icon(
+          Icons.search,
+          color: LogicOasisTheme.of(context).violet,
+        ),
         hintText: _t('Filter questions', 'Tapis soalan'),
         suffixIcon: _filter.text.isEmpty
             ? null
@@ -825,7 +854,7 @@ class _AnswersPageState extends State<ForumDiscussionPage> {
                                   'Jawapan akhir: ${_optionLabel(answer.selectedOption)}',
                                 ),
                                 style: Theme.of(context).textTheme.bodySmall
-                                    ?.copyWith(fontWeight: FontWeight.w800),
+                                    ?.copyWith(fontWeight: FontWeight.w700),
                               ),
                             ],
                             if (answer.acceptedAt != null ||
@@ -1450,9 +1479,7 @@ class _LinkedAnswerFormState extends State<_LinkedAnswerForm> {
       children: [
         Text(
           _t('Choose your final answer', 'Pilih jawapan akhir'),
-          style: theme.textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w800,
-          ),
+          style: theme.textTheme.titleSmall,
         ),
         const SizedBox(height: 8),
         for (var index = 0; index < widget.options.length; index++) ...[
@@ -1509,16 +1536,19 @@ class _OptionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(14),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: selected ? LogicOasisTheme.sky : LogicOasisDesign.card,
+          color: selected
+              ? oasis.violet.withValues(alpha: .10)
+              : oasis.surface,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: selected ? LogicOasisTheme.water : LogicOasisTheme.line,
+            color: selected ? oasis.violet : oasis.outline,
             width: 1.4,
           ),
         ),
@@ -1528,7 +1558,7 @@ class _OptionTile extends StatelessWidget {
               selected
                   ? Icons.radio_button_checked
                   : Icons.radio_button_off,
-              color: selected ? LogicOasisTheme.water : LogicOasisTheme.ink,
+              color: selected ? oasis.violet : oasis.secondaryInk,
               size: 20,
             ),
             const SizedBox(width: 10),
