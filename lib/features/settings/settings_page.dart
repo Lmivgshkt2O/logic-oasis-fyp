@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:logic_oasis/app/logic_oasis_design.dart';
+import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/features/settings/parent_access_page.dart';
 import 'package:logic_oasis/features/settings/parent_invitation_page.dart';
 import 'package:logic_oasis/l10n/app_localizations.dart';
@@ -22,8 +22,12 @@ class SettingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final oasis = LogicOasisTheme.of(context);
 
     return LogicOasisScaffold(
+      // Quiet teal/botanical atmosphere for the Settings canvas while keeping
+      // the existing feature icon/colour differentiation.
+      topTint: const Color(0xFFDFF1EA),
       children: [
         LogicHeader(
           title: l10n.settings,
@@ -50,7 +54,7 @@ class SettingsPage extends StatelessWidget {
           children: [
             SettingsRow(
               icon: 'volume_up',
-              iconColor: LogicOasisDesign.leaf,
+              iconColor: oasis.leaf,
               label: state.t('Sound', 'Bunyi'),
               value: state.soundEnabled
                   ? state.t('On', 'Hidup')
@@ -68,14 +72,14 @@ class SettingsPage extends StatelessWidget {
             ),
             SettingsRow(
               icon: 'language',
-              iconColor: LogicOasisDesign.forest,
+              iconColor: oasis.forest,
               label: state.t('Language', 'Bahasa'),
               value: state.language,
               onTap: () => _showLanguageSheet(context),
             ),
             SettingsRow(
               icon: 'accessibility',
-              iconColor: const Color(0xFF42A6E2),
+              iconColor: oasis.water,
               label: state.t('Accessibility', 'Aksesibiliti'),
               value: state.accessibilityMode
                   ? state.t('Larger text', 'Teks besar')
@@ -101,7 +105,7 @@ class SettingsPage extends StatelessWidget {
               icon: state.missionReminders
                   ? 'notifications_active'
                   : 'notifications_off',
-              iconColor: const Color(0xFFE6A124),
+              iconColor: OasisSemanticTheme.continuedPracticeText,
               label: state.t('Notification', 'Notifikasi'),
               value: state.missionReminders
                   ? state.t('Mission reminders', 'Peringatan misi')
@@ -126,8 +130,8 @@ class SettingsPage extends StatelessWidget {
             SettingsRow(
               icon: 'visibility',
               iconColor: state.eyeComfortMode
-                  ? const Color(0xFF8A6B2C)
-                  : const Color(0xFF6C8BD8),
+                  ? OasisSemanticTheme.continuedPracticeText
+                  : oasis.violet,
               label: state.t('Eye protecting mode', 'Mod lindung mata'),
               value: state.eyeComfortMode
                   ? state.t('On', 'Hidup')
@@ -152,7 +156,7 @@ class SettingsPage extends StatelessWidget {
             _EyeProtectingStatusCard(state: state),
             SettingsRow(
               icon: 'screen_time',
-              iconColor: const Color(0xFFFFB532),
+              iconColor: oasis.reward,
               label: state.t('Screen Time', 'Masa Skrin'),
               value: state.t(
                 '${state.screenTimeLimitMinutes} min/day',
@@ -178,7 +182,7 @@ class SettingsPage extends StatelessWidget {
             ),
             SettingsRow(
               icon: 'privacy',
-              iconColor: const Color(0xFF4FBF87),
+              iconColor: oasis.leaf,
               label: state.t('Privacy & Safety', 'Privasi & Keselamatan'),
               showDivider: false,
               onTap: () => _showPrivacySafetySheet(context),
@@ -255,32 +259,32 @@ class SettingsPage extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 ListTile(
-                  leading: const AppSvgIcon(
+                  leading: AppSvgIcon(
                     'language',
-                    color: LogicOasisDesign.forest,
+                    color: LogicOasisTheme.of(context).forest,
                     size: 22,
                   ),
                   title: const Text('English'),
                   trailing: state.language == 'English'
-                      ? const AppSvgIcon(
+                      ? AppSvgIcon(
                           'check',
-                          color: LogicOasisDesign.leaf,
+                          color: LogicOasisTheme.of(context).leaf,
                           size: 22,
                         )
                       : null,
                   onTap: () => Navigator.of(context).pop('English'),
                 ),
                 ListTile(
-                  leading: const AppSvgIcon(
+                  leading: AppSvgIcon(
                     'language',
-                    color: Color(0xFF42A6E2),
+                    color: LogicOasisTheme.of(context).water,
                     size: 22,
                   ),
                   title: const Text('Bahasa Melayu'),
                   trailing: state.language == 'Bahasa Melayu'
-                      ? const AppSvgIcon(
+                      ? AppSvgIcon(
                           'check',
-                          color: LogicOasisDesign.leaf,
+                          color: LogicOasisTheme.of(context).leaf,
                           size: 22,
                         )
                       : null,
@@ -333,9 +337,9 @@ class SettingsPage extends StatelessWidget {
                 for (final minutes in limits)
                   ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: const AppSvgIcon(
+                    leading: AppSvgIcon(
                       'screen_time',
-                      color: Color(0xFFFFB532),
+                      color: LogicOasisTheme.of(context).reward,
                       size: 22,
                     ),
                     title: Text(
@@ -345,9 +349,9 @@ class SettingsPage extends StatelessWidget {
                       ),
                     ),
                     trailing: state.screenTimeLimitMinutes == minutes
-                        ? const AppSvgIcon(
+                        ? AppSvgIcon(
                             'check',
-                            color: LogicOasisDesign.leaf,
+                            color: LogicOasisTheme.of(context).leaf,
                             size: 22,
                           )
                         : null,
@@ -511,13 +515,14 @@ class _SafetyTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          AppSvgIcon(icon, color: LogicOasisDesign.forest, size: 22),
+          AppSvgIcon(icon, color: oasis.forest, size: 22),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -542,16 +547,12 @@ class _EyeProtectingStatusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
     final enabled = state.eyeComfortMode;
-    final background = enabled
-        ? const Color(0xFFFFE7AA)
-        : const Color(0xFFF2F5FF);
-    final borderColor = enabled
-        ? const Color(0xFFD99A2B)
-        : const Color(0xFFD8E0FF);
-    final iconColor = enabled
-        ? const Color(0xFF8A5A00)
-        : const Color(0xFF6372A6);
+    final background = enabled ? oasis.mint : oasis.groupedSurface;
+    final borderColor = oasis.outline;
+    final iconColor = enabled ? oasis.leaf : oasis.secondaryInk;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
@@ -574,17 +575,17 @@ class _EyeProtectingStatusCard extends StatelessWidget {
               child: Text(
                 enabled
                     ? state.t(
-                        'Warm low-glare palette is active.',
-                        'Palet hangat kurang silau sedang aktif.',
+                        'Low-glare botanical palette is active.',
+                        'Palet botanikal kurang silau sedang aktif.',
                       )
                     : state.t(
                         'Default bright palette is active.',
                         'Palet cerah asal sedang aktif.',
                       ),
-                style: const TextStyle(
-                  color: LogicOasisDesign.ink,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: oasis.primaryInk,
                   fontSize: 12.5,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w600,
                   height: 1.18,
                 ),
               ),
@@ -611,6 +612,8 @@ class _ParentDashboardCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
     return Column(
       children: [
         Material(
@@ -625,12 +628,12 @@ class _ParentDashboardCard extends StatelessWidget {
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(
-                      color: LogicOasisDesign.purple.withValues(alpha: .16),
+                      color: oasis.violet.withValues(alpha: .16),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.supervisor_account_rounded,
-                      color: LogicOasisDesign.purple,
+                      color: oasis.violet,
                       size: 24,
                     ),
                   ),
@@ -643,10 +646,8 @@ class _ParentDashboardCard extends StatelessWidget {
                           title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: LogicOasisDesign.ink,
+                          style: theme.textTheme.titleMedium?.copyWith(
                             fontSize: 15,
-                            fontWeight: FontWeight.w900,
                           ),
                         ),
                         const SizedBox(height: 5),
@@ -654,19 +655,19 @@ class _ParentDashboardCard extends StatelessWidget {
                           summary,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: LogicOasisDesign.body,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: oasis.secondaryInk,
                             fontSize: 12.5,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: FontWeight.w600,
                             height: 1.18,
                           ),
                         ),
                         const SizedBox(height: 7),
                         Row(
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.eco_rounded,
-                              color: LogicOasisDesign.leaf,
+                              color: oasis.leaf,
                               size: 14,
                             ),
                             const SizedBox(width: 4),
@@ -675,10 +676,9 @@ class _ParentDashboardCard extends StatelessWidget {
                                 restoration,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: LogicOasisDesign.forest,
+                                style: theme.textTheme.labelMedium?.copyWith(
+                                  color: oasis.forest,
                                   fontSize: 12,
-                                  fontWeight: FontWeight.w900,
                                 ),
                               ),
                             ),
@@ -688,9 +688,9 @@ class _ParentDashboardCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  const Icon(
+                  Icon(
                     Icons.chevron_right_rounded,
-                    color: Color(0xFF8C7A61),
+                    color: oasis.secondaryInk,
                     size: 24,
                   ),
                 ],
@@ -698,9 +698,9 @@ class _ParentDashboardCard extends StatelessWidget {
             ),
           ),
         ),
-        const Padding(
-          padding: EdgeInsets.only(left: 62, right: 14),
-          child: Divider(height: 1, color: Color(0xFFEDE3D0)),
+        Padding(
+          padding: const EdgeInsets.only(left: 62, right: 14),
+          child: Divider(height: 1, color: oasis.outline),
         ),
       ],
     );
@@ -728,9 +728,12 @@ class _FigmaProfileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     return SoftCard(
       onTap: onTap,
-      color: const Color(0xFFE6F5E4),
+      color: oasis.mint,
       radius: 22,
       padding: const EdgeInsets.all(14),
       child: Column(
@@ -747,10 +750,9 @@ class _FigmaProfileCard extends StatelessWidget {
                       name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: LogicOasisDesign.forest,
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        color: oasis.primaryInk,
                         fontSize: 18,
-                        fontWeight: FontWeight.w900,
                         height: 1.05,
                       ),
                     ),
@@ -759,10 +761,10 @@ class _FigmaProfileCard extends StatelessWidget {
                       level,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: LogicOasisDesign.ink,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: oasis.primaryInk,
                         fontSize: 13,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 5),
@@ -770,8 +772,8 @@ class _FigmaProfileCard extends StatelessWidget {
                       email,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: LogicOasisDesign.body,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: oasis.secondaryInk,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -780,9 +782,9 @@ class _FigmaProfileCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              const Icon(
+              Icon(
                 Icons.chevron_right_rounded,
-                color: Color(0xFF806F59),
+                color: oasis.secondaryInk,
                 size: 26,
               ),
             ],
@@ -794,9 +796,9 @@ class _FigmaProfileCard extends StatelessWidget {
                 child: StatCard(
                   compact: true,
                   icon: 'stat_crystal',
-                  iconColor: const Color(0xFF36BFE2),
+                  iconColor: oasis.water,
                   value: '$crystals',
-                  label: 'Crystals',
+                  label: l10n.crystals,
                 ),
               ),
               const SizedBox(width: 10),
@@ -804,9 +806,9 @@ class _FigmaProfileCard extends StatelessWidget {
                 child: StatCard(
                   compact: true,
                   icon: 'stat_energy',
-                  iconColor: const Color(0xFFFFB92E),
+                  iconColor: oasis.reward,
                   value: '$energy',
-                  label: 'Energy',
+                  label: l10n.energy,
                 ),
               ),
               const SizedBox(width: 10),
@@ -814,9 +816,9 @@ class _FigmaProfileCard extends StatelessWidget {
                 child: StatCard(
                   compact: true,
                   icon: 'stat_streak',
-                  iconColor: const Color(0xFFFF6B4A),
+                  iconColor: oasis.leaf,
                   value: '$streak',
-                  label: 'Day Streak',
+                  label: l10n.dayStreak,
                 ),
               ),
             ],
@@ -835,23 +837,24 @@ class _SettingsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            const Icon(
+            Icon(
               Icons.eco_rounded,
-              color: LogicOasisDesign.leaf,
+              color: oasis.leaf,
               size: 15,
             ),
             const SizedBox(width: 5),
             Text(
               title,
-              style: const TextStyle(
-                color: Color(0xFF74664E),
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: oasis.secondaryInk,
                 fontSize: 13,
-                fontWeight: FontWeight.w900,
                 letterSpacing: .2,
               ),
             ),
@@ -876,22 +879,22 @@ class _LogoutButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FigmaCard(
+    final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
+    return SoftCard(
       onTap: onTap,
-      color: const Color(0xFFFFF8EC),
       radius: 16,
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 17),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.logout_rounded, color: Color(0xFFB72B27), size: 22),
+          Icon(Icons.logout_rounded, color: oasis.coral, size: 22),
           const SizedBox(width: 8),
           Text(
             title,
-            style: const TextStyle(
-              color: Color(0xFFB72B27),
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: oasis.coral,
               fontSize: 16,
-              fontWeight: FontWeight.w900,
             ),
           ),
         ],

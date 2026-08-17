@@ -10,6 +10,12 @@ canonical_plan: docs/plans/2026-08-01-001-feat-u10-forum-production-closure-plan
 
 **Purpose:** This is the developer-facing Firestore schema for Logic Oasis. It records the implemented trusted-content, secure-quiz, parent-link, adaptive-AI, and U10 forum boundaries plus future migration expectations.
 
+**Authority:** The canonical FYP1 executable plan
+(`docs/plans/2026-07-05-001-feat-fyp1-prototype-development-plan(2)(1).md`) and
+the approved U14 parent Progress Map plan remain the product and sequencing
+authority. This schema document reconciles to them; where wording differs, the
+canonical plan and enforced code/rules win.
+
 The U10 closure addendum below is authoritative for forum records. Older
 `Target FYP1` forum sketches remain historical design context only where they
 conflict with that addendum.
@@ -68,7 +74,14 @@ erDiagram
 | `parentAccounts/{parentId}` | Current prototype transitional record | Existing parent ID | Prototype parent metadata only; never store plaintext password | Treat as transitional. Do not extend it as a production authentication design. | Replace unsafe prototype credential handling with authenticated UID plus `parentLinks` checks when U9 is secured. |
 | `rememberedProfiles/{uid}` | Current prototype convenience record | Auth `uid` | Minimal display preference only, such as `displayName`, `yearLevel`, `updatedAt` | Owner only | Never store passwords, tokens, parent access secrets, trusted learning fields, or role grants. |
 
-**Parent boundary:** Production-grade parent authentication remains deferred in the canonical plan. FYP1 parent-dashboard access still requires an authenticated UID and an approved parent-student link; a client-visible prototype password is not a durable database-security design.
+**Parent boundary:** Parent access uses Firebase Auth in an isolated parent
+   session plus a server-owned, approved `parentLinks/{parentId}_{studentId}`
+   record; prototype parent-password/OTP records are retired. A linked parent
+   reads only the selected child's safe projections: `subtopicMastery`,
+   `parentPracticeSummaries/{studentId}` (U14 current-week rhythm), and
+   `forumParticipationSummaries/{studentId}` (U10 count-only). Raw attempts,
+   responses, answer keys, AI jobs/runs, SHAP, forum content, model registry,
+   and parent-link documents remain denied.
 
 ## 4. Curriculum and Trusted Content
 
@@ -79,8 +92,9 @@ These are controlled reference records. They are versioned, client-readable only
 | `topics/{topicId}` | Current prototype / Target FYP1 | Stable curriculum topic ID | `yearLevel`, `titleEn`, `titleMs`, `order`, `isActive`, `contentVersion` | Authenticated read; controlled seed/admin write only. |
 | `subtopics/{subtopicId}` | Current prototype / Target FYP1 | Stable curriculum subtopic ID | `topicId`, `yearLevel`, `titleEn`, `titleMs`, `order`, `skillIds`, `activeBankCounts`, `contentVersion`, `isActive` | Authenticated read; controlled seed/admin write only. |
 | `questionBanks/{bankId}` | Current prototype / Target FYP1 | Stable bank/version ID | `topicId`, `subtopicId`, `difficultyLevel` (`easy`, `moderate`, `hard`), `questionIds`, `version`, `isActive`, `createdAt` | Authenticated read; controlled seed/admin write only. |
-| `questions/{questionId}` | Current prototype / Target FYP1 | Stable question/version ID | `topicId`, `subtopicId`, `skillId`, `bankId`, `difficultyLevel`, `prompt`, `options`, `estimatedDifficulty`, `contentVersion`, `isActive` | Authenticated read; controlled seed/admin write only. Must not contain `answerIndex` or authoritative explanation. |
-| `questionAnswerKeys/{questionId}` | Target FYP1 | Same stable question ID | `answerIndex`, `explanation`, `contentVersion`, `isActive`, `updatedAt` | Client read/write denied. Callable Functions only. |
+| `questions/{questionId}` | Current prototype / Target FYP1 | Stable question/version ID | `topicId`, `subtopicId`, `skillId`, `bankId`, `difficultyLevel`, `questionText`, `questionTextBm`, `options`, `optionsBm`, `questionType`, `questionTypeBm`, `estimatedDifficulty`, `contentVersion`, `sourceMaterialId`, `sourceMaterialIdBm`, `sourceLocator`, `sourceLocatorBm`, `sourceSectionClass`, `isActive` | Authenticated read; controlled seed/admin write only. Must not contain `answerIndex`, `feedbackByOption`, or any explanation/hint content. |
+| `questionAnswerKeys/{questionId}` | Target FYP1 | Same stable question ID | `answerIndex`, `feedbackByOption` (per wrong option: `misconceptionCode`, `hint`, `hintBm`, optional `example`/`exampleBm`, `reviewFocus`, `reviewFocusBm`), `difficultyReview` (`cognitiveDemand`, `reasoningStepCount`, `transferRequired`), `contentVersion`, `isActive`, author/reviewer identity | Client read/write denied. Callable Functions only. |
+| `contentSourceManifest/{materialId}` | Target FYP1 (U15) | Stable material ID (e.g. `en_y4`, `bm_y4`) | `materialId`, `filename`, `sha256`, `syllabus`, `yearLevel`, `language`, `contentVersion`, `authorId`, `reviewerId`, `approvedAt`, `sourceSectionClass`, `questions` (per question: `sourceLocator`, `sourceLocatorBm`, `contentDigest`, `questionType`, `questionTypeBm`, `sourceSectionClass`) | Client read/write denied. Seed writes the approved manifest only; any content change invalidates the digest and blocks activation. |
 
 **Content invariant:** `questions/{questionId}` and `questionAnswerKeys/{questionId}` share a content version. A session records that version and rejects stale or mismatched content during U3 validation.
 
@@ -102,7 +116,7 @@ startQuizSession
 |---|---|---|---|---|
 | `quizSessions/{sessionId}` | Target FYP1 | Server-generated session ID | `studentId`, `assignmentId`, `bankId`, `questionIds`, `contentVersion`, `status`, `validatedResponseCount`, `expectedResponseCount`, `startedAt`, `expiresAt`, `finalizedAt`, `attemptId` | Callable Functions create/transition states. Client direct reads/writes denied; safe state is returned by callable responses. |
 | `questionResponses/{responseId}` | Target FYP1 | Deterministic session/question or idempotency identity | `sessionId`, `attemptId` after finalization, `studentId`, `questionId`, `skillId`, `bankId`, `selectedIndex`, `serverIsCorrect`, `validationStatus`, `responseTimeMs`, `hintCount`, `sequenceIndex`, `idempotencyKey`, `createdAt` | Callable Functions write once. Client direct reads/writes denied. A second sealed answer is rejected. |
-| `quizAttempts/{attemptId}` | Current prototype -> Target FYP1 | Server-generated finalized attempt ID | `studentId`, `sessionId`, `topicId`, `subtopicId`, `bankId`, `difficultyLevel`, `contentVersion`, `validationStatus`, `processingStatus`, `trustedScore`, `trustedCorrectCount`, `responseCount`, `startedAt`, `finalizedAt`, `dataSource`, `deviceSessionId` | Backend creates once. Student reads own; linked parent reads only a safe dashboard projection or authorized attempt summary. Client writes denied. |
+| `quizAttempts/{attemptId}` | Current prototype -> Target FYP1 | Server-generated finalized attempt ID | `studentId`, `sessionId`, `topicId`, `subtopicId`, `bankId`, `difficultyLevel`, `contentVersion`, `validationStatus`, `processingStatus`, `trustedScore`, `trustedCorrectCount`, `responseCount`, `responseIds`, `reviewItems` (per missed question: `questionId`, `sequenceIndex`, `questionText`, `questionTextBm`, `questionType`, `questionTypeBm`, `reviewFocus`, `reviewFocusBm`), `startedAt`, `finalizedAt`, `dataSource`, `deviceSessionId` | Backend creates once. Student reads own; linked parents never read raw attempts (U14 reads only safe projections). Client writes denied. `reviewItems` are answer-free and list only missed questions in quiz order. |
 | `quizAttemptTelemetry/{telemetryId}` | Optional target only if needed | Generated ID | Untrusted UI timing/device telemetry, `studentId`, `sessionId`, `createdAt` | Client may submit only through a restricted validated path. Never use as correctness, score, reward, or model truth without server validation. |
 
 ### U3 invariants
@@ -119,7 +133,7 @@ startQuizSession
 |---|---|---|---|---|
 | `masterySnapshots/{studentId}_{skillId}` | Derived target | Student-skill pair | `studentId`, `skillId`, `pKnown`, `pLearn`, `pGuess`, `pSlip`, `observationCount`, `sourceAttemptId`, `modelVersion`, `updatedAt` | AI/BKT backend writes. Student reads own derived result; parents read authorized summaries. |
 | `topicMastery/{studentId}_y{yearLevel}_{topicId}` | Current prototype -> Derived target | Student/year/topic pair | `studentId`, `yearLevel`, `topicId`, summary mastery fields, `sourceAttemptId`, `updatedAt` | Derived dashboard summary only; client writes denied. |
-| `subtopicMastery/{studentId}_y{yearLevel}_{topicId}_{subtopicId}` | Current prototype -> Derived target | Student/year/topic/subtopic pair | `studentId`, `yearLevel`, `topicId`, `subtopicId`, BKT posterior, `observationCount`, `evidenceLevel`, `lastSourceAttemptId`, `updatedAt` | Derived dashboard summary only; client writes denied. |
+| `subtopicMastery/{studentId}_y{yearLevel}_{topicId}_{subtopicId}` | Current prototype -> Derived target | Student/year/topic/subtopic pair | `studentId`, `yearLevel`, `topicId`, `subtopicId`, `masteryProbability` (nullable), `observationCount`, `evidenceLevel`, `attempted`, `accessUnlocked`, `completed` (monotonic BKT outcome), `completionCriterionVersion`, `recommendedLearningAction` (`repeat_subtopic`/`advance`), `recommendationBasis` (`bkt_mastery`/`correct_rate_fallback`/`provisional_pending_ai`), `recommendationTargetTopicId`, `recommendationTargetSubtopicId`, `projectionStatus`, `bestCorrectRate`, `lastCorrectRate`, `masteryLevel`, `lastSourceAttemptId`, `sourceAttemptSequence`, `updatedAt` | Derived dashboard summary only; client writes denied. Access and completion are separate: any valid finalized attempt sets `attempted`/`accessUnlocked`, while `completed` only rises via `subtopic-completion-v1` (BKT `masteryProbability >= 0.72` with at least 5 observations) and is never reset by a weaker retry. |
 | `adaptiveAssignments/{assignmentId}` | Target FYP1 | Deterministic student/subtopic assignment ID | `studentId`, `subtopicId`, `bankId`, `difficultyLevel`, `reasonCode`, `reasonText`, `policyVersion`, `sourceAttemptId`, `sourceAttemptSequence`, `status`, optional bounded `modelEvidenceState`, `createdAt` | Adaptive-policy backend writes. Student and linked parent may read the safe projection; clients cannot choose or edit the bank assignment. `modelEvidenceState` is present only for a compatible completed model-backed assignment. |
 | `aiJobs/{attemptId}` | Target FYP1 | Attempt ID | `attemptId`, `studentId`, `status`, `attemptCount`, sanitized `errorCode`, timestamps, `sourceAttemptSequence` | Trigger/worker only. All client reads and writes are denied; visible state is copied to `studentAiStatuses`. |
 | `aiModelRuns/{runId}` | Derived target | Deterministic attempt run ID | `studentId`, `attemptId`, `modelVersion`, `featureSchemaVersion`, prediction, raw feature values, Tree SHAP values/expected value, `releaseId`, evidence and source lineage, `status`, `createdAt` | AI runtime only. All client reads and writes are denied; no raw feature, SHAP, hash, path, or release data enters a client projection. |
@@ -201,7 +215,8 @@ The approved Stage 3 reservation does not change FYP1 database implementation. T
 |---|---|---|---|---|
 | Safe curriculum (`topics`, `subtopics`, `questions`, `questionBanks`) | Authenticated read | Denied | Controlled seed/deployment | Questions never include answer keys. |
 | Answer keys, sessions, responses | Denied | Denied | Callable Functions only | Emulator denies direct access even to the owning student. |
-| Final attempts and safe mastery/status/assignment projections | Owner/authorized parent safe view | Denied | Backend only | Student cannot forge correctness, score, evidence state, mastery, or next bank. |
+| Content approval manifest (`contentSourceManifest`) | Denied | Denied | Controlled seed/deployment only | Material checksums, locators, digests, and reviewer identities never cross the client boundary. |
+| Safe mastery, practice, and Mutual Aid projections (`subtopicMastery`, `parentPracticeSummaries`, `forumParticipationSummaries`) | Owner or exact linked parent | Denied | Backend only | Student cannot forge correctness, score, evidence state, mastery, practice rhythm, or participation counts. |
 | Raw AI jobs/runs and model registry | Denied | Denied | Runtime or privileged promotion only | Raw features, SHAP values, errors, hashes, paths, release metadata, and registry state never cross the client boundary. |
 | User profile and preferences | Owner only | Restricted safe fields only | Server validates identity/role fields | Foreign UID access denied; role/link escalation denied. |
 | Parent links | Linked parties may read | Denied | Approved server/admin flow | No self-linking or cross-student access. |
@@ -210,7 +225,12 @@ The approved Stage 3 reservation does not change FYP1 database implementation. T
 | Wallet, ledger, world, restoration | Owner read of projection | Denied | Backend commands only | Reconcile balances, events, level, and revision; reject duplicate source IDs. |
 | Configuration and model registry | Read only where needed | Denied | Controlled deployment/promotion only | Client cannot activate policy/model/configuration. |
 
-`firestore.rules` is the enforcement layer. Firebase Emulator tests must prove owner isolation, parent-link access, answer-key denial, direct trusted-write denial, and no access to another student's records.
+`firestore.rules` is the enforcement layer. Firebase Emulator tests must prove
+owner isolation, exact linked-parent projection reads, answer-key denial,
+direct trusted-write denial, collection/list enumeration denial, and no access
+to another student's records. The U14 authenticated emulator flow
+(`tools/run_parent_dashboard_emulator_flow.js`) exercises the exact-child read
+matrix and every denied path.
 
 ## 11. Required Query Indexes
 
@@ -288,6 +308,7 @@ The implemented student forum uses these collections and identities:
 | `forumParticipationAggregateClaims/{claimId}` | idempotent aggregation claim |
 | `forumParticipationWeeklySummaries/{studentId_week}` | server-owned Malaysia-week materialization |
 | `forumParticipationSummaries/{studentId}` | current count-only student/linked-parent projection |
+| `parentPracticeSummaries/{studentId}` | U14 server-owned current-week rhythm; one current week plus one optional prior total, no raw identifiers |
 | `forumAiJobs/{answerId}` | mutable lease/fencing job for the latest answer revision |
 | `forumAiRuns/{logicalInferenceId}` | immutable revision/text/model/artifact/policy/claim-level result |
 | `modelRegistry/{releaseId}` | forum-scoped immutable release bindings with controlled lifecycle pointer |
@@ -316,3 +337,48 @@ parity before model deserialization. Revocation/supersession changes only
 lifecycle pointer fields and preserves prior release/run evidence. The
 dedicated cloud identity is declared and contract-tested; it is required only
 when an authorized cloud deployment occurs, which remains pending.
+
+## Supervisor Quiz Learning Loop Refinements Addendum (U15-U20, authoritative 2026-08-12)
+
+The supervisor refinements separate learner access from mastery, ground every
+active question in uploaded teaching material, and replace fixed guidance and
+count-only review with authored, answer-free feedback and one server-backed
+next action. This addendum is the authoritative field contract; earlier
+descriptions of score-gated unlocking and `guidedSteps` guidance are
+superseded.
+
+### Content provenance and activation
+
+- `questions/{questionId}` is the only client-readable content record. It
+  carries the approved bilingual projection plus `questionType`/`questionTypeBm`
+  and material locators, and never contains `answerIndex`, `feedbackByOption`,
+  `difficultyReview`, or author/reviewer state.
+- `questionAnswerKeys/{questionId}` is server-only. It carries `answerIndex`,
+  per-wrong-option `feedbackByOption` entries (misconception code, bilingual
+  hint, optional different-number worked example, bilingual review focus), and
+  the reviewed difficulty metadata. `guidedSteps` is no longer authored.
+- `contentSourceManifest/{materialId}` is the server-only approval record:
+  material filename/SHA-256, source-section class, bilingual locator, exact
+  bilingual content digest, content version, author/reviewer identity, and
+  approval timestamp. Any prompt, option, hint, example, type, focus, or
+  translation change alters the digest and blocks activation until re-approval.
+- Active banks contain exactly five questions; the callable serves the complete
+  five-question form and validates every wrong option's feedback before any
+  response is sealed.
+
+### Access, mastery, and next action
+
+- `subtopicMastery` writes `attempted: true` and `accessUnlocked: true` for
+  every valid finalized attempt, including 0%. `completed` is separate: it is
+  promoted only by `subtopic-completion-v1` (BKT `masteryProbability >= 0.72`
+  with at least five validated observations) and is monotonic.
+- `recommendedLearningAction` is `repeat_subtopic` below the criterion and
+  `advance` with target topic/subtopic IDs when it passes. `recommendationBasis`
+  is `bkt_mastery` normally, `correct_rate_fallback` when BKT processing
+  terminates in fallback/failed state, and `provisional_pending_ai` on the
+  immediate finalization projection before analysis completes.
+- `quizAttempts.reviewItems` is answer-free and lists only missed questions in
+  quiz order with prompt, type, and review focus in both languages.
+- `studentAiStatuses` remains the only client-readable analysis state; a repeat
+  session start is refused with a retryable `analysis-pending` response until
+  the assignment's source analysis reaches a terminal state.

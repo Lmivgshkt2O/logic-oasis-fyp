@@ -8,11 +8,12 @@ class MasteryChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final oasis = LogicOasisTheme.of(context);
     final color = switch (label) {
-      'Strong' => LogicOasisTheme.leaf,
-      'Moderate' => LogicOasisTheme.water,
-      'Locked' => const Color(0xFF8F8F8F),
-      _ => LogicOasisTheme.clay,
+      'Strong' => oasis.statusStrong,
+      'Moderate' => oasis.water,
+      'Locked' => oasis.statusLocked,
+      _ => oasis.statusNeedsHelp,
     };
 
     return Container(
@@ -25,7 +26,7 @@ class MasteryChip extends StatelessWidget {
         label,
         style: TextStyle(
           color: color,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w600,
           fontSize: 12.5,
           height: 1,
         ),

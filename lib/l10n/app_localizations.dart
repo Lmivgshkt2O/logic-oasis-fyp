@@ -560,6 +560,24 @@ abstract class AppLocalizations {
   /// **'Crystals'**
   String get crystals;
 
+  /// No description provided for @energy.
+  ///
+  /// In en, this message translates to:
+  /// **'Energy'**
+  String get energy;
+
+  /// No description provided for @dayStreak.
+  ///
+  /// In en, this message translates to:
+  /// **'Day Streak'**
+  String get dayStreak;
+
+  /// No description provided for @tapMarkersToRestoreOasis.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap markers to restore your oasis'**
+  String get tapMarkersToRestoreOasis;
+
   /// No description provided for @repairReady.
   ///
   /// In en, this message translates to:
@@ -606,11 +624,77 @@ abstract class AppLocalizations {
   /// **'Let\'s review the steps'**
   String get guidedStepsTitle;
 
+  /// No description provided for @hintTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Hint'**
+  String get hintTitle;
+
+  /// No description provided for @examplePrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'Example: {example}'**
+  String examplePrefix(Object example);
+
   /// No description provided for @secureAnswerChecked.
   ///
   /// In en, this message translates to:
   /// **'Your choice has been securely checked.'**
   String get secureAnswerChecked;
+
+  /// No description provided for @reviewTheseFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Review these first'**
+  String get reviewTheseFirst;
+
+  /// No description provided for @perfectScore.
+  ///
+  /// In en, this message translates to:
+  /// **'Perfect score! Nothing to review.'**
+  String get perfectScore;
+
+  /// No description provided for @nextPractice.
+  ///
+  /// In en, this message translates to:
+  /// **'Next practice'**
+  String get nextPractice;
+
+  /// No description provided for @nextPracticeLevel.
+  ///
+  /// In en, this message translates to:
+  /// **'Next: {difficulty} practice'**
+  String nextPracticeLevel(Object difficulty);
+
+  /// No description provided for @practiseAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Practise Again'**
+  String get practiseAgain;
+
+  /// No description provided for @moveOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Move On'**
+  String get moveOn;
+
+  /// No description provided for @basedOnQuizProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Based on your quiz progress'**
+  String get basedOnQuizProgress;
+
+  /// No description provided for @preparingNextPractice.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing your next practice…'**
+  String get preparingNextPractice;
+
+  /// No description provided for @allTopicsComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'You completed all available topics!'**
+  String get allTopicsComplete;
 
   /// No description provided for @parentDashboardSummary.
   ///
@@ -747,6 +831,462 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{days} day ago'**
   String daysAgo(Object days);
+
+  /// No description provided for @discussInForum.
+  ///
+  /// In en, this message translates to:
+  /// **'Discuss in forum'**
+  String get discussInForum;
+
+  /// No description provided for @openingDiscussion.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening discussion...'**
+  String get openingDiscussion;
+
+  /// No description provided for @discussionUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'This question is not available for discussion.'**
+  String get discussionUnavailable;
+
+  /// No description provided for @parentDashboardCaption.
+  ///
+  /// In en, this message translates to:
+  /// **'Safe learning updates for {name}.'**
+  String parentDashboardCaption(String name);
+
+  /// No description provided for @parentDashboardUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Updated: {updated}'**
+  String parentDashboardUpdated(String updated);
+
+  /// No description provided for @glanceFull.
+  ///
+  /// In en, this message translates to:
+  /// **'A steady week with a clear focus.'**
+  String get glanceFull;
+
+  /// No description provided for @glanceFullSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'{focus} is the focus, with practice and Mutual Aid activity this week.'**
+  String glanceFullSupport(String focus);
+
+  /// No description provided for @glanceFocusPractice.
+  ///
+  /// In en, this message translates to:
+  /// **'A steady practice week with a clear focus.'**
+  String get glanceFocusPractice;
+
+  /// No description provided for @glanceFocusPracticeSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'{focus} is the focus, with practice recorded this week.'**
+  String glanceFocusPracticeSupport(String focus);
+
+  /// No description provided for @glanceFocusPracticeNoMutualAidYet.
+  ///
+  /// In en, this message translates to:
+  /// **'A steady practice week with a clear focus.'**
+  String get glanceFocusPracticeNoMutualAidYet;
+
+  /// No description provided for @glanceFocusPracticeNoMutualAidYetSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'{focus} is the focus, with practice recorded and no Mutual Aid moments yet.'**
+  String glanceFocusPracticeNoMutualAidYetSupport(String focus);
+
+  /// No description provided for @glanceFocusNoPracticeYetMutualAid.
+  ///
+  /// In en, this message translates to:
+  /// **'Forum activity with a clear focus.'**
+  String get glanceFocusNoPracticeYetMutualAid;
+
+  /// No description provided for @glanceFocusNoPracticeYetMutualAidSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'{focus} is the focus, with Mutual Aid moments and no practice recorded yet.'**
+  String glanceFocusNoPracticeYetMutualAidSupport(String focus);
+
+  /// No description provided for @glanceFocusNoPracticeYet.
+  ///
+  /// In en, this message translates to:
+  /// **'A clear focus is ready.'**
+  String get glanceFocusNoPracticeYet;
+
+  /// No description provided for @glanceFocusNoPracticeYetSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'{focus} is the focus. Practice evidence is still being collected.'**
+  String glanceFocusNoPracticeYetSupport(String focus);
+
+  /// No description provided for @glanceFocusNoPracticeYetNoMutualAidYet.
+  ///
+  /// In en, this message translates to:
+  /// **'A clear focus is ready.'**
+  String get glanceFocusNoPracticeYetNoMutualAidYet;
+
+  /// No description provided for @glanceFocusNoPracticeYetNoMutualAidYetSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'{focus} is the focus. Practice and Mutual Aid activity are still being collected.'**
+  String glanceFocusNoPracticeYetNoMutualAidYetSupport(String focus);
+
+  /// No description provided for @glanceFocusMutualAid.
+  ///
+  /// In en, this message translates to:
+  /// **'Forum activity with a clear focus.'**
+  String get glanceFocusMutualAid;
+
+  /// No description provided for @glanceFocusMutualAidSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'{focus} is the focus, with Mutual Aid moments recorded this week.'**
+  String glanceFocusMutualAidSupport(String focus);
+
+  /// No description provided for @glanceFocusNoMutualAidYet.
+  ///
+  /// In en, this message translates to:
+  /// **'A clear focus is ready.'**
+  String get glanceFocusNoMutualAidYet;
+
+  /// No description provided for @glanceFocusNoMutualAidYetSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'{focus} is the focus, with no Mutual Aid moments yet.'**
+  String glanceFocusNoMutualAidYetSupport(String focus);
+
+  /// No description provided for @glanceFocusOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'A clear focus is ready.'**
+  String get glanceFocusOnly;
+
+  /// No description provided for @glanceFocusOnlySupport.
+  ///
+  /// In en, this message translates to:
+  /// **'{focus} is the current learning focus.'**
+  String glanceFocusOnlySupport(String focus);
+
+  /// No description provided for @glancePracticeRecorded.
+  ///
+  /// In en, this message translates to:
+  /// **'Practice is being recorded this week.'**
+  String get glancePracticeRecorded;
+
+  /// No description provided for @glancePracticeRecordedSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'Practice continues while more Understanding evidence is collected.'**
+  String get glancePracticeRecordedSupport;
+
+  /// No description provided for @glanceNoPracticeYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No practice completed yet this week.'**
+  String get glanceNoPracticeYet;
+
+  /// No description provided for @glanceNoPracticeYetSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'A short practice can start the weekly routine.'**
+  String get glanceNoPracticeYetSupport;
+
+  /// No description provided for @glanceMutualAidRecorded.
+  ///
+  /// In en, this message translates to:
+  /// **'Mutual Aid activity is recorded this week.'**
+  String get glanceMutualAidRecorded;
+
+  /// No description provided for @glanceMutualAidRecordedSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'More Understanding and Practice evidence is still being collected.'**
+  String get glanceMutualAidRecordedSupport;
+
+  /// No description provided for @glanceNoMutualAidYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No Mutual Aid moments yet this week.'**
+  String get glanceNoMutualAidYet;
+
+  /// No description provided for @glanceNoMutualAidYetSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'More Understanding and Practice evidence is still being collected.'**
+  String get glanceNoMutualAidYetSupport;
+
+  /// No description provided for @glanceNoDataYet.
+  ///
+  /// In en, this message translates to:
+  /// **'Learning evidence is still being collected.'**
+  String get glanceNoDataYet;
+
+  /// No description provided for @glanceNoDataYetSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'Safe updates will appear after the next completed practice.'**
+  String get glanceNoDataYetSupport;
+
+  /// No description provided for @understandingCardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Understanding'**
+  String get understandingCardTitle;
+
+  /// No description provided for @learningSnapshotLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Learning snapshot'**
+  String get learningSnapshotLabel;
+
+  /// No description provided for @practiceCardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Practice Effort'**
+  String get practiceCardTitle;
+
+  /// No description provided for @mutualAidCardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Mutual Aid'**
+  String get mutualAidCardTitle;
+
+  /// No description provided for @conversationStarterTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'A gentle question to ask'**
+  String get conversationStarterTitle;
+
+  /// No description provided for @focusStatusNeedsGuidedPractice.
+  ///
+  /// In en, this message translates to:
+  /// **'Needs guided practice'**
+  String get focusStatusNeedsGuidedPractice;
+
+  /// No description provided for @focusStatusGrowing.
+  ///
+  /// In en, this message translates to:
+  /// **'Growing'**
+  String get focusStatusGrowing;
+
+  /// No description provided for @focusStatusCurrentStrength.
+  ///
+  /// In en, this message translates to:
+  /// **'Current strength'**
+  String get focusStatusCurrentStrength;
+
+  /// No description provided for @focusTopic.
+  ///
+  /// In en, this message translates to:
+  /// **'Topic: {topic}'**
+  String focusTopic(String topic);
+
+  /// No description provided for @focusSubtopic.
+  ///
+  /// In en, this message translates to:
+  /// **'Focus: {subtopic}'**
+  String focusSubtopic(String subtopic);
+
+  /// No description provided for @focusObservationSentence.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Based on 1 trusted learning observation.} other{Based on {count} trusted learning observations.}}'**
+  String focusObservationSentence(int count);
+
+  /// No description provided for @focusStrength.
+  ///
+  /// In en, this message translates to:
+  /// **'Strength: {subtopic}'**
+  String focusStrength(String subtopic);
+
+  /// No description provided for @understandingInsufficient.
+  ///
+  /// In en, this message translates to:
+  /// **'More recent learning evidence is needed before a focus can be named.'**
+  String get understandingInsufficient;
+
+  /// No description provided for @understandingUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Understanding is temporarily unavailable.'**
+  String get understandingUnavailable;
+
+  /// No description provided for @parentNextStep.
+  ///
+  /// In en, this message translates to:
+  /// **'Parent next step'**
+  String get parentNextStep;
+
+  /// No description provided for @actionUnderstandingFocus.
+  ///
+  /// In en, this message translates to:
+  /// **'Practise {subtopic} together this week.'**
+  String actionUnderstandingFocus(String subtopic);
+
+  /// No description provided for @actionMaintainStrength.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep {subtopic} fresh with a short practice.'**
+  String actionMaintainStrength(String subtopic);
+
+  /// No description provided for @actionPracticeRoutine.
+  ///
+  /// In en, this message translates to:
+  /// **'One short practice this week keeps the routine going.'**
+  String get actionPracticeRoutine;
+
+  /// No description provided for @actionMutualAidInvitation.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask whether classmates answered a maths question this week.'**
+  String get actionMutualAidInvitation;
+
+  /// No description provided for @actionNeedsMoreActivity.
+  ///
+  /// In en, this message translates to:
+  /// **'More activity is needed before a recommendation can be made.'**
+  String get actionNeedsMoreActivity;
+
+  /// No description provided for @practiceWeekly.
+  ///
+  /// In en, this message translates to:
+  /// **'{total, plural, =0{No practice completed yet this week} =1{1 practice completed this week} other{{total} practices completed this week}}'**
+  String practiceWeekly(int total);
+
+  /// No description provided for @practiceActiveDays.
+  ///
+  /// In en, this message translates to:
+  /// **'across {count, plural, =1{1 active day} other{{count} active days}}'**
+  String practiceActiveDays(int count);
+
+  /// No description provided for @practiceUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Practice effort is unavailable this week.'**
+  String get practiceUnavailable;
+
+  /// No description provided for @practiceComparison.
+  ///
+  /// In en, this message translates to:
+  /// **'Compared with {previous, plural, =1{1 practice} other{{previous} practices}} last week.'**
+  String practiceComparison(int previous);
+
+  /// No description provided for @practiceImproved.
+  ///
+  /// In en, this message translates to:
+  /// **'Practice improved by {difference} this week.'**
+  String practiceImproved(int difference);
+
+  /// No description provided for @dayMonday.
+  ///
+  /// In en, this message translates to:
+  /// **'Mon'**
+  String get dayMonday;
+
+  /// No description provided for @dayTuesday.
+  ///
+  /// In en, this message translates to:
+  /// **'Tue'**
+  String get dayTuesday;
+
+  /// No description provided for @dayWednesday.
+  ///
+  /// In en, this message translates to:
+  /// **'Wed'**
+  String get dayWednesday;
+
+  /// No description provided for @dayThursday.
+  ///
+  /// In en, this message translates to:
+  /// **'Thu'**
+  String get dayThursday;
+
+  /// No description provided for @dayFriday.
+  ///
+  /// In en, this message translates to:
+  /// **'Fri'**
+  String get dayFriday;
+
+  /// No description provided for @daySaturday.
+  ///
+  /// In en, this message translates to:
+  /// **'Sat'**
+  String get daySaturday;
+
+  /// No description provided for @daySunday.
+  ///
+  /// In en, this message translates to:
+  /// **'Sun'**
+  String get daySunday;
+
+  /// No description provided for @mutualAidQuestions.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 question asked} other{{count} questions asked}}'**
+  String mutualAidQuestions(int count);
+
+  /// No description provided for @mutualAidReplies.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 reply} other{{count} replies}}'**
+  String mutualAidReplies(int count);
+
+  /// No description provided for @mutualAidAccepted.
+  ///
+  /// In en, this message translates to:
+  /// **' · {count} accepted'**
+  String mutualAidAccepted(int count);
+
+  /// No description provided for @mutualAidHelpfulMarks.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 helpful mark} other{{count} helpful marks}}'**
+  String mutualAidHelpfulMarks(int count);
+
+  /// No description provided for @mutualAidZero.
+  ///
+  /// In en, this message translates to:
+  /// **'No Mutual Aid moments yet this week.'**
+  String get mutualAidZero;
+
+  /// No description provided for @mutualAidUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Participation summary is unavailable this week.'**
+  String get mutualAidUnavailable;
+
+  /// No description provided for @conversationUnderstandingFocus.
+  ///
+  /// In en, this message translates to:
+  /// **'What part of {subtopic} should we look at together?'**
+  String conversationUnderstandingFocus(String subtopic);
+
+  /// No description provided for @conversationMaintainStrength.
+  ///
+  /// In en, this message translates to:
+  /// **'Would you like to show me how you solve {subtopic}?'**
+  String conversationMaintainStrength(String subtopic);
+
+  /// No description provided for @conversationPracticeRoutine.
+  ///
+  /// In en, this message translates to:
+  /// **'Shall we do one short practice together this week?'**
+  String get conversationPracticeRoutine;
+
+  /// No description provided for @conversationMutualAidInvitation.
+  ///
+  /// In en, this message translates to:
+  /// **'Did anyone in class help with a maths question this week?'**
+  String get conversationMutualAidInvitation;
+
+  /// No description provided for @conversationNeedsMoreActivity.
+  ///
+  /// In en, this message translates to:
+  /// **'What did you enjoy practising this week?'**
+  String get conversationNeedsMoreActivity;
 }
 
 class _AppLocalizationsDelegate

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/features/formula_forge/subtopic_page.dart';
 import 'package:logic_oasis/features/formula_forge/widgets/topic_card.dart';
 import 'package:logic_oasis/l10n/app_localizations.dart';
@@ -15,14 +16,42 @@ class FormulaForgePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
 
-    return LogicOasisScaffold(
-      children: [
+    return AnimatedBuilder(
+      animation: state,
+      builder: (context, _) => LogicOasisScaffold(
+        // Faint mint/emerald atmosphere around the Forge header and year
+        // selector; topic cards and mastery/status content stay unchanged.
+        topTint: const Color(0xFFE1F3E7),
+        children: [
         LogicHeader(
           leading: const _ForgeVillageIcon(),
           title: 'Formula Forge',
           subtitle: state.t(
             'Practice topics that restore your oasis.',
             l10n.forgeSubtitle,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Center(
+          child: SegmentedButton<int>(
+            segments: <ButtonSegment<int>>[
+              ButtonSegment<int>(
+                value: 4,
+                label: Text(l10n.year4),
+              ),
+              ButtonSegment<int>(
+                value: 5,
+                label: Text(l10n.year5),
+              ),
+              ButtonSegment<int>(
+                value: 6,
+                label: Text(l10n.year6),
+              ),
+            ],
+            selected: <int>{state.yearLevel},
+            showSelectedIcon: false,
+            onSelectionChanged: (selection) =>
+                state.switchYear(selection.first),
           ),
         ),
         const SizedBox(height: 18),
@@ -54,7 +83,8 @@ class FormulaForgePage extends StatelessWidget {
           ),
           const SizedBox(height: 14),
         ],
-      ],
+        ],
+      ),
     );
   }
 
@@ -82,11 +112,12 @@ class _ForgeVillageIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final oasis = LogicOasisTheme.of(context);
     return Container(
       width: 68,
       height: 68,
       decoration: BoxDecoration(
-        color: const Color(0xFFDDF4E4),
+        color: oasis.mint,
         borderRadius: BorderRadius.circular(18),
       ),
       child: ClipRRect(
@@ -105,16 +136,17 @@ class _QuizSaveStatusBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
     final isSuccess = state.lastQuizSavedToFirebase;
     final message = state.quizSaveMessage ?? '';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: isSuccess ? const Color(0xFFE8F4EE) : const Color(0xFFFFF6E6),
+        color: isSuccess ? oasis.mint : oasis.groupedSurface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: isSuccess ? const Color(0xFFCFE3D7) : const Color(0xFFF0D8A8),
+          color: oasis.outline,
         ),
       ),
       child: Row(
@@ -128,8 +160,8 @@ class _QuizSaveStatusBanner extends StatelessWidget {
                     isSuccess ? Icons.task_alt_outlined : Icons.info_outline,
                     size: 20,
                     color: isSuccess
-                        ? const Color(0xFF4F8F72)
-                        : const Color(0xFF9A6514),
+                        ? oasis.leaf
+                        : oasis.secondaryInk,
                   ),
           ),
           const SizedBox(width: 10),
@@ -137,8 +169,8 @@ class _QuizSaveStatusBanner extends StatelessWidget {
             child: Text(
               message,
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: const Color(0xFF33433D),
-                fontWeight: FontWeight.w700,
+                color: oasis.primaryInk,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),
@@ -156,6 +188,7 @@ class _FirebaseStatusBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
     final isSuccess = state.loadedTopicsFromFirebase;
     final message = state.isLoadingTopics
         ? AppLocalizations.of(context)!.loadingFirebaseQuestionBank
@@ -164,10 +197,10 @@ class _FirebaseStatusBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: isSuccess ? const Color(0xFFE8F4EE) : const Color(0xFFFFF6E6),
+        color: isSuccess ? oasis.mint : oasis.groupedSurface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: isSuccess ? const Color(0xFFCFE3D7) : const Color(0xFFF0D8A8),
+          color: oasis.outline,
         ),
       ),
       child: Row(
@@ -183,8 +216,8 @@ class _FirebaseStatusBanner extends StatelessWidget {
                         : Icons.cloud_off_outlined,
                     size: 20,
                     color: isSuccess
-                        ? const Color(0xFF4F8F72)
-                        : const Color(0xFF9A6514),
+                        ? oasis.leaf
+                        : oasis.secondaryInk,
                   ),
           ),
           const SizedBox(width: 10),
@@ -192,8 +225,8 @@ class _FirebaseStatusBanner extends StatelessWidget {
             child: Text(
               message,
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: const Color(0xFF33433D),
-                fontWeight: FontWeight.w700,
+                color: oasis.primaryInk,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),

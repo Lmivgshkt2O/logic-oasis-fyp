@@ -37,7 +37,7 @@ from forum_runtime import (
     FORUM_RUNTIME_SERVICE_ACCOUNT,
     ForumRuntimeError,
     ForumRuntimeGateway,
-    load_forum_classifier,
+    load_forum_bundle,
 )
 from logic_oasis_ai.sinks.firestore_sink import adaptive_assignment_id, subtopic_mastery_id
 from parent_link_admin import (
@@ -62,6 +62,7 @@ from parent_link_invitation import (
     decline_parent_link_invitation,
     unlink_own_parent_link,
 )
+from parent_progress import ParentPracticeError, merge_practice_event
 from policy_evaluation import (
     POLICY_EVALUATION_ADMIN_SERVICE_ACCOUNT,
     PolicyEvaluationError,
@@ -84,13 +85,13 @@ from quiz_session import (
     client_response,
     client_session,
     response_document_id,
-    validated_guided_steps,
+    validate_answer_key_feedback,
+    validated_option_feedback,
 )
 
 
 QUESTION_COUNT = 5
-MIN_BANK_QUESTION_COUNT = 8
-MAX_BANK_QUESTION_COUNT = 10
+BANK_QUESTION_COUNT = 5
 SESSION_TTL_MINUTES = 30
 FUNCTION_REGION = "asia-southeast1"
 _TELEMETRY_FIELDS = frozenset({
@@ -279,8 +280,7 @@ def _bank_questions(
     question_ids = bank.get("questionIds")
     if (
         not isinstance(question_ids, list)
-        or len(question_ids) < MIN_BANK_QUESTION_COUNT
-        or len(question_ids) > MAX_BANK_QUESTION_COUNT
+        or len(question_ids) != BANK_QUESTION_COUNT
         or any(not isinstance(item, str) or not item for item in question_ids)
         or len(set(question_ids)) != len(question_ids)
     ):
@@ -348,7 +348,7 @@ def _bank_questions(
             or answer_index >= len(options)
         ):
             raise QuizSessionError("failed-precondition", "The active question bank has invalid answer content.")
-        validated_guided_steps(key, options, options_bm)
+        validate_answer_key_feedback(key, options, options_bm)
     return questions
 
 
@@ -477,6 +477,23 @@ def _compatible_adaptive_assignment(
         or mastery.get("sourceAttemptSequence") != source_sequence
     ):
         return None
+
+    # U17: a repeat cannot start until the runtime has finished analysing the
+    # assignment's source attempt. Respond with a retryable pending signal
+    # instead of silently reusing a stale or not-yet-ready projection.
+    status_snapshot = (
+        database.collection("studentAiStatuses").document(source_attempt_id).get()
+    )
+    analysis_state = (
+        dict(status_snapshot.to_dict() or {}).get("analysisState")
+        if status_snapshot.exists
+        else None
+    )
+    if analysis_state not in {"completed", "fallback", "failed"}:
+        raise QuizSessionError(
+            "analysis-pending",
+            "Your next practice plan is still being prepared. Please try again in a moment.",
+        )
 
     return {
         "assignmentId": assignment_id,
@@ -909,10 +926,18 @@ def submit_quiz_response(data: dict[str, Any], student_id: str) -> dict[str, Any
                 "positiveConfirmationBm": POSITIVE_CONFIRMATION_BM,
             })
         else:
-            guided_steps, guided_steps_bm = validated_guided_steps(
-                answer_key, options, question.get("optionsBm")
+            feedback = validated_option_feedback(
+                answer_key, selected_index, options, question.get("optionsBm")
             )
-            response.update({"guidedSteps": guided_steps, "guidedStepsBm": guided_steps_bm})
+            response.update({
+                "misconceptionCode": feedback["misconceptionCode"],
+                "feedbackHint": feedback["hint"],
+                "feedbackHintBm": feedback["hintBm"],
+                "feedbackExample": feedback["example"],
+                "feedbackExampleBm": feedback["exampleBm"],
+                "reviewFocus": feedback["reviewFocus"],
+                "reviewFocusBm": feedback["reviewFocusBm"],
+            })
         transaction.create(response_ref, response)
         transaction.update(session_ref, {"validatedResponseCount": firestore.Increment(1)})
         return response
@@ -925,6 +950,10 @@ def finalize_quiz_session(data: dict[str, Any], student_id: str) -> dict[str, An
     _reject_finalization_telemetry(data)
     database = firestore_db()
     session_ref = database.collection("quizSessions").document(session_id)
+    # Capture one trusted UTC instant before the transaction. Every retry
+    # reuses it so a retry across Malaysia Monday midnight cannot move the
+    # same completion into another week.
+    finalization_instant = datetime.now(timezone.utc)
 
     @firestore.transactional
     def finalize(transaction: firestore.Transaction) -> dict[str, Any]:
@@ -974,6 +1003,57 @@ def finalize_quiz_session(data: dict[str, Any], student_id: str) -> dict[str, An
             if response.get("validationStatus") != "validated" or response.get("questionId") != question_ids[index]:
                 raise QuizSessionError("failed-precondition", "Response lineage is invalid.")
             responses.append(response)
+        missed_question_ids = [
+            response["questionId"]
+            for response in responses
+            if response.get("serverIsCorrect") is not True
+        ]
+        question_refs = [
+            database.collection("questions").document(question_id)
+            for question_id in dict.fromkeys(missed_question_ids)
+        ]
+        question_snapshots = (
+            {
+                snapshot.reference.path: snapshot
+                for snapshot in transaction.get_all(question_refs)
+            }
+            if question_refs
+            else {}
+        )
+        review_items: list[dict[str, Any]] = []
+        for response in responses:
+            if response.get("serverIsCorrect") is True:
+                continue
+            review_focus = response.get("reviewFocus")
+            review_focus_bm = response.get("reviewFocusBm")
+            question_snapshot = question_snapshots.get(
+                database.collection("questions").document(
+                    response["questionId"]
+                ).path
+            )
+            if (
+                not question_snapshot
+                or not question_snapshot.exists
+                or not isinstance(review_focus, str)
+                or not review_focus.strip()
+                or not isinstance(review_focus_bm, str)
+                or not review_focus_bm.strip()
+            ):
+                raise QuizSessionError(
+                    "failed-precondition",
+                    "A missed question is missing its review focus.",
+                )
+            question = dict(question_snapshot.to_dict() or {})
+            review_items.append({
+                "questionId": response["questionId"],
+                "sequenceIndex": response["sequenceIndex"],
+                "questionText": question.get("questionText", ""),
+                "questionTextBm": question.get("questionTextBm", ""),
+                "questionType": question.get("questionType", ""),
+                "questionTypeBm": question.get("questionTypeBm", ""),
+                "reviewFocus": review_focus,
+                "reviewFocusBm": review_focus_bm,
+            })
         correct_count = sum(1 for response in responses if response.get("serverIsCorrect") is True)
         total = len(responses)
         sequence_ref = (
@@ -1020,6 +1100,7 @@ def finalize_quiz_session(data: dict[str, Any], student_id: str) -> dict[str, An
             "trustedScore": round(correct_count * 100 / total),
             "responseCount": total,
             "responseIds": [response["responseId"] for response in responses],
+            "reviewItems": review_items,
             "validationStatus": "finalized",
             "finalizationStatus": "finalized",
             "processingStatus": "pending",
@@ -1043,8 +1124,20 @@ def finalize_quiz_session(data: dict[str, Any], student_id: str) -> dict[str, An
                 "topicId": session["topicId"],
                 "subtopicId": session["subtopicId"],
                 "bestCorrectRate": best_correct_rate,
-                "completed": best_correct_rate > 0.5,
+                # U17: completion is a separate monotonic BKT outcome. A 0%
+                # attempt must never set it, and a completed subtopic is never
+                # reset by a weaker retry.
+                "completed": existing_mastery.get("completed") is True,
                 "masteryLevel": mastery_level,
+                # Every valid finalized attempt unlocks the next subtopic,
+                # including 0%. The runtime replaces this provisional repeat
+                # with the BKT-derived recommendation when analysis finishes.
+                "attempted": True,
+                "accessUnlocked": True,
+                "recommendedLearningAction": "repeat_subtopic",
+                "recommendationBasis": "provisional_pending_ai",
+                "recommendationTargetTopicId": session["topicId"],
+                "recommendationTargetSubtopicId": session["subtopicId"],
                 "lastSourceAttemptId": session["attemptId"],
                 "sourceAttemptSequence": source_attempt_sequence,
                 "projectionStatus": "finalized_pending_ai",
@@ -1061,6 +1154,25 @@ def finalize_quiz_session(data: dict[str, Any], student_id: str) -> dict[str, An
                 "updatedAt": firestore.SERVER_TIMESTAMP,
             },
         )
+        practice_ref = database.collection("parentPracticeSummaries").document(
+            student_id
+        )
+        practice_snapshot = practice_ref.get(transaction=transaction)
+        practice_data = (
+            dict(practice_snapshot.to_dict() or {})
+            if practice_snapshot.exists
+            else None
+        )
+        try:
+            practice_payload = merge_practice_event(
+                practice_data,
+                student_id=student_id,
+                event_instant=finalization_instant,
+                updated_at=firestore.SERVER_TIMESTAMP,
+            )
+        except ParentPracticeError as error:
+            raise QuizSessionError(error.code, str(error)) from error
+        transaction.set(practice_ref, practice_payload)
         transaction.update(session_ref, {"status": "finalized", "finalizedAt": firestore.SERVER_TIMESTAMP})
         return attempt
 
@@ -1077,6 +1189,7 @@ _ERROR_CODES: dict[str, https_fn.FunctionsErrorCode] = {
     "deadline-exceeded": https_fn.FunctionsErrorCode.DEADLINE_EXCEEDED,
     "resource-exhausted": https_fn.FunctionsErrorCode.RESOURCE_EXHAUSTED,
     "unavailable": https_fn.FunctionsErrorCode.UNAVAILABLE,
+    "analysis-pending": https_fn.FunctionsErrorCode.UNAVAILABLE,
 }
 
 
@@ -1130,6 +1243,105 @@ def reportForumContent(request: https_fn.CallableRequest) -> dict[str, Any]:
             actor_id=student_id,
             now=datetime.now(timezone.utc),
         ),
+        request,
+    )
+
+
+def _open_or_create_linked_discussion(
+    data: dict[str, Any], student_id: str,
+) -> dict[str, Any]:
+    """Create or open the canonical linked discussion for a question-bank item.
+
+    The server accepts only the public question ID and derives the canonical
+    source identity and client-safe prompt/options snapshot itself.
+    """
+    return ForumRuntimeGateway(firestore_db()).open_or_create_linked_discussion(
+        question_id=_string(data, "questionId"),
+        actor_id=student_id,
+        now=datetime.now(timezone.utc),
+    )
+
+
+def _submit_linked_forum_answer(
+    data: dict[str, Any], student_id: str,
+) -> dict[str, Any]:
+    return ForumRuntimeGateway(firestore_db()).submit_linked_answer(
+        discussion_id=_string(data, "discussionId"),
+        selected_option=_int(data, "selectedOption"),
+        explanation=_string(data, "explanation"),
+        actor_id=student_id,
+        now=datetime.now(timezone.utc),
+    )
+
+
+def _edit_linked_forum_answer(
+    data: dict[str, Any], student_id: str,
+) -> dict[str, Any]:
+    return ForumRuntimeGateway(firestore_db()).edit_linked_answer(
+        answer_id=_string(data, "answerId"),
+        selected_option=_int(data, "selectedOption"),
+        explanation=_string(data, "explanation"),
+        actor_id=student_id,
+        now=datetime.now(timezone.utc),
+    )
+
+
+def _delete_forum_question(
+    data: dict[str, Any], student_id: str,
+) -> dict[str, Any]:
+    return ForumRuntimeGateway(firestore_db()).delete_question(
+        question_id=_string(data, "questionId"),
+        actor_id=student_id,
+        now=datetime.now(timezone.utc),
+    )
+
+
+def _delete_forum_answer(
+    data: dict[str, Any], student_id: str,
+) -> dict[str, Any]:
+    return ForumRuntimeGateway(firestore_db()).delete_answer(
+        answer_id=_string(data, "answerId"),
+        actor_id=student_id,
+    )
+
+
+@https_fn.on_call(region=FUNCTION_REGION, service_account=FORUM_RUNTIME_SERVICE_ACCOUNT)
+def openOrCreateForumDiscussion(request: https_fn.CallableRequest) -> dict[str, Any]:
+    return _forum_call(
+        lambda student_id: _open_or_create_linked_discussion(
+            _data(request), student_id,
+        ), request,
+    )
+
+
+@https_fn.on_call(region=FUNCTION_REGION, service_account=FORUM_RUNTIME_SERVICE_ACCOUNT)
+def submitLinkedForumAnswer(request: https_fn.CallableRequest) -> dict[str, Any]:
+    return _forum_call(
+        lambda student_id: _submit_linked_forum_answer(_data(request), student_id),
+        request,
+    )
+
+
+@https_fn.on_call(region=FUNCTION_REGION, service_account=FORUM_RUNTIME_SERVICE_ACCOUNT)
+def editLinkedForumAnswer(request: https_fn.CallableRequest) -> dict[str, Any]:
+    return _forum_call(
+        lambda student_id: _edit_linked_forum_answer(_data(request), student_id),
+        request,
+    )
+
+
+@https_fn.on_call(region=FUNCTION_REGION, service_account=FORUM_RUNTIME_SERVICE_ACCOUNT)
+def deleteForumQuestion(request: https_fn.CallableRequest) -> dict[str, Any]:
+    return _forum_call(
+        lambda student_id: _delete_forum_question(_data(request), student_id),
+        request,
+    )
+
+
+@https_fn.on_call(region=FUNCTION_REGION, service_account=FORUM_RUNTIME_SERVICE_ACCOUNT)
+def deleteForumAnswer(request: https_fn.CallableRequest) -> dict[str, Any]:
+    return _forum_call(
+        lambda student_id: _delete_forum_answer(_data(request), student_id),
         request,
     )
 
@@ -1402,28 +1614,28 @@ def _active_forum_registry_documents() -> list[dict[str, Any]]:
 
 
 @lru_cache(maxsize=2)
-def _cached_verified_forum_classifier(
+def _cached_verified_forum_bundle(
     evidence_mode: str, code_revision: str, registry_payload: str,
 ) -> Any:
     registry_documents = json.loads(registry_payload)
-    classifier = load_forum_classifier(
+    bundle = load_forum_bundle(
         evidence_mode=evidence_mode, code_revision=code_revision,
         registry_documents=registry_documents,
     )
-    if classifier is None:
+    if bundle is None:
         # Do not pin a failed/missing verification for the life of a warm
         # instance. A repaired deployment may be retried on the next event.
         raise _ForumClassifierUnavailable
-    return classifier
+    return bundle
 
 
-def _forum_classifier() -> Any:
+def _forum_bundle() -> Any:
     try:
         registry_documents = _active_forum_registry_documents()
         registry_payload = json.dumps(
             registry_documents, sort_keys=True, separators=(",", ":"), default=str,
         )
-        return _cached_verified_forum_classifier(
+        return _cached_verified_forum_bundle(
             _resolved_string_param(FORUM_MODEL_EVIDENCE_MODE),
             _resolved_string_param(FORUM_RUNTIME_CODE_REVISION),
             registry_payload,
@@ -1439,6 +1651,8 @@ def _forum_answer_needs_reprocessing(
     return (
         before.get("revision") != after.get("revision")
         or before.get("text") != after.get("text")
+        or before.get("selectedOption") != after.get("selectedOption")
+        or before.get("explanation") != after.get("explanation")
     )
 
 
@@ -1467,7 +1681,7 @@ def processForumAnswer(event: firestore_fn.Event[Any]) -> None:
     data = snapshot.to_dict()
     gateway.record_answer(snapshot.id, data)
     gateway.process_answer(
-        snapshot.id, data, _forum_classifier(), event_id=getattr(event, "id", None),
+        snapshot.id, data, _forum_bundle(), event_id=getattr(event, "id", None),
     )
 
 
@@ -1489,7 +1703,7 @@ def reprocessForumAnswer(event: firestore_fn.Event[Any]) -> None:
     ForumRuntimeGateway(firestore_db()).process_answer(
         after.id,
         after_data,
-        _forum_classifier(),
+        _forum_bundle(),
         event_id=getattr(event, "id", None),
     )
 

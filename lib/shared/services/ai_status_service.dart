@@ -12,7 +12,12 @@ class AiStatusService {
 
   final FirebaseFirestore _firestore;
 
-  Stream<AiDiagnosis?> watchAttempt(String attemptId) {
+  Stream<AiDiagnosis?> watchAttempt(
+    String attemptId, {
+    String? topicId,
+    String? subtopicId,
+    int? yearLevel,
+  }) {
     if (attemptId.trim().isEmpty) return Stream<AiDiagnosis?>.value(null);
     return _firestore
         .collection('studentAiStatuses')
@@ -30,6 +35,7 @@ class AiStatusService {
         );
       }
       AdaptiveAssignment? assignment;
+      Map<String, dynamic>? mastery;
       final studentId = data['studentId'];
       if (studentId is String && studentId.isNotEmpty) {
         final assignments = await _firestore
@@ -48,10 +54,22 @@ class AiStatusService {
             assignment = null;
           }
         }
+        if (topicId != null &&
+            subtopicId != null &&
+            yearLevel != null) {
+          final masterySnapshot = await _firestore
+              .collection('subtopicMastery')
+              .doc('${studentId}_y${yearLevel}_${topicId}_${subtopicId}')
+              .get();
+          if (masterySnapshot.exists) {
+            mastery = masterySnapshot.data();
+          }
+        }
       }
       return AiDiagnosis.fromSafeProjection(
         status.id,
         data,
+        mastery: mastery,
         assignment: assignment,
       );
     });

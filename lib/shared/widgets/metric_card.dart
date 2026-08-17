@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:logic_oasis/app/logic_oasis_design.dart';
+import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/shared/widgets/logic_oasis_figma_components.dart';
 
 class MetricCard extends StatelessWidget {
@@ -19,6 +19,7 @@ class MetricCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
 
     return SoftCard(
       padding: const EdgeInsets.all(14),
@@ -41,7 +42,7 @@ class MetricCard extends StatelessWidget {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: LogicOasisDesign.body,
+                color: oasis.secondaryInk,
                 fontWeight: FontWeight.w700,
               ),
             ),

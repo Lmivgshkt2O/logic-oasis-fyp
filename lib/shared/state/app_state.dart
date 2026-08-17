@@ -49,48 +49,215 @@ class AppState extends ChangeNotifier {
   static const String _savedAttemptsKey = 'logic_oasis_saved_attempts';
   static const int _maxStoredResource = 99999;
 
+  static Topic _placeholderTopic({
+    required String id,
+    required String title,
+    required String titleBm,
+    required int yearLevel,
+    required String area,
+    required String areaBm,
+  }) {
+    return Topic(
+      id: id,
+      title: title,
+      titleBm: titleBm,
+      area: area,
+      areaBm: areaBm,
+      yearLevel: yearLevel,
+      progress: 0,
+      mastery: 'Locked',
+    );
+  }
+
   static final List<Topic> _localTopicBank = [
     ...year4Chapter1Topics,
-    const Topic(
-      id: 'fractions_y4',
-      title: 'Fractions',
-      titleBm: 'Pecahan',
-      area: 'Understand and compare fractions.',
-      areaBm: 'Fahami dan bandingkan pecahan.',
+    _placeholderTopic(
+      id: 'fractions_decimals_percentages_y4',
+      title: 'Fractions, Decimals, and Percentages',
+      titleBm: 'Pecahan, Perpuluhan dan Peratus',
       yearLevel: 4,
-      progress: 0,
-      mastery: 'Locked',
+      area: 'Understand and compare fractions, decimals, and percentages.',
+      areaBm: 'Fahami dan bandingkan pecahan, perpuluhan dan peratus.',
     ),
-    const Topic(
-      id: 'decimals_y4',
-      title: 'Decimals',
-      titleBm: 'Perpuluhan',
-      area: 'Read, compare, and calculate with decimal values.',
-      areaBm: 'Baca, banding dan kira nilai perpuluhan.',
-      yearLevel: 4,
-      progress: 0,
-      mastery: 'Locked',
-    ),
-    const Topic(
-      id: 'percentages_y4',
-      title: 'Percentages',
-      titleBm: 'Peratus',
-      area: 'Connect percentages with parts of one hundred.',
-      areaBm: 'Hubungkan peratus dengan bahagian daripada seratus.',
-      yearLevel: 4,
-      progress: 0,
-      mastery: 'Locked',
-    ),
-    const Topic(
+    _placeholderTopic(
       id: 'money_y4',
       title: 'Money',
       titleBm: 'Wang',
-      area: 'Solve daily spending problems using ringgit and sen.',
-      areaBm:
-          'Selesaikan masalah perbelanjaan harian menggunakan ringgit dan sen.',
       yearLevel: 4,
-      progress: 0,
-      mastery: 'Locked',
+      area: 'Manage money and solve daily financial problems.',
+      areaBm: 'Urus wang dan selesaikan masalah kewangan harian.',
+    ),
+    _placeholderTopic(
+      id: 'time_y4',
+      title: 'Time',
+      titleBm: 'Masa dan Waktu',
+      yearLevel: 4,
+      area: 'Read time and solve duration problems.',
+      areaBm: 'Baca masa dan selesaikan masalah tempoh.',
+    ),
+    _placeholderTopic(
+      id: 'length_mass_volume_y4',
+      title: 'Length, Mass, and Volume of Liquid',
+      titleBm: 'Panjang, Jisim dan Isi Padu Cecair',
+      yearLevel: 4,
+      area: 'Measure length, mass, and volume of liquid.',
+      areaBm: 'Ukur panjang, jisim dan isi padu cecair.',
+    ),
+    _placeholderTopic(
+      id: 'space_y4',
+      title: 'Space',
+      titleBm: 'Ruang',
+      yearLevel: 4,
+      area: 'Explore angles, shapes, perimeter, area, and volume.',
+      areaBm: 'Teroka sudut, bentuk, perimeter, luas dan isi padu.',
+    ),
+    _placeholderTopic(
+      id: 'coordinates_ratio_proportion_y4',
+      title: 'Coordinates, Ratio, and Proportion',
+      titleBm: 'Koordinat, Nisbah dan Kadaran',
+      yearLevel: 4,
+      area: 'Locate points, compare ratios, and solve proportions.',
+      areaBm: 'Tentukan titik, banding nisbah dan selesaikan kadaran.',
+    ),
+    _placeholderTopic(
+      id: 'data_handling_y4',
+      title: 'Data Handling',
+      titleBm: 'Pengurusan Data',
+      yearLevel: 4,
+      area: 'Read, interpret, and construct data displays.',
+      areaBm: 'Baca, tafsir dan bina paparan data.',
+    ),
+    _placeholderTopic(
+      id: 'whole_numbers_y5',
+      title: 'Whole Numbers and Operations',
+      titleBm: 'Nombor Bulat dan Operasi',
+      yearLevel: 5,
+      area:
+          'Whole numbers up to 1 000 000: read, write, compare, round, and operate.',
+      areaBm:
+          'Nombor bulat hingga 1 000 000: kenal, tulis, banding, bundar dan operasi.',
+    ),
+    _placeholderTopic(
+      id: 'fractions_decimals_percentages_y5',
+      title: 'Fractions, Decimals, and Percentages',
+      titleBm: 'Pecahan, Perpuluhan dan Peratus',
+      yearLevel: 5,
+      area: 'Understand and compare fractions, decimals, and percentages.',
+      areaBm: 'Fahami dan bandingkan pecahan, perpuluhan dan peratus.',
+    ),
+    _placeholderTopic(
+      id: 'money_y5',
+      title: 'Money',
+      titleBm: 'Wang',
+      yearLevel: 5,
+      area: 'Manage money and solve daily financial problems.',
+      areaBm: 'Urus wang dan selesaikan masalah kewangan harian.',
+    ),
+    _placeholderTopic(
+      id: 'time_y5',
+      title: 'Time',
+      titleBm: 'Masa dan Waktu',
+      yearLevel: 5,
+      area: 'Read time and solve duration problems.',
+      areaBm: 'Baca masa dan selesaikan masalah tempoh.',
+    ),
+    _placeholderTopic(
+      id: 'length_mass_volume_y5',
+      title: 'Length, Mass, and Volume of Liquid',
+      titleBm: 'Panjang, Jisim dan Isi Padu Cecair',
+      yearLevel: 5,
+      area: 'Measure length, mass, and volume of liquid.',
+      areaBm: 'Ukur panjang, jisim dan isi padu cecair.',
+    ),
+    _placeholderTopic(
+      id: 'space_y5',
+      title: 'Space',
+      titleBm: 'Ruang',
+      yearLevel: 5,
+      area: 'Explore angles, shapes, perimeter, area, and volume.',
+      areaBm: 'Teroka sudut, bentuk, perimeter, luas dan isi padu.',
+    ),
+    _placeholderTopic(
+      id: 'coordinates_ratio_proportion_y5',
+      title: 'Coordinates, Ratio, and Proportion',
+      titleBm: 'Koordinat, Nisbah dan Kadaran',
+      yearLevel: 5,
+      area: 'Locate points, compare ratios, and solve proportions.',
+      areaBm: 'Tentukan titik, banding nisbah dan selesaikan kadaran.',
+    ),
+    _placeholderTopic(
+      id: 'data_handling_y5',
+      title: 'Data Handling',
+      titleBm: 'Pengurusan Data',
+      yearLevel: 5,
+      area: 'Read, interpret, and construct data displays.',
+      areaBm: 'Baca, tafsir dan bina paparan data.',
+    ),
+    _placeholderTopic(
+      id: 'whole_numbers_y6',
+      title: 'Whole Numbers and Operations',
+      titleBm: 'Nombor Bulat dan Operasi',
+      yearLevel: 6,
+      area:
+          'Whole numbers up to 10 000 000: read, write, compare, and operate.',
+      areaBm:
+          'Nombor bulat hingga 10 000 000: kenal, tulis, banding dan operasi.',
+    ),
+    _placeholderTopic(
+      id: 'fractions_decimals_percentages_y6',
+      title: 'Fractions, Decimals, and Percentages',
+      titleBm: 'Pecahan, Perpuluhan dan Peratus',
+      yearLevel: 6,
+      area: 'Understand and compare fractions, decimals, and percentages.',
+      areaBm: 'Fahami dan bandingkan pecahan, perpuluhan dan peratus.',
+    ),
+    _placeholderTopic(
+      id: 'money_y6',
+      title: 'Money',
+      titleBm: 'Wang',
+      yearLevel: 6,
+      area: 'Manage money and solve daily financial problems.',
+      areaBm: 'Urus wang dan selesaikan masalah kewangan harian.',
+    ),
+    _placeholderTopic(
+      id: 'time_y6',
+      title: 'Time',
+      titleBm: 'Masa dan Waktu',
+      yearLevel: 6,
+      area: 'Read time and solve duration problems.',
+      areaBm: 'Baca masa dan selesaikan masalah tempoh.',
+    ),
+    _placeholderTopic(
+      id: 'measurement_y6',
+      title: 'Measurement',
+      titleBm: 'Ukuran dan Sukatan',
+      yearLevel: 6,
+      area: 'Measure length, mass, and volume of liquid.',
+      areaBm: 'Ukur panjang, jisim dan isi padu cecair.',
+    ),
+    _placeholderTopic(
+      id: 'space_y6',
+      title: 'Space',
+      titleBm: 'Ruang',
+      yearLevel: 6,
+      area: 'Explore angles, polygons, and circles.',
+      areaBm: 'Teroka sudut, poligon dan bulatan.',
+    ),
+    _placeholderTopic(
+      id: 'coordinates_ratio_proportion_y6',
+      title: 'Coordinates, Ratio, and Proportion',
+      titleBm: 'Koordinat, Nisbah dan Kadaran',
+      yearLevel: 6,
+      area: 'Locate points, compare ratios, and solve proportions.',
+      areaBm: 'Tentukan titik, banding nisbah dan selesaikan kadaran.',
+    ),
+    _placeholderTopic(
+      id: 'data_handling_likelihood_y6',
+      title: 'Data Handling and Likelihood',
+      titleBm: 'Pengurusan Data dan Kebolehjadian',
+      yearLevel: 6,
+      area: 'Interpret data and describe likelihood.',
+      areaBm: 'Tafsir data dan huraikan kebolehjadian.',
     ),
   ];
   static List<Topic> _localTopicsForYear(int yearLevel) {
@@ -111,9 +278,6 @@ class AppState extends ChangeNotifier {
   bool isSavingQuizToFirebase = false;
   bool lastQuizSavedToFirebase = false;
   String? quizSaveMessage;
-  bool isLoadingParentDashboard = false;
-  bool loadedParentDashboardFromFirebase = false;
-  String? parentDashboardMessage;
   bool isLoadingOasisProgress = false;
   bool loadedOasisProgressFromFirebase = false;
   String? oasisProgressMessage;
@@ -134,6 +298,8 @@ class AppState extends ChangeNotifier {
   final Set<String> _unlockedSubtopicIds = <String>{};
   final Map<String, List<String>> _recentQuestionIdsBySubtopic =
       <String, List<String>>{};
+  StreamSubscription<List<TrustedSubtopicProgress>>?
+  _trustedProgressSubscription;
   final List<AiDiagnosis> aiDiagnoses = <AiDiagnosis>[];
   final List<OasisArea> oasisAreas = [
     const OasisArea(
@@ -312,6 +478,9 @@ class AppState extends ChangeNotifier {
     if (topicIndex <= 0) return true;
     if (_unlockedTopicIds.contains(topic.id)) return true;
     final previousTopic = topics[topicIndex - 1];
+    // Each year has its own progress: the first topic of a year is always
+    // unlocked, and completion only unlocks the next topic within the year.
+    if (previousTopic.yearLevel != topic.yearLevel) return true;
     return _isTopicComplete(previousTopic);
   }
 
@@ -320,6 +489,7 @@ class AppState extends ChangeNotifier {
     final topicIndex = topics.indexWhere((item) => item.id == topic.id);
     if (topicIndex <= 0) return null;
     final previousTopic = topics[topicIndex - 1];
+    if (previousTopic.yearLevel != topic.yearLevel) return null;
     return t(
       'Complete ${previousTopic.title} first.',
       'Lengkapkan ${previousTopic.titleBm} dahulu.',
@@ -335,7 +505,8 @@ class AppState extends ChangeNotifier {
     if (_unlockedSubtopicIds.contains(_subtopicUnlockKey(topic, subtopic))) {
       return true;
     }
-    return subtopics[subtopicIndex - 1].isComplete;
+    // U18: one trusted attempt unlocks the next step; completion is mastery.
+    return subtopics[subtopicIndex - 1].accessUnlocked;
   }
 
   String? lockedReasonForSubtopic(Topic topic, Subtopic subtopic) {
@@ -347,8 +518,8 @@ class AppState extends ChangeNotifier {
     if (subtopicIndex <= 0) return null;
     final previousSubtopic = subtopics[subtopicIndex - 1];
     return t(
-      'Complete ${previousSubtopic.title} with more than 50%.',
-      'Lengkapkan ${previousSubtopic.titleBm} dengan lebih daripada 50%.',
+      'Complete ${previousSubtopic.title} first.',
+      'Lengkapkan ${previousSubtopic.titleBm} dahulu.',
     );
   }
 
@@ -646,8 +817,27 @@ class AppState extends ChangeNotifier {
     unawaited(saveAppSession());
     if (persistQuizResults) {
       unawaited(loadOasisProgressFromFirebase());
-      unawaited(loadParentDashboardFromFirebase());
       if (!yearChanged) {
+        unawaited(refreshTrustedProgress());
+      }
+    }
+  }
+
+  /// Session-level year switch for the Formula Forge: lets a Year 6 student
+  /// revise an earlier year, or a lower-year student prepare ahead, without
+  /// changing the registered profile year. Each year keeps its own topic and
+  /// mastery progression.
+  Future<void> switchYear(int year) async {
+    final nextYearLevel = year.clamp(4, 6);
+    if (nextYearLevel == yearLevel) return;
+    yearLevel = nextYearLevel;
+    _cancelTrustedProgressWatch();
+    _resetTopicsForCurrentYear();
+    notifyListeners();
+    unawaited(saveAppSession().catchError((_) {}));
+    if (persistQuizResults) {
+      unawaited(loadTopicsFromFirebase());
+      if (currentStudentId != demoStudentId) {
         unawaited(refreshTrustedProgress());
       }
     }
@@ -664,6 +854,7 @@ class AppState extends ChangeNotifier {
   }
 
   void _clearSignedInStudentRuntimeState() {
+    _cancelTrustedProgressWatch();
     attempts.clear();
     aiDiagnoses.clear();
     _recentQuestionIdsBySubtopic.clear();
@@ -692,9 +883,18 @@ class AppState extends ChangeNotifier {
         topicId: topicId,
         subtopicId: subtopicId,
         yearLevel: yearLevel,
-        completed: rate > .5 || mastery == 'Moderate' || mastery == 'Strong',
+        // U18: completion is a server-side BKT outcome, never a client score.
+        // The callable's immediate projection unlocks the next subtopic while
+        // the runtime computes mastery and the next action.
+        attempted: true,
+        accessUnlocked: true,
+        completed: false,
         masteryLevel: mastery,
         bestCorrectRate: rate,
+        evidenceLevel: 'pending',
+        recommendedLearningAction: 'repeat_subtopic',
+        recommendationBasis: 'provisional_pending_ai',
+        projectionStatus: 'finalized_pending_ai',
       ),
     ], replaceAll: false);
   }
@@ -718,6 +918,39 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  /// Subscribes to the student's safe mastery projection so a subtopic card
+  /// can move from "Preparing mastery..." to the calculated BKT mastery as
+  /// soon as the runtime finishes, without waiting for the next navigation.
+  void watchTrustedProgress() {
+    if (!persistQuizResults || currentStudentId == demoStudentId) return;
+    _cancelTrustedProgressWatch();
+    final repository = _learningRepository ?? LearningRepository();
+    final requestedStudentId = currentStudentId;
+    final requestedYearLevel = yearLevel;
+    _trustedProgressSubscription = repository
+        .streamTrustedSubtopicProgress(
+          studentId: requestedStudentId,
+          yearLevel: requestedYearLevel,
+        )
+        .listen(
+          (records) {
+            if (currentStudentId != requestedStudentId ||
+                yearLevel != requestedYearLevel) {
+              return;
+            }
+            applyTrustedSubtopicProgress(records, replaceAll: false);
+          },
+          onError: (_) {
+            // Keep the last applied projection; the next refresh retries.
+          },
+        );
+  }
+
+  void _cancelTrustedProgressWatch() {
+    _trustedProgressSubscription?.cancel();
+    _trustedProgressSubscription = null;
+  }
+
   void applyTrustedSubtopicProgress(
     List<TrustedSubtopicProgress> records, {
     bool replaceAll = true,
@@ -738,23 +971,75 @@ class AppState extends ChangeNotifier {
           .map((subtopic) {
             final record = bySubtopic['${topic.id}::${subtopic.id}'];
             if (record == null && replaceAll) {
-              if (subtopic.progress != 0 || subtopic.mastery != 'New') {
+              if (subtopic.progress != 0 ||
+                  subtopic.mastery != 'New' ||
+                  subtopic.completed ||
+                  subtopic.accessUnlocked ||
+                  subtopic.masteryProbability != null) {
                 topicChanged = true;
-                return subtopic.copyWith(progress: 0, mastery: 'New');
+                return subtopic.copyWith(
+                  progress: 0,
+                  mastery: 'New',
+                  completed: false,
+                  accessUnlocked: false,
+                  masteryProbability: null,
+                  evidenceLevel: null,
+                  recommendedLearningAction: null,
+                  recommendationBasis: null,
+                  recommendationTargetTopicId: null,
+                  recommendationTargetSubtopicId: null,
+                  projectionStatus: null,
+                  bestCorrectRate: null,
+                  lastCorrectRate: null,
+                );
               }
               return subtopic;
             }
             if (record == null) return subtopic;
-            final trustedProgress = record.completed
-                ? record.bestCorrectRate.clamp(.6, 1.0).toDouble()
-                : record.bestCorrectRate;
+            final masteryProbability = record.masteryProbability;
+            final double trustedProgress;
+            if (masteryProbability != null) {
+              trustedProgress = masteryProbability;
+            } else if (record.recommendationBasis == 'correct_rate_fallback') {
+              trustedProgress = record.bestCorrectRate;
+            } else {
+              // Pending or unattempted: never invent a mastery percentage.
+              trustedProgress = 0;
+            }
             if (subtopic.progress != trustedProgress ||
-                subtopic.mastery != record.masteryLevel) {
+                subtopic.mastery != record.masteryLevel ||
+                subtopic.completed != record.completed ||
+                subtopic.accessUnlocked !=
+                    (record.accessUnlocked || record.completed) ||
+                subtopic.masteryProbability != masteryProbability ||
+                subtopic.evidenceLevel != record.evidenceLevel ||
+                subtopic.recommendedLearningAction !=
+                    record.recommendedLearningAction ||
+                subtopic.recommendationBasis != record.recommendationBasis ||
+                subtopic.recommendationTargetTopicId !=
+                    record.recommendationTargetTopicId ||
+                subtopic.recommendationTargetSubtopicId !=
+                    record.recommendationTargetSubtopicId ||
+                subtopic.projectionStatus != record.projectionStatus ||
+                subtopic.bestCorrectRate != record.bestCorrectRate ||
+                subtopic.lastCorrectRate != record.lastCorrectRate) {
               topicChanged = true;
             }
             return subtopic.copyWith(
               progress: trustedProgress,
               mastery: record.masteryLevel,
+              completed: record.completed,
+              accessUnlocked: record.accessUnlocked || record.completed,
+              masteryProbability: masteryProbability,
+              evidenceLevel: record.evidenceLevel,
+              recommendedLearningAction: record.recommendedLearningAction,
+              recommendationBasis: record.recommendationBasis,
+              recommendationTargetTopicId: record.recommendationTargetTopicId,
+              recommendationTargetSubtopicId:
+                  record.recommendationTargetSubtopicId,
+              projectionStatus: record.projectionStatus,
+              bestCorrectRate: record.bestCorrectRate,
+              lastCorrectRate: record.lastCorrectRate,
             );
           })
           .toList(growable: false);
@@ -922,6 +1207,9 @@ class AppState extends ChangeNotifier {
     final updated = selected.copyWith(
       progress: mathMax(selected.progress, score / 100),
       mastery: mastery,
+      // Legacy offline demo path: a passing score still counts as complete.
+      completed: score >= 50,
+      accessUnlocked: true,
     );
     subtopics[subtopicIndex] = updated;
     return (subtopics, updated);
@@ -970,60 +1258,6 @@ class AppState extends ChangeNotifier {
       );
     } finally {
       isSavingQuizToFirebase = false;
-      notifyListeners();
-    }
-  }
-
-  Future<void> loadParentDashboardFromFirebase() async {
-    if (isLoadingParentDashboard) return;
-
-    isLoadingParentDashboard = true;
-    parentDashboardMessage = null;
-    notifyListeners();
-
-    try {
-      final repository = _learningRepository ?? LearningRepository();
-      final snapshot = await repository.fetchParentDashboardSnapshot(
-        studentId: currentStudentId,
-        yearLevel: yearLevel,
-        topics: topics,
-      );
-
-      if (snapshot.attempts.isEmpty &&
-          snapshot.masteryRecordCount == 0 &&
-          snapshot.aiDiagnoses.isEmpty) {
-        loadedParentDashboardFromFirebase = false;
-        parentDashboardMessage = t(
-          'Using local parent dashboard until Firestore has learning data.',
-          'Menggunakan papan pemuka ibu bapa setempat sehingga Firestore mempunyai data pembelajaran.',
-        );
-      } else {
-        if (snapshot.attempts.isNotEmpty) {
-          attempts
-            ..clear()
-            ..addAll(snapshot.attempts);
-          _applyAttemptProgressToTopics();
-          _recordUnlockedProgression();
-          unawaited(saveAppSession());
-        }
-        aiDiagnoses
-          ..clear()
-          ..addAll(snapshot.aiDiagnoses);
-        _applyAiTopicMastery();
-        loadedParentDashboardFromFirebase = true;
-        parentDashboardMessage = t(
-          'Loaded parent dashboard from Firebase: ${snapshot.attempts.length} attempts, ${snapshot.masteryRecordCount} mastery records, ${snapshot.aiDiagnoses.length} AI diagnoses.',
-          'Memuat papan pemuka ibu bapa daripada Firebase: ${snapshot.attempts.length} cubaan, ${snapshot.masteryRecordCount} rekod penguasaan, ${snapshot.aiDiagnoses.length} diagnosis AI.',
-        );
-      }
-    } catch (_) {
-      loadedParentDashboardFromFirebase = false;
-      parentDashboardMessage = t(
-        'Firebase parent dashboard unavailable. Using local summary.',
-        'Papan pemuka ibu bapa Firebase tidak tersedia. Menggunakan ringkasan setempat.',
-      );
-    } finally {
-      isLoadingParentDashboard = false;
       notifyListeners();
     }
   }
@@ -1179,16 +1413,18 @@ class AppState extends ChangeNotifier {
   List<Topic> _mergeTopicProgress(List<Topic> sourceTopics) {
     final localTopics = _localTopicsForYear(yearLevel);
     final merged = <Topic>[];
-    for (final localTopic in localTopics) {
-      final sourceMatches = sourceTopics.where(
-        (sourceTopic) => sourceTopic.id == localTopic.id,
+    final sourceIds = sourceTopics.map((topic) => topic.id).toSet();
+    for (final sourceTopic in sourceTopics) {
+      final localMatches = localTopics.where(
+        (localTopic) => localTopic.id == sourceTopic.id,
       );
-      if (sourceMatches.isEmpty) {
-        merged.add(localTopic);
+      if (localMatches.isEmpty) {
+        // Firestore is authoritative for the textbook structure; never drop a
+        // server topic that has no local twin.
+        merged.add(sourceTopic);
         continue;
       }
-
-      final sourceTopic = sourceMatches.first;
+      final localTopic = localMatches.first;
       merged.add(
         sourceTopic.copyWith(
           progress: localTopic.progress,
@@ -1199,15 +1435,11 @@ class AppState extends ChangeNotifier {
         ),
       );
     }
-
-    for (final sourceTopic in sourceTopics) {
-      if (merged.any((topic) => topic.id == sourceTopic.id)) continue;
-      merged.add(
-        sourceTopic.copyWith(
-          progress: sourceTopic.progress,
-          mastery: sourceTopic.mastery,
-        ),
-      );
+    // Offline fallback: keep local topics Firestore has not provided yet.
+    for (final localTopic in localTopics) {
+      if (!sourceIds.contains(localTopic.id)) {
+        merged.add(localTopic);
+      }
     }
     return merged;
   }
@@ -1246,6 +1478,11 @@ class AppState extends ChangeNotifier {
               return subtopic.copyWith(
                 progress: mathMax(subtopic.progress, bestAttempt.score / 100),
                 mastery: bestAttempt.mastery,
+                // Legacy offline demo path mirrors the server rule used by the
+                // callable finalization: a passing score unlocks and counts as
+                // complete for offline/prototype sessions.
+                completed: bestAttempt.score >= 50,
+                accessUnlocked: true,
               );
             })
             .toList(growable: false);
@@ -1377,7 +1614,10 @@ class AppState extends ChangeNotifier {
   bool _recordUnlockedProgression() {
     var changed = false;
     for (var topicIndex = 1; topicIndex < topics.length; topicIndex += 1) {
-      if (_isTopicComplete(topics[topicIndex - 1])) {
+      final previousTopic = topics[topicIndex - 1];
+      final currentTopic = topics[topicIndex];
+      if (previousTopic.yearLevel == currentTopic.yearLevel &&
+          _isTopicComplete(previousTopic)) {
         changed = _unlockedTopicIds.add(topics[topicIndex].id) || changed;
       }
     }
@@ -1385,7 +1625,7 @@ class AppState extends ChangeNotifier {
     for (final topic in topics) {
       final subtopics = subtopicsForTopic(topic);
       for (var index = 1; index < subtopics.length; index += 1) {
-        if (subtopics[index - 1].isComplete) {
+        if (subtopics[index - 1].accessUnlocked) {
           changed =
               _unlockedSubtopicIds.add(
                 _subtopicUnlockKey(topic, subtopics[index]),
@@ -1512,21 +1752,6 @@ class AppState extends ChangeNotifier {
     return currentYearAttempts
         .where((attempt) => attempt.topicId == topicId)
         .length;
-  }
-
-  void _applyAiTopicMastery() {
-    for (final diagnosis in _latestAiDiagnosesForCurrentYear()) {
-      final topicIndex = topics.indexWhere(
-        (topic) => topic.id == diagnosis.topicId,
-      );
-      if (topicIndex == -1) continue;
-
-      final topic = topics[topicIndex];
-      topics[topicIndex] = topic.copyWith(
-        progress: diagnosis.bktMasteryProbability.clamp(0.0, 1.0),
-        mastery: diagnosis.finalMasteryLabel,
-      );
-    }
   }
 
   List<AiDiagnosis> _latestAiDiagnosesForCurrentYear() {

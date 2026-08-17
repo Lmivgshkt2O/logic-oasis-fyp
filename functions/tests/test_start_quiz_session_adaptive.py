@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import sys
+from types import SimpleNamespace
 from unittest.mock import patch
 import unittest
 
@@ -10,6 +11,7 @@ if str(FUNCTIONS_ROOT) not in sys.path:
     sys.path.insert(0, str(FUNCTIONS_ROOT))
 
 import main
+from quiz_session import QuizSessionError
 
 
 TOPIC_ID = "whole_numbers_y4"
@@ -19,10 +21,13 @@ YEAR_LEVEL = 4
 
 
 class Snapshot:
-    def __init__(self, document_id: str, data: dict | None) -> None:
+    def __init__(
+        self, document_id: str, data: dict | None, reference_path: str = ""
+    ) -> None:
         self.id = document_id
         self._data = data
         self.exists = data is not None
+        self.reference = SimpleNamespace(path=reference_path)
 
     def to_dict(self):
         return dict(self._data or {})
@@ -34,7 +39,11 @@ class Document:
         self.id = document_id
 
     def get(self, transaction=None):
-        return Snapshot(self.id, self._parent.documents.get(self.id))
+        return Snapshot(self.id, self._parent.documents.get(self.id), self.path)
+
+    @property
+    def path(self) -> str:
+        return f"{self._parent.name}/{self.id}"
 
     def collection(self, name: str):
         document = self._parent.documents.setdefault(self.id, {})
@@ -50,11 +59,17 @@ class Transaction:
     def get(self, reference: Document):
         return reference.get()
 
+    def get_all(self, references):
+        return [reference.get() for reference in references]
+
     def create(self, reference: Document, data: dict):
         reference.create(data)
 
-    def set(self, reference: Document, data: dict):
-        reference._parent.documents[reference.id] = dict(data)
+    def set(self, reference: Document, data: dict, merge: bool = False):
+        if merge and reference.id in reference._parent.documents:
+            reference._parent.documents[reference.id].update(data)
+        else:
+            reference._parent.documents[reference.id] = dict(data)
 
     def update(self, reference: Document, data: dict):
         reference._parent.documents[reference.id].update(data)
@@ -106,7 +121,7 @@ class Database:
 
 
 def bank(bank_id: str, difficulty: str) -> dict:
-    question_ids = [f"{bank_id}_q{index}" for index in range(8)]
+    question_ids = [f"{bank_id}_q{index}" for index in range(5)]
     return {
         "bankId": bank_id,
         "topicId": TOPIC_ID,
@@ -142,6 +157,16 @@ def questions_for(bank_data: dict) -> dict[str, dict]:
 
 
 def answer_keys_for(bank_data: dict) -> dict[str, dict]:
+    feedback = {
+        str(index): {
+            "misconceptionCode": f"misconception_{index}",
+            "hint": f"Hint for option {index}.",
+            "hintBm": f"Petunjuk untuk pilihan {index}.",
+            "reviewFocus": f"Focus on option {index}.",
+            "reviewFocusBm": f"Fokus pada pilihan {index}.",
+        }
+        for index in (1, 2, 3)
+    }
     return {
         question_id: {
             "questionId": question_id,
@@ -150,8 +175,7 @@ def answer_keys_for(bank_data: dict) -> dict[str, dict]:
             "isActive": True,
             "explanation": "Server-validated explanation.",
             "explanationBm": "Penerangan pelayan yang disahkan.",
-            "guidedSteps": ["Read the place values.", "Check each option."],
-            "guidedStepsBm": ["Baca nilai tempat.", "Semak setiap pilihan."],
+            "feedbackByOption": feedback,
         }
         for question_id in bank_data["questionIds"]
     }
@@ -189,6 +213,16 @@ class AdaptiveQuizStartTests(unittest.TestCase):
                     "validationStatus": "finalized",
                     "finalizationStatus": "finalized",
                     "dataSource": "runtime_callable",
+                },
+            },
+            "studentAiStatuses": {
+                "attempt-1": {
+                    "analysisState": "completed",
+                    "displayCode": "analysis_completed",
+                },
+                "attempt-2": {
+                    "analysisState": "completed",
+                    "displayCode": "analysis_completed",
                 },
             },
             "subtopicMastery": {
@@ -232,7 +266,7 @@ class AdaptiveQuizStartTests(unittest.TestCase):
         ):
             return main.start_quiz_session(data, STUDENT_ID)
 
-    def test_uses_only_a_compatible_runtime_assignment_and_rotates_question_forms(self) -> None:
+    def test_uses_only_a_compatible_runtime_assignment_and_serves_the_full_bank(self) -> None:
         first = self._start()
         self.database.collections["quizAttempts"]["attempt-2"] = {
             **self.database.collections["quizAttempts"]["attempt-1"],
@@ -256,14 +290,11 @@ class AdaptiveQuizStartTests(unittest.TestCase):
         self.assertEqual("Moderate", first["difficultyLevel"])
         self.assertEqual(f"{STUDENT_ID}_{SUBTOPIC_ID}", first["assignmentId"])
         self.assertEqual("runtime_adaptive", first["assignmentSource"])
-        self.assertNotEqual(first["questionIds"], second["questionIds"])
-        self.assertNotIn("guidedSteps", first["questions"][0])
-        self.assertNotIn("guidedStepsBm", first["questions"][0])
+        self.assertEqual(first["questionIds"], second["questionIds"])
+        self.assertEqual(self.moderate["questionIds"], first["questionIds"])
+        self.assertNotIn("feedbackByOption", first["questions"][0])
+        self.assertNotIn("misconceptionCode", first["questions"][0])
         self.assertNotIn("answerIndex", first["questions"][0])
-        self.assertEqual(
-            set(self.moderate["questionIds"]),
-            set(first["questionIds"]) | set(second["questionIds"]),
-        )
 
     def test_untrusted_or_incompatible_assignment_safely_falls_back_to_easy(self) -> None:
         self.database.collections["adaptiveAssignments"][f"{STUDENT_ID}_{SUBTOPIC_ID}"]["dataSource"] = "seed_demo"
@@ -318,6 +349,21 @@ class AdaptiveQuizStartTests(unittest.TestCase):
         self.assertEqual("easy-bank", session["bankId"])
         self.assertEqual("cold_start_easy", session["assignmentSource"])
 
+    def test_pending_assignment_analysis_returns_retryable_pending_error(self) -> None:
+        self.database.collections["studentAiStatuses"]["attempt-1"]["analysisState"] = (
+            "processing"
+        )
+        with self.assertRaisesRegex(QuizSessionError, "still being prepared"):
+            self._start()
+
+    def test_failed_assignment_analysis_still_allows_repeat_with_fallback(self) -> None:
+        self.database.collections["studentAiStatuses"]["attempt-1"]["analysisState"] = (
+            "fallback"
+        )
+        session = self._start()
+        self.assertEqual("moderate-bank", session["bankId"])
+        self.assertEqual("runtime_adaptive", session["assignmentSource"])
+
     def test_missing_assignment_answer_key_safely_falls_back_to_easy(self) -> None:
         self.database.collections["questionAnswerKeys"].pop("moderate-bank_q0")
 
@@ -328,7 +374,7 @@ class AdaptiveQuizStartTests(unittest.TestCase):
 
     def test_oversized_assignment_bank_safely_falls_back_to_easy(self) -> None:
         oversized = bank("moderate-bank", "Moderate")
-        oversized["questionIds"] = [f"moderate-bank_q{index}" for index in range(11)]
+        oversized["questionIds"] = [f"moderate-bank_q{index}" for index in range(6)]
         self.database.collections["questionBanks"]["moderate-bank"] = oversized
         self.database.collections["questions"].update(questions_for(oversized))
 
@@ -351,7 +397,7 @@ class AdaptiveQuizStartTests(unittest.TestCase):
 
         self.assertEqual("easy-bank", session["bankId"])
 
-    def test_fallback_uses_next_server_sequence_for_a_new_form(self) -> None:
+    def test_fallback_uses_next_server_sequence_for_the_complete_bank(self) -> None:
         self.database.collections["adaptiveAssignments"].clear()
         self.database.collections["studentSubtopicSequenceStates"] = {
             STUDENT_ID: {"subtopics": {SUBTOPIC_ID: {"lastAllocatedSequence": 1}}},
@@ -360,7 +406,7 @@ class AdaptiveQuizStartTests(unittest.TestCase):
         session = self._start()
 
         self.assertEqual("easy-bank", session["bankId"])
-        self.assertEqual(self.easy["questionIds"][5:], session["questionIds"][:3])
+        self.assertEqual(self.easy["questionIds"], session["questionIds"])
 
     def test_legacy_minimal_start_payload_remains_supported(self) -> None:
         with patch.object(main, "firestore_db", return_value=self.database), patch.object(

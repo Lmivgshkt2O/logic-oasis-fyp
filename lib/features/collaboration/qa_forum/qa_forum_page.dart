@@ -1,7 +1,9 @@
 import 'dart:async';
 
+import 'package:logic_oasis/app/theme.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:logic_oasis/shared/models/forum_answer.dart';
 import 'package:logic_oasis/shared/models/forum_question.dart';
@@ -14,16 +16,30 @@ class QaForumPage extends StatefulWidget {
     super.key,
     required this.state,
     this.repository,
-    this.questionsStream,
+    this.questionPager,
+    this.latestQuestionsStream,
     this.blockedStudentIdsStream,
+    this.deletedQuestionIdsStream,
     this.answersStreamForQuestion,
+    this.authorFeedbackStreamForAnswer,
   });
+
+  static const int pageSize = 20;
+
   final AppState state;
   final CollaborationRepository? repository;
-  final Stream<List<ForumQuestion>>? questionsStream;
+  final Future<ForumQuestionPage> Function({
+    required int limit,
+    String? cursor,
+  })?
+  questionPager;
+  final Stream<List<ForumQuestion>>? latestQuestionsStream;
   final Stream<Set<String>>? blockedStudentIdsStream;
+  final Stream<Set<String>>? deletedQuestionIdsStream;
   final Stream<List<ForumAnswer>> Function(String questionId)?
   answersStreamForQuestion;
+  final Stream<ForumAnswerFeedback> Function(String answerId)?
+  authorFeedbackStreamForAnswer;
 
   @override
   State<QaForumPage> createState() => _QaForumPageState();
@@ -37,9 +53,20 @@ class _QaForumPageState extends State<QaForumPage> {
   final _questionTitle = TextEditingController();
   final _questionBody = TextEditingController();
   StreamSubscription<Set<String>>? _blockedSubscription;
+  StreamSubscription<Set<String>>? _deletedSubscription;
+  StreamSubscription<List<ForumQuestion>>? _latestSubscription;
   Set<String> _blockedAuthors = const {};
+  Set<String> _deletedQuestions = const {};
   Object? _blockedError;
   bool _postingQuestion = false;
+  String? _deleting;
+  List<ForumQuestion> _questions = const [];
+  String? _nextCursor;
+  bool _hasMore = false;
+  bool _loading = true;
+  Object? _loadError;
+  bool _loadingMore = false;
+  Object? _loadMoreError;
 
   String _t(String english, String bahasaMelayu) =>
       widget.state.t(english, bahasaMelayu);
@@ -63,6 +90,40 @@ class _QaForumPageState extends State<QaForumPage> {
         if (mounted) setState(() => _blockedError = error);
       },
     );
+    Stream<Set<String>> deletedIds;
+    try {
+      deletedIds =
+          widget.deletedQuestionIdsStream ??
+          _repo.watchDeletedQuestionIds(widget.state.currentStudentId);
+    } catch (_) {
+      // The deletion signal is advisory for the loaded list; widget-test
+      // harnesses and degraded startup without Firestore fall back to empty.
+      deletedIds = const Stream<Set<String>>.empty();
+    }
+    _deletedSubscription = deletedIds.listen(
+      (ids) {
+        if (mounted) setState(() => _deletedQuestions = ids);
+      },
+      onError: (Object error) {
+        // A failed deletion signal must not break the loaded list.
+        if (mounted) setState(() {});
+      },
+    );
+    final latest =
+        widget.latestQuestionsStream ??
+        _repo.watchLatestForumQuestions(limit: QaForumPage.pageSize);
+    _latestSubscription = latest.listen(
+      (questions) {
+        if (!mounted) return;
+        _handleLatestPage(questions);
+      },
+      onError: (Object error) {
+        // The latest-page signal is advisory; a failed signal must not break
+        // the already-loaded paged list.
+        if (mounted) setState(() {});
+      },
+    );
+    _refresh();
   }
 
   @override
@@ -71,117 +132,370 @@ class _QaForumPageState extends State<QaForumPage> {
     _questionTitle.dispose();
     _questionBody.dispose();
     _blockedSubscription?.cancel();
+    _deletedSubscription?.cancel();
+    _latestSubscription?.cancel();
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: Text(_t('Q&A Forum', 'Forum S&J')),
-      actions: [
-        IconButton(
-          tooltip: _t('Manage blocked students', 'Urus murid yang disekat'),
-          onPressed: _manageBlockedStudents,
-          icon: const Icon(Icons.block_outlined),
+  Widget build(BuildContext context) {
+    final oasis = LogicOasisTheme.of(context);
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(_t('Q&A Forum', 'Forum S&J')),
+        actions: [
+          IconButton(
+            tooltip: _t('Manage blocked students', 'Urus murid yang disekat'),
+            onPressed: _manageBlockedStudents,
+            icon: const Icon(Icons.block_outlined),
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _composeQuestion(context),
+        backgroundColor: oasis.violet,
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.add_comment_outlined),
+        label: Text(_t('Ask a question', 'Tanya soalan')),
+      ),
+      body: DecoratedBox(
+        // Restrained lavender atmosphere near the header/search region so the
+        // list page reads as part of the shared system while violet stays the
+        // restrained identity accent.
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              const Color(0xFFEEE8F8),
+              oasis.canvas,
+              oasis.lowerCanvas,
+            ],
+          ),
+        ),
+        child: _buildQuestionList(context),
+      ),
+    );
+  }
+
+  Widget _buildQuestionList(BuildContext context) {
+    if (_blockedError != null) {
+      return _Message(_friendlyError(_blockedError!, widget.state));
+    }
+    if (_loading && _questions.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_loadError != null && _questions.isEmpty) {
+      final error = _loadError!;
+      final denied =
+          error is FirebaseException && error.code == 'permission-denied';
+      return Column(
+        children: [
+          _filterField(),
+          Expanded(
+            child: _Message(
+              denied
+                  ? _t(
+                      'Forum access is unavailable for this account. Sign in with a student profile, then try again.',
+                      'Akses forum tidak tersedia untuk akaun ini. Log masuk dengan profil murid dan cuba lagi.',
+                    )
+                  : _t(
+                      'The forum could not be loaded. Please check your connection and try again.',
+                      'Forum tidak dapat dimuatkan. Periksa sambungan anda dan cuba lagi.',
+                    ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 24),
+            child: OutlinedButton.icon(
+              onPressed: _refresh,
+              icon: const Icon(Icons.refresh),
+              label: Text(_t('Retry', 'Cuba semula')),
+            ),
+          ),
+        ],
+      );
+    }
+    final query = _filter.text.trim().toLowerCase();
+    final questions = _questions
+        .where(
+          (question) =>
+              !_blockedAuthors.contains(question.authorId) &&
+              !_deletedQuestions.contains(question.id) &&
+              (query.isEmpty ||
+                  question.title.toLowerCase().contains(query) ||
+                  question.text.toLowerCase().contains(query)),
+        )
+        .toList(growable: false);
+    if (questions.isEmpty) {
+      return Column(
+        children: [
+          _filterField(),
+          Expanded(
+            child: _Message(
+              query.isEmpty
+                  ? _t(
+                      'No questions yet. Start the conversation by asking how you solved a problem.',
+                      'Belum ada soalan. Mulakan perbualan dengan bertanya cara menyelesaikan masalah.',
+                    )
+                  : _t(
+                      'No questions match this filter.',
+                      'Tiada soalan sepadan dengan tapisan ini.',
+                    ),
+            ),
+          ),
+        ],
+      );
+    }
+    final showFooter = _hasMore || _loadMoreError != null;
+    return Column(
+      children: [
+        _filterField(),
+        Expanded(
+          child: ListView.separated(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+            itemCount: questions.length + (showFooter ? 1 : 0),
+            separatorBuilder: (_, _) => const SizedBox(height: 10),
+            itemBuilder: (context, index) {
+              if (index == questions.length) return _pagingFooter();
+              final question = questions[index];
+              final localizedPrompt =
+                  widget.state.isBahasaMelayu &&
+                      (question.promptBm?.isNotEmpty ?? false)
+                  ? question.promptBm!
+                  : null;
+              return Card(
+                child: ListTile(
+                  title: Text(
+                    localizedPrompt ?? question.title,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  subtitle: Text(
+                    localizedPrompt ?? question.text,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (question.authorId ==
+                                  widget.state.currentStudentId ||
+                              question.mode == 'linked')
+                        PopupMenuButton<_QuestionAction>(
+                          tooltip: _t(
+                            'Question actions',
+                            'Tindakan soalan',
+                          ),
+                          enabled: _deleting != question.id,
+                          onSelected: (action) =>
+                              _questionAction(question, action),
+                          itemBuilder: (_) => [
+                            PopupMenuItem(
+                              value: _QuestionAction.delete,
+                              child: Text(
+                                _t('Delete question', 'Padam soalan'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      const Icon(Icons.chevron_right),
+                    ],
+                  ),
+                  onTap: () => _openAnswers(context, question),
+                ),
+              );
+            },
+          ),
         ),
       ],
-    ),
-    floatingActionButton: FloatingActionButton.extended(
-      onPressed: () => _composeQuestion(context),
-      icon: const Icon(Icons.add_comment_outlined),
-      label: Text(_t('Ask a question', 'Tanya soalan')),
-    ),
-    body: StreamBuilder<List<ForumQuestion>>(
-      stream: widget.questionsStream ?? _repo.watchQuestions(),
-      builder: (context, snapshot) {
-        if (_blockedError != null) {
-          return _Message(_friendlyError(_blockedError!, widget.state));
-        }
-        if (snapshot.hasError) {
-          final error = snapshot.error;
-          final denied =
-              error is FirebaseException && error.code == 'permission-denied';
-          return _Message(
-            denied
-                ? _t(
-                    'Forum access is unavailable for this account. Sign in with a student profile, then try again.',
-                    'Akses forum tidak tersedia untuk akaun ini. Log masuk dengan profil murid dan cuba lagi.',
-                  )
-                : _t(
-                    'The forum could not be loaded. Please check your connection and try again.',
-                    'Forum tidak dapat dimuatkan. Periksa sambungan anda dan cuba lagi.',
-                  ),
-          );
-        }
-        if (!snapshot.hasData)
-          return const Center(child: CircularProgressIndicator());
-        final query = _filter.text.trim().toLowerCase();
-        final questions = snapshot.data!
-            .where(
-              (question) =>
-                  !_blockedAuthors.contains(question.authorId) &&
-                  (query.isEmpty ||
-                      question.title.toLowerCase().contains(query) ||
-                      question.text.toLowerCase().contains(query)),
-            )
-            .toList(growable: false);
-        if (questions.isEmpty)
-          return Column(
-            children: [
-              _filterField(),
-              Expanded(
-                child: _Message(
-                  query.isEmpty
-                      ? _t(
-                          'No questions yet. Start the conversation by asking how you solved a problem.',
-                          'Belum ada soalan. Mulakan perbualan dengan bertanya cara menyelesaikan masalah.',
-                        )
-                      : _t(
-                          'No questions match this filter.',
-                          'Tiada soalan sepadan dengan tapisan ini.',
-                        ),
-                ),
-              ),
-            ],
-          );
-        return Column(
+    );
+  }
+
+  Widget _pagingFooter() {
+    if (_loadMoreError != null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Column(
           children: [
-            _filterField(),
-            Expanded(
-              child: ListView.separated(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
-                itemCount: questions.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 10),
-                itemBuilder: (context, index) {
-                  final question = questions[index];
-                  return Card(
-                    child: ListTile(
-                      title: Text(question.title),
-                      subtitle: Text(
-                        question.text,
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: () => _openAnswers(context, question),
-                    ),
-                  );
-                },
+            Text(
+              _t(
+                'Could not load more questions. Your current list is unchanged.',
+                'Tidak dapat memuatkan lebih banyak soalan. Senarai semasa tidak berubah.',
               ),
+              textAlign: TextAlign.center,
+            ),
+            TextButton.icon(
+              onPressed: _loadingMore ? null : _loadMore,
+              icon: const Icon(Icons.refresh),
+              label: Text(_t('Retry', 'Cuba semula')),
             ),
           ],
-        );
-      },
-    ),
-  );
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Center(
+        child: _loadingMore
+            ? const SizedBox.square(
+                dimension: 22,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : OutlinedButton.icon(
+                onPressed: _loadMore,
+                icon: const Icon(Icons.expand_more),
+                label: Text(_t('Load more', 'Muat lagi')),
+              ),
+      ),
+    );
+  }
+
+  Future<ForumQuestionPage> _loadPage({required String? cursor}) {
+    final pager =
+        widget.questionPager ?? _repo.loadForumQuestions;
+    return pager(limit: QaForumPage.pageSize, cursor: cursor);
+  }
+
+  Future<void> _questionAction(
+    ForumQuestion question,
+    _QuestionAction action,
+  ) async {
+    if (action != _QuestionAction.delete) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          question.mode == 'linked'
+              ? _t(
+                  'Remove this question from your list?',
+                  'Buang soalan ini daripada senarai anda?',
+                )
+              : _t('Delete this question?', 'Padam soalan ini?'),
+        ),
+        content: Text(
+          question.mode == 'linked'
+              ? _t(
+                  'This shared thread stays available to other students. It will be hidden from your forum list.',
+                  'Benang kongsi ini masih tersedia untuk murid lain. Ia akan disembunyikan daripada senarai forum anda.',
+                )
+              : _t(
+                  'This will also remove every answer to it. This action cannot be undone.',
+                  'Ini juga akan memadam setiap jawapan kepadanya. Tindakan ini tidak boleh dibatalkan.',
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(_t('Cancel', 'Batal')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(_t('Delete', 'Padam')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _deleting = question.id);
+    try {
+      await _repo.deleteQuestion(question.id);
+      _showMessage(_t('Question deleted.', 'Soalan telah dipadam.'));
+      await _refresh();
+    } catch (error) {
+      _showMessage(_friendlyError(error, widget.state));
+    } finally {
+      if (mounted) setState(() => _deleting = null);
+    }
+  }
+
+  Future<void> _refresh() async {
+    setState(() {
+      _loading = true;
+      _loadError = null;
+      _loadMoreError = null;
+    });
+    try {
+      final page = await _loadPage(cursor: null);
+      if (!mounted) return;
+      setState(() {
+        _questions = page.questions;
+        _nextCursor = page.nextCursor;
+        _hasMore = page.hasMore;
+        _loading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _loadError = error;
+      });
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_loading || _loadingMore || !_hasMore || _nextCursor == null) return;
+    setState(() {
+      _loadingMore = true;
+      _loadMoreError = null;
+    });
+    try {
+      final page = await _loadPage(cursor: _nextCursor);
+      if (!mounted) return;
+      setState(() {
+        final seen = _questions.map((question) => question.id).toSet();
+        _questions = [
+          ..._questions,
+          ...page.questions
+              .where((question) => !seen.contains(question.id))
+              .toList(growable: false),
+        ];
+        _nextCursor = page.nextCursor;
+        _hasMore = page.hasMore;
+        _loadingMore = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loadingMore = false;
+        _loadMoreError = error;
+      });
+    }
+  }
+
+  void _handleLatestPage(List<ForumQuestion> latest) {
+    final firstPageIds = _questions
+        .take(QaForumPage.pageSize)
+        .map((question) => question.id)
+        .toList(growable: false);
+    final latestIds = latest
+        .map((question) => question.id)
+        .toList(growable: false);
+    final reordered = !listEquals(latestIds, firstPageIds);
+    if (reordered && !_loading && !_loadingMore && mounted) {
+      _refresh();
+    }
+  }
+
+  void _onFilterChanged() {
+    setState(() {});
+    // Filters operate on loaded pages but reset the accumulated paging state
+    // so a stale cursor cannot create gaps behind a narrower filter.
+    _refresh();
+  }
 
   Widget _filterField() => Padding(
     padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
     child: TextField(
       controller: _filter,
-      onChanged: (_) => setState(() {}),
+      onChanged: (_) => _onFilterChanged(),
       decoration: InputDecoration(
-        prefixIcon: const Icon(Icons.search),
+        // Tie the search field to the Forum accent with a faint lavender fill.
+        fillColor: LogicOasisTheme.of(context).violet.withValues(alpha: .05),
+        prefixIcon: Icon(
+          Icons.search,
+          color: LogicOasisTheme.of(context).violet,
+        ),
         hintText: _t('Filter questions', 'Tapis soalan'),
         suffixIcon: _filter.text.isEmpty
             ? null
@@ -189,7 +503,7 @@ class _QaForumPageState extends State<QaForumPage> {
                 tooltip: _t('Clear filter', 'Kosongkan tapisan'),
                 onPressed: () {
                   _filter.clear();
-                  setState(() {});
+                  _onFilterChanged();
                 },
                 icon: const Icon(Icons.clear),
               ),
@@ -361,43 +675,61 @@ class _QaForumPageState extends State<QaForumPage> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => _AnswersPage(
+          builder: (_) => ForumDiscussionPage(
             question: question,
             state: widget.state,
             repository: _repository ?? widget.repository,
             answersStream: widget.answersStreamForQuestion?.call(question.id),
             blockedStudentIdsStream: widget.blockedStudentIdsStream,
+            authorFeedbackStreamForAnswer:
+                widget.authorFeedbackStreamForAnswer,
           ),
         ),
       );
 }
 
-class _AnswersPage extends StatefulWidget {
-  const _AnswersPage({
+class ForumDiscussionPage extends StatefulWidget {
+  const ForumDiscussionPage({
     required this.question,
     required this.state,
     this.repository,
     this.answersStream,
     this.blockedStudentIdsStream,
+    this.authorFeedbackStreamForAnswer,
+    this.returnOnLinkedSubmit = false,
   });
   final ForumQuestion question;
   final AppState state;
   final CollaborationRepository? repository;
   final Stream<List<ForumAnswer>>? answersStream;
   final Stream<Set<String>>? blockedStudentIdsStream;
+  final Stream<ForumAnswerFeedback> Function(String answerId)?
+  authorFeedbackStreamForAnswer;
+  /// When the thread was opened from quiz review, returning the student to
+  /// the review card automatically after a successful linked submission.
+  final bool returnOnLinkedSubmit;
   @override
-  State<_AnswersPage> createState() => _AnswersPageState();
+  State<ForumDiscussionPage> createState() => _AnswersPageState();
 }
 
-class _AnswersPageState extends State<_AnswersPage> {
+class _AnswersPageState extends State<ForumDiscussionPage> {
   final _answer = TextEditingController();
+  final _explanation = TextEditingController();
   final _status = const ForumAiStatusService();
   final Set<String> _inFlight = {};
   StreamSubscription<Set<String>>? _blockedSubscription;
+  Timer? _returnTimer;
   Set<String> _blockedAuthors = const {};
   Object? _blockedError;
   String? _acceptedAnswerId;
   bool _submitting = false;
+
+  bool get _isLinked => widget.question.mode == 'linked';
+
+  List<String> get _options =>
+      widget.state.isBahasaMelayu
+          ? widget.question.optionsBm
+          : widget.question.options;
   CollaborationRepository? _repository;
   CollaborationRepository get _repo =>
       _repository ??= widget.repository ?? CollaborationRepository();
@@ -430,7 +762,9 @@ class _AnswersPageState extends State<_AnswersPage> {
   @override
   void dispose() {
     _answer.dispose();
+    _explanation.dispose();
     _blockedSubscription?.cancel();
+    _returnTimer?.cancel();
     super.dispose();
   }
 
@@ -444,12 +778,26 @@ class _AnswersPageState extends State<_AnswersPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                widget.question.title,
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 6),
-              Text(widget.question.text),
+              Builder(builder: (context) {
+                final promptBm =
+                    widget.state.isBahasaMelayu &&
+                        (widget.question.promptBm?.isNotEmpty ?? false)
+                    ? widget.question.promptBm!
+                    : null;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      promptBm ?? widget.question.title,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    if (promptBm == null) ...[
+                      const SizedBox(height: 6),
+                      Text(widget.question.text),
+                    ],
+                  ],
+                );
+              }),
             ],
           ),
         ),
@@ -493,7 +841,22 @@ class _AnswersPageState extends State<_AnswersPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(answer.text),
+                            Text(
+                              answer.mode == 'linked'
+                                  ? (answer.explanation ?? '')
+                                  : answer.text,
+                            ),
+                            if (answer.mode == 'linked') ...[
+                              const SizedBox(height: 6),
+                              Text(
+                                _t(
+                                  'Final answer: ${_optionLabel(answer.selectedOption)}',
+                                  'Jawapan akhir: ${_optionLabel(answer.selectedOption)}',
+                                ),
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(fontWeight: FontWeight.w700),
+                              ),
+                            ],
                             if (answer.acceptedAt != null ||
                                 effectiveAcceptedAnswerId == answer.id) ...[
                               const SizedBox(height: 8),
@@ -510,13 +873,44 @@ class _AnswersPageState extends State<_AnswersPage> {
                             const SizedBox(height: 8),
                             if (answer.authorId ==
                                 widget.state.currentStudentId)
-                              Text(
-                                _status.statusText(
-                                  answer.feedback,
-                                  isBahasaMelayu: widget.state.isBahasaMelayu,
-                                ),
-                                style: Theme.of(context).textTheme.bodySmall,
+                              _AuthorFeedbackText(
+                                legacyFeedbackPresent:
+                                    answer.feedback.state != 'queued',
+                                legacyFeedback: answer.feedback,
+                                feedbackFactory: () =>
+                                    widget.authorFeedbackStreamForAnswer?.call(
+                                      answer.id,
+                                    ) ??
+                                    _repo.watchOwnFeedback(answer.id),
+                                status: _status,
+                                isBahasaMelayu:
+                                    widget.state.isBahasaMelayu,
                               ),
+                            if (_status.publicBadgeLabel(
+                                  answer.aiPublicState,
+                                  isBahasaMelayu:
+                                      widget.state.isBahasaMelayu,
+                                ) !=
+                                null) ...[
+                              const SizedBox(height: 8),
+                              _PublicAdvisoryBadge(
+                                label: _status.publicBadgeLabel(
+                                      answer.aiPublicState,
+                                      isBahasaMelayu:
+                                          widget.state.isBahasaMelayu,
+                                    )!,
+                                explanation: _status.publicBadgeExplanation(
+                                  answer.aiPublicState,
+                                  isBahasaMelayu:
+                                      widget.state.isBahasaMelayu,
+                                ),
+                                icon:
+                                    answer.aiPublicState ==
+                                        'may_be_irrelevant'
+                                    ? Icons.help_outline
+                                    : Icons.verified_outlined,
+                              ),
+                            ],
                             Row(
                               children: [
                                 TextButton.icon(
@@ -560,13 +954,22 @@ class _AnswersPageState extends State<_AnswersPage> {
                                   itemBuilder: (_) => [
                                     if (answer.authorId ==
                                             widget.state.currentStudentId &&
-                                        answer.acceptedAt == null)
+                                        answer.acceptedAt == null &&
+                                        effectiveAcceptedAnswerId !=
+                                            answer.id) ...[
                                       PopupMenuItem(
                                         value: _AnswerAction.edit,
                                         child: Text(
                                           _t('Edit answer', 'Edit jawapan'),
                                         ),
                                       ),
+                                      PopupMenuItem(
+                                        value: _AnswerAction.delete,
+                                        child: Text(
+                                          _t('Delete answer', 'Padam jawapan'),
+                                        ),
+                                      ),
+                                    ],
                                     if (answer.authorId !=
                                         widget.state.currentStudentId) ...[
                                       PopupMenuItem(
@@ -596,29 +999,41 @@ class _AnswersPageState extends State<_AnswersPage> {
         SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _answer,
-                    minLines: 2,
-                    maxLines: 4,
-                    maxLength: 4000,
-                    decoration: InputDecoration(
-                      hintText: _t(
-                        'Explain how you worked it out…',
-                        'Terangkan cara anda menyelesaikannya…',
+            child: _isLinked
+                ? ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 360),
+                    child: SingleChildScrollView(
+                      child: _LinkedAnswerForm(
+                        options: _options,
+                        isBahasaMelayu: widget.state.isBahasaMelayu,
+                        submitLabel: _t('Submit answer', 'Hantar jawapan'),
+                        onSubmit: _submitLinked,
                       ),
                     ),
+                  )
+                : Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _answer,
+                          minLines: 2,
+                          maxLines: 4,
+                          maxLength: 4000,
+                          decoration: InputDecoration(
+                            hintText: _t(
+                              'Explain how you worked it out…',
+                              'Terangkan cara anda menyelesaikannya…',
+                            ),
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.send),
+                        tooltip: _t('Post answer', 'Hantar jawapan'),
+                        onPressed: _submitting ? null : _submit,
+                      ),
+                    ],
                   ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.send),
-                  tooltip: _t('Post answer', 'Hantar jawapan'),
-                  onPressed: _submitting ? null : _submit,
-                ),
-              ],
-            ),
           ),
         ),
       ],
@@ -646,6 +1061,63 @@ class _AnswersPageState extends State<_AnswersPage> {
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
+  }
+
+  String _optionLabel(int? index) {
+    final options = _options;
+    if (index == null || index < 0 || index >= options.length) return '';
+    return options[index];
+  }
+
+  Future<bool> _submitLinked(int selectedOption, String explanation) async {
+    try {
+      await _repo.submitLinkedAnswer(
+        discussionId: widget.question.id,
+        selectedOption: selectedOption,
+        explanation: explanation,
+      );
+      _message(
+        _t(
+          'Answer posted and queued for review.',
+          'Jawapan telah dihantar dan menunggu semakan.',
+        ),
+      );
+      if (widget.returnOnLinkedSubmit) {
+        _returnTimer?.cancel();
+        _returnTimer = Timer(const Duration(seconds: 2), () {
+          if (mounted) Navigator.of(context).pop();
+        });
+      }
+      return true;
+    } catch (error) {
+      _message(_friendlyError(error, widget.state));
+      return false;
+    }
+  }
+
+  Future<void> _editLinkedAnswer(ForumAnswer answer) async {
+    final result = await showDialog<_LinkedAnswerResult>(
+      context: context,
+      builder: (_) => _LinkedAnswerDialog(
+        options: _options,
+        isBahasaMelayu: widget.state.isBahasaMelayu,
+        initialOption: answer.selectedOption,
+        initialExplanation: answer.explanation ?? '',
+      ),
+    );
+    if (result == null) return;
+    await _runAction(
+      'edit:${answer.id}',
+      () => _repo.editLinkedAnswer(
+        answerId: answer.id,
+        selectedOption: result.option,
+        explanation: result.explanation,
+      ),
+      _t(
+        'Response edited successfully. Feedback review queued.',
+        'Jawapan berjaya diedit. Semakan maklum balas sedang menunggu.',
+      ),
+    );
   }
 
   Future<bool> _runAction(
@@ -677,6 +1149,10 @@ class _AnswersPageState extends State<_AnswersPage> {
   }
 
   Future<void> _answerAction(_AnswerAction action, ForumAnswer answer) async {
+    if (action == _AnswerAction.delete) {
+      await _confirmDeleteAnswer(answer);
+      return;
+    }
     if (action == _AnswerAction.block) {
       final blocked = await _runAction(
         'block:${answer.authorId}',
@@ -692,6 +1168,10 @@ class _AnswersPageState extends State<_AnswersPage> {
       if (blocked && mounted) {
         setState(() => _blockedAuthors = {..._blockedAuthors, answer.authorId});
       }
+      return;
+    }
+    if (action == _AnswerAction.edit && answer.mode == 'linked') {
+      await _editLinkedAnswer(answer);
       return;
     }
     final value = await showDialog<String>(
@@ -730,6 +1210,37 @@ class _AnswersPageState extends State<_AnswersPage> {
     );
   }
 
+  Future<void> _confirmDeleteAnswer(ForumAnswer answer) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(_t('Delete this answer?', 'Padam jawapan ini?')),
+        content: Text(
+          _t(
+            'Your answer and its AI review will be removed. This action cannot be undone.',
+            'Jawapan anda dan semakan AI akan dipadam. Tindakan ini tidak boleh dibatalkan.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(_t('Cancel', 'Batal')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(_t('Delete', 'Padam')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await _runAction(
+      'delete:${answer.id}',
+      () => _repo.deleteAnswer(answer.id),
+      _t('Answer deleted.', 'Jawapan telah dipadam.'),
+    );
+  }
+
   void _message(String message) {
     if (mounted)
       ScaffoldMessenger.of(
@@ -738,7 +1249,9 @@ class _AnswersPageState extends State<_AnswersPage> {
   }
 }
 
-enum _AnswerAction { edit, report, block }
+enum _AnswerAction { edit, report, block, delete }
+
+enum _QuestionAction { delete }
 
 class _AnswerActionDialog extends StatefulWidget {
   const _AnswerActionDialog({
@@ -875,4 +1388,319 @@ class _Message extends StatelessWidget {
       child: Text(text, textAlign: TextAlign.center),
     ),
   );
+}
+
+class _LinkedAnswerForm extends StatefulWidget {
+  const _LinkedAnswerForm({
+    required this.options,
+    required this.isBahasaMelayu,
+    required this.submitLabel,
+    required this.onSubmit,
+    this.initialOption,
+    this.initialExplanation = '',
+  });
+
+  final List<String> options;
+  final bool isBahasaMelayu;
+  final String submitLabel;
+  final Future<bool> Function(int option, String explanation) onSubmit;
+  final int? initialOption;
+  final String initialExplanation;
+
+  @override
+  State<_LinkedAnswerForm> createState() => _LinkedAnswerFormState();
+}
+
+class _LinkedAnswerFormState extends State<_LinkedAnswerForm> {
+  int? _selectedOption;
+  late final TextEditingController _explanation = TextEditingController(
+    text: widget.initialExplanation,
+  );
+  bool _submitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedOption = widget.initialOption;
+  }
+
+  @override
+  void dispose() {
+    _explanation.dispose();
+    super.dispose();
+  }
+
+  String _t(String english, String bahasaMelayu) =>
+      widget.isBahasaMelayu ? bahasaMelayu : english;
+
+  void _message(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _submit() async {
+    final option = _selectedOption;
+    final explanation = _explanation.text.trim();
+    if (option == null) {
+      _message(_t('Select an option first.', 'Pilih satu pilihan dahulu.'));
+      return;
+    }
+    if (explanation.length < 8) {
+      _message(
+        _t(
+          'Add at least 8 characters of explanation.',
+          'Tambah sekurang-kurangnya 8 aksara penerangan.',
+        ),
+      );
+      return;
+    }
+    setState(() => _submitting = true);
+    try {
+      final success = await widget.onSubmit(option, explanation);
+      if (success && mounted) {
+        setState(() {
+          _selectedOption = null;
+          _explanation.clear();
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          _t('Choose your final answer', 'Pilih jawapan akhir'),
+          style: theme.textTheme.titleSmall,
+        ),
+        const SizedBox(height: 8),
+        for (var index = 0; index < widget.options.length; index++) ...[
+          _OptionTile(
+            label: widget.options[index],
+            selected: _selectedOption == index,
+            onTap: _submitting
+                ? null
+                : () => setState(() => _selectedOption = index),
+          ),
+          if (index < widget.options.length - 1) const SizedBox(height: 8),
+        ],
+        const SizedBox(height: 12),
+        TextField(
+          controller: _explanation,
+          minLines: 2,
+          maxLines: 4,
+          maxLength: 4000,
+          decoration: InputDecoration(
+            labelText: _t('Explain your answer', 'Terangkan jawapan anda'),
+            hintText: _t(
+              'Show the steps you used…',
+              'Tunjukkan langkah yang anda gunakan…',
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        FilledButton.icon(
+          onPressed: _submitting ? null : _submit,
+          icon: _submitting
+              ? const SizedBox.square(
+                  dimension: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.send),
+          label: Text(widget.submitLabel),
+        ),
+      ],
+    );
+  }
+}
+
+class _OptionTile extends StatelessWidget {
+  const _OptionTile({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: selected
+              ? oasis.violet.withValues(alpha: .10)
+              : oasis.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected ? oasis.violet : oasis.outline,
+            width: 1.4,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              selected
+                  ? Icons.radio_button_checked
+                  : Icons.radio_button_off,
+              color: selected ? oasis.violet : oasis.secondaryInk,
+              size: 20,
+            ),
+            const SizedBox(width: 10),
+            Expanded(child: Text(label, style: theme.textTheme.bodyMedium)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LinkedAnswerResult {
+  const _LinkedAnswerResult(this.option, this.explanation);
+
+  final int option;
+  final String explanation;
+}
+
+class _LinkedAnswerDialog extends StatelessWidget {
+  const _LinkedAnswerDialog({
+    required this.options,
+    required this.isBahasaMelayu,
+    this.initialOption,
+    this.initialExplanation,
+  });
+
+  final List<String> options;
+  final bool isBahasaMelayu;
+  final int? initialOption;
+  final String? initialExplanation;
+
+  @override
+  Widget build(BuildContext context) {
+    final isBahasaMelayu = this.isBahasaMelayu;
+    return AlertDialog(
+      title: Text(
+        isBahasaMelayu ? 'Edit jawapan' : 'Edit answer',
+      ),
+      content: SingleChildScrollView(
+        child: _LinkedAnswerForm(
+          options: options,
+          isBahasaMelayu: isBahasaMelayu,
+          initialOption: initialOption,
+          initialExplanation: initialExplanation ?? '',
+          submitLabel: isBahasaMelayu ? 'Hantar' : 'Submit',
+          onSubmit: (option, explanation) async {
+            Navigator.of(
+              context,
+            ).pop(_LinkedAnswerResult(option, explanation));
+            return true;
+          },
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(isBahasaMelayu ? 'Batal' : 'Cancel'),
+        ),
+      ],
+    );
+  }
+}
+
+class _AuthorFeedbackText extends StatefulWidget {
+  const _AuthorFeedbackText({
+    required this.legacyFeedbackPresent,
+    required this.legacyFeedback,
+    required this.feedbackFactory,
+    required this.status,
+    required this.isBahasaMelayu,
+  });
+
+  final bool legacyFeedbackPresent;
+  final ForumAnswerFeedback legacyFeedback;
+  final Stream<ForumAnswerFeedback> Function() feedbackFactory;
+  final ForumAiStatusService status;
+  final bool isBahasaMelayu;
+
+  @override
+  State<_AuthorFeedbackText> createState() => _AuthorFeedbackTextState();
+}
+
+class _AuthorFeedbackTextState extends State<_AuthorFeedbackText> {
+  Stream<ForumAnswerFeedback>? _stream;
+
+  @override
+  void initState() {
+    super.initState();
+    if (!widget.legacyFeedbackPresent) {
+      _stream = widget.feedbackFactory();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final stream = _stream;
+    if (stream == null) {
+      return Text(
+        widget.status.statusText(
+          widget.legacyFeedback,
+          isBahasaMelayu: widget.isBahasaMelayu,
+        ),
+        style: Theme.of(context).textTheme.bodySmall,
+      );
+    }
+    return StreamBuilder<ForumAnswerFeedback>(
+      stream: stream,
+      builder: (context, snapshot) {
+        final feedback = snapshot.data;
+        if (feedback == null) return const SizedBox.shrink();
+        return Text(
+          widget.status.statusText(
+            feedback,
+            isBahasaMelayu: widget.isBahasaMelayu,
+          ),
+          style: Theme.of(context).textTheme.bodySmall,
+        );
+      },
+    );
+  }
+}
+
+class _PublicAdvisoryBadge extends StatelessWidget {
+  const _PublicAdvisoryBadge({
+    required this.label,
+    required this.explanation,
+    required this.icon,
+  });
+
+  final String label;
+  final String? explanation;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: explanation ?? label,
+      container: true,
+      child: Chip(
+        avatar: Icon(icon, size: 18),
+        label: Text(label),
+      ),
+    );
+  }
 }

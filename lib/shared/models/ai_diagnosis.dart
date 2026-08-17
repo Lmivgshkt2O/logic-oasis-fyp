@@ -25,6 +25,10 @@ class AiDiagnosis {
     this.observationCount,
     this.rankingVersion,
     this.assignment,
+    this.recommendedLearningAction,
+    this.recommendationBasis,
+    this.recommendationTargetTopicId,
+    this.recommendationTargetSubtopicId,
     this.updatedAt,
   }) : _topicId = topicId;
 
@@ -43,6 +47,10 @@ class AiDiagnosis {
   final int? observationCount;
   final String? rankingVersion;
   final AdaptiveAssignment? assignment;
+  final String? recommendedLearningAction;
+  final String? recommendationBasis;
+  final String? recommendationTargetTopicId;
+  final String? recommendationTargetSubtopicId;
   final DateTime? updatedAt;
 
   double get priorityScore => weakTopicPriorityScore ?? 0;
@@ -83,6 +91,9 @@ class AiDiagnosis {
       rankingVersion != null &&
       rankingVersion!.isNotEmpty &&
       masteryProbability != null;
+
+  bool get recommendsAdvance => recommendedLearningAction == 'advance';
+  bool get recommendsRepeat => recommendedLearningAction == 'repeat_subtopic';
 
   /// Only server-projected child-friendly text may be shown as an explanation.
   String? get supportingReason => assignment?.reasonText;
@@ -130,6 +141,14 @@ class AiDiagnosis {
       observationCount: _int(mastery?['observationCount']),
       rankingVersion: _string(mastery?['rankingVersion']),
       assignment: assignment,
+      recommendedLearningAction: _string(mastery?['recommendedLearningAction']),
+      recommendationBasis: _string(mastery?['recommendationBasis']),
+      recommendationTargetTopicId: _string(
+        mastery?['recommendationTargetTopicId'],
+      ),
+      recommendationTargetSubtopicId: _string(
+        mastery?['recommendationTargetSubtopicId'],
+      ),
       updatedAt: status['updatedAt'] is Timestamp
           ? (status['updatedAt'] as Timestamp).toDate()
           : null,

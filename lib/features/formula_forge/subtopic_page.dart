@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:logic_oasis/app/logic_oasis_design.dart';
+import 'package:logic_oasis/app/theme.dart';
+import 'package:logic_oasis/features/quiz/result_page.dart';
 import 'package:logic_oasis/features/quiz/quiz_page.dart';
+import 'package:logic_oasis/shared/models/next_learning_action.dart';
 import 'package:logic_oasis/shared/models/subtopic.dart';
 import 'package:logic_oasis/shared/models/topic.dart';
 import 'package:logic_oasis/shared/services/quiz_session_service.dart';
@@ -10,10 +12,18 @@ import 'package:logic_oasis/shared/state/app_state.dart';
 import 'package:logic_oasis/shared/widgets/logic_oasis_figma_components.dart';
 
 class SubtopicPage extends StatelessWidget {
-  const SubtopicPage({super.key, required this.state, required this.topic});
+  const SubtopicPage({
+    super.key,
+    required this.state,
+    required this.topic,
+    this.sessionService,
+    this.aiDiagnosisStreamFactory,
+  });
 
   final AppState state;
   final Topic topic;
+  final QuizSessionGateway? sessionService;
+  final AiDiagnosisStreamFactory? aiDiagnosisStreamFactory;
 
   @override
   Widget build(BuildContext context) {
@@ -74,19 +84,21 @@ class SubtopicPage extends StatelessWidget {
 
     _showStartingQuiz(context);
     try {
-      final session = await QuizSessionService().startSession(
+      final session = await (sessionService ?? QuizSessionService()).startSession(
         topicId: topic.id,
         subtopicId: subtopic.id,
         yearLevel: topic.yearLevel,
       );
       if (!context.mounted) return;
       Navigator.of(context).pop();
-      await Navigator.of(context).push<void>(
+      final action = await Navigator.of(context).push<NextLearningAction>(
         MaterialPageRoute(
           builder: (_) => QuizPage(
             session: session,
             title: topic.localizedTitle(state.isBahasaMelayu),
             isBahasaMelayu: state.isBahasaMelayu,
+            sessionService: sessionService,
+            aiDiagnosisStreamFactory: aiDiagnosisStreamFactory,
             onFinalized: (completion) {
               state.applyTrustedQuizCompletion(
                 topicId: topic.id,
@@ -95,6 +107,10 @@ class SubtopicPage extends StatelessWidget {
                 totalQuestions:
                     completion.totalQuestions ?? session.questions.length,
               );
+              // Live-update the mastery projection so the card leaves
+              // "Preparing mastery..." as soon as the runtime writes the BKT
+              // result, without waiting for the next quiz or navigation.
+              state.watchTrustedProgress();
               // The callable completion has already been confirmed. Reconcile
               // with its projection without holding the result page hostage to
               // a separate Firestore read.
@@ -103,6 +119,13 @@ class SubtopicPage extends StatelessWidget {
             },
           ),
         ),
+      );
+      if (!context.mounted) return;
+      await _resolveNextLearningAction(
+        context,
+        topic,
+        subtopic,
+        action,
       );
     } on QuizSessionException catch (error) {
       if (!context.mounted) return;
@@ -133,6 +156,82 @@ class SubtopicPage extends StatelessWidget {
       builder: (_) => const Center(child: CircularProgressIndicator()),
     );
   }
+
+  Future<void> _resolveNextLearningAction(
+    BuildContext context,
+    Topic topic,
+    Subtopic subtopic,
+    NextLearningAction? action,
+  ) async {
+    if (action == null || action.isBack) return;
+    if (action.isRepeat) {
+      await _startSubtopicQuiz(context, topic, subtopic);
+      return;
+    }
+    if (action.isAdvance) {
+      await _handleAdvance(context, topic, action);
+    }
+  }
+
+  Future<void> _handleAdvance(
+    BuildContext context,
+    Topic topic,
+    NextLearningAction action,
+  ) async {
+    final targetTopicId = action.targetTopicId;
+    final targetSubtopicId = action.targetSubtopicId;
+    if (targetSubtopicId != null &&
+        (targetTopicId == null || targetTopicId == topic.id)) {
+      final matches = state
+          .subtopicsForTopic(topic)
+          .where((item) => item.id == targetSubtopicId)
+          .toList();
+      if (matches.isNotEmpty) {
+        await _startSubtopicQuiz(context, topic, matches.first);
+        return;
+      }
+    }
+
+    final topics = state.topics;
+    if (targetTopicId != null && targetTopicId != topic.id) {
+      final nextTopic = topics.where((item) => item.id == targetTopicId).toList();
+      if (nextTopic.isNotEmpty) {
+        _openSubtopicPage(context, nextTopic.first);
+        return;
+      }
+    }
+
+    final topicIndex = topics.indexWhere((item) => item.id == topic.id);
+    if (topicIndex >= 0 && topicIndex + 1 < topics.length) {
+      _openSubtopicPage(context, topics[topicIndex + 1]);
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          state.t(
+            'You completed all available topics!',
+            'Anda telah melengkapkan semua topik yang tersedia!',
+          ),
+        ),
+      ),
+    );
+    Navigator.of(context).popUntil((route) => route.isFirst);
+  }
+
+  void _openSubtopicPage(BuildContext context, Topic nextTopic) {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(
+        builder: (_) => SubtopicPage(
+          state: state,
+          topic: nextTopic,
+          sessionService: sessionService,
+          aiDiagnosisStreamFactory: aiDiagnosisStreamFactory,
+        ),
+      ),
+    );
+  }
 }
 
 class _TopicProgressSummary extends StatelessWidget {
@@ -143,6 +242,8 @@ class _TopicProgressSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
     final subtopics = state.subtopicsForTopic(topic);
     final completed = subtopics.where((subtopic) => subtopic.isComplete).length;
     return SoftCard(
@@ -153,9 +254,9 @@ class _TopicProgressSummary extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.route_rounded,
-                color: LogicOasisDesign.forest,
+                color: oasis.forest,
                 size: 20,
               ),
               const SizedBox(width: 8),
@@ -165,7 +266,7 @@ class _TopicProgressSummary extends StatelessWidget {
                     '$completed of ${subtopics.length} subtopics completed',
                     '$completed daripada ${subtopics.length} subtopik selesai',
                   ),
-                  style: Theme.of(context).textTheme.titleMedium,
+                  style: theme.textTheme.titleMedium,
                 ),
               ),
             ],
@@ -173,7 +274,6 @@ class _TopicProgressSummary extends StatelessWidget {
           const SizedBox(height: 10),
           ProgressBar(
             value: topic.progress,
-            color: LogicOasisDesign.leaf,
             height: 7,
           ),
         ],
@@ -197,19 +297,29 @@ class _SubtopicCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
     final unlocked = state.isSubtopicUnlocked(topic, subtopic);
     final lockedReason = state.lockedReasonForSubtopic(topic, subtopic);
     // A client-side question preview alone is not sufficient for the U3
     // callable workflow: the selected bank must also be active on the server.
     // This avoids offering a playable card that would fail at quiz start while
     // its Firestore bank deployment is still pending.
-    final hasActiveServerBank = subtopic.activeBankCount > 0;
-    final canStart =
-        unlocked && hasActiveServerBank && subtopic.questions.isNotEmpty;
-    final masteryLabel = unlocked ? subtopic.mastery : 'Lock';
+    // The server callable is the bank authority: the card stays tappable as
+    // long as client-safe questions are present, so a stale or missing
+    // `activeBankCount` never locks the first subtopic. If the server bank is
+    // genuinely unavailable, the start attempt returns a clear localized error.
+    final hasClientQuestions = subtopic.questions.isNotEmpty;
+    final canStart = unlocked && hasClientQuestions;
+    final status = _SubtopicStatus.forSubtopic(
+      subtopic,
+      unlocked: unlocked,
+      isBahasaMelayu: state.isBahasaMelayu,
+      oasis: oasis,
+    );
     final description =
         lockedReason ??
-        (!hasActiveServerBank || subtopic.questions.isEmpty
+        (!hasClientQuestions
             ? state.t(
                 'Question bank is not ready yet.',
                 'Bank soalan belum tersedia.',
@@ -237,10 +347,8 @@ class _SubtopicCard extends StatelessWidget {
                           subtopic.localizedTitle(state.isBahasaMelayu),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: LogicOasisDesign.ink,
+                          style: theme.textTheme.titleMedium?.copyWith(
                             fontSize: 17,
-                            fontWeight: FontWeight.w900,
                           ),
                         ),
                       ),
@@ -249,8 +357,8 @@ class _SubtopicCard extends StatelessWidget {
                             ? Icons.play_arrow_rounded
                             : Icons.lock_outline_rounded,
                         color: canStart
-                            ? LogicOasisDesign.forest
-                            : const Color(0xFF8C7A61),
+                            ? oasis.forest
+                            : oasis.neutral,
                       ),
                     ],
                   ),
@@ -259,38 +367,47 @@ class _SubtopicCard extends StatelessWidget {
                     description,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: LogicOasisDesign.body,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: oasis.secondaryInk,
                       fontSize: 12.5,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ProgressBar(
-                          value: subtopic.progress,
-                          color: LogicOasisDesign.leaf,
-                          height: 6,
+                  Semantics(
+                    container: true,
+                    label: status.progressSemanticsLabel,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: ProgressBar(
+                            value: status.progress,
+                            color: status.progressColor,
+                            height: 6,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      StatusChip(
-                        label: masteryLabel,
-                        icon: unlocked ? null : 'lock_outline',
-                        color: !unlocked
-                            ? const Color(0xFF8C7A61)
-                            : subtopic.isComplete
-                            ? LogicOasisDesign.forest
-                            : const Color(0xFFB96E00),
-                        background: !unlocked
-                            ? const Color(0xFFF1E8D7)
-                            : subtopic.isComplete
-                            ? const Color(0xFFE3F5DB)
-                            : const Color(0xFFFFF0CC),
-                      ),
-                    ],
+                        if (status.percentageLabel != null) ...[
+                          const SizedBox(width: 8),
+                          Text(
+                            status.percentageLabel!,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: oasis.secondaryInk,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(width: 10),
+                        Flexible(
+                          child: StatusChip(
+                            label: status.label,
+                            icon: status.icon,
+                            color: status.color,
+                            background: status.background,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -298,6 +415,119 @@ class _SubtopicCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Child-facing mastery/status shown on a subtopic card. It renders only
+/// server-derived values: BKT mastery when available, a clearly labelled
+/// quiz-progress rate on fallback, and no invented percentage while pending.
+class _SubtopicStatus {
+  const _SubtopicStatus({
+    required this.label,
+    required this.color,
+    required this.background,
+    required this.progressColor,
+    this.icon,
+    this.progress = 0,
+    this.percentageLabel,
+    this.progressSemanticsLabel = '',
+  });
+
+  final String label;
+  final Color color;
+  final Color background;
+  final Color progressColor;
+  final String? icon;
+  final double progress;
+  final String? percentageLabel;
+  final String progressSemanticsLabel;
+
+  factory _SubtopicStatus.forSubtopic(
+    Subtopic subtopic, {
+    required bool unlocked,
+    required bool isBahasaMelayu,
+    required OasisSemanticTheme oasis,
+  }) {
+    if (!unlocked) {
+      return _SubtopicStatus(
+        label: 'Lock',
+        color: oasis.neutral,
+        background: oasis.groupedSurface,
+        progressColor: oasis.neutral,
+        icon: 'lock_outline',
+        progressSemanticsLabel: 'Locked',
+      );
+    }
+    if (!subtopic.isAttempted) {
+      final label =
+          subtopic.mastery == 'New'
+              ? (isBahasaMelayu ? 'Baru' : 'New')
+              : subtopic.mastery;
+      return _SubtopicStatus(
+        label: label,
+        color: OasisSemanticTheme.continuedPracticeText,
+        background: oasis.reward.withValues(alpha: .15),
+        progressColor: oasis.leaf,
+        progressSemanticsLabel: label,
+      );
+    }
+    if (subtopic.isAnalysisPending) {
+      final label = isBahasaMelayu
+          ? 'Menyediakan penguasaan…'
+          : 'Preparing mastery…';
+      return _SubtopicStatus(
+        label: label,
+        color: OasisSemanticTheme.continuedPracticeText,
+        background: oasis.reward.withValues(alpha: .15),
+        progressColor: oasis.leaf,
+        progressSemanticsLabel: label,
+      );
+    }
+    if (subtopic.usesCorrectRateFallback) {
+      final percent = ((subtopic.bestCorrectRate ?? 0) * 100).round();
+      final label = isBahasaMelayu
+          ? 'Kemajuan kuiz $percent%'
+          : 'Quiz progress $percent%';
+      return _SubtopicStatus(
+        label: label,
+        color: OasisSemanticTheme.continuedPracticeText,
+        background: oasis.reward.withValues(alpha: .15),
+        progress: subtopic.bestCorrectRate ?? 0,
+        progressColor: oasis.leaf,
+        progressSemanticsLabel: label,
+      );
+    }
+    final masteryProbability = subtopic.masteryProbability;
+    if (masteryProbability != null) {
+      final percent = (masteryProbability * 100).round();
+      final ready = subtopic.isComplete;
+      final statusLabel = ready
+          ? (isBahasaMelayu ? 'Bersedia untuk teruskan' : 'Ready to move on')
+          : (isBahasaMelayu ? 'Masih belajar' : 'Still learning');
+      final percentageLabel = isBahasaMelayu
+          ? 'Penguasaan $percent%'
+          : 'Mastery $percent%';
+      return _SubtopicStatus(
+        label: statusLabel,
+        color: ready
+            ? oasis.forest
+            : OasisSemanticTheme.continuedPracticeText,
+        background: ready
+            ? oasis.mint
+            : oasis.reward.withValues(alpha: .15),
+        progress: masteryProbability,
+        progressColor: ready ? oasis.leaf : oasis.reward,
+        percentageLabel: percentageLabel,
+        progressSemanticsLabel: '$percentageLabel, $statusLabel',
+      );
+    }
+    return _SubtopicStatus(
+      label: subtopic.mastery,
+      color: OasisSemanticTheme.continuedPracticeText,
+      background: oasis.reward.withValues(alpha: .15),
+      progressColor: oasis.leaf,
+      progressSemanticsLabel: subtopic.mastery,
     );
   }
 }
@@ -310,21 +540,22 @@ class _SubtopicStepBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final oasis = LogicOasisTheme.of(context);
     return Container(
       width: 46,
       height: 46,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: unlocked ? const Color(0xFFE3F5DB) : const Color(0xFFF1E8D7),
-        border: Border.all(color: LogicOasisDesign.line),
+        color: unlocked ? oasis.mint : oasis.groupedSurface,
+        border: Border.all(color: oasis.outline),
       ),
       child: Text(
         '$order',
         style: TextStyle(
-          color: unlocked ? LogicOasisDesign.forest : const Color(0xFF8C7A61),
+          color: unlocked ? oasis.forest : oasis.neutral,
           fontSize: 18,
-          fontWeight: FontWeight.w900,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );
@@ -336,16 +567,17 @@ class _SubtopicHeaderIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final oasis = LogicOasisTheme.of(context);
     return Container(
       width: 58,
       height: 58,
       decoration: BoxDecoration(
-        color: const Color(0xFFE3F5DB),
+        color: oasis.mint,
         borderRadius: BorderRadius.circular(17),
       ),
-      child: const Icon(
+      child: Icon(
         Icons.account_tree_rounded,
-        color: LogicOasisDesign.forest,
+        color: oasis.forest,
         size: 30,
       ),
     );

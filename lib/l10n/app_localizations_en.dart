@@ -271,6 +271,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get crystals => 'Crystals';
 
   @override
+  String get energy => 'Energy';
+
+  @override
+  String get dayStreak => 'Day Streak';
+
+  @override
+  String get tapMarkersToRestoreOasis => 'Tap markers to restore your oasis';
+
+  @override
   String get repairReady => 'Repair Ready';
 
   @override
@@ -300,7 +309,44 @@ class AppLocalizationsEn extends AppLocalizations {
   String get guidedStepsTitle => 'Let\'s review the steps';
 
   @override
+  String get hintTitle => 'Hint';
+
+  @override
+  String examplePrefix(Object example) {
+    return 'Example: $example';
+  }
+
+  @override
   String get secureAnswerChecked => 'Your choice has been securely checked.';
+
+  @override
+  String get reviewTheseFirst => 'Review these first';
+
+  @override
+  String get perfectScore => 'Perfect score! Nothing to review.';
+
+  @override
+  String get nextPractice => 'Next practice';
+
+  @override
+  String nextPracticeLevel(Object difficulty) {
+    return 'Next: $difficulty practice';
+  }
+
+  @override
+  String get practiseAgain => 'Practise Again';
+
+  @override
+  String get moveOn => 'Move On';
+
+  @override
+  String get basedOnQuizProgress => 'Based on your quiz progress';
+
+  @override
+  String get preparingNextPractice => 'Preparing your next practice…';
+
+  @override
+  String get allTopicsComplete => 'You completed all available topics!';
 
   @override
   String parentDashboardSummary(Object name) {
@@ -397,4 +443,349 @@ class AppLocalizationsEn extends AppLocalizations {
   String daysAgo(Object days) {
     return '$days day ago';
   }
+
+  @override
+  String get discussInForum => 'Discuss in forum';
+
+  @override
+  String get openingDiscussion => 'Opening discussion...';
+
+  @override
+  String get discussionUnavailable =>
+      'This question is not available for discussion.';
+
+  @override
+  String parentDashboardCaption(String name) {
+    return 'Safe learning updates for $name.';
+  }
+
+  @override
+  String parentDashboardUpdated(String updated) {
+    return 'Updated: $updated';
+  }
+
+  @override
+  String get glanceFull => 'A steady week with a clear focus.';
+
+  @override
+  String glanceFullSupport(String focus) {
+    return '$focus is the focus, with practice and Mutual Aid activity this week.';
+  }
+
+  @override
+  String get glanceFocusPractice =>
+      'A steady practice week with a clear focus.';
+
+  @override
+  String glanceFocusPracticeSupport(String focus) {
+    return '$focus is the focus, with practice recorded this week.';
+  }
+
+  @override
+  String get glanceFocusPracticeNoMutualAidYet =>
+      'A steady practice week with a clear focus.';
+
+  @override
+  String glanceFocusPracticeNoMutualAidYetSupport(String focus) {
+    return '$focus is the focus, with practice recorded and no Mutual Aid moments yet.';
+  }
+
+  @override
+  String get glanceFocusNoPracticeYetMutualAid =>
+      'Forum activity with a clear focus.';
+
+  @override
+  String glanceFocusNoPracticeYetMutualAidSupport(String focus) {
+    return '$focus is the focus, with Mutual Aid moments and no practice recorded yet.';
+  }
+
+  @override
+  String get glanceFocusNoPracticeYet => 'A clear focus is ready.';
+
+  @override
+  String glanceFocusNoPracticeYetSupport(String focus) {
+    return '$focus is the focus. Practice evidence is still being collected.';
+  }
+
+  @override
+  String get glanceFocusNoPracticeYetNoMutualAidYet =>
+      'A clear focus is ready.';
+
+  @override
+  String glanceFocusNoPracticeYetNoMutualAidYetSupport(String focus) {
+    return '$focus is the focus. Practice and Mutual Aid activity are still being collected.';
+  }
+
+  @override
+  String get glanceFocusMutualAid => 'Forum activity with a clear focus.';
+
+  @override
+  String glanceFocusMutualAidSupport(String focus) {
+    return '$focus is the focus, with Mutual Aid moments recorded this week.';
+  }
+
+  @override
+  String get glanceFocusNoMutualAidYet => 'A clear focus is ready.';
+
+  @override
+  String glanceFocusNoMutualAidYetSupport(String focus) {
+    return '$focus is the focus, with no Mutual Aid moments yet.';
+  }
+
+  @override
+  String get glanceFocusOnly => 'A clear focus is ready.';
+
+  @override
+  String glanceFocusOnlySupport(String focus) {
+    return '$focus is the current learning focus.';
+  }
+
+  @override
+  String get glancePracticeRecorded => 'Practice is being recorded this week.';
+
+  @override
+  String get glancePracticeRecordedSupport =>
+      'Practice continues while more Understanding evidence is collected.';
+
+  @override
+  String get glanceNoPracticeYet => 'No practice completed yet this week.';
+
+  @override
+  String get glanceNoPracticeYetSupport =>
+      'A short practice can start the weekly routine.';
+
+  @override
+  String get glanceMutualAidRecorded =>
+      'Mutual Aid activity is recorded this week.';
+
+  @override
+  String get glanceMutualAidRecordedSupport =>
+      'More Understanding and Practice evidence is still being collected.';
+
+  @override
+  String get glanceNoMutualAidYet => 'No Mutual Aid moments yet this week.';
+
+  @override
+  String get glanceNoMutualAidYetSupport =>
+      'More Understanding and Practice evidence is still being collected.';
+
+  @override
+  String get glanceNoDataYet => 'Learning evidence is still being collected.';
+
+  @override
+  String get glanceNoDataYetSupport =>
+      'Safe updates will appear after the next completed practice.';
+
+  @override
+  String get understandingCardTitle => 'Understanding';
+
+  @override
+  String get learningSnapshotLabel => 'Learning snapshot';
+
+  @override
+  String get practiceCardTitle => 'Practice Effort';
+
+  @override
+  String get mutualAidCardTitle => 'Mutual Aid';
+
+  @override
+  String get conversationStarterTitle => 'A gentle question to ask';
+
+  @override
+  String get focusStatusNeedsGuidedPractice => 'Needs guided practice';
+
+  @override
+  String get focusStatusGrowing => 'Growing';
+
+  @override
+  String get focusStatusCurrentStrength => 'Current strength';
+
+  @override
+  String focusTopic(String topic) {
+    return 'Topic: $topic';
+  }
+
+  @override
+  String focusSubtopic(String subtopic) {
+    return 'Focus: $subtopic';
+  }
+
+  @override
+  String focusObservationSentence(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Based on $count trusted learning observations.',
+      one: 'Based on 1 trusted learning observation.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String focusStrength(String subtopic) {
+    return 'Strength: $subtopic';
+  }
+
+  @override
+  String get understandingInsufficient =>
+      'More recent learning evidence is needed before a focus can be named.';
+
+  @override
+  String get understandingUnavailable =>
+      'Understanding is temporarily unavailable.';
+
+  @override
+  String get parentNextStep => 'Parent next step';
+
+  @override
+  String actionUnderstandingFocus(String subtopic) {
+    return 'Practise $subtopic together this week.';
+  }
+
+  @override
+  String actionMaintainStrength(String subtopic) {
+    return 'Keep $subtopic fresh with a short practice.';
+  }
+
+  @override
+  String get actionPracticeRoutine =>
+      'One short practice this week keeps the routine going.';
+
+  @override
+  String get actionMutualAidInvitation =>
+      'Ask whether classmates answered a maths question this week.';
+
+  @override
+  String get actionNeedsMoreActivity =>
+      'More activity is needed before a recommendation can be made.';
+
+  @override
+  String practiceWeekly(int total) {
+    String _temp0 = intl.Intl.pluralLogic(
+      total,
+      locale: localeName,
+      other: '$total practices completed this week',
+      one: '1 practice completed this week',
+      zero: 'No practice completed yet this week',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String practiceActiveDays(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count active days',
+      one: '1 active day',
+    );
+    return 'across $_temp0';
+  }
+
+  @override
+  String get practiceUnavailable => 'Practice effort is unavailable this week.';
+
+  @override
+  String practiceComparison(int previous) {
+    String _temp0 = intl.Intl.pluralLogic(
+      previous,
+      locale: localeName,
+      other: '$previous practices',
+      one: '1 practice',
+    );
+    return 'Compared with $_temp0 last week.';
+  }
+
+  @override
+  String practiceImproved(int difference) {
+    return 'Practice improved by $difference this week.';
+  }
+
+  @override
+  String get dayMonday => 'Mon';
+
+  @override
+  String get dayTuesday => 'Tue';
+
+  @override
+  String get dayWednesday => 'Wed';
+
+  @override
+  String get dayThursday => 'Thu';
+
+  @override
+  String get dayFriday => 'Fri';
+
+  @override
+  String get daySaturday => 'Sat';
+
+  @override
+  String get daySunday => 'Sun';
+
+  @override
+  String mutualAidQuestions(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count questions asked',
+      one: '1 question asked',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String mutualAidReplies(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count replies',
+      one: '1 reply',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String mutualAidAccepted(int count) {
+    return ' · $count accepted';
+  }
+
+  @override
+  String mutualAidHelpfulMarks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count helpful marks',
+      one: '1 helpful mark',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get mutualAidZero => 'No Mutual Aid moments yet this week.';
+
+  @override
+  String get mutualAidUnavailable =>
+      'Participation summary is unavailable this week.';
+
+  @override
+  String conversationUnderstandingFocus(String subtopic) {
+    return 'What part of $subtopic should we look at together?';
+  }
+
+  @override
+  String conversationMaintainStrength(String subtopic) {
+    return 'Would you like to show me how you solve $subtopic?';
+  }
+
+  @override
+  String get conversationPracticeRoutine =>
+      'Shall we do one short practice together this week?';
+
+  @override
+  String get conversationMutualAidInvitation =>
+      'Did anyone in class help with a maths question this week?';
+
+  @override
+  String get conversationNeedsMoreActivity =>
+      'What did you enjoy practising this week?';
 }

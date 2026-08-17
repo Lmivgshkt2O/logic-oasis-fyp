@@ -1,0 +1,13 @@
+# Keep the deployed bundle lean and secret-free. The runtime reads the model
+# artifacts, manifest, and vendored runtime from this directory, so those stay.
+venv/
+venv/**/
+.venv/
+.venv/**/
+tests/
+tests/**/
+__pycache__/
+**/__pycache__/
+*.pyc
+.env
+.env.*

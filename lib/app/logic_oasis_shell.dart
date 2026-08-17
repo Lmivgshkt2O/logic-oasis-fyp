@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:logic_oasis/app/logic_oasis_design.dart';
 import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/features/collaboration/qa_forum/qa_forum_page.dart';
 import 'package:logic_oasis/features/formula_forge/formula_forge_page.dart';
@@ -92,39 +91,31 @@ class _LogicOasisShellState extends State<LogicOasisShell> {
       SettingsPage(state: state, onLogout: widget.onLogout),
     ];
 
-    return Theme(
-      data: state.eyeComfortMode
-          ? LogicOasisTheme.eyeComfort()
-          : LogicOasisTheme.light(),
-      child: Scaffold(
-        backgroundColor: state.eyeComfortMode
-            ? const Color(0xFFFFF1CE)
-            : LogicOasisDesign.page,
-        body: Stack(
-          children: [
-            pages[state.selectedTab],
-            if (showWelcome && state.selectedTab == 0)
-              Positioned(
-                top: 18,
-                right: 78,
-                child: _WelcomeToast(
-                  studentName: widget.welcomeStudentName!.trim(),
-                ),
+    return Scaffold(
+      body: Stack(
+        children: [
+          pages[state.selectedTab],
+          if (showWelcome && state.selectedTab == 0)
+            Positioned(
+              top: 18,
+              right: 78,
+              child: _WelcomeToast(
+                studentName: widget.welcomeStudentName!.trim(),
               ),
+            ),
+        ],
+      ),
+      bottomNavigationBar: DecoratedBox(
+        decoration: const BoxDecoration(color: Colors.transparent),
+        child: BottomNavBar(
+          selectedIndex: state.selectedTab,
+          onSelected: state.changeTab,
+          items: [
+            BottomNavItemData(icon: 'nav_home', label: l10n.home),
+            BottomNavItemData(icon: 'nav_forge', label: l10n.forge),
+            BottomNavItemData(icon: 'nav_forum', label: l10n.forum),
+            BottomNavItemData(icon: 'nav_settings', label: l10n.settings),
           ],
-        ),
-        bottomNavigationBar: DecoratedBox(
-          decoration: const BoxDecoration(color: Colors.transparent),
-          child: BottomNavBar(
-            selectedIndex: state.selectedTab,
-            onSelected: state.changeTab,
-            items: [
-              BottomNavItemData(icon: 'nav_home', label: l10n.home),
-              BottomNavItemData(icon: 'nav_forge', label: l10n.forge),
-              BottomNavItemData(icon: 'nav_forum', label: l10n.forum),
-              BottomNavItemData(icon: 'nav_settings', label: l10n.settings),
-            ],
-          ),
         ),
       ),
     );
@@ -139,6 +130,7 @@ class _WelcomeToast extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
 
     return Material(
       color: Colors.transparent,
@@ -149,17 +141,17 @@ class _WelcomeToast extends StatelessWidget {
           constraints: const BoxConstraints(maxWidth: 220),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
           decoration: BoxDecoration(
-            color: LogicOasisDesign.card,
+            color: oasis.surface,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: LogicOasisDesign.line),
-            boxShadow: LogicOasisDesign.softShadow,
+            border: Border.all(color: oasis.outline),
+            boxShadow: oasis.softShadow,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
+              Icon(
                 Icons.waving_hand_outlined,
-                color: LogicOasisDesign.leaf,
+                color: oasis.leaf,
                 size: 20,
               ),
               const SizedBox(width: 8),

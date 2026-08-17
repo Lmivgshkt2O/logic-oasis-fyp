@@ -2,7 +2,7 @@
   "command": "python -m training.evaluate_forum_classifier",
   "commandArguments": [
     "--catalogue",
-    "ai_pipeline/forum_controlled_demo/forum_scenario_catalog_v1.yaml",
+    "ai_pipeline/forum_controlled_demo/forum_verification_catalog_v1.yaml",
     "--generated",
     "ai_pipeline/forum_controlled_demo/generated",
     "--reports",
@@ -11,10 +11,10 @@
     "developer"
   ],
   "environmentMode": "controlled_demo_generation",
-  "executionTimestampUtc": "2026-08-03T14:45:04.337513+00:00",
+  "executionTimestampUtc": "2026-08-13T10:16:11.475419+00:00",
   "logicalWorkingPath": "ai_pipeline",
-  "observedWarmPredictionLatencyMs": 3.4102,
+  "observedWarmPredictionLatencyMs": 6.6354,
   "operatingSystem": "Windows",
   "operatorRole": "developer",
-  "pythonVersion": "3.12.13"
+  "pythonVersion": "3.11.9"
 }

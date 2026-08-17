@@ -8,19 +8,20 @@ class RecommendationBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final oasis = LogicOasisTheme.of(context);
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: LogicOasisTheme.sand,
+        color: oasis.mint,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFF0D8B8)),
+        border: Border.all(color: oasis.outline),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(
+          Icon(
             Icons.tips_and_updates_outlined,
-            color: LogicOasisTheme.clay,
+            color: oasis.leaf,
           ),
           const SizedBox(width: 10),
           Expanded(child: Text(text)),

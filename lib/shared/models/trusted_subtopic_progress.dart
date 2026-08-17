@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 /// A bounded, server-owned learning projection. It deliberately excludes raw
 /// responses, answer keys, and any AI/model evidence.
 class TrustedSubtopicProgress {
@@ -9,6 +11,18 @@ class TrustedSubtopicProgress {
     required this.completed,
     required this.masteryLevel,
     required this.bestCorrectRate,
+    this.attempted = false,
+    this.accessUnlocked = false,
+    this.masteryProbability,
+    this.evidenceLevel,
+    this.recommendedLearningAction,
+    this.recommendationBasis,
+    this.recommendationTargetTopicId,
+    this.recommendationTargetSubtopicId,
+    this.projectionStatus,
+    this.lastCorrectRate,
+    this.observationCount,
+    this.updatedAt,
   });
 
   final String studentId;
@@ -18,6 +32,22 @@ class TrustedSubtopicProgress {
   final bool completed;
   final String masteryLevel;
   final double bestCorrectRate;
+  final bool attempted;
+  final bool accessUnlocked;
+  final double? masteryProbability;
+  final String? evidenceLevel;
+  final String? recommendedLearningAction;
+  final String? recommendationBasis;
+  final String? recommendationTargetTopicId;
+  final String? recommendationTargetSubtopicId;
+  final String? projectionStatus;
+  final double? lastCorrectRate;
+
+  /// Number of trusted finalized observations behind the projection.
+  final int? observationCount;
+
+  /// Server-owned projection timestamp, absent on legacy documents.
+  final DateTime? updatedAt;
 
   factory TrustedSubtopicProgress.fromFirestore(Map<String, dynamic> data) {
     final studentId = data['studentId'];
@@ -45,6 +75,26 @@ class TrustedSubtopicProgress {
       completed: _requiredCompleted(completed),
       masteryLevel: _requiredMasteryLevel(masteryLevel, masteryLevels),
       bestCorrectRate: _requiredRate(rate),
+      attempted: data['attempted'] is bool ? data['attempted'] as bool : false,
+      accessUnlocked: data['accessUnlocked'] is bool
+          ? data['accessUnlocked'] as bool
+          : false,
+      masteryProbability: _optionalRate(data['masteryProbability']),
+      evidenceLevel: _optionalString(data['evidenceLevel']),
+      recommendedLearningAction: _optionalString(
+        data['recommendedLearningAction'],
+      ),
+      recommendationBasis: _optionalString(data['recommendationBasis']),
+      recommendationTargetTopicId: _optionalString(
+        data['recommendationTargetTopicId'],
+      ),
+      recommendationTargetSubtopicId: _optionalString(
+        data['recommendationTargetSubtopicId'],
+      ),
+      projectionStatus: _optionalString(data['projectionStatus']),
+      lastCorrectRate: _optionalRate(data['lastCorrectRate']),
+      observationCount: _optionalObservationCount(data['observationCount']),
+      updatedAt: _optionalUpdatedAt(data['updatedAt']),
     );
   }
 
@@ -71,5 +121,31 @@ class TrustedSubtopicProgress {
   static double _requiredRate(Object? value) {
     if (value is num && value >= 0 && value <= 1) return value.toDouble();
     throw const FormatException('Invalid trusted progress rate.');
+  }
+
+  static double? _optionalRate(Object? value) {
+    if (value == null) return null;
+    if (value is num && value >= 0 && value <= 1) return value.toDouble();
+    throw const FormatException('Invalid trusted progress probability.');
+  }
+
+  static String? _optionalString(Object? value) {
+    if (value == null) return null;
+    if (value is String && value.isNotEmpty) return value;
+    throw const FormatException('Invalid trusted progress field.');
+  }
+
+  static int? _optionalObservationCount(Object? value) {
+    if (value == null) return null;
+    if (value is num && value >= 0 && value == value.roundToDouble()) {
+      return value.toInt();
+    }
+    throw const FormatException('Invalid trusted progress observation count.');
+  }
+
+  static DateTime? _optionalUpdatedAt(Object? value) {
+    if (value == null) return null;
+    if (value is Timestamp) return value.toDate().toUtc();
+    throw const FormatException('Invalid trusted progress updated timestamp.');
   }
 }

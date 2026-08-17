@@ -12,6 +12,11 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import parent_link_admin as links
+from parent_progress import (
+    PARENT_PRACTICE_SUMMARY_SCHEMA_VERSION,
+    PARENT_PRACTICE_TIMEZONE,
+    malaysia_week_start,
+)
 
 
 class _Ref:
@@ -34,6 +39,9 @@ class _Ref:
         if self.data is None:
             raise ValueError("missing")
         self.data.update(data)
+
+    def set(self, data: dict) -> None:
+        self.data = dict(data)
 
 
 class _Collection:
@@ -61,6 +69,9 @@ class _Transaction:
 
     def update(self, ref: _Ref, data: dict) -> None:
         ref.update(data)
+
+    def set(self, ref: _Ref, data: dict) -> None:
+        ref.set(data)
 
 
 class ParentLinkAdminTests(unittest.TestCase):
@@ -185,6 +196,130 @@ class ParentLinkAdminTests(unittest.TestCase):
                     database,
                     get_user=get_user,
                 )
+
+    def test_admin_link_creation_initializes_a_zero_current_week_summary(
+        self,
+    ) -> None:
+        database = _Db()
+        admin = links.VerifiedAdmin(uid="admin_uid", claims={links.PARENT_LINK_ADMIN_CLAIM: True})
+        now = datetime(2026, 7, 21, tzinfo=timezone.utc)
+        with patch.object(links.firestore, "transactional", lambda function: function):
+            links.manage_parent_link(
+                {
+                    "parentId": "parent_uid",
+                    "studentId": "student_uid",
+                    "supervisorApprovalId": "SUP-LINK-ZERO",
+                    "rationale": "Approved link with zero practice init.",
+                },
+                admin,
+                database,
+                get_user=lambda _: SimpleNamespace(uid="present"),
+                now=now,
+            )
+        practice = database.collection("parentPracticeSummaries").document("student_uid").data
+        self.assertEqual(PARENT_PRACTICE_SUMMARY_SCHEMA_VERSION, practice["schemaVersion"])
+        self.assertEqual("student_uid", practice["studentId"])
+        self.assertEqual(PARENT_PRACTICE_TIMEZONE, practice["timezone"])
+        self.assertEqual(malaysia_week_start(now), practice["weekStart"])
+        self.assertEqual([0, 0, 0, 0, 0, 0, 0], practice["dailyCompletionCounts"])
+        self.assertEqual(0, practice["completedPracticeCount"])
+        self.assertEqual(0, practice["activeDayCount"])
+        self.assertNotIn("previousWeekCompletedPracticeCount", practice)
+        self.assertNotIn("lastPracticeAt", practice)
+
+    def test_admin_link_creation_preserves_an_existing_current_week_summary(
+        self,
+    ) -> None:
+        database = _Db()
+        admin = links.VerifiedAdmin(uid="admin_uid", claims={links.PARENT_LINK_ADMIN_CLAIM: True})
+        now = datetime(2026, 7, 21, tzinfo=timezone.utc)
+        existing = {
+            "schemaVersion": PARENT_PRACTICE_SUMMARY_SCHEMA_VERSION,
+            "studentId": "student_uid",
+            "timezone": PARENT_PRACTICE_TIMEZONE,
+            "weekStart": malaysia_week_start(now),
+            "dailyCompletionCounts": [1, 0, 0, 0, 0, 0, 0],
+            "completedPracticeCount": 1,
+            "activeDayCount": 1,
+        }
+        database.collection("parentPracticeSummaries").document("student_uid").data = existing
+        with patch.object(links.firestore, "transactional", lambda function: function):
+            links.manage_parent_link(
+                {
+                    "parentId": "parent_uid",
+                    "studentId": "student_uid",
+                    "supervisorApprovalId": "SUP-LINK-KEEP",
+                    "rationale": "Approved link preserving practice evidence.",
+                },
+                admin,
+                database,
+                get_user=lambda _: SimpleNamespace(uid="present"),
+                now=now,
+            )
+        self.assertIs(
+            existing,
+            database.collection("parentPracticeSummaries").document("student_uid").data,
+        )
+
+    def test_admin_link_creation_fails_closed_on_malformed_summary(self) -> None:
+        database = _Db()
+        admin = links.VerifiedAdmin(uid="admin_uid", claims={links.PARENT_LINK_ADMIN_CLAIM: True})
+        now = datetime(2026, 7, 21, tzinfo=timezone.utc)
+        database.collection("parentPracticeSummaries").document("student_uid").data = {
+            "schemaVersion": PARENT_PRACTICE_SUMMARY_SCHEMA_VERSION,
+            "studentId": "student_uid",
+            "timezone": PARENT_PRACTICE_TIMEZONE,
+            "weekStart": malaysia_week_start(now),
+            "dailyCompletionCounts": [-1, 0, 0, 0, 0, 0, 0],
+            "completedPracticeCount": -1,
+            "activeDayCount": 1,
+        }
+        with patch.object(links.firestore, "transactional", lambda function: function):
+            with self.assertRaisesRegex(links.ParentLinkAdminError, "day counts"):
+                links.manage_parent_link(
+                    {
+                        "parentId": "parent_uid",
+                        "studentId": "student_uid",
+                        "supervisorApprovalId": "SUP-LINK-BAD",
+                        "rationale": "Must fail closed on malformed practice data.",
+                    },
+                    admin,
+                    database,
+                    get_user=lambda _: SimpleNamespace(uid="present"),
+                    now=now,
+                )
+        self.assertIsNone(
+            database.collection("parentLinks").document(
+                links.link_document_id("parent_uid", "student_uid")
+            ).data
+        )
+
+    def test_admin_already_active_link_does_not_backfill_a_summary(self) -> None:
+        database = _Db()
+        admin = links.VerifiedAdmin(uid="admin_uid", claims={links.PARENT_LINK_ADMIN_CLAIM: True})
+        now = datetime(2026, 7, 21, tzinfo=timezone.utc)
+        link_ref = database.collection("parentLinks").document(
+            links.link_document_id("parent_uid", "student_uid")
+        )
+        link_ref.data = {
+            "parentId": "parent_uid",
+            "studentId": "student_uid",
+            "status": "active",
+        }
+        with patch.object(links.firestore, "transactional", lambda function: function):
+            links.manage_parent_link(
+                {
+                    "parentId": "parent_uid",
+                    "studentId": "student_uid",
+                    "supervisorApprovalId": "SUP-LINK-NO-BACKFILL",
+                    "rationale": "Pre-U14 links stay unavailable until practice.",
+                },
+                admin,
+                database,
+                get_user=lambda _: SimpleNamespace(uid="present"),
+                now=now,
+            )
+        self.assertEqual(0, len(database.collection("parentPracticeSummaries").refs))
 
 
 if __name__ == "__main__":

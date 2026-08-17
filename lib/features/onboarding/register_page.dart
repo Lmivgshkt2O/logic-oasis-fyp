@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:logic_oasis/app/logic_oasis_design.dart';
 import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/shared/repositories/auth_repository.dart';
 import 'package:logic_oasis/shared/widgets/recommendation_box.dart';
@@ -84,15 +83,16 @@ class _RegisterPageState extends State<RegisterPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Create student profile')),
       body: DecoratedBox(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [LogicOasisDesign.page, LogicOasisDesign.pageWarm],
+            colors: [oasis.topCanvas, oasis.canvas, oasis.lowerCanvas],
           ),
         ),
         child: SafeArea(
@@ -106,13 +106,13 @@ class _RegisterPageState extends State<RegisterPage> {
                 height: 68,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: LogicOasisTheme.mint,
+                  color: oasis.mint,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: LogicOasisTheme.line),
+                  border: Border.all(color: oasis.outline),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.person_add_alt_1_outlined,
-                  color: LogicOasisTheme.leaf,
+                  color: oasis.leaf,
                   size: 34,
                 ),
               ),
@@ -266,19 +266,21 @@ class _ErrorBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFEDEA),
+        color: oasis.coral.withValues(alpha: .10),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2A39B)),
-        boxShadow: LogicOasisDesign.softShadow,
+        border: Border.all(color: oasis.coral),
+        boxShadow: oasis.softShadow,
       ),
       child: Text(
         message,
-        style: const TextStyle(
-          color: Color(0xFF9A2F24),
-          fontWeight: FontWeight.w800,
+        style: theme.textTheme.bodyMedium?.copyWith(
+          color: oasis.coral,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );

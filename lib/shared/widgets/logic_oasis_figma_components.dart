@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:logic_oasis/app/logic_oasis_design.dart';
+import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/l10n/app_localizations.dart';
 import 'package:logic_oasis/shared/models/oasis_area.dart';
 import 'package:logic_oasis/shared/widgets/restoration_celebration.dart';
@@ -94,22 +95,33 @@ class LogicOasisScaffold extends StatelessWidget {
     super.key,
     required this.children,
     this.padding = const EdgeInsets.fromLTRB(24, 24, 24, 120),
+    this.topTint,
   });
 
   final List<Widget> children;
   final EdgeInsets padding;
 
+  /// Optional feature-identity tint blended into the very top of the layered
+  /// botanical canvas (Home aqua, Forge mint, Settings teal). The tint stays
+  /// restrained so the page accent system remains the primary identity.
+  final Color? topTint;
+
   @override
   Widget build(BuildContext context) {
+    final oasis = LogicOasisTheme.of(context);
     return Material(
       color: Colors.transparent,
       child: SizedBox.expand(
         child: DecoratedBox(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [LogicOasisDesign.page, LogicOasisDesign.pageWarm],
+              colors: [
+                topTint ?? oasis.topCanvas,
+                oasis.canvas,
+                oasis.lowerCanvas,
+              ],
             ),
           ),
           child: SafeArea(
@@ -144,6 +156,7 @@ class LogicHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -157,10 +170,8 @@ class LogicHeader extends StatelessWidget {
                 title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: LogicOasisDesign.forest,
+                style: theme.textTheme.headlineSmall?.copyWith(
                   fontSize: 28,
-                  fontWeight: FontWeight.w900,
                   height: 1.05,
                 ),
               ),
@@ -169,8 +180,7 @@ class LogicHeader extends StatelessWidget {
                 subtitle,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: LogicOasisDesign.body,
+                style: theme.textTheme.bodyLarge?.copyWith(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                   height: 1.18,
@@ -190,28 +200,29 @@ class SoftCard extends StatelessWidget {
     super.key,
     required this.child,
     this.padding = const EdgeInsets.all(20),
-    this.color = LogicOasisDesign.card,
-    this.radius = 24,
+    this.color,
+    this.radius = 20,
     this.onTap,
   });
 
   final Widget child;
   final EdgeInsets padding;
-  final Color color;
+  final Color? color;
   final double radius;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
+    final oasis = LogicOasisTheme.of(context);
     final card = AnimatedContainer(
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
       padding: padding,
       decoration: BoxDecoration(
-        color: color,
+        color: color ?? oasis.surface,
         borderRadius: BorderRadius.circular(radius),
-        border: Border.all(color: const Color(0xFFF0E5D1)),
-        boxShadow: LogicOasisDesign.softShadow,
+        border: Border.all(color: oasis.outline),
+        boxShadow: oasis.softShadow,
       ),
       child: child,
     );
@@ -233,15 +244,16 @@ class SoftIconButton extends StatelessWidget {
     super.key,
     required this.icon,
     this.onTap,
-    this.color = LogicOasisDesign.card,
+    this.color,
   });
 
   final String icon;
   final VoidCallback? onTap;
-  final Color color;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
+    final oasis = LogicOasisTheme.of(context);
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -251,12 +263,16 @@ class SoftIconButton extends StatelessWidget {
           width: 48,
           height: 48,
           decoration: BoxDecoration(
-            color: color,
+            color: color ?? oasis.surface,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFF0E5D1)),
-            boxShadow: LogicOasisDesign.softShadow,
+            border: Border.all(color: oasis.outline),
+            boxShadow: oasis.softShadow,
           ),
-          child: AppSvgIcon(icon, color: const Color(0xFF7D6C55), size: 24),
+          child: AppSvgIcon(
+            icon,
+            color: oasis.secondaryInk,
+            size: 24,
+          ),
         ),
       ),
     );
@@ -270,11 +286,12 @@ class SproutAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final oasis = LogicOasisTheme.of(context);
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: const Color(0xFFDDF5E7),
+        color: oasis.mint,
         borderRadius: BorderRadius.circular(size * .28),
       ),
       child: ClipRRect(
@@ -303,7 +320,12 @@ class StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final oasis = LogicOasisTheme.of(context);
+    final theme = Theme.of(context);
     return SoftCard(
+      // Supporting stat/resource cards sit on the quiet botanical surface so
+      // they read as calm supporting content rather than primary cards.
+      color: oasis.quietSurface,
       padding: EdgeInsets.symmetric(
         horizontal: compact ? 8 : 10,
         vertical: compact ? 10 : 12,
@@ -320,10 +342,10 @@ class StatCard extends StatelessWidget {
               fit: BoxFit.scaleDown,
               child: Text(
                 value,
-                style: const TextStyle(
-                  color: LogicOasisDesign.ink,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: oasis.primaryInk,
                   fontSize: 18,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w700,
                   height: 1,
                 ),
               ),
@@ -334,8 +356,8 @@ class StatCard extends StatelessWidget {
               child: Text(
                 label,
                 maxLines: 1,
-                style: const TextStyle(
-                  color: LogicOasisDesign.body,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: oasis.secondaryInk,
                   fontSize: 11.5,
                   fontWeight: FontWeight.w700,
                   height: 1,
@@ -388,7 +410,7 @@ class StatusChip extends StatelessWidget {
               style: TextStyle(
                 color: color,
                 fontSize: 11,
-                fontWeight: FontWeight.w900,
+                fontWeight: FontWeight.w700,
                 height: 1,
               ),
             ),
@@ -423,6 +445,8 @@ class MissionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -430,7 +454,6 @@ class MissionCard extends StatelessWidget {
         const SizedBox(height: 8),
         SoftCard(
           onTap: onTap,
-          color: const Color(0xFFFFFEF6),
           padding: const EdgeInsets.all(12),
           radius: 20,
           child: Row(
@@ -443,10 +466,12 @@ class MissionCard extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        StatusChip(
-                          label: topicLabel,
-                          color: LogicOasisDesign.forest,
-                          background: const Color(0xFFDFF4D7),
+                        Flexible(
+                          child: StatusChip(
+                            label: topicLabel,
+                            color: oasis.forest,
+                            background: oasis.mint,
+                          ),
                         ),
                         const SizedBox(width: 8),
                         Flexible(
@@ -454,10 +479,10 @@ class MissionCard extends StatelessWidget {
                             durationLabel,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: LogicOasisDesign.body,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: oasis.secondaryInk,
                               fontSize: 12,
-                              fontWeight: FontWeight.w700,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ),
@@ -468,10 +493,8 @@ class MissionCard extends StatelessWidget {
                       title,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: LogicOasisDesign.ink,
+                      style: theme.textTheme.titleMedium?.copyWith(
                         fontSize: 15,
-                        fontWeight: FontWeight.w900,
                         height: 1.05,
                       ),
                     ),
@@ -480,10 +503,10 @@ class MissionCard extends StatelessWidget {
                       rewardLabel,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: LogicOasisDesign.body,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: oasis.secondaryInk,
                         fontSize: 11.5,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 10),
@@ -492,17 +515,15 @@ class MissionCard extends StatelessWidget {
                         Expanded(
                           child: ProgressBar(
                             value: progress,
-                            color: LogicOasisDesign.leaf,
                             height: 6,
                           ),
                         ),
                         const SizedBox(width: 8),
                         Text(
                           progressLabel,
-                          style: const TextStyle(
-                            color: LogicOasisDesign.forest,
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: oasis.forest,
                             fontSize: 12,
-                            fontWeight: FontWeight.w900,
                           ),
                         ),
                       ],
@@ -563,12 +584,13 @@ class OasisHeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final oasis = LogicOasisTheme.of(context);
     final markerAreas = _heroAreas();
 
     return SoftCard(
       padding: EdgeInsets.zero,
       radius: 20,
-      color: const Color(0xFFDDF3E8),
+      color: oasis.mint,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(20),
         child: SizedBox(
@@ -639,35 +661,44 @@ class OasisHeroCard extends StatelessWidget {
                 bottom: 0,
                 child: Container(
                   padding: const EdgeInsets.fromLTRB(12, 9, 12, 10),
-                  decoration: const BoxDecoration(color: Color(0xFFFFFDF4)),
+                  decoration: BoxDecoration(
+                    color: oasis.surface.withValues(alpha: 0.92),
+                  ),
                   child: Row(
                     children: [
-                      const AppSvgIcon(
+                      AppSvgIcon(
                         'repair_marker',
-                        color: Color(0xFF8A7659),
+                        color: oasis.secondaryInk,
                         size: 16,
                       ),
                       const SizedBox(width: 7),
-                      const Expanded(
+                      Expanded(
                         child: Text(
-                          'Tap markers to restore your oasis',
+                          AppLocalizations.of(
+                            context,
+                          )!.tapMarkersToRestoreOasis,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: LogicOasisDesign.body,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                          ),
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(
+                                color: oasis.secondaryInk,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
                         ),
                       ),
                       const SizedBox(width: 8),
                       Text(
                         '${(progress * 100).round()}%',
-                        style: const TextStyle(
-                          color: LogicOasisDesign.forest,
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w900,
-                        ),
+                        style: Theme.of(context)
+                            .textTheme
+                            .labelMedium
+                            ?.copyWith(
+                              color: oasis.forest,
+                              fontSize: 12.5,
+                            ),
                       ),
                     ],
                   ),
@@ -780,12 +811,14 @@ class _RepairDetailSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
     final resourceIcon = area.resource == OasisResource.crystals
         ? 'stat_crystal'
         : 'stat_energy';
     final resourceColor = area.resource == OasisResource.crystals
-        ? LogicOasisDesign.water
-        : LogicOasisDesign.orange;
+        ? oasis.water
+        : oasis.reward;
     final resourceLabel = _resourceLabel(area.resource, l10n);
     final hasImage = area.currentImage.isNotEmpty;
 
@@ -854,10 +887,8 @@ class _RepairDetailSheet extends StatelessWidget {
                             children: [
                               Text(
                                 area.localizedTitle(isBahasaMelayu),
-                                style: const TextStyle(
-                                  color: LogicOasisDesign.ink,
+                                style: theme.textTheme.headlineSmall?.copyWith(
                                   fontSize: 20,
-                                  fontWeight: FontWeight.w900,
                                 ),
                               ),
                               const SizedBox(height: 2),
@@ -868,14 +899,14 @@ class _RepairDetailSheet extends StatelessWidget {
                                   style: TextStyle(
                                     color: resourceColor,
                                     fontSize: 12,
-                                    fontWeight: FontWeight.w800,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               const SizedBox(height: 2),
                               Text(
                                 area.localizedDescription(isBahasaMelayu),
-                                style: const TextStyle(
-                                  color: LogicOasisDesign.body,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: oasis.secondaryInk,
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -894,10 +925,10 @@ class _RepairDetailSheet extends StatelessWidget {
                     const SizedBox(height: 8),
                     Text(
                       l10n.restoredPercent((area.progress * 100).round()),
-                      style: const TextStyle(
-                        color: LogicOasisDesign.body,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: oasis.secondaryInk,
                         fontSize: 13,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 18),
@@ -919,7 +950,7 @@ class _RepairDetailSheet extends StatelessWidget {
                             icon: Icons.handyman_rounded,
                             label: l10n.repairCost,
                             value: '${area.repairCost}',
-                            color: LogicOasisDesign.leaf,
+                            color: oasis.leaf,
                           ),
                         ),
                       ],
@@ -969,12 +1000,14 @@ class _SheetMetric extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFFEF6),
+        color: oasis.quietSurface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFF0E5D1)),
+        border: Border.all(color: oasis.outline),
       ),
       child: Row(
         children: [
@@ -986,18 +1019,18 @@ class _SheetMetric extends StatelessWidget {
               children: [
                 Text(
                   value,
-                  style: const TextStyle(
-                    color: LogicOasisDesign.ink,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: oasis.primaryInk,
                     fontSize: 16,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 Text(
                   label,
-                  style: const TextStyle(
-                    color: LogicOasisDesign.body,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: oasis.secondaryInk,
                     fontSize: 12,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
@@ -1051,6 +1084,7 @@ class _RepairMarkerState extends State<RepairMarker>
 
   @override
   Widget build(BuildContext context) {
+    final oasis = LogicOasisTheme.of(context);
     // Determine marker appearance based on area progress.
     final isComplete = widget.progress >= 1.0;
     final isRepairing = widget.progress > 0 && widget.progress < 1.0;
@@ -1060,21 +1094,23 @@ class _RepairMarkerState extends State<RepairMarker>
     final Color labelBgColor;
 
     if (isComplete) {
-      markerColor = LogicOasisDesign.leaf;
+      markerColor = oasis.leaf;
       markerIcon = Icons.check_rounded;
-      labelBgColor = const Color(0xFFD4F5D0);
+      labelBgColor = oasis.mint;
     } else if (isRepairing) {
-      markerColor = const Color(0xFFE8A92E); // amber
+      markerColor = oasis.reward;
       markerIcon = Icons.construction_rounded;
-      labelBgColor = const Color(0xFFFFF3D6);
+      labelBgColor = oasis.reward.withValues(alpha: .18);
     } else {
-      markerColor = LogicOasisDesign.orange;
+      markerColor = oasis.coral;
       markerIcon = Icons.add_rounded;
-      labelBgColor = const Color(0xFFEAF8D6);
+      labelBgColor = oasis.coral.withValues(alpha: .12);
     }
 
     // Pulse animation: active for recommended + repairing, off for completed.
-    final shouldPulse = !isComplete && (widget.recommended || isRepairing);
+    final reducedMotion = MediaQuery.disableAnimationsOf(context);
+    final shouldPulse =
+        !isComplete && !reducedMotion && (widget.recommended || isRepairing);
 
     return AnimatedBuilder(
       animation: controller,
@@ -1129,10 +1165,10 @@ class _RepairMarkerState extends State<RepairMarker>
                           widget.label,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: LogicOasisDesign.forest,
+                          style: TextStyle(
+                            color: oasis.forest,
                             fontSize: 9,
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.w700,
                             height: 1,
                           ),
                         ),
@@ -1173,6 +1209,8 @@ class SettingsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -1193,12 +1231,11 @@ class SettingsRow extends StatelessWidget {
                     Expanded(
                       child: Text(
                         label,
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: LogicOasisDesign.ink,
+                        style: theme.textTheme.titleMedium?.copyWith(
                           fontSize: 14,
-                          fontWeight: FontWeight.w900,
+                          height: 1.15,
                         ),
                       ),
                     ),
@@ -1206,32 +1243,34 @@ class SettingsRow extends StatelessWidget {
                       const SizedBox(width: 8),
                       Flexible(
                         flex: 0,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              value!,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: LogicOasisDesign.body,
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            if (progress != null) ...[
-                              const SizedBox(height: 5),
-                              SizedBox(
-                                width: 52,
-                                child: ProgressBar(
-                                  value: progress!,
-                                  height: 5,
-                                  color: LogicOasisDesign.leaf,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 150),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                value!,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: oasis.secondaryInk,
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
+                              if (progress != null) ...[
+                                const SizedBox(height: 5),
+                                SizedBox(
+                                  width: 52,
+                                  child: ProgressBar(
+                                    value: progress!,
+                                    height: 5,
+                                  ),
+                                ),
+                              ],
                             ],
-                          ],
+                          ),
                         ),
                       ),
                     ],
@@ -1239,9 +1278,9 @@ class SettingsRow extends StatelessWidget {
                     if (trailingSwitch != null)
                       _MiniSwitch(value: trailingSwitch!)
                     else
-                      const Icon(
+                      Icon(
                         Icons.chevron_right_rounded,
-                        color: Color(0xFF8C7A61),
+                        color: oasis.secondaryInk,
                         size: 24,
                       ),
                   ],
@@ -1249,9 +1288,9 @@ class SettingsRow extends StatelessWidget {
               ),
             ),
             if (showDivider)
-              const Padding(
-                padding: EdgeInsets.only(left: 62, right: 14),
-                child: Divider(height: 1, color: Color(0xFFEDE3D0)),
+              Padding(
+                padding: const EdgeInsets.only(left: 62, right: 14),
+                child: Divider(height: 1, color: oasis.outline),
               ),
           ],
         ),
@@ -1274,6 +1313,7 @@ class BottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final oasis = LogicOasisTheme.of(context);
     return SafeArea(
       top: false,
       child: Container(
@@ -1281,10 +1321,10 @@ class BottomNavBar extends StatelessWidget {
         margin: const EdgeInsets.fromLTRB(24, 0, 24, 12),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
-          color: const Color(0xFFFFFEF6),
+          color: oasis.surface,
           borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: const Color(0xFFF0E5D1)),
-          boxShadow: LogicOasisDesign.softShadow,
+          border: Border.all(color: oasis.outline),
+          boxShadow: oasis.softShadow,
         ),
         child: Row(
           children: [
@@ -1315,22 +1355,23 @@ class ProgressBar extends StatelessWidget {
     super.key,
     required this.value,
     this.height = 7,
-    this.color = LogicOasisDesign.leaf,
+    this.color,
   });
 
   final double value;
   final double height;
-  final Color color;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
+    final oasis = LogicOasisTheme.of(context);
     return ClipRRect(
       borderRadius: BorderRadius.circular(999),
       child: LinearProgressIndicator(
         value: value.clamp(0.0, 1.0).toDouble(),
         minHeight: height,
-        backgroundColor: const Color(0xFFE5DFCF),
-        color: color,
+        backgroundColor: oasis.outline,
+        color: color ?? oasis.leaf,
       ),
     );
   }
@@ -1414,7 +1455,20 @@ class _LowPolyOasisSceneState extends State<LowPolyOasisScene>
     _shimmerController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 3200),
-    )..repeat();
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // The shimmer is nonessential ambience; reduced-motion preference keeps
+    // the scene static while progress glows and markers still convey state.
+    final reducedMotion = MediaQuery.disableAnimationsOf(context);
+    if (reducedMotion && _shimmerController.isAnimating) {
+      _shimmerController.stop();
+    } else if (!reducedMotion && !_shimmerController.isAnimating) {
+      _shimmerController.repeat();
+    }
   }
 
   @override
@@ -1584,37 +1638,57 @@ class _BottomNavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? LogicOasisDesign.forest : const Color(0xFF806F59);
+    final oasis = LogicOasisTheme.of(context);
+    final color = selected ? oasis.forest : oasis.secondaryInk;
     return Material(
       color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOutCubic,
-          height: 60,
-          decoration: BoxDecoration(
-            color: selected ? const Color(0xFFE0F4D6) : Colors.transparent,
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              AppSvgIcon(data.icon, color: color, size: selected ? 25 : 23),
-              const SizedBox(height: 4),
-              Text(
-                data.label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 11.5,
-                  fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
-                  height: 1,
-                ),
+      child: Semantics(
+        selected: selected,
+        button: true,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+            height: 60,
+            decoration: BoxDecoration(
+              color: selected ? oasis.mint : Colors.transparent,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  AppSvgIcon(data.icon, color: color, size: selected ? 25 : 23),
+                  const SizedBox(height: 4),
+                  Text(
+                    data.label,
+                    maxLines: 1,
+                    softWrap: false,
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 11.5,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                      height: 1,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOutCubic,
+                    width: selected ? 22 : 0,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: oasis.forest,
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -1649,13 +1723,14 @@ class _MiniSwitch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final oasis = LogicOasisTheme.of(context);
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
       width: 46,
       height: 28,
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: value ? LogicOasisDesign.leaf : const Color(0xFFD8D4CA),
+        color: value ? oasis.leaf : oasis.outline,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Align(
@@ -1687,17 +1762,22 @@ class _SectionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
     return Row(
       children: [
-        const Icon(Icons.eco_rounded, color: LogicOasisDesign.leaf, size: 16),
+        Icon(Icons.eco_rounded, color: oasis.leaf, size: 16),
         const SizedBox(width: 5),
-        Text(
-          label,
-          style: const TextStyle(
-            color: Color(0xFF74664E),
-            fontSize: 13,
-            fontWeight: FontWeight.w900,
-            letterSpacing: .2,
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: oasis.secondaryInk,
+              fontSize: 13,
+              letterSpacing: .2,
+            ),
           ),
         ),
       ],
@@ -1710,23 +1790,24 @@ class _HeroTitleBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Column(
+    final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'Logic Oasis',
-          style: TextStyle(
-            color: LogicOasisDesign.forest,
+          style: theme.textTheme.headlineSmall?.copyWith(
+            color: oasis.primaryInk,
             fontSize: 28,
-            fontWeight: FontWeight.w900,
             height: 1.02,
           ),
         ),
-        SizedBox(height: 5),
+        const SizedBox(height: 5),
         Text(
           'Learn. Restore. Grow together.',
-          style: TextStyle(
-            color: LogicOasisDesign.ink,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: oasis.secondaryInk,
             fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
@@ -1734,375 +1815,6 @@ class _HeroTitleBlock extends StatelessWidget {
       ],
     );
   }
-}
-
-class _SproutPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final pot = Paint()..color = const Color(0xFFC69252);
-    final leaf = Paint()..color = const Color(0xFF74C85D);
-    final stem = Paint()
-      ..color = LogicOasisDesign.forest
-      ..strokeWidth = 3
-      ..strokeCap = StrokeCap.round;
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(
-          size.width * .31,
-          size.height * .58,
-          size.width * .38,
-          size.height * .22,
-        ),
-        Radius.circular(size.width * .05),
-      ),
-      pot,
-    );
-    canvas.drawLine(
-      Offset(size.width * .5, size.height * .61),
-      Offset(size.width * .5, size.height * .35),
-      stem,
-    );
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: Offset(size.width * .38, size.height * .34),
-        width: size.width * .3,
-        height: size.height * .17,
-      ),
-      leaf,
-    );
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: Offset(size.width * .62, size.height * .33),
-        width: size.width * .3,
-        height: size.height * .17,
-      ),
-      leaf,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _LowPolyOasisPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final bg = Paint()
-      ..shader = const LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [Color(0xFFD7F5ED), Color(0xFFEAF7D8)],
-      ).createShader(Offset.zero & size);
-    canvas.drawRect(Offset.zero & size, bg);
-
-    _mountain(canvas, size, Offset(size.width * .1, size.height * .36), .9);
-    _mountain(canvas, size, Offset(size.width * .72, size.height * .3), .6);
-    _sand(canvas, size);
-    _water(canvas, size);
-    _building(canvas, size, Offset(size.width * .13, size.height * .42), .95);
-    _tower(canvas, size, Offset(size.width * .66, size.height * .36), .86);
-    _bridge(canvas, size);
-    _market(canvas, size);
-    _crystal(canvas, size, Offset(size.width * .78, size.height * .73), .9);
-    _palm(canvas, size, Offset(size.width * .28, size.height * .39), 1.0);
-    _palm(canvas, size, Offset(size.width * .81, size.height * .45), .72);
-    _garden(canvas, size);
-    _pathDots(canvas, size);
-    _sparkles(canvas, size);
-  }
-
-  void _mountain(Canvas canvas, Size size, Offset base, double scale) {
-    final p = Path()
-      ..moveTo(base.dx, base.dy + 64 * scale)
-      ..lineTo(base.dx + 58 * scale, base.dy)
-      ..lineTo(base.dx + 118 * scale, base.dy + 64 * scale)
-      ..close();
-    canvas.drawPath(p, Paint()..color = const Color(0xFFF6DFB0));
-  }
-
-  void _sand(Canvas canvas, Size size) {
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: Offset(size.width * .52, size.height * .73),
-        width: size.width * .84,
-        height: size.height * .28,
-      ),
-      Paint()..color = const Color(0xFFF0D093),
-    );
-  }
-
-  void _water(Canvas canvas, Size size) {
-    final water = Paint()..color = const Color(0xFF58CDD1);
-    final canal = Path()
-      ..moveTo(size.width * .38, size.height * .36)
-      ..cubicTo(
-        size.width * .58,
-        size.height * .4,
-        size.width * .35,
-        size.height * .64,
-        size.width * .52,
-        size.height * .76,
-      )
-      ..cubicTo(
-        size.width * .62,
-        size.height * .84,
-        size.width * .76,
-        size.height * .82,
-        size.width * .88,
-        size.height * .9,
-      )
-      ..lineTo(size.width, size.height)
-      ..lineTo(size.width * .42, size.height)
-      ..cubicTo(
-        size.width * .36,
-        size.height * .86,
-        size.width * .18,
-        size.height * .76,
-        size.width * .24,
-        size.height * .62,
-      )
-      ..cubicTo(
-        size.width * .29,
-        size.height * .51,
-        size.width * .2,
-        size.height * .42,
-        size.width * .38,
-        size.height * .36,
-      )
-      ..close();
-    canvas.drawPath(canal, water);
-    final highlight = Paint()
-      ..color = Colors.white.withValues(alpha: .42)
-      ..strokeWidth = 2
-      ..strokeCap = StrokeCap.round;
-    for (var i = 0; i < 4; i += 1) {
-      canvas.drawLine(
-        Offset(size.width * (.45 + i * .08), size.height * (.57 + i * .04)),
-        Offset(size.width * (.52 + i * .08), size.height * (.55 + i * .04)),
-        highlight,
-      );
-    }
-  }
-
-  void _building(Canvas canvas, Size size, Offset origin, double scale) {
-    final paint = Paint()..color = const Color(0xFFE9C487);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(origin.dx, origin.dy, 62 * scale, 96 * scale),
-        Radius.circular(10 * scale),
-      ),
-      paint,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(
-          origin.dx + 24 * scale,
-          origin.dy + 57 * scale,
-          18 * scale,
-          39 * scale,
-        ),
-        Radius.circular(9 * scale),
-      ),
-      Paint()..color = const Color(0xFF9B754B),
-    );
-    canvas.drawRect(
-      Rect.fromLTWH(
-        origin.dx + 8 * scale,
-        origin.dy - 6 * scale,
-        46 * scale,
-        16 * scale,
-      ),
-      Paint()..color = const Color(0xFFF3D99F),
-    );
-  }
-
-  void _tower(Canvas canvas, Size size, Offset origin, double scale) {
-    canvas.drawPath(
-      Path()
-        ..moveTo(origin.dx, origin.dy + 26 * scale)
-        ..lineTo(origin.dx + 64 * scale, origin.dy)
-        ..lineTo(origin.dx + 112 * scale, origin.dy + 28 * scale)
-        ..lineTo(origin.dx + 98 * scale, origin.dy + 46 * scale)
-        ..lineTo(origin.dx + 13 * scale, origin.dy + 46 * scale)
-        ..close(),
-      Paint()..color = const Color(0xFFF7D9A1),
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(
-          origin.dx + 22 * scale,
-          origin.dy + 38 * scale,
-          76 * scale,
-          88 * scale,
-        ),
-        Radius.circular(12 * scale),
-      ),
-      Paint()..color = const Color(0xFFE7C083),
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(
-          origin.dx + 50 * scale,
-          origin.dy + 78 * scale,
-          24 * scale,
-          48 * scale,
-        ),
-        Radius.circular(12 * scale),
-      ),
-      Paint()..color = const Color(0xFF93724F),
-    );
-  }
-
-  void _bridge(Canvas canvas, Size size) {
-    final deck = Paint()
-      ..color = const Color(0xFFC6965F)
-      ..strokeWidth = 12
-      ..strokeCap = StrokeCap.round;
-    canvas.drawArc(
-      Rect.fromLTWH(
-        size.width * .43,
-        size.height * .62,
-        size.width * .25,
-        size.height * .13,
-      ),
-      math.pi,
-      math.pi,
-      false,
-      deck,
-    );
-    final rail = Paint()
-      ..color = const Color(0xFF8F704B)
-      ..strokeWidth = 2
-      ..strokeCap = StrokeCap.round;
-    for (var i = 0; i < 4; i += 1) {
-      final x = size.width * (.46 + i * .055);
-      canvas.drawLine(
-        Offset(x, size.height * .6),
-        Offset(x, size.height * .68),
-        rail,
-      );
-    }
-  }
-
-  void _market(Canvas canvas, Size size) {
-    final base = Rect.fromLTWH(
-      size.width * .68,
-      size.height * .58,
-      size.width * .17,
-      size.height * .1,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(base, const Radius.circular(7)),
-      Paint()..color = const Color(0xFFE0B36F),
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(base.left - 4, base.top - 15, base.width + 8, 22),
-        const Radius.circular(6),
-      ),
-      Paint()..color = LogicOasisDesign.orange,
-    );
-    for (final x in [.72, .77, .82]) {
-      canvas.drawCircle(
-        Offset(size.width * x, size.height * .66),
-        4,
-        Paint()..color = LogicOasisDesign.yellow,
-      );
-    }
-  }
-
-  void _crystal(Canvas canvas, Size size, Offset center, double scale) {
-    final path = Path()
-      ..moveTo(center.dx, center.dy - 28 * scale)
-      ..lineTo(center.dx + 18 * scale, center.dy)
-      ..lineTo(center.dx + 9 * scale, center.dy + 32 * scale)
-      ..lineTo(center.dx - 12 * scale, center.dy + 32 * scale)
-      ..lineTo(center.dx - 18 * scale, center.dy)
-      ..close();
-    canvas.drawPath(path, Paint()..color = const Color(0xFF35BCD2));
-    canvas.drawLine(
-      Offset(center.dx, center.dy - 20 * scale),
-      Offset(center.dx - 5 * scale, center.dy + 22 * scale),
-      Paint()
-        ..color = Colors.white.withValues(alpha: .55)
-        ..strokeWidth = 2,
-    );
-  }
-
-  void _palm(Canvas canvas, Size size, Offset base, double scale) {
-    final trunk = Paint()
-      ..color = const Color(0xFF9F7444)
-      ..strokeWidth = 9 * scale
-      ..strokeCap = StrokeCap.round;
-    canvas.drawLine(
-      base,
-      Offset(base.dx + 9 * scale, base.dy + 77 * scale),
-      trunk,
-    );
-    final leaf = Paint()..color = const Color(0xFF62B75E);
-    for (final angle in [-.9, -.45, 0.0, .45, .9]) {
-      canvas.save();
-      canvas.translate(base.dx, base.dy);
-      canvas.rotate(angle);
-      canvas.drawOval(
-        Rect.fromCenter(
-          center: Offset(18 * scale, 0),
-          width: 44 * scale,
-          height: 14 * scale,
-        ),
-        leaf,
-      );
-      canvas.restore();
-    }
-  }
-
-  void _garden(Canvas canvas, Size size) {
-    final green = Paint()..color = const Color(0xFF5FBF65);
-    for (final o in [
-      Offset(size.width * .18, size.height * .74),
-      Offset(size.width * .22, size.height * .79),
-      Offset(size.width * .32, size.height * .77),
-      Offset(size.width * .84, size.height * .67),
-    ]) {
-      canvas.drawPath(
-        Path()
-          ..moveTo(o.dx, o.dy - 8)
-          ..lineTo(o.dx + 8, o.dy)
-          ..lineTo(o.dx, o.dy + 8)
-          ..lineTo(o.dx - 8, o.dy)
-          ..close(),
-        green,
-      );
-    }
-  }
-
-  void _pathDots(Canvas canvas, Size size) {
-    final paint = Paint()..color = const Color(0xFFBCA57D);
-    for (var i = 0; i < 8; i += 1) {
-      canvas.drawCircle(
-        Offset(
-          size.width * (.32 + i * .055),
-          size.height * (.84 - (i % 2) * .02),
-        ),
-        4,
-        paint,
-      );
-    }
-  }
-
-  void _sparkles(Canvas canvas, Size size) {
-    final p = Paint()..color = const Color(0xFFF5CA56);
-    for (final o in [
-      Offset(size.width * .34, size.height * .55),
-      Offset(size.width * .55, size.height * .48),
-      Offset(size.width * .74, size.height * .58),
-    ]) {
-      canvas.drawCircle(o, 3, p);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _TopicThumbnailPainter extends CustomPainter {

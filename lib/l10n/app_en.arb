@@ -77,6 +77,9 @@
   "quizCorrectSummary": "You answered {correct} of {total} correctly.",
   "score": "Score",
   "crystals": "Crystals",
+  "energy": "Energy",
+  "dayStreak": "Day Streak",
+  "tapMarkersToRestoreOasis": "Tap markers to restore your oasis",
   "repairReady": "Repair Ready",
   "masteryResultMessage": "{encouragement} Mastery: {previous} -> {next}. Spend crystals on Home to choose what to repair.",
   "backToForge": "Back to Forge",
@@ -84,7 +87,18 @@
   "finishQuiz": "Finish Quiz",
   "nextQuestion": "Next Question",
   "guidedStepsTitle": "Let's review the steps",
+  "hintTitle": "Hint",
+  "examplePrefix": "Example: {example}",
   "secureAnswerChecked": "Your choice has been securely checked.",
+  "reviewTheseFirst": "Review these first",
+  "perfectScore": "Perfect score! Nothing to review.",
+  "nextPractice": "Next practice",
+  "nextPracticeLevel": "Next: {difficulty} practice",
+  "practiseAgain": "Practise Again",
+  "moveOn": "Move On",
+  "basedOnQuizProgress": "Based on your quiz progress",
+  "preparingNextPractice": "Preparing your next practice…",
+  "allTopicsComplete": "You completed all available topics!",
   "parentDashboardSummary": "A calm summary of {name}'s learning progress.",
   "overallRestoration": "Overall restoration",
   "oasisRestoredSummary": "{percent}% of the oasis is restored.",
@@ -105,5 +119,162 @@
   "justNow": "Just now",
   "minutesAgo": "{minutes} min ago",
   "hoursAgo": "{hours} hr ago",
-  "daysAgo": "{days} day ago"
+  "daysAgo": "{days} day ago",
+  "discussInForum": "Discuss in forum",
+  "openingDiscussion": "Opening discussion...",
+  "discussionUnavailable": "This question is not available for discussion.",
+  "parentDashboardCaption": "Safe learning updates for {name}.",
+  "parentDashboardUpdated": "Updated: {updated}",
+  "glanceFull": "A steady week with a clear focus.",
+  "glanceFullSupport": "{focus} is the focus, with practice and Mutual Aid activity this week.",
+  "glanceFocusPractice": "A steady practice week with a clear focus.",
+  "glanceFocusPracticeSupport": "{focus} is the focus, with practice recorded this week.",
+  "glanceFocusPracticeNoMutualAidYet": "A steady practice week with a clear focus.",
+  "glanceFocusPracticeNoMutualAidYetSupport": "{focus} is the focus, with practice recorded and no Mutual Aid moments yet.",
+  "glanceFocusNoPracticeYetMutualAid": "Forum activity with a clear focus.",
+  "glanceFocusNoPracticeYetMutualAidSupport": "{focus} is the focus, with Mutual Aid moments and no practice recorded yet.",
+  "glanceFocusNoPracticeYet": "A clear focus is ready.",
+  "glanceFocusNoPracticeYetSupport": "{focus} is the focus. Practice evidence is still being collected.",
+  "glanceFocusNoPracticeYetNoMutualAidYet": "A clear focus is ready.",
+  "glanceFocusNoPracticeYetNoMutualAidYetSupport": "{focus} is the focus. Practice and Mutual Aid activity are still being collected.",
+  "glanceFocusMutualAid": "Forum activity with a clear focus.",
+  "glanceFocusMutualAidSupport": "{focus} is the focus, with Mutual Aid moments recorded this week.",
+  "glanceFocusNoMutualAidYet": "A clear focus is ready.",
+  "glanceFocusNoMutualAidYetSupport": "{focus} is the focus, with no Mutual Aid moments yet.",
+  "glanceFocusOnly": "A clear focus is ready.",
+  "glanceFocusOnlySupport": "{focus} is the current learning focus.",
+  "glancePracticeRecorded": "Practice is being recorded this week.",
+  "glancePracticeRecordedSupport": "Practice continues while more Understanding evidence is collected.",
+  "glanceNoPracticeYet": "No practice completed yet this week.",
+  "glanceNoPracticeYetSupport": "A short practice can start the weekly routine.",
+  "glanceMutualAidRecorded": "Mutual Aid activity is recorded this week.",
+  "glanceMutualAidRecordedSupport": "More Understanding and Practice evidence is still being collected.",
+  "glanceNoMutualAidYet": "No Mutual Aid moments yet this week.",
+  "glanceNoMutualAidYetSupport": "More Understanding and Practice evidence is still being collected.",
+  "glanceNoDataYet": "Learning evidence is still being collected.",
+  "glanceNoDataYetSupport": "Safe updates will appear after the next completed practice.",
+  "understandingCardTitle": "Understanding",
+  "learningSnapshotLabel": "Learning snapshot",
+  "practiceCardTitle": "Practice Effort",
+  "mutualAidCardTitle": "Mutual Aid",
+  "conversationStarterTitle": "A gentle question to ask",
+  "focusStatusNeedsGuidedPractice": "Needs guided practice",
+  "focusStatusGrowing": "Growing",
+  "focusStatusCurrentStrength": "Current strength",
+  "focusTopic": "Topic: {topic}",
+  "focusSubtopic": "Focus: {subtopic}",
+  "focusObservationSentence": "{count, plural, =1{Based on 1 trusted learning observation.} other{Based on {count} trusted learning observations.}}",
+  "focusStrength": "Strength: {subtopic}",
+  "understandingInsufficient": "More recent learning evidence is needed before a focus can be named.",
+  "understandingUnavailable": "Understanding is temporarily unavailable.",
+  "parentNextStep": "Parent next step",
+  "actionUnderstandingFocus": "Practise {subtopic} together this week.",
+  "actionMaintainStrength": "Keep {subtopic} fresh with a short practice.",
+  "actionPracticeRoutine": "One short practice this week keeps the routine going.",
+  "actionMutualAidInvitation": "Ask whether classmates answered a maths question this week.",
+  "actionNeedsMoreActivity": "More activity is needed before a recommendation can be made.",
+  "practiceWeekly": "{total, plural, =0{No practice completed yet this week} =1{1 practice completed this week} other{{total} practices completed this week}}",
+  "practiceActiveDays": "across {count, plural, =1{1 active day} other{{count} active days}}",
+  "practiceUnavailable": "Practice effort is unavailable this week.",
+  "practiceComparison": "Compared with {previous, plural, =1{1 practice} other{{previous} practices}} last week.",
+  "practiceImproved": "Practice improved by {difference} this week.",
+  "dayMonday": "Mon",
+  "dayTuesday": "Tue",
+  "dayWednesday": "Wed",
+  "dayThursday": "Thu",
+  "dayFriday": "Fri",
+  "daySaturday": "Sat",
+  "daySunday": "Sun",
+  "mutualAidQuestions": "{count, plural, =1{1 question asked} other{{count} questions asked}}",
+  "mutualAidReplies": "{count, plural, =1{1 reply} other{{count} replies}}",
+  "mutualAidAccepted": " · {count} accepted",
+  "mutualAidHelpfulMarks": "{count, plural, =1{1 helpful mark} other{{count} helpful marks}}",
+  "mutualAidZero": "No Mutual Aid moments yet this week.",
+  "mutualAidUnavailable": "Participation summary is unavailable this week.",
+  "conversationUnderstandingFocus": "What part of {subtopic} should we look at together?",
+  "conversationMaintainStrength": "Would you like to show me how you solve {subtopic}?",
+  "conversationPracticeRoutine": "Shall we do one short practice together this week?",
+  "conversationMutualAidInvitation": "Did anyone in class help with a maths question this week?",
+  "conversationNeedsMoreActivity": "What did you enjoy practising this week?",
+  "@parentDashboardCaption": {
+    "placeholders": {"name": {"type": "String"}}
+  },
+  "@parentDashboardUpdated": {
+    "placeholders": {"updated": {"type": "String"}}
+  },
+  "@glanceFullSupport": {
+    "placeholders": {"focus": {"type": "String"}}
+  },
+  "@glanceFocusPracticeSupport": {
+    "placeholders": {"focus": {"type": "String"}}
+  },
+  "@glanceFocusPracticeNoMutualAidYetSupport": {
+    "placeholders": {"focus": {"type": "String"}}
+  },
+  "@glanceFocusNoPracticeYetMutualAidSupport": {
+    "placeholders": {"focus": {"type": "String"}}
+  },
+  "@glanceFocusNoPracticeYetSupport": {
+    "placeholders": {"focus": {"type": "String"}}
+  },
+  "@glanceFocusNoPracticeYetNoMutualAidYetSupport": {
+    "placeholders": {"focus": {"type": "String"}}
+  },
+  "@glanceFocusMutualAidSupport": {
+    "placeholders": {"focus": {"type": "String"}}
+  },
+  "@glanceFocusNoMutualAidYetSupport": {
+    "placeholders": {"focus": {"type": "String"}}
+  },
+  "@glanceFocusOnlySupport": {
+    "placeholders": {"focus": {"type": "String"}}
+  },
+  "@focusTopic": {
+    "placeholders": {"topic": {"type": "String"}}
+  },
+  "@focusSubtopic": {
+    "placeholders": {"subtopic": {"type": "String"}}
+  },
+  "@focusObservationSentence": {
+    "placeholders": {"count": {"type": "int"}}
+  },
+  "@focusStrength": {
+    "placeholders": {"subtopic": {"type": "String"}}
+  },
+  "@actionUnderstandingFocus": {
+    "placeholders": {"subtopic": {"type": "String"}}
+  },
+  "@actionMaintainStrength": {
+    "placeholders": {"subtopic": {"type": "String"}}
+  },
+  "@practiceWeekly": {
+    "placeholders": {"total": {"type": "int"}}
+  },
+  "@practiceActiveDays": {
+    "placeholders": {"count": {"type": "int"}}
+  },
+  "@practiceComparison": {
+    "placeholders": {"previous": {"type": "int"}}
+  },
+  "@practiceImproved": {
+    "placeholders": {"difference": {"type": "int"}}
+  },
+  "@mutualAidQuestions": {
+    "placeholders": {"count": {"type": "int"}}
+  },
+  "@mutualAidReplies": {
+    "placeholders": {"count": {"type": "int"}}
+  },
+  "@mutualAidAccepted": {
+    "placeholders": {"count": {"type": "int"}}
+  },
+  "@mutualAidHelpfulMarks": {
+    "placeholders": {"count": {"type": "int"}}
+  },
+  "@conversationUnderstandingFocus": {
+    "placeholders": {"subtopic": {"type": "String"}}
+  },
+  "@conversationMaintainStrength": {
+    "placeholders": {"subtopic": {"type": "String"}}
+  }
 }
