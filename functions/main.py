@@ -1083,6 +1083,24 @@ def finalize_quiz_session(data: dict[str, Any], student_id: str) -> dict[str, An
             "Moderate" if best_correct_rate > 0.5 else
             "Weak" if best_correct_rate > 0 else "New"
         )
+        practice_ref = database.collection("parentPracticeSummaries").document(
+            student_id
+        )
+        practice_snapshot = practice_ref.get(transaction=transaction)
+        practice_data = (
+            dict(practice_snapshot.to_dict() or {})
+            if practice_snapshot.exists
+            else None
+        )
+        try:
+            practice_payload = merge_practice_event(
+                practice_data,
+                student_id=student_id,
+                event_instant=finalization_instant,
+                updated_at=firestore.SERVER_TIMESTAMP,
+            )
+        except ParentPracticeError as error:
+            raise QuizSessionError(error.code, str(error)) from error
         attempt = {
             "attemptId": session["attemptId"], "sessionId": session_id, "studentId": student_id,
             "topicId": session["topicId"], "subtopicId": session["subtopicId"],
@@ -1154,24 +1172,6 @@ def finalize_quiz_session(data: dict[str, Any], student_id: str) -> dict[str, An
                 "updatedAt": firestore.SERVER_TIMESTAMP,
             },
         )
-        practice_ref = database.collection("parentPracticeSummaries").document(
-            student_id
-        )
-        practice_snapshot = practice_ref.get(transaction=transaction)
-        practice_data = (
-            dict(practice_snapshot.to_dict() or {})
-            if practice_snapshot.exists
-            else None
-        )
-        try:
-            practice_payload = merge_practice_event(
-                practice_data,
-                student_id=student_id,
-                event_instant=finalization_instant,
-                updated_at=firestore.SERVER_TIMESTAMP,
-            )
-        except ParentPracticeError as error:
-            raise QuizSessionError(error.code, str(error)) from error
         transaction.set(practice_ref, practice_payload)
         transaction.update(session_ref, {"status": "finalized", "finalizedAt": firestore.SERVER_TIMESTAMP})
         return attempt

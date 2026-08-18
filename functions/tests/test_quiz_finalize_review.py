@@ -212,6 +212,17 @@ class QuizFinalizeReviewTests(unittest.TestCase):
         self.assertNotIn("previousWeekCompletedPracticeCount", practice)
         self.assertIn("updatedAt", practice)
 
+    def test_finalize_performs_all_transaction_reads_before_writes(self) -> None:
+        completion = self._finalize()
+
+        self.assertEqual(ATTEMPT_ID, completion["attemptId"])
+        self.assertEqual(
+            1,
+            self.database.collections["parentPracticeSummaries"][STUDENT_ID][
+                "completedPracticeCount"
+            ],
+        )
+
     def test_duplicate_finalization_does_not_increment_practice_twice(self) -> None:
         self._finalize()
         self._finalize()

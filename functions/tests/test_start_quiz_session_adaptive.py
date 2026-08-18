@@ -39,6 +39,8 @@ class Document:
         self.id = document_id
 
     def get(self, transaction=None):
+        if transaction is not None:
+            transaction.record_read()
         return Snapshot(self.id, self._parent.documents.get(self.id), self.path)
 
     @property
@@ -56,22 +58,34 @@ class Document:
 
 
 class Transaction:
+    def __init__(self):
+        self._has_writes = False
+
+    def record_read(self):
+        if self._has_writes:
+            raise AssertionError("Attempted read after write in a transaction.")
+
     def get(self, reference: Document):
+        self.record_read()
         return reference.get()
 
     def get_all(self, references):
+        self.record_read()
         return [reference.get() for reference in references]
 
     def create(self, reference: Document, data: dict):
+        self._has_writes = True
         reference.create(data)
 
     def set(self, reference: Document, data: dict, merge: bool = False):
+        self._has_writes = True
         if merge and reference.id in reference._parent.documents:
             reference._parent.documents[reference.id].update(data)
         else:
             reference._parent.documents[reference.id] = dict(data)
 
     def update(self, reference: Document, data: dict):
+        self._has_writes = True
         reference._parent.documents[reference.id].update(data)
 
 
