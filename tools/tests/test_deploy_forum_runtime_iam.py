@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 import sys
 import unittest
@@ -146,6 +147,28 @@ class ForumRuntimeIamTests(unittest.TestCase):
         self.assertEqual(3, rendered.count("--trigger-service-account"))
         self.assertEqual(3, rendered.count("FUNCTION_SIGNATURE_TYPE=cloudevent"))
         self.assertEqual(3, rendered.count("--memory=512MiB"))
+        self.assertEqual(8, rendered.count("--allow-unauthenticated"))
+
+    def test_firebase_config_declares_forum_answers_composite_index(self):
+        config = json.loads((ROOT / "firebase.json").read_text(encoding="utf-8"))
+        self.assertEqual(
+            "firestore.indexes.json",
+            config["firestore"]["indexes"],
+        )
+        indexes = json.loads(
+            (ROOT / "firestore.indexes.json").read_text(encoding="utf-8")
+        )["indexes"]
+        self.assertIn(
+            {
+                "collectionGroup": "forumAnswers",
+                "queryScope": "COLLECTION",
+                "fields": [
+                    {"fieldPath": "questionId", "order": "ASCENDING"},
+                    {"fieldPath": "createdAt", "order": "ASCENDING"},
+                ],
+            },
+            indexes,
+        )
 
     def test_inspection_and_attestation_require_the_full_matching_inventory(self):
         inspection = inspection_commands()

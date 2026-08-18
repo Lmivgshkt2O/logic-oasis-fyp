@@ -176,7 +176,7 @@ def deploy_command(
         if entry.get("retry") is True:
             command.append("--retry")
     else:
-        command.append("--trigger-http")
+        command.extend(["--trigger-http", "--allow-unauthenticated"])
     return command
 
 
