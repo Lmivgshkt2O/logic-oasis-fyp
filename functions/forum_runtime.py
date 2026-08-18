@@ -27,7 +27,7 @@ FORUM_MODEL_MANIFEST_PATH = Path(__file__).resolve().parent / "forum_model_manif
 KUALA_LUMPUR = ZoneInfo("Asia/Kuala_Lumpur")
 COUNTER_FIELDS = ("questionsPostedCount", "answersSubmittedCount", "acceptedAnswersCount", "helpfulReceivedCount")
 FORUM_AI_POLICY_VERSION = "forum-advisory-policy-v1"
-FORUM_COMPOSITE_POLICY_VERSION = "forum-composite-policy-v1"
+FORUM_COMPOSITE_POLICY_VERSION = "forum-composite-policy-v2"
 FORUM_AI_LEASE_DURATION = timedelta(minutes=5)
 FORUM_AI_MAX_ATTEMPTS = 3
 FORUM_RELEASE_MANIFEST_SCHEMA = "forum-model-release-manifest-v1"
@@ -59,7 +59,8 @@ COMPOSITE_POLICY_CONTRACT = {
     "relevanceNegativeThreshold": RELEVANCE_NEGATIVE_THRESHOLD,
     "reasoningAbstentionThreshold": REASONING_ABSTENTION_THRESHOLD,
     "freeFormNeverVerified": True,
-    "withholdOnAnyAbstention": True,
+    "linkedCorrectAnswerVerification": "protected_answer_key_match",
+    "withholdOnAnyAbstention": False,
     "noPublicNegativeCorrectnessLabel": True,
 }
 LEGACY_EMBEDDED_FEEDBACK_ALLOWED = frozenset({"state", "label", "revision"})
@@ -381,7 +382,11 @@ def composite_decision(
         or relevance_label == "uncertain"
     ):
         return {
-            "publicState": FORUM_PUBLIC_STATE_NONE,
+            "publicState": (
+                FORUM_PUBLIC_STATE_VERIFIED
+                if correctness == "correct"
+                else FORUM_PUBLIC_STATE_NONE
+            ),
             "privateLabel": "uncertain",
             "correctness": (
                 "correct" if correctness == "correct" else "incorrect"
@@ -390,7 +395,8 @@ def composite_decision(
             "reasoning": reasoning_label,
             "message": (
                 "Your answer is saved. We could not reach a confident "
-                "automated decision, so no badge is shown."
+                "automated explanation decision. A correct-answer badge is "
+                "still based on the protected answer key."
             ),
             "correctnessGuidance": None,
             "relevanceGuidance": None,
@@ -416,7 +422,7 @@ def composite_decision(
         }
     if relevance_label == "irrelevant":
         return {
-            "publicState": FORUM_PUBLIC_STATE_MAY_BE_IRRELEVANT,
+            "publicState": FORUM_PUBLIC_STATE_VERIFIED,
             "privateLabel": "may_be_irrelevant",
             "correctness": "correct",
             "relevance": "irrelevant",
@@ -427,14 +433,14 @@ def composite_decision(
             ),
             "correctnessGuidance": None,
             "relevanceGuidance": (
-                "A public advisory note may show that this answer may be "
-                "irrelevant. Only you can see this private guidance."
+                "The selected answer remains verified by the protected answer "
+                "key. Only you can see this explanation guidance."
             ),
             "reasoningGuidance": None,
         }
     if reasoning_label == "needs_reasoning":
         return {
-            "publicState": FORUM_PUBLIC_STATE_NONE,
+            "publicState": FORUM_PUBLIC_STATE_VERIFIED,
             "privateLabel": "needs_reasoning",
             "correctness": "correct",
             "relevance": "relevant",

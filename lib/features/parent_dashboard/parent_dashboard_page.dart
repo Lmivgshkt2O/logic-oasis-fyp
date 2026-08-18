@@ -43,6 +43,7 @@ class _ParentDashboardPageState extends State<ParentDashboardPage> {
     _dashboardState = ParentDashboardState(
       gateway: widget.linkedChildrenGateway ?? ParentLinkedChildrenService(),
       loaderFactory: _loaderFactory,
+      watcherFactory: widget.dashboardLoader == null ? _watcherFactory : null,
     );
     _listenable = Listenable.merge([widget.state, _dashboardState]);
     _dashboardState.loadLinkedChildren();
@@ -67,6 +68,17 @@ class _ParentDashboardPageState extends State<ParentDashboardPage> {
           studentId: selectedChild.studentId,
           yearLevel: selectedChild.yearLevel,
           topics: widget.state.topics,
+        );
+  }
+
+  Future<ParentDashboardWatcher> _watcherFactory() async {
+    final repository = LearningRepository(
+      firestore: await ParentFirebaseSession.firestore(),
+    );
+    return (LinkedChildContext selectedChild) =>
+        repository.watchParentDashboardSnapshot(
+          studentId: selectedChild.studentId,
+          yearLevel: selectedChild.yearLevel,
         );
   }
 

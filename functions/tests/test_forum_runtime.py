@@ -1575,23 +1575,23 @@ class ForumCompositeRuntimeTests(unittest.TestCase):
         self.assertEqual("incorrect", private["correctness"])
         self.assertIn("does not match", private["correctnessGuidance"])
 
-    def test_composite_may_be_irrelevant_is_public_with_private_guidance(self):
+    def test_correct_option_keeps_badge_when_explanation_may_be_irrelevant(self):
         database = self._linked_database(answer_index=2, selected_option=2)
         self._process(
             database, self._bundle(reasoning_label=SUFFICIENT, relevance_label="irrelevant"),
         )
         answer = database.rows[("forumAnswers", "a1")]
-        self.assertEqual(FORUM_PUBLIC_STATE_MAY_BE_IRRELEVANT, answer["aiPublicState"])
+        self.assertEqual(FORUM_PUBLIC_STATE_VERIFIED, answer["aiPublicState"])
         private = database.rows[("forumAiFeedback", "a1")]
         self.assertEqual("may_be_irrelevant", private["label"])
         self.assertIn("may not address", private["message"])
-        self.assertIn("may be irrelevant", private["relevanceGuidance"])
+        self.assertIn("remains verified", private["relevanceGuidance"])
 
-    def test_composite_needs_reasoning_withholds_badge(self):
+    def test_correct_option_keeps_badge_when_explanation_needs_reasoning(self):
         database = self._linked_database(answer_index=2, selected_option=2)
         self._process(database, self._bundle(reasoning_label=REVISION))
         answer = database.rows[("forumAnswers", "a1")]
-        self.assertEqual(FORUM_PUBLIC_STATE_NONE, answer["aiPublicState"])
+        self.assertEqual(FORUM_PUBLIC_STATE_VERIFIED, answer["aiPublicState"])
         private = database.rows[("forumAiFeedback", "a1")]
         self.assertEqual("needs_reasoning", private["label"])
 
@@ -1633,7 +1633,7 @@ class ForumCompositeRuntimeTests(unittest.TestCase):
                 private = database.rows[("forumAiFeedback", "a1")]
                 self.assertEqual("not_applicable", private["correctness"])
 
-    def test_component_abstention_withholds_public_decisions(self):
+    def test_correct_option_keeps_badge_when_explanation_models_abstain(self):
         for reasoning_label, relevance_label in (
             (UNCERTAIN, "relevant"),
             (SUFFICIENT, "uncertain"),
@@ -1649,7 +1649,7 @@ class ForumCompositeRuntimeTests(unittest.TestCase):
                     ),
                 )
                 answer = database.rows[("forumAnswers", "a1")]
-                self.assertEqual(FORUM_PUBLIC_STATE_NONE, answer["aiPublicState"])
+                self.assertEqual(FORUM_PUBLIC_STATE_VERIFIED, answer["aiPublicState"])
 
     def test_public_payload_contains_only_allowlisted_fields(self):
         database = self._linked_database(answer_index=2, selected_option=2)
@@ -1781,7 +1781,8 @@ class ForumCompositeRuntimeTests(unittest.TestCase):
                     "relevanceNegativeThreshold": RELEVANCE_NEGATIVE_THRESHOLD,
                     "reasoningAbstentionThreshold": 0.60,
                     "freeFormNeverVerified": True,
-                    "withholdOnAnyAbstention": True,
+                    "linkedCorrectAnswerVerification": "protected_answer_key_match",
+                    "withholdOnAnyAbstention": False,
                     "noPublicNegativeCorrectnessLabel": True,
                 },
                 "vectorizerContract": {

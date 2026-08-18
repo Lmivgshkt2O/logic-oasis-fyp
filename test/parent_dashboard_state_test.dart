@@ -41,6 +41,28 @@ class _ControllableLoader {
   }
 }
 
+class _ControllableWatcher {
+  final Map<String, StreamController<ParentDashboardSnapshot>> controllers =
+      {};
+  final List<String> calls = [];
+
+  Stream<ParentDashboardSnapshot> call(LinkedChildContext child) {
+    calls.add(child.studentId);
+    return controllers
+        .putIfAbsent(
+          child.studentId,
+          () => StreamController<ParentDashboardSnapshot>.broadcast(),
+        )
+        .stream;
+  }
+
+  Future<void> close() async {
+    for (final controller in controllers.values) {
+      await controller.close();
+    }
+  }
+}
+
 Future<ParentDashboardLoader> Function() loaderFactory(
   _ControllableLoader loader,
 ) =>
@@ -178,6 +200,60 @@ void main() {
   });
 
   group('ParentDashboardState races', () {
+    test('live child snapshots update without reopening the dashboard', () async {
+      final watcher = _ControllableWatcher();
+      final state = ParentDashboardState(
+        gateway: _Gateway(() async => const [childA]),
+        loaderFactory: () async => (_) async => partialSnapshot(),
+        watcherFactory: () async => watcher.call,
+      );
+
+      unawaited(state.loadLinkedChildren());
+      await settle();
+      expect(state.phase, ParentDashboardPhase.loadingChild);
+
+      watcher.controllers['student_a']!.add(partialSnapshot());
+      await settle();
+      expect(state.phase, ParentDashboardPhase.readyPartial);
+
+      watcher.controllers['student_a']!.add(fullSnapshot());
+      await settle();
+      expect(state.phase, ParentDashboardPhase.readyAll);
+      expect(state.snapshot?.practiceSummary?.completedPracticeCount, 3);
+
+      state.dispose();
+      await watcher.close();
+    });
+
+    test('switching children cancels updates from the previous watcher', () async {
+      final watcher = _ControllableWatcher();
+      final state = ParentDashboardState(
+        gateway: _Gateway(() async => const [childA, childB]),
+        loaderFactory: () async => (_) async => partialSnapshot(),
+        watcherFactory: () async => watcher.call,
+      );
+
+      unawaited(state.loadLinkedChildren());
+      await settle();
+      watcher.controllers['student_a']!.add(partialSnapshot());
+      await settle();
+
+      unawaited(state.selectChild(childB));
+      await settle();
+      watcher.controllers['student_b']!.add(fullSnapshot());
+      await settle();
+      expect(state.selectedChild, childB);
+      expect(state.phase, ParentDashboardPhase.readyAll);
+
+      watcher.controllers['student_a']!.add(partialSnapshot());
+      await settle();
+      expect(state.selectedChild, childB);
+      expect(state.phase, ParentDashboardPhase.readyAll);
+
+      state.dispose();
+      await watcher.close();
+    });
+
     test(
       'disposing while a child load is pending ignores the late completion',
       () async {
