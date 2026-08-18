@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:logic_oasis/shared/models/linked_child_context.dart';
 import 'package:logic_oasis/shared/models/parent_dashboard_snapshot.dart';
@@ -22,6 +24,8 @@ enum ParentDashboardPhase {
 
 typedef ParentDashboardLoader =
     Future<ParentDashboardSnapshot> Function(LinkedChildContext child);
+typedef ParentDashboardWatcher =
+    Stream<ParentDashboardSnapshot> Function(LinkedChildContext child);
 
 /// Child-scoped parent dashboard state with monotonic request generations.
 ///
@@ -35,11 +39,15 @@ class ParentDashboardState extends ChangeNotifier {
   ParentDashboardState({
     required ParentLinkedChildrenGateway gateway,
     required Future<ParentDashboardLoader> Function() loaderFactory,
+    Future<ParentDashboardWatcher> Function()? watcherFactory,
   }) : _gateway = gateway,
-       _loaderFactory = loaderFactory;
+       _loaderFactory = loaderFactory,
+       _watcherFactory = watcherFactory;
 
   final ParentLinkedChildrenGateway _gateway;
   final Future<ParentDashboardLoader> Function() _loaderFactory;
+  final Future<ParentDashboardWatcher> Function()? _watcherFactory;
+  StreamSubscription<ParentDashboardSnapshot>? _watchSubscription;
 
   ParentDashboardPhase _phase = ParentDashboardPhase.loadingLinks;
   List<LinkedChildContext> _children = const [];
@@ -66,6 +74,8 @@ class ParentDashboardState extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    unawaited(_watchSubscription?.cancel());
+    _watchSubscription = null;
     super.dispose();
   }
 
@@ -75,6 +85,9 @@ class ParentDashboardState extends ChangeNotifier {
   /// retain content.
   Future<void> loadLinkedChildren() async {
     final generation = ++_linksGeneration;
+    ++_requestGeneration;
+    unawaited(_watchSubscription?.cancel());
+    _watchSubscription = null;
     _phase = ParentDashboardPhase.loadingLinks;
     _message = null;
     _clearChildView();
@@ -155,47 +168,98 @@ class ParentDashboardState extends ChangeNotifier {
     int generation, {
     bool cardRetry = false,
   }) async {
+    final watcherFactory = _watcherFactory;
+    if (watcherFactory != null) {
+      await _watchChild(
+        child,
+        generation,
+        watcherFactory,
+        cardRetry: cardRetry,
+      );
+      return;
+    }
     try {
       final loader = await _loaderFactory();
       final snapshot = await loader(child);
-      if (generation != _requestGeneration ||
-          child.studentId != _selectedChild?.studentId) {
-        return;
-      }
-      _snapshot = snapshot;
-      _retryingCard = null;
-      _message = null;
-      _phase = _allCardsAvailable(snapshot)
-          ? ParentDashboardPhase.readyAll
-          : ParentDashboardPhase.readyPartial;
-      _notify();
-    } on ParentDashboardAuthException {
-      if (generation != _requestGeneration ||
-          child.studentId != _selectedChild?.studentId) {
-        return;
-      }
+      if (!_isCurrent(child, generation)) return;
+      _commitSnapshot(snapshot);
+    } catch (error) {
+      if (!_isCurrent(child, generation)) return;
+      _commitLoadError(error, cardRetry: cardRetry);
+    }
+  }
+
+  Future<void> _watchChild(
+    LinkedChildContext child,
+    int generation,
+    Future<ParentDashboardWatcher> Function() watcherFactory, {
+    required bool cardRetry,
+  }) async {
+    await _watchSubscription?.cancel();
+    _watchSubscription = null;
+    try {
+      final watcher = await watcherFactory();
+      if (!_isCurrent(child, generation)) return;
+      final firstEvent = Completer<void>();
+      _watchSubscription = watcher(child).listen(
+        (snapshot) {
+          if (!_isCurrent(child, generation)) return;
+          _commitSnapshot(snapshot);
+          if (!firstEvent.isCompleted) firstEvent.complete();
+        },
+        onError: (Object error, StackTrace stackTrace) {
+          if (!_isCurrent(child, generation)) return;
+          _commitLoadError(error, cardRetry: cardRetry);
+          if (!firstEvent.isCompleted) firstEvent.complete();
+        },
+        onDone: () {
+          if (!firstEvent.isCompleted) {
+            _commitLoadError(
+              StateError('Parent dashboard stream closed before loading.'),
+              cardRetry: cardRetry,
+            );
+            firstEvent.complete();
+          }
+        },
+      );
+      await firstEvent.future;
+    } catch (error) {
+      if (!_isCurrent(child, generation)) return;
+      _commitLoadError(error, cardRetry: cardRetry);
+    }
+  }
+
+  bool _isCurrent(LinkedChildContext child, int generation) =>
+      !_disposed &&
+      generation == _requestGeneration &&
+      child.studentId == _selectedChild?.studentId;
+
+  void _commitSnapshot(ParentDashboardSnapshot snapshot) {
+    _snapshot = snapshot;
+    _retryingCard = null;
+    _message = null;
+    _phase = _allCardsAvailable(snapshot)
+        ? ParentDashboardPhase.readyAll
+        : ParentDashboardPhase.readyPartial;
+    _notify();
+  }
+
+  void _commitLoadError(Object error, {required bool cardRetry}) {
+    if (error is ParentDashboardAuthException) {
       _snapshot = null;
       _retryingCard = null;
       _message = 'This learner link is no longer active. Please reconnect.';
       _phase = ParentDashboardPhase.childError;
-      _notify();
-    } catch (_) {
-      if (generation != _requestGeneration ||
-          child.studentId != _selectedChild?.studentId) {
-        return;
-      }
-      if (cardRetry && _snapshot != null) {
-        _retryingCard = null;
-        _phase = ParentDashboardPhase.readyPartial;
-        _notify();
-        return;
-      }
+    } else if (cardRetry && _snapshot != null) {
+      _retryingCard = null;
+      _phase = ParentDashboardPhase.readyPartial;
+    } else {
       _snapshot = null;
       _retryingCard = null;
       _message = 'Safe learner updates are temporarily unavailable.';
       _phase = ParentDashboardPhase.childError;
-      _notify();
     }
+    _notify();
   }
 
   void _notify() {

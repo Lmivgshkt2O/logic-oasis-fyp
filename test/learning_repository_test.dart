@@ -113,7 +113,12 @@ class _FakeCollectionReference
   }
 
   @override
-  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+  dynamic noSuchMethod(Invocation invocation) {
+    if (invocation.memberName == #snapshots) {
+      return Stream<QuerySnapshot<Map<String, dynamic>>>.fromFuture(get());
+    }
+    return super.noSuchMethod(invocation);
+  }
 }
 
 // ignore: subtype_of_sealed_class
@@ -162,7 +167,12 @@ class _FakeQuery implements Query<Map<String, dynamic>> {
   }
 
   @override
-  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+  dynamic noSuchMethod(Invocation invocation) {
+    if (invocation.memberName == #snapshots) {
+      return Stream<QuerySnapshot<Map<String, dynamic>>>.fromFuture(get());
+    }
+    return super.noSuchMethod(invocation);
+  }
 }
 
 class _FakeQuerySnapshot implements QuerySnapshot<Map<String, dynamic>> {
@@ -210,6 +220,15 @@ class _FakeDocumentReference
       final error = readErrors['$collectionPath/$documentPath'];
       if (error != null) throw error;
       return Future<DocumentSnapshot<Map<String, dynamic>>>.value(
+        _FakeDocumentSnapshot(documents[documentPath]),
+      );
+    }
+    if (invocation.memberName == #snapshots) {
+      final error = readErrors['$collectionPath/$documentPath'];
+      if (error != null) {
+        return Stream<DocumentSnapshot<Map<String, dynamic>>>.error(error);
+      }
+      return Stream<DocumentSnapshot<Map<String, dynamic>>>.value(
         _FakeDocumentSnapshot(documents[documentPath]),
       );
     }
@@ -517,6 +536,51 @@ void main() {
   });
 
   group('fetchParentDashboardSnapshot safe assembly', () {
+    test('watch assembles the three allowlisted live projections', () async {
+      final fake = _FakeFirestore({
+        'subtopicMastery': {'a_read_write': masteryData()},
+        'parentPracticeSummaries': {parentStudentId: practiceData()},
+        'forumParticipationSummaries': {parentStudentId: forumData()},
+      });
+      final repository = LearningRepository(firestore: fake);
+
+      final snapshot = await repository
+          .watchParentDashboardSnapshot(
+            studentId: parentStudentId,
+            yearLevel: 4,
+          )
+          .first;
+
+      expect(snapshot.mastery, hasLength(1));
+      expect(snapshot.practiceSummary?.completedPracticeCount, 3);
+      expect(snapshot.forumParticipationSummary?.answersSubmittedCount, 2);
+      for (final collection in forbiddenParentCollections) {
+        expect(fake.accessedCollections, isNot(contains(collection)));
+      }
+    });
+
+    test('watch surfaces permission denial as an auth failure', () async {
+      final fake = _FakeFirestore({
+        'subtopicMastery': {'a_read_write': masteryData()},
+        'parentPracticeSummaries': {parentStudentId: practiceData()},
+      });
+      fake.readErrors['forumParticipationSummaries/$parentStudentId'] =
+          FirebaseException(
+            code: 'permission-denied',
+            message: 'Missing or insufficient permissions.',
+            plugin: 'cloud_firestore',
+          );
+      final repository = LearningRepository(firestore: fake);
+
+      await expectLater(
+        repository.watchParentDashboardSnapshot(
+          studentId: parentStudentId,
+          yearLevel: 4,
+        ),
+        emitsError(isA<ParentDashboardAuthException>()),
+      );
+    });
+
     test(
       'assembles only typed safe card inputs from the allowlisted reads',
       () async {

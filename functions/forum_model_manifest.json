@@ -8,7 +8,7 @@
   "candidateManifestSha256": "d1a7e47938b6ca6d95ea16cf03f9cdab84e8e6f906a20036755bd6e12acfd8d1",
   "catalogueSha256": "c896a2af1a2f796d60a570a9de35262bb88f14c019ca464f5981b1aa4350bffd",
   "claimLevel": "controlled_demonstration_only",
-  "codeRevision": "5bd2716bb53506fedcc0596de2b55ee8c96f2eeec48e766e849946ad7228d4b4",
+  "codeRevision": "4ae97bc15d38171c070f2ea02c867c96b0589d9fd90b0fe9e5d3c28d4e91a4e8",
   "codeRevisionKind": "sha256_bounded_release_sources_v1",
   "compositePolicy": {
     "correctness": "deterministic_protected_answer_key_v1",
@@ -31,7 +31,7 @@
   "dependencyLockSha256": "0067273f13fc463f830c49f4f91169a2dbf71c36246c7d2db2cba3e9e15c7006",
   "deploymentRuntimeHashes": {
     "forum_runtime.py": "4c220d18913bcb1d006403e650702087436b89646881a1c2e685985ae9d9e817",
-    "main.py": "6603f02cdb37888e35585b32ea6f4590244f55e7f49c74c7e2aa245c22cf0a61"
+    "main.py": "1eeaf677497560cddeb7bb603e90abe56bc0bf61f4af50374b8ade67626f681b"
   },
   "deploymentScope": "controlled_demo",
   "deploymentState": "pending_cloud_deployment",
@@ -55,10 +55,10 @@
   "reasoningArtifactSizeBytes": 50066,
   "reasoningModelType": "MultinomialNB",
   "reasoningModelVersion": "forum-controlled-demo-nb-v1",
-  "releaseId": "forum-controlled-demo-nb-v1-release-9",
+  "releaseId": "forum-controlled-demo-nb-v1-release-12",
   "releaseRationale": "Developer-released FYP1 controlled-demonstration model. Not evaluated on real learner forum responses.",
   "releaseScope": "fyp1_forum_controlled_demo",
-  "releasedAt": "2026-08-15T00:00:00Z",
+  "releasedAt": "2026-08-18T12:00:00Z",
   "releasedBy": "developer",
   "relevanceAbstentionPolicyVersion": "forum-relevance-policy-v1",
   "relevanceArtifactSha256": "8df2fea527df9053f9c3c27c11ddbcc9441e7f16fa3ada305bf3f05df922a6e8",
@@ -104,7 +104,7 @@
     "relevance.py": "842684b464dbe815f5877932a1816ea96e95b52d923c9ddf789099ccf2062a96"
   },
   "splitManifestSha256": "b07f4e9961e6bad3824f601000026d73df07b7e86a63293ee8956407f41db6cb",
-  "supersedesReleaseId": "forum-controlled-demo-nb-v1-release-8",
+  "supersedesReleaseId": "forum-controlled-demo-nb-v1-release-11",
   "trainingDataProvenance": "expert_authored_controlled_demo",
   "vectorizerContract": {
     "abstentionPolicyVersion": "forum-advisory-policy-v1",

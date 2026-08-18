@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:logic_oasis/shared/models/forum_participation_summary.dart';
 import 'package:logic_oasis/shared/models/parent_dashboard_snapshot.dart';
@@ -331,6 +333,192 @@ class LearningRepository {
     );
   }
 
+  /// Watches the three allow-listed parent projections and emits a complete
+  /// child-scoped snapshot whenever any projection changes.
+  ///
+  /// Each source must produce once before the first snapshot is emitted, so
+  /// the UI never combines a new child value with stale values from another
+  /// source. Non-auth failures fail only their card closed; permission denial
+  /// terminates the whole child view.
+  Stream<ParentDashboardSnapshot> watchParentDashboardSnapshot({
+    required String studentId,
+    required int yearLevel,
+  }) {
+    final normalizedYearLevel = yearLevel.clamp(4, 6);
+    late final StreamController<ParentDashboardSnapshot> controller;
+    final subscriptions = <StreamSubscription<Object?>>[];
+    List<TrustedSubtopicProgress>? mastery;
+    ParentPracticeSummary? practice;
+    ForumParticipationSummary? mutualAid;
+    var hasMastery = false;
+    var hasPractice = false;
+    var hasMutualAid = false;
+
+    void emitWhenReady() {
+      if (controller.isClosed || !hasMastery || !hasPractice || !hasMutualAid) {
+        return;
+      }
+      controller.add(
+        ParentDashboardSnapshot(
+          mastery: mastery,
+          practiceSummary: practice,
+          forumParticipationSummary: mutualAid,
+        ),
+      );
+    }
+
+    void handleError(
+      Object error,
+      StackTrace stackTrace,
+      void Function() failCard,
+    ) {
+      if (error is ParentDashboardAuthException ||
+          (error is FirebaseException && error.code == 'permission-denied')) {
+        controller.addError(
+          const ParentDashboardAuthException(
+            'Parent access to this child was revoked or denied.',
+          ),
+          stackTrace,
+        );
+        unawaited(controller.close());
+        return;
+      }
+      failCard();
+      emitWhenReady();
+    }
+
+    controller = StreamController<ParentDashboardSnapshot>(
+      onListen: () {
+        subscriptions.add(
+          _firestore
+              .collection('subtopicMastery')
+              .where('studentId', isEqualTo: studentId)
+              .where('yearLevel', isEqualTo: normalizedYearLevel)
+              .snapshots()
+              .listen(
+                (snapshot) {
+                  try {
+                    mastery = _parseSafeMastery(snapshot.docs);
+                    hasMastery = true;
+                    emitWhenReady();
+                  } catch (error, stackTrace) {
+                    handleError(error, stackTrace, () {
+                      mastery = null;
+                      hasMastery = true;
+                    });
+                  }
+                },
+                onError: (Object error, StackTrace stackTrace) =>
+                    handleError(error, stackTrace, () {
+                      mastery = null;
+                      hasMastery = true;
+                    }),
+              ),
+        );
+        subscriptions.add(
+          _firestore
+              .collection('parentPracticeSummaries')
+              .doc(studentId)
+              .snapshots()
+              .listen(
+                (document) {
+                  try {
+                    practice = _parsePracticeDocument(document, studentId);
+                    hasPractice = true;
+                    emitWhenReady();
+                  } catch (error, stackTrace) {
+                    handleError(error, stackTrace, () {
+                      practice = null;
+                      hasPractice = true;
+                    });
+                  }
+                },
+                onError: (Object error, StackTrace stackTrace) =>
+                    handleError(error, stackTrace, () {
+                      practice = null;
+                      hasPractice = true;
+                    }),
+              ),
+        );
+        subscriptions.add(
+          _firestore
+              .collection('forumParticipationSummaries')
+              .doc(studentId)
+              .snapshots()
+              .listen(
+                (document) {
+                  try {
+                    mutualAid = _parseForumDocument(document, studentId);
+                    hasMutualAid = true;
+                    emitWhenReady();
+                  } catch (error, stackTrace) {
+                    handleError(error, stackTrace, () {
+                      mutualAid = null;
+                      hasMutualAid = true;
+                    });
+                  }
+                },
+                onError: (Object error, StackTrace stackTrace) =>
+                    handleError(error, stackTrace, () {
+                      mutualAid = null;
+                      hasMutualAid = true;
+                    }),
+              ),
+        );
+      },
+      onCancel: () async {
+        for (final subscription in subscriptions) {
+          await subscription.cancel();
+        }
+      },
+    );
+    return controller.stream;
+  }
+
+  List<TrustedSubtopicProgress> _parseSafeMastery(
+    Iterable<QueryDocumentSnapshot<Map<String, dynamic>>> documents,
+  ) {
+    final records = <TrustedSubtopicProgress>[];
+    for (final document in documents) {
+      try {
+        records.add(TrustedSubtopicProgress.fromFirestore(document.data()));
+      } on FormatException {
+        // A malformed projection is omitted rather than turned into advice.
+      }
+    }
+    return records;
+  }
+
+  ParentPracticeSummary? _parsePracticeDocument(
+    DocumentSnapshot<Map<String, dynamic>> document,
+    String studentId,
+  ) {
+    if (!document.exists) return null;
+    final data = document.data();
+    if (data == null) return null;
+    _requireProjectionIdentity(data, studentId);
+    try {
+      return ParentPracticeSummary.fromFirestore(studentId, data);
+    } on FormatException {
+      return null;
+    }
+  }
+
+  ForumParticipationSummary? _parseForumDocument(
+    DocumentSnapshot<Map<String, dynamic>> document,
+    String studentId,
+  ) {
+    if (!document.exists) return null;
+    final data = document.data();
+    if (data == null) return null;
+    _requireProjectionIdentity(data, studentId);
+    try {
+      return ForumParticipationSummary.fromFirestore(studentId, data);
+    } on FormatException {
+      return null;
+    }
+  }
+
   Future<List<TrustedSubtopicProgress>?> _fetchSafeMastery(
     String studentId,
     int yearLevel,
@@ -341,15 +529,7 @@ class LearningRepository {
           .where('studentId', isEqualTo: studentId)
           .where('yearLevel', isEqualTo: yearLevel)
           .get(const GetOptions(source: Source.server));
-      final records = <TrustedSubtopicProgress>[];
-      for (final document in snapshot.docs) {
-        try {
-          records.add(TrustedSubtopicProgress.fromFirestore(document.data()));
-        } on FormatException {
-          // A malformed projection is omitted rather than turned into advice.
-        }
-      }
-      return records;
+      return _parseSafeMastery(snapshot.docs);
     } on FirebaseException catch (error) {
       _throwIfPermissionDenied(error);
       return null;
@@ -364,15 +544,7 @@ class LearningRepository {
           .collection('parentPracticeSummaries')
           .doc(studentId)
           .get(const GetOptions(source: Source.server));
-      if (!document.exists) return null;
-      final data = document.data();
-      if (data == null) return null;
-      _requireProjectionIdentity(data, studentId);
-      try {
-        return ParentPracticeSummary.fromFirestore(studentId, data);
-      } on FormatException {
-        return null;
-      }
+      return _parsePracticeDocument(document, studentId);
     } on ParentDashboardAuthException {
       rethrow;
     } on FirebaseException catch (error) {
@@ -391,15 +563,7 @@ class LearningRepository {
           .collection('forumParticipationSummaries')
           .doc(studentId)
           .get(const GetOptions(source: Source.server));
-      if (!document.exists) return null;
-      final data = document.data();
-      if (data == null) return null;
-      _requireProjectionIdentity(data, studentId);
-      try {
-        return ForumParticipationSummary.fromFirestore(studentId, data);
-      } on FormatException {
-        return null;
-      }
+      return _parseForumDocument(document, studentId);
     } on ParentDashboardAuthException {
       rethrow;
     } on FirebaseException catch (error) {

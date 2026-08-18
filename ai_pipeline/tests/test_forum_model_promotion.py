@@ -132,6 +132,9 @@ class ForumModelPromotionTests(unittest.TestCase):
                 "forum-composite-policy-v1",
                 manifest["compositePolicy"]["policyVersion"],
             )
+            self.assertTrue(
+                manifest["compositePolicy"]["withholdOnAnyAbstention"],
+            )
             self.assertRegex(manifest["dependencyLockSha256"], r"^[0-9a-f]{64}$")
             for key in (
                 "catalogueSha256", "datasetSha256", "datasetManifestSha256",

@@ -1581,7 +1581,10 @@ class ForumCompositeRuntimeTests(unittest.TestCase):
             database, self._bundle(reasoning_label=SUFFICIENT, relevance_label="irrelevant"),
         )
         answer = database.rows[("forumAnswers", "a1")]
-        self.assertEqual(FORUM_PUBLIC_STATE_MAY_BE_IRRELEVANT, answer["aiPublicState"])
+        self.assertEqual(
+            FORUM_PUBLIC_STATE_MAY_BE_IRRELEVANT,
+            answer["aiPublicState"],
+        )
         private = database.rows[("forumAiFeedback", "a1")]
         self.assertEqual("may_be_irrelevant", private["label"])
         self.assertIn("may not address", private["message"])
