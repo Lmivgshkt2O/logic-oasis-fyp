@@ -129,12 +129,11 @@ class ForumModelPromotionTests(unittest.TestCase):
             self.assertEqual("pending_cloud_deployment", manifest["deploymentState"])
             self.assertEqual(platform.python_version(), manifest["pythonVersion"])
             self.assertEqual(
-                "forum-composite-policy-v2",
+                "forum-composite-policy-v1",
                 manifest["compositePolicy"]["policyVersion"],
             )
-            self.assertEqual(
-                "protected_answer_key_match",
-                manifest["compositePolicy"]["linkedCorrectAnswerVerification"],
+            self.assertTrue(
+                manifest["compositePolicy"]["withholdOnAnyAbstention"],
             )
             self.assertRegex(manifest["dependencyLockSha256"], r"^[0-9a-f]{64}$")
             for key in (

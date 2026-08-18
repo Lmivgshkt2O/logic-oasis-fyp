@@ -35,21 +35,6 @@ DEPENDENCY_LOCK_FILENAME = "forum-runtime-requirements.lock.txt"
 RUNTIME_FILES = ("__init__.py", "classifier.py", "relevance.py")
 
 
-def _release_composite_policy(candidate: dict[str, Any]) -> dict[str, Any]:
-    """Bind public linked correctness to the protected answer key.
-
-    The two classifiers still provide private explanation guidance. Their
-    abstentions must not hide a deterministic correct-selection badge.
-    """
-    policy = dict(candidate["compositePolicy"])
-    policy.update({
-        "policyVersion": "forum-composite-policy-v2",
-        "linkedCorrectAnswerVerification": "protected_answer_key_match",
-        "withholdOnAnyAbstention": False,
-    })
-    return policy
-
-
 @dataclass(frozen=True)
 class PublishedForumRelease:
     artifact_path: Path
@@ -248,7 +233,7 @@ def publish_forum_controlled_demo(
         "relevanceOutputContract": candidate["relevanceOutputContract"],
         "relevanceVectorizerContract": candidate["relevanceVectorizerContract"],
         "relevanceAbstentionPolicyVersion": candidate["relevanceAbstentionPolicyVersion"],
-        "compositePolicy": _release_composite_policy(candidate),
+        "compositePolicy": candidate["compositePolicy"],
         "semanticReproducibilityStatus": candidate["semanticReproducibilityStatus"],
         "runtimeEnvironmentFingerprint": candidate["runtimeEnvironmentFingerprint"],
         "baselineComparisonResult": report["baselineComparisonResult"],
