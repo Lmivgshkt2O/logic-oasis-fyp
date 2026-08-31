@@ -39,7 +39,9 @@ Future<void> _capture(
 ) async {
   Directory(_outDir).createSync(recursive: true);
   await tester.binding.setSurfaceSize(const Size(430, 2000));
-  addTearDown(() => tester.binding.setSurfaceSize(null));
+  addTearDown(() async {
+    await tester.binding.setSurfaceSize(null);
+  });
   await tester.pumpWidget(
     RepaintBoundary(
       key: const Key('capture-boundary'),
