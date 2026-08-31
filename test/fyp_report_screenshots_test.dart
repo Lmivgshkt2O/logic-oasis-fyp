@@ -284,7 +284,7 @@ void main() {
     );
     await _capture(
       tester,
-      _wrap(ResultPage(
+      _wrap(const ResultPage(
         completion: completion,
         topicArea: 'Whole Numbers',
         isBahasaMelayu: false,
