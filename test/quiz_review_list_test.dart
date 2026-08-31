@@ -164,7 +164,7 @@ void main() {
     );
 
     expect(find.text('Next: Moderate practice'), findsOneWidget);
-    expect(find.text('Practise Again'), findsOneWidget);
+    expect(find.text('Try Next Level'), findsOneWidget);
   });
 
   testWidgets('fallback recommendation is visibly labelled', (tester) async {
@@ -182,6 +182,6 @@ void main() {
 
     expect(find.text('Based on your quiz progress'), findsOneWidget);
     expect(find.text('Next: Easy practice'), findsOneWidget);
-    expect(find.text('Practise Again'), findsOneWidget);
+    expect(find.text('Try Next Level'), findsOneWidget);
   });
 }

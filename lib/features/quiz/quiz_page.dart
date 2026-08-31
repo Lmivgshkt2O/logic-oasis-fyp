@@ -209,6 +209,7 @@ class _QuizPageState extends State<QuizPage> {
           for (var i = 0; i < options.length; i++) ...[
             AnswerTile(
               label: options[i],
+              letter: String.fromCharCode(65 + i),
               selected: selectedIndex == i,
               correct: feedback?.isCorrect == true && selectedIndex == i,
               wrong: feedback?.isCorrect == false && selectedIndex == i,

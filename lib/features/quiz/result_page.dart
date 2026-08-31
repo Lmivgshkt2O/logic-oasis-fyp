@@ -568,7 +568,9 @@ class _NextPracticePanel extends StatelessWidget {
               label: Text(
                 ready
                     ? (action.isRepeat
-                          ? l10n.practiseAgain
+                          ? (isBahasaMelayu
+                                ? 'Cuba Tahap Seterusnya'
+                                : 'Try Next Level')
                           : l10n.moveOn)
                     : l10n.preparingNextPractice,
               ),

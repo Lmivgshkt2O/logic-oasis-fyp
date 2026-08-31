@@ -165,7 +165,7 @@ class _LogicOasisAppState extends State<LogicOasisApp>
               return MediaQuery(
                 data: mediaQuery.copyWith(
                   textScaler: state.accessibilityMode
-                      ? const TextScaler.linear(1.08)
+                      ? const TextScaler.linear(1.15)
                       : mediaQuery.textScaler,
                 ),
                 child: child ?? const SizedBox.shrink(),

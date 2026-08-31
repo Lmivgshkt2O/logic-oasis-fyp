@@ -1066,7 +1066,7 @@ class _AnswersPageState extends State<ForumDiscussionPage> {
   String _optionLabel(int? index) {
     final options = _options;
     if (index == null || index < 0 || index >= options.length) return '';
-    return options[index];
+    return '${String.fromCharCode(65 + index)}. ${options[index]}';
   }
 
   Future<bool> _submitLinked(int selectedOption, String explanation) async {
@@ -1485,6 +1485,7 @@ class _LinkedAnswerFormState extends State<_LinkedAnswerForm> {
         for (var index = 0; index < widget.options.length; index++) ...[
           _OptionTile(
             label: widget.options[index],
+            letter: String.fromCharCode(65 + index),
             selected: _selectedOption == index,
             onTap: _submitting
                 ? null
@@ -1527,11 +1528,14 @@ class _OptionTile extends StatelessWidget {
     required this.label,
     required this.selected,
     required this.onTap,
+    this.letter,
   });
 
   final String label;
   final bool selected;
   final VoidCallback? onTap;
+  /// Optional textbook-style option letter (A, B, C, D) shown before the text.
+  final String? letter;
 
   @override
   Widget build(BuildContext context) {
@@ -1554,6 +1558,34 @@ class _OptionTile extends StatelessWidget {
         ),
         child: Row(
           children: [
+            if (letter != null) ...[
+              Container(
+                width: 26,
+                height: 26,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: selected
+                      ? oasis.violet.withValues(alpha: .10)
+                      : oasis.groupedSurface,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: selected ? oasis.violet : oasis.outline,
+                    width: 1.2,
+                  ),
+                ),
+                child: Text(
+                  letter!,
+                  style: TextStyle(
+                    color: selected ? oasis.violet : oasis.secondaryInk,
+                    fontFamily: 'Fredoka',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    height: 1,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 9),
+            ],
             Icon(
               selected
                   ? Icons.radio_button_checked

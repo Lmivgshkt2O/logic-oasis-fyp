@@ -3,9 +3,14 @@ import 'package:logic_oasis/shared/models/topic.dart';
 import 'package:logic_oasis/shared/widgets/mastery_chip.dart';
 
 class TopicProgressRow extends StatelessWidget {
-  const TopicProgressRow({super.key, required this.topic});
+  const TopicProgressRow({
+    super.key,
+    required this.topic,
+    this.isBahasaMelayu = false,
+  });
 
   final Topic topic;
+  final bool isBahasaMelayu;
 
   @override
   Widget build(BuildContext context) {
@@ -19,7 +24,10 @@ class TopicProgressRow extends StatelessWidget {
             Expanded(
               child: Text(topic.title, style: theme.textTheme.titleMedium),
             ),
-            MasteryChip(label: topic.mastery),
+            MasteryChip(
+              label: topic.mastery,
+              isBahasaMelayu: isBahasaMelayu,
+            ),
           ],
         ),
         const SizedBox(height: 8),

@@ -29,8 +29,8 @@ class TopicCard extends StatelessWidget {
         ? lockedReason!
         : _restorationSubtitle(topic);
     final masteryLabel = !locked && topic.mastery == 'Locked'
-        ? 'New'
-        : topic.mastery;
+        ? _masteryText('New')
+        : _masteryText(topic.mastery);
 
     return Opacity(
       opacity: locked ? .74 : 1,
@@ -125,11 +125,34 @@ class TopicCard extends StatelessWidget {
   }
 
   String _restorationSubtitle(Topic topic) {
-    if (topic.id.startsWith('fractions')) return 'Repair the Fraction Bridge';
-    if (topic.id.startsWith('decimals')) return 'Refresh the Waterway';
-    if (topic.id.startsWith('percentages')) return 'Grow the Palm Garden';
-    if (topic.id.startsWith('money')) return 'Rebuild the Market Corner';
+    if (topic.id.startsWith('fractions')) {
+      return isBahasaMelayu
+          ? 'Baiki Jambatan Pecahan'
+          : 'Repair the Fraction Bridge';
+    }
+    if (topic.id.startsWith('decimals')) {
+      return isBahasaMelayu ? 'Segar semula Laluan Air' : 'Refresh the Waterway';
+    }
+    if (topic.id.startsWith('percentages')) {
+      return isBahasaMelayu ? 'Tanam Taman Palma' : 'Grow the Palm Garden';
+    }
+    if (topic.id.startsWith('money')) {
+      return isBahasaMelayu ? 'Bina semula Sudut Pasar' : 'Rebuild the Market Corner';
+    }
     return topic.localizedArea(isBahasaMelayu);
+  }
+
+  String _masteryText(String label) {
+    if (!isBahasaMelayu) return label.isEmpty ? 'Mastery' : label;
+    return switch (label) {
+      'Strong' => 'Kukuh',
+      'Moderate' => 'Sederhana',
+      'Weak' => 'Lemah',
+      'New' => 'Baharu',
+      'Locked' => 'Dikunci',
+      '' => 'Penguasaan',
+      _ => label,
+    };
   }
 
   _TopicStatus _statusFor(
@@ -139,7 +162,7 @@ class TopicCard extends StatelessWidget {
   ) {
     if (locked) {
       return _TopicStatus(
-        label: 'Locked',
+        label: isBahasaMelayu ? 'Dikunci' : 'Locked',
         icon: 'lock_outline',
         color: oasis.neutral,
         background: oasis.groupedSurface,
@@ -147,7 +170,7 @@ class TopicCard extends StatelessWidget {
     }
     if (topic.progress >= .7 || topic.mastery == 'Strong') {
       return _TopicStatus(
-        label: 'Doing Great',
+        label: isBahasaMelayu ? 'Hebat' : 'Doing Great',
         icon: 'check',
         color: oasis.forest,
         background: oasis.mint,
@@ -155,14 +178,14 @@ class TopicCard extends StatelessWidget {
     }
     if (topic.progress < .35 || topic.mastery == 'Weak') {
       return _TopicStatus(
-        label: 'Needs Help',
+        label: isBahasaMelayu ? 'Perlu Bantuan' : 'Needs Help',
         icon: 'warning',
         color: oasis.coral,
         background: oasis.coral.withValues(alpha: .12),
       );
     }
     return _TopicStatus(
-      label: 'Keep Practicing',
+      label: isBahasaMelayu ? 'Terus Berlatih' : 'Keep Practicing',
       icon: 'star',
       color: OasisSemanticTheme.continuedPracticeText,
       background: oasis.reward.withValues(alpha: .15),

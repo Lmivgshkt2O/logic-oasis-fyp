@@ -354,7 +354,7 @@ class _SubtopicCard extends StatelessWidget {
                       ),
                       Icon(
                         canStart
-                            ? Icons.play_arrow_rounded
+                            ? Icons.chevron_right_rounded
                             : Icons.lock_outline_rounded,
                         color: canStart
                             ? oasis.forest
@@ -451,19 +451,16 @@ class _SubtopicStatus {
   }) {
     if (!unlocked) {
       return _SubtopicStatus(
-        label: 'Lock',
+        label: isBahasaMelayu ? 'Dikunci' : 'Lock',
         color: oasis.neutral,
         background: oasis.groupedSurface,
         progressColor: oasis.neutral,
         icon: 'lock_outline',
-        progressSemanticsLabel: 'Locked',
+        progressSemanticsLabel: isBahasaMelayu ? 'Dikunci' : 'Locked',
       );
     }
     if (!subtopic.isAttempted) {
-      final label =
-          subtopic.mastery == 'New'
-              ? (isBahasaMelayu ? 'Baru' : 'New')
-              : subtopic.mastery;
+      final label = _masteryLabel(subtopic.mastery, isBahasaMelayu);
       return _SubtopicStatus(
         label: label,
         color: OasisSemanticTheme.continuedPracticeText,
@@ -523,12 +520,25 @@ class _SubtopicStatus {
       );
     }
     return _SubtopicStatus(
-      label: subtopic.mastery,
+      label: _masteryLabel(subtopic.mastery, isBahasaMelayu),
       color: OasisSemanticTheme.continuedPracticeText,
       background: oasis.reward.withValues(alpha: .15),
       progressColor: oasis.leaf,
-      progressSemanticsLabel: subtopic.mastery,
+      progressSemanticsLabel: _masteryLabel(subtopic.mastery, isBahasaMelayu),
     );
+  }
+
+  static String _masteryLabel(String label, bool isBahasaMelayu) {
+    if (!isBahasaMelayu) return label.isEmpty ? 'New' : label;
+    return switch (label) {
+      'Strong' => 'Kukuh',
+      'Moderate' => 'Sederhana',
+      'Weak' => 'Lemah',
+      'New' => 'Baru',
+      'Locked' => 'Dikunci',
+      '' => 'Baru',
+      _ => label,
+    };
   }
 }
 

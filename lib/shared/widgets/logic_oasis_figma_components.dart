@@ -432,6 +432,7 @@ class MissionCard extends StatelessWidget {
     required this.progressLabel,
     required this.onTap,
     required this.readyToClaim,
+    required this.sectionLabel,
   });
 
   final String topicLabel;
@@ -442,6 +443,7 @@ class MissionCard extends StatelessWidget {
   final String progressLabel;
   final VoidCallback onTap;
   final bool readyToClaim;
+  final String sectionLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -450,7 +452,7 @@ class MissionCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SectionLabel(label: "TODAY'S MISSION"),
+        _SectionLabel(label: sectionLabel),
         const SizedBox(height: 8),
         SoftCard(
           onTap: onTap,
@@ -604,11 +606,11 @@ class OasisHeroCard extends StatelessWidget {
                   restorationProgress: progress,
                 ),
               ),
-              const Positioned(
+              Positioned(
                 left: 20,
                 top: 18,
                 right: 20,
-                child: _HeroTitleBlock(),
+                child: _HeroTitleBlock(isBahasaMelayu: isBahasaMelayu),
               ),
               // Progress-aware repair markers.
               Positioned(
@@ -1786,7 +1788,9 @@ class _SectionLabel extends StatelessWidget {
 }
 
 class _HeroTitleBlock extends StatelessWidget {
-  const _HeroTitleBlock();
+  const _HeroTitleBlock({required this.isBahasaMelayu});
+
+  final bool isBahasaMelayu;
 
   @override
   Widget build(BuildContext context) {
@@ -1805,7 +1809,9 @@ class _HeroTitleBlock extends StatelessWidget {
         ),
         const SizedBox(height: 5),
         Text(
-          'Learn. Restore. Grow together.',
+          isBahasaMelayu
+              ? 'Belajar. Pulihkan. Berkembang bersama.'
+              : 'Learn. Restore. Grow together.',
           style: theme.textTheme.bodyMedium?.copyWith(
             color: oasis.secondaryInk,
             fontSize: 14,

@@ -436,23 +436,24 @@ class LogicOasisTheme {
       // and explanation text with comfortable line spacing.
       bodyLarge: base.bodyLarge?.copyWith(
         fontFamily: 'Nunito',
-        fontSize: 15,
+        fontSize: 16,
         fontWeight: FontWeight.w400,
         color: oasis.secondaryInk,
-        height: 1.35,
+        height: 1.42,
       ),
       bodyMedium: base.bodyMedium?.copyWith(
+        fontFamily: 'Nunito',
+        fontSize: 14,
+        fontWeight: FontWeight.w400,
+        color: oasis.secondaryInk,
+        height: 1.42,
+      ),
+      bodySmall: base.bodySmall?.copyWith(
         fontFamily: 'Nunito',
         fontSize: 13,
         fontWeight: FontWeight.w400,
         color: oasis.secondaryInk,
-        height: 1.35,
-      ),
-      bodySmall: base.bodySmall?.copyWith(
-        fontFamily: 'Nunito',
-        fontWeight: FontWeight.w400,
-        color: oasis.secondaryInk,
-        height: 1.35,
+        height: 1.42,
       ),
     );
 

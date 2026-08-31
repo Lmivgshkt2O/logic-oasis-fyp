@@ -41,6 +41,8 @@ class _OpeningAnimationPageState extends State<OpeningAnimationPage>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isBahasaMelayu =
+        Localizations.localeOf(context).languageCode == 'ms';
 
     return Scaffold(
       body: SafeArea(
@@ -89,7 +91,9 @@ class _OpeningAnimationPageState extends State<OpeningAnimationPage>
                     Text('Logic Oasis', style: theme.textTheme.headlineLarge),
                     const SizedBox(height: 8),
                     Text(
-                      'Learn. Restore. Grow together.',
+                      isBahasaMelayu
+                          ? 'Belajar. Pulihkan. Berkembang bersama.'
+                          : 'Learn. Restore. Grow together.',
                       style: theme.textTheme.bodyLarge,
                       textAlign: TextAlign.center,
                     ),

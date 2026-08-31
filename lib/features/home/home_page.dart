@@ -29,7 +29,7 @@ class HomePage extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Good morning,',
+                    state.t('Good morning,', 'Selamat pagi,'),
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: oasis.secondaryInk,
                       fontSize: 15,
@@ -171,15 +171,18 @@ class _HomeMissionCard extends StatelessWidget {
         ? l10n.rewardClaimedKeepPractising(topic)
         : mission.isReadyToClaim
         ? l10n.missionCompleteClaimReward
+        : isBahasaMelayu
+        ? '+${mission.rewardCrystals} Kristal apabila selesai'
         : '+${mission.rewardCrystals} Crystals on completion';
 
     return MissionCard(
       topicLabel: topic,
-      durationLabel: 'Easy - 5 min',
+      durationLabel: isBahasaMelayu ? 'Mudah - 5 minit' : 'Easy - 5 min',
       title: l10n.completeTopicDrills(required, topic),
       rewardLabel: rewardLabel,
       progress: progress,
       progressLabel: '${mission.visibleCompletions}/$required',
+      sectionLabel: isBahasaMelayu ? 'MISI HARI INI' : "TODAY'S MISSION",
       readyToClaim: mission.isReadyToClaim,
       onTap: onTap,
     );

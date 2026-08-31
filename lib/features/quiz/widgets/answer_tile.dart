@@ -9,6 +9,7 @@ class AnswerTile extends StatelessWidget {
     required this.correct,
     required this.wrong,
     required this.onTap,
+    this.letter,
   });
 
   final String label;
@@ -16,6 +17,8 @@ class AnswerTile extends StatelessWidget {
   final bool correct;
   final bool wrong;
   final VoidCallback? onTap;
+  /// Optional textbook-style option letter (A, B, C, D) shown before the text.
+  final String? letter;
 
   @override
   Widget build(BuildContext context) {
@@ -50,6 +53,31 @@ class AnswerTile extends StatelessWidget {
         ),
         child: Row(
           children: [
+            if (letter != null) ...[
+              Container(
+                width: 30,
+                height: 30,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: (correct || wrong || selected)
+                      ? background
+                      : oasis.groupedSurface,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: border, width: 1.2),
+                ),
+                child: Text(
+                  letter!,
+                  style: TextStyle(
+                    color: border,
+                    fontFamily: 'Fredoka',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    height: 1,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+            ],
             Expanded(
               child: Text(
                 label,

@@ -50,7 +50,7 @@ class SettingsPage extends StatelessWidget {
         ),
         const SizedBox(height: 20),
         _SettingsSection(
-          title: 'LEARNING',
+          title: state.t('LEARNING', 'PEMBELAJARAN'),
           children: [
             SettingsRow(
               icon: 'volume_up',
@@ -170,7 +170,7 @@ class SettingsPage extends StatelessWidget {
         ),
         const SizedBox(height: 20),
         _SettingsSection(
-          title: 'PARENT & SAFETY',
+          title: state.t('PARENT & SAFETY', 'IBU BAPA & KESELAMATAN'),
           children: [
             _ParentDashboardCard(
               title: l10n.parentDashboard,

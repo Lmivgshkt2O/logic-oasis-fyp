@@ -131,6 +131,8 @@ class _WelcomeToast extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final oasis = LogicOasisTheme.of(context);
+    final isBahasaMelayu =
+        Localizations.localeOf(context).languageCode == 'ms';
 
     return Material(
       color: Colors.transparent,
@@ -157,7 +159,9 @@ class _WelcomeToast extends StatelessWidget {
               const SizedBox(width: 8),
               Flexible(
                 child: Text(
-                  'Welcome back, $studentName',
+                  isBahasaMelayu
+                      ? 'Selamat kembali, $studentName'
+                      : 'Welcome back, $studentName',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.titleMedium?.copyWith(fontSize: 13.5),
