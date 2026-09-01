@@ -30,7 +30,7 @@
   "dependencyLockFile": "forum-runtime-requirements.lock.txt",
   "dependencyLockSha256": "0067273f13fc463f830c49f4f91169a2dbf71c36246c7d2db2cba3e9e15c7006",
   "deploymentRuntimeHashes": {
-    "forum_runtime.py": "4c220d18913bcb1d006403e650702087436b89646881a1c2e685985ae9d9e817",
+    "forum_runtime.py": "f8f1682a5d27d30f6a50f8df5df0d6394b05eab9f5aeb7169851fab01bf366fd",
     "main.py": "1eeaf677497560cddeb7bb603e90abe56bc0bf61f4af50374b8ade67626f681b"
   },
   "deploymentScope": "controlled_demo",
