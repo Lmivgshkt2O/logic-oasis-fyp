@@ -59,16 +59,17 @@ class AnswerTile extends StatelessWidget {
                 height: 30,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: (correct || wrong || selected)
-                      ? background
-                      : oasis.groupedSurface,
+                  color: correct
+                      ? oasis.forest
+                      : wrong
+                      ? oasis.coral
+                      : oasis.primaryInk,
                   shape: BoxShape.circle,
-                  border: Border.all(color: border, width: 1.2),
                 ),
                 child: Text(
                   letter!,
-                  style: TextStyle(
-                    color: border,
+                  style: const TextStyle(
+                    color: Colors.white,
                     fontFamily: 'Fredoka',
                     fontSize: 14,
                     fontWeight: FontWeight.w700,

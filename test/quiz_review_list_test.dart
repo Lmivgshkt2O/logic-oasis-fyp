@@ -182,6 +182,6 @@ void main() {
 
     expect(find.text('Based on your quiz progress'), findsOneWidget);
     expect(find.text('Next: Easy practice'), findsOneWidget);
-    expect(find.text('Try Next Level'), findsOneWidget);
+    expect(find.text('Try again'), findsOneWidget);
   });
 }

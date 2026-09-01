@@ -441,9 +441,9 @@ void main() {
     );
 
     await _completeOneQuiz(tester);
-    final tryNextLevel = find.text('Try Next Level');
-    await tester.ensureVisible(tryNextLevel);
-    await tester.tap(tryNextLevel);
+    final tryAgain = find.text('Try again');
+    await tester.ensureVisible(tryAgain);
+    await tester.tap(tryAgain);
     await tester.pumpAndSettle();
 
     expect(service.startedSubtopicIds, <String>['s1', 's1']);

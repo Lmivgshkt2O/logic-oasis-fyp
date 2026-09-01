@@ -22,7 +22,11 @@ class HomePage extends StatelessWidget {
       children: [
         Row(
           children: [
-            SproutAvatar(size: 60, avatarId: state.avatarId),
+            SproutAvatar(
+              size: 60,
+              avatarId: state.avatarId,
+              imageBytes: state.avatarImageBytes,
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(

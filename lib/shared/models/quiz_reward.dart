@@ -5,6 +5,7 @@ class QuizReward {
     required this.previousMastery,
     required this.newMastery,
     required this.encouragement,
+    this.previousMasteryPercent = 0,
   });
 
   final int score;
@@ -12,4 +13,5 @@ class QuizReward {
   final String previousMastery;
   final String newMastery;
   final String encouragement;
+  final int previousMasteryPercent;
 }

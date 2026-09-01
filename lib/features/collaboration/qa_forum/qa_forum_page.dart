@@ -1582,19 +1582,13 @@ class _OptionTile extends StatelessWidget {
                 height: 26,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: selected
-                      ? oasis.violet.withValues(alpha: .10)
-                      : oasis.groupedSurface,
+                  color: selected ? oasis.violet : oasis.primaryInk,
                   shape: BoxShape.circle,
-                  border: Border.all(
-                    color: selected ? oasis.violet : oasis.outline,
-                    width: 1.2,
-                  ),
                 ),
                 child: Text(
                   letter!,
-                  style: TextStyle(
-                    color: selected ? oasis.violet : oasis.secondaryInk,
+                  style: const TextStyle(
+                    color: Colors.white,
                     fontFamily: 'Fredoka',
                     fontSize: 12,
                     fontWeight: FontWeight.w700,

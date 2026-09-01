@@ -1,4 +1,7 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/features/settings/parent_access_page.dart';
 import 'package:logic_oasis/features/settings/parent_invitation_page.dart';
@@ -44,6 +47,7 @@ class SettingsPage extends StatelessWidget {
               '${state.t('Level 7 Gardener', 'Tukang Kebun Tahap 7')} - ${state.t('Year', 'Tahun')} ${state.yearLevel}',
           email: state.currentStudentEmail ?? 'amirah@logicoasis.edu.my',
           avatarId: state.avatarId,
+          imageBytes: state.avatarImageBytes,
           crystals: state.crystals,
           energy: state.mutualAidEnergy,
           streak: state.currentYearAttempts.length,
@@ -108,13 +112,6 @@ class SettingsPage extends StatelessWidget {
               label: state.t('Theme colour', 'Warna tema'),
               value: _themeColorLabel(state),
               onTap: () => _showThemeColorSheet(context),
-            ),
-            SettingsRow(
-              icon: 'face',
-              iconColor: oasis.leaf,
-              label: state.t('Profile icon', 'Ikon profil'),
-              value: _avatarLabel(state),
-              onTap: () => _showAvatarSheet(context),
             ),
             SettingsRow(
               icon: state.missionReminders
@@ -339,25 +336,6 @@ class SettingsPage extends StatelessWidget {
     );
   }
 
-  String _avatarLabel(AppState state) {
-    return state.t(
-      switch (state.avatarId) {
-        'star' => 'Star',
-        'rocket' => 'Rocket',
-        'heart' => 'Heart',
-        'sun' => 'Sun',
-        _ => 'Sprout',
-      },
-      switch (state.avatarId) {
-        'star' => 'Bintang',
-        'rocket' => 'Roket',
-        'heart' => 'Hati',
-        'sun' => 'Matahari',
-        _ => 'Pucuk',
-      },
-    );
-  }
-
   Future<void> _showThemeColorSheet(BuildContext context) async {
     final selected = await showModalBottomSheet<String>(
       context: context,
@@ -421,69 +399,6 @@ class SettingsPage extends StatelessWidget {
     _showMessage(
       context,
       state.t('Theme colour changed.', 'Warna tema ditukar.'),
-    );
-  }
-
-  Future<void> _showAvatarSheet(BuildContext context) async {
-    final selected = await showModalBottomSheet<String>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  state.t('Profile icon', 'Ikon profil'),
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 10),
-                for (final id in AppState.avatarOptions)
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: SproutAvatar(size: 44, avatarId: id),
-                    title: Text(
-                      state.t(
-                        switch (id) {
-                          'star' => 'Star',
-                          'rocket' => 'Rocket',
-                          'heart' => 'Heart',
-                          'sun' => 'Sun',
-                          _ => 'Sprout',
-                        },
-                        switch (id) {
-                          'star' => 'Bintang',
-                          'rocket' => 'Roket',
-                          'heart' => 'Hati',
-                          'sun' => 'Matahari',
-                          _ => 'Pucuk',
-                        },
-                      ),
-                    ),
-                    trailing: state.avatarId == id
-                        ? AppSvgIcon(
-                            'check',
-                            color: LogicOasisTheme.of(context).leaf,
-                            size: 22,
-                          )
-                        : null,
-                    onTap: () => Navigator.of(context).pop(id),
-                  ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-    if (selected == null) return;
-    state.updateAvatar(selected);
-    if (!context.mounted) return;
-    _showMessage(
-      context,
-      state.t('Profile icon changed.', 'Ikon profil ditukar.'),
     );
   }
 
@@ -891,6 +806,7 @@ class _FigmaProfileCard extends StatelessWidget {
     required this.level,
     required this.email,
     required this.avatarId,
+    required this.imageBytes,
     required this.crystals,
     required this.energy,
     required this.streak,
@@ -901,6 +817,7 @@ class _FigmaProfileCard extends StatelessWidget {
   final String level;
   final String email;
   final String avatarId;
+  final Uint8List? imageBytes;
   final int crystals;
   final int energy;
   final int streak;
@@ -920,7 +837,7 @@ class _FigmaProfileCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              SproutAvatar(size: 68, avatarId: avatarId),
+              SproutAvatar(size: 68, avatarId: avatarId, imageBytes: imageBytes),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -1160,6 +1077,114 @@ class _StudentProfileSheetState extends State<_StudentProfileSheet> {
     }
   }
 
+  Widget _buildAvatarPicker(BuildContext context) {
+    final state = widget.state;
+    final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            SproutAvatar(
+              size: 54,
+              avatarId: state.avatarId,
+              imageBytes: state.avatarImageBytes,
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    state.t('Profile icon', 'Ikon profil'),
+                    style: theme.textTheme.titleSmall,
+                  ),
+                  Text(
+                    state.t(
+                      'Pick one below or upload from your device.',
+                      'Pilih satu di bawah atau muat naik dari peranti anda.',
+                    ),
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 12,
+          runSpacing: 10,
+          children: [
+            for (final id in AppState.avatarOptions)
+              GestureDetector(
+                onTap: () {
+                  state.updateAvatarImage(null);
+                  state.updateAvatar(id);
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: state.avatarImageBytes == null &&
+                              state.avatarId == id
+                          ? oasis.leaf
+                          : Colors.transparent,
+                      width: 2,
+                    ),
+                  ),
+                  child: SproutAvatar(size: 48, avatarId: id),
+                ),
+              ),
+            _avatarUploadButton(context),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _avatarUploadButton(BuildContext context) {
+    return Tooltip(
+      message: 'Upload from device',
+      child: GestureDetector(
+        onTap: _pickAvatarImage,
+        child: Container(
+          width: 52,
+          height: 52,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: LogicOasisTheme.of(context).groupedSurface,
+            border: Border.all(
+              color: LogicOasisTheme.of(context).outline,
+            ),
+          ),
+          child: Icon(
+            Icons.add_a_photo_outlined,
+            color: LogicOasisTheme.of(context).secondaryInk,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickAvatarImage() async {
+    try {
+      final picked = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 600,
+        imageQuality: 85,
+      );
+      if (picked == null || !mounted) return;
+      final bytes = await picked.readAsBytes();
+      if (mounted) widget.state.updateAvatarImage(bytes);
+    } catch (_) {
+      // Device picking can be cancelled or unavailable; silently ignore.
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -1180,6 +1205,8 @@ class _StudentProfileSheetState extends State<_StudentProfileSheet> {
               l10n.editStudentProfile,
               style: Theme.of(context).textTheme.titleLarge,
             ),
+            const SizedBox(height: 12),
+            _buildAvatarPicker(context),
             const SizedBox(height: 16),
             TextField(
               controller: nameController,

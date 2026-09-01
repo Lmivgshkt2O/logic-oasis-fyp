@@ -148,6 +148,7 @@ class _QuizPageState extends State<QuizPage> {
             completion: completion,
             reward: reward,
             topicArea: widget.title,
+            currentDifficulty: widget.session.difficultyLevel,
             isBahasaMelayu: widget.isBahasaMelayu,
             topicId: widget.session.topicId,
             subtopicId: widget.session.subtopicId,

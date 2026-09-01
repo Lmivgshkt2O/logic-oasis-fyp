@@ -1,5 +1,7 @@
 // ignore_for_file: unused_element
 
+import 'dart:typed_data';
+
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -284,14 +286,27 @@ class SproutAvatar extends StatelessWidget {
     super.key,
     this.size = 48,
     this.avatarId = 'sprout',
+    this.imageBytes,
   });
 
   final double size;
   final String avatarId;
+  final Uint8List? imageBytes;
 
   @override
   Widget build(BuildContext context) {
     final oasis = LogicOasisTheme.of(context);
+    if (imageBytes != null && imageBytes!.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(size * .28),
+        child: Image.memory(
+          imageBytes!,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+        ),
+      );
+    }
     final iconOption = _AvatarIconOption.from(avatarId, oasis);
     if (iconOption != null) {
       return Container(

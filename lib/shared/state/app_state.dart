@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:logic_oasis/shared/data/year4_chapter1_content.dart';
@@ -318,11 +319,18 @@ class AppState extends ChangeNotifier {
   String themeColorId = 'green';
   /// Selected profile avatar id (one of [avatarOptions]).
   String avatarId = 'sprout';
+  /// Optional device-uploaded avatar image bytes (overrides [avatarId]).
+  Uint8List? avatarImageBytes;
   int crystals = 124;
   int mutualAidEnergy = 36;
   /// Forum answers (and badges) that already granted mutual-aid, so a student
   /// is rewarded once per badge and never double-counted.
   final Set<String> _forumAidRewarded = <String>{};
+  /// Previous mastery % captured at quiz completion, awaiting the server BKT
+  /// value so the crystal reward matches the mastery the student actually sees.
+  final Map<String, int> _pendingQuizRewardPrevious = <String, int>{};
+  /// The most recent authoritative quiz reward, for display.
+  QuizReward? lastQuizReward;
   final Set<String> claimedRecommendedMissionTopicIds = <String>{};
   final Set<String> _unlockedTopicIds = <String>{};
   final Set<String> _unlockedSubtopicIds = <String>{};
@@ -926,11 +934,10 @@ class AppState extends ChangeNotifier {
     final previousPercent =
         ((_subtopicMasteryProbability(topicId, subtopicId) ?? 0) * 100)
             .round();
-    final earned = _quizRewardCrystals(
-      previousPercent: previousPercent,
-      newPercent: score,
-    );
-    if (earned > 0) crystals += earned;
+    // The crystal reward is granted once the authoritative server BKT value
+    // arrives (see _grantAuthoritativeQuizRewards), so it matches the mastery
+    // the student sees rather than the provisional score-based projection.
+    _pendingQuizRewardPrevious[subtopicId] = previousPercent;
     applyTrustedSubtopicProgress(<TrustedSubtopicProgress>[
       TrustedSubtopicProgress(
         studentId: currentStudentId,
@@ -951,13 +958,19 @@ class AppState extends ChangeNotifier {
         projectionStatus: 'finalized_pending_ai',
       ),
     ], replaceAll: false);
+    final provisionalEarned = quizRewardCrystals(
+      previousPercent: previousPercent,
+      newPercent: score,
+    );
     final reward = QuizReward(
       score: score,
-      earnedCrystals: earned,
+      earnedCrystals: provisionalEarned,
       previousMastery: _masteryForScore(previousPercent),
       newMastery: mastery,
       encouragement: _encouragementForScore(score),
+      previousMasteryPercent: previousPercent,
     );
+    lastQuizReward = reward;
     notifyListeners();
     return reward;
   }
@@ -1120,11 +1133,47 @@ class AppState extends ChangeNotifier {
         );
       }
     }
+    _grantAuthoritativeQuizRewards(records);
     if (!changed) return;
     _unlockedTopicIds.clear();
     _unlockedSubtopicIds.clear();
     _recordUnlockedProgression();
     notifyListeners();
+  }
+
+  /// Grants the quiz crystal reward once the authoritative server BKT mastery
+  /// arrives for a subtopic that has a pending quiz reward. This keeps the
+  /// reward aligned with the mastery the student sees on the subtopic card.
+  void _grantAuthoritativeQuizRewards(List<TrustedSubtopicProgress> records) {
+    for (final record in records) {
+      if (record.studentId != currentStudentId ||
+          record.yearLevel != yearLevel) {
+        continue;
+      }
+      final masteryProbability = record.masteryProbability;
+      if (masteryProbability == null) continue;
+      final previousPercent = _pendingQuizRewardPrevious.remove(
+        record.subtopicId,
+      );
+      if (previousPercent == null) continue;
+      final newPercent = (masteryProbability * 100).round();
+      final earned = quizRewardCrystals(
+        previousPercent: previousPercent,
+        newPercent: newPercent,
+      );
+      if (earned > 0) crystals += earned;
+      final scoreRate = record.bestCorrectRate.clamp(0.0, 1.0);
+      final score = (scoreRate * 100).round();
+      lastQuizReward = QuizReward(
+        score: score,
+        earnedCrystals: earned,
+        previousMastery: _masteryForScore(previousPercent),
+        newMastery: _masteryForScore(newPercent),
+        encouragement: _encouragementForScore(score),
+        previousMasteryPercent: previousPercent,
+      );
+      notifyListeners();
+    }
   }
 
   void updateLanguage(String value) {
@@ -1180,6 +1229,13 @@ class AppState extends ChangeNotifier {
       notifyListeners();
       unawaited(saveAppSession());
     }
+  }
+
+  void updateAvatarImage(Uint8List? bytes) {
+    avatarImageBytes = bytes;
+    avatarId = 'sprout';
+    notifyListeners();
+    unawaited(saveAppSession());
   }
 
   void updateScreenTimeLimit(int minutes) {
@@ -1936,7 +1992,10 @@ class AppState extends ChangeNotifier {
 
   /// Issue #6 quiz reward tiers, in crystals. Reward only when the new
   /// mastery moved forward (new > 0 and not below the previous value).
-  int _quizRewardCrystals({required int previousPercent, required int newPercent}) {
+  static int quizRewardCrystals({
+    required int previousPercent,
+    required int newPercent,
+  }) {
     if (newPercent <= 0) return 0;
     if (newPercent < previousPercent) return 0;
     if (newPercent < 20) return 10;
