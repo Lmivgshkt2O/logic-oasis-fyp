@@ -119,7 +119,7 @@ class ResultPage extends StatelessWidget {
             icon: Icons.emoji_events_outlined,
             child: Text('$score%', style: theme.textTheme.headlineLarge),
           ),
-          if (reward != null) ...[
+          if (reward != null && reward!.earnedCrystals > 0) ...[
             const SizedBox(height: 14),
             Row(
               children: [

@@ -280,13 +280,35 @@ class SoftIconButton extends StatelessWidget {
 }
 
 class SproutAvatar extends StatelessWidget {
-  const SproutAvatar({super.key, this.size = 48});
+  const SproutAvatar({
+    super.key,
+    this.size = 48,
+    this.avatarId = 'sprout',
+  });
 
   final double size;
+  final String avatarId;
 
   @override
   Widget build(BuildContext context) {
     final oasis = LogicOasisTheme.of(context);
+    final iconOption = _AvatarIconOption.from(avatarId, oasis);
+    if (iconOption != null) {
+      return Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: iconOption.color.withValues(alpha: .18),
+          borderRadius: BorderRadius.circular(size * .28),
+          border: Border.all(color: iconOption.color, width: 1.4),
+        ),
+        child: Icon(
+          iconOption.icon,
+          color: iconOption.color,
+          size: size * .5,
+        ),
+      );
+    }
     return Container(
       width: size,
       height: size,
@@ -299,6 +321,37 @@ class SproutAvatar extends StatelessWidget {
         child: const AppIllustration('sprout_avatar.jpg'),
       ),
     );
+  }
+}
+
+/// Map a local avatar id to its colour + icon cue. `sprout` keeps the bundled
+/// illustration; the others are locally rendered so no extra assets are needed.
+class _AvatarIconOption {
+  const _AvatarIconOption({required this.icon, required this.color});
+
+  final IconData icon;
+  final Color color;
+
+  static _AvatarIconOption? from(String id, OasisSemanticTheme oasis) {
+    return switch (id) {
+      'star' => _AvatarIconOption(
+        icon: Icons.star_rounded,
+        color: oasis.reward,
+      ),
+      'rocket' => _AvatarIconOption(
+        icon: Icons.rocket_launch_rounded,
+        color: oasis.water,
+      ),
+      'heart' => _AvatarIconOption(
+        icon: Icons.favorite_rounded,
+        color: oasis.coral,
+      ),
+      'sun' => _AvatarIconOption(
+        icon: Icons.wb_sunny_rounded,
+        color: oasis.forest,
+      ),
+      _ => null,
+    };
   }
 }
 

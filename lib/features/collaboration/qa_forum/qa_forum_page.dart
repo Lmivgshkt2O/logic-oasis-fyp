@@ -814,6 +814,7 @@ class _AnswersPageState extends State<ForumDiscussionPage> {
               }
               if (!snapshot.hasData)
                 return const Center(child: CircularProgressIndicator());
+              _rewardAid(snapshot.data!);
               var effectiveAcceptedAnswerId = _acceptedAnswerId;
               for (final answer in snapshot.data!) {
                 if (answer.acceptedAt != null) {
@@ -1061,6 +1062,23 @@ class _AnswersPageState extends State<ForumDiscussionPage> {
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
+  }
+
+  /// Grants the student's own mutual-aid once per answer/badge (Issue #6).
+  /// Runs post-frame so it never mutates [AppState] during build. The award
+  /// is idempotent in [AppState.awardForumAid], so repeat scans are no-ops.
+  void _rewardAid(List<ForumAnswer> answers) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      for (final answer in answers) {
+        if (answer.authorId != widget.state.currentStudentId) continue;
+        widget.state.awardForumAid(
+          answerId: answer.id,
+          helpful: answer.helpfulCount > 0,
+          aiVerified: answer.aiPublicState == 'verified',
+        );
+      }
+    });
   }
 
   String _optionLabel(int? index) {

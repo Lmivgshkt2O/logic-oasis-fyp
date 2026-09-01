@@ -95,12 +95,12 @@ class SubtopicPage extends StatelessWidget {
         MaterialPageRoute(
           builder: (_) => QuizPage(
             session: session,
-            title: topic.localizedTitle(state.isBahasaMelayu),
+            title: subtopic.localizedTitle(state.isBahasaMelayu),
             isBahasaMelayu: state.isBahasaMelayu,
             sessionService: sessionService,
             aiDiagnosisStreamFactory: aiDiagnosisStreamFactory,
-            onFinalized: (completion) {
-              state.applyTrustedQuizCompletion(
+            onFinalized: (completion) async {
+              final reward = state.applyTrustedQuizCompletion(
                 topicId: topic.id,
                 subtopicId: subtopic.id,
                 correctCount: completion.correctCount,
@@ -115,7 +115,7 @@ class SubtopicPage extends StatelessWidget {
               // with its projection without holding the result page hostage to
               // a separate Firestore read.
               unawaited(state.refreshTrustedProgress(replaceAll: false));
-              return Future<void>.value();
+              return reward;
             },
           ),
         ),

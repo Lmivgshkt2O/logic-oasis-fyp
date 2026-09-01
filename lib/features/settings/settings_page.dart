@@ -43,6 +43,7 @@ class SettingsPage extends StatelessWidget {
           level:
               '${state.t('Level 7 Gardener', 'Tukang Kebun Tahap 7')} - ${state.t('Year', 'Tahun')} ${state.yearLevel}',
           email: state.currentStudentEmail ?? 'amirah@logicoasis.edu.my',
+          avatarId: state.avatarId,
           crystals: state.crystals,
           energy: state.mutualAidEnergy,
           streak: state.currentYearAttempts.length,
@@ -100,6 +101,20 @@ class SettingsPage extends StatelessWidget {
                         ),
                 );
               },
+            ),
+            SettingsRow(
+              icon: 'palette',
+              iconColor: oasis.violet,
+              label: state.t('Theme colour', 'Warna tema'),
+              value: _themeColorLabel(state),
+              onTap: () => _showThemeColorSheet(context),
+            ),
+            SettingsRow(
+              icon: 'face',
+              iconColor: oasis.leaf,
+              label: state.t('Profile icon', 'Ikon profil'),
+              value: _avatarLabel(state),
+              onTap: () => _showAvatarSheet(context),
             ),
             SettingsRow(
               icon: state.missionReminders
@@ -307,6 +322,169 @@ class SettingsPage extends StatelessWidget {
           content: Text(AppLocalizations.of(context)!.languageSet(selected)),
         ),
       );
+  }
+
+  String _themeColorLabel(AppState state) {
+    return state.t(
+      switch (state.themeColorId) {
+        'ocean' => 'Ocean',
+        'sunset' => 'Sunset',
+        _ => 'Green',
+      },
+      switch (state.themeColorId) {
+        'ocean' => 'Lautan',
+        'sunset' => 'Senja',
+        _ => 'Hijau',
+      },
+    );
+  }
+
+  String _avatarLabel(AppState state) {
+    return state.t(
+      switch (state.avatarId) {
+        'star' => 'Star',
+        'rocket' => 'Rocket',
+        'heart' => 'Heart',
+        'sun' => 'Sun',
+        _ => 'Sprout',
+      },
+      switch (state.avatarId) {
+        'star' => 'Bintang',
+        'rocket' => 'Roket',
+        'heart' => 'Hati',
+        'sun' => 'Matahari',
+        _ => 'Pucuk',
+      },
+    );
+  }
+
+  Future<void> _showThemeColorSheet(BuildContext context) async {
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  state.t('Theme colour', 'Warna tema'),
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 10),
+                for (final id in AppState.themeColorOptions)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: LogicOasisPalette.swatchFor(id),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    title: Text(
+                      state.t(
+                        switch (id) {
+                          'ocean' => 'Ocean',
+                          'sunset' => 'Sunset',
+                          _ => 'Green',
+                        },
+                        switch (id) {
+                          'ocean' => 'Lautan',
+                          'sunset' => 'Senja',
+                          _ => 'Hijau',
+                        },
+                      ),
+                    ),
+                    trailing: state.themeColorId == id
+                        ? AppSvgIcon(
+                            'check',
+                            color: LogicOasisTheme.of(context).leaf,
+                            size: 22,
+                          )
+                        : null,
+                    onTap: () => Navigator.of(context).pop(id),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (selected == null) return;
+    state.updateThemeColor(selected);
+    if (!context.mounted) return;
+    _showMessage(
+      context,
+      state.t('Theme colour changed.', 'Warna tema ditukar.'),
+    );
+  }
+
+  Future<void> _showAvatarSheet(BuildContext context) async {
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  state.t('Profile icon', 'Ikon profil'),
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 10),
+                for (final id in AppState.avatarOptions)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: SproutAvatar(size: 44, avatarId: id),
+                    title: Text(
+                      state.t(
+                        switch (id) {
+                          'star' => 'Star',
+                          'rocket' => 'Rocket',
+                          'heart' => 'Heart',
+                          'sun' => 'Sun',
+                          _ => 'Sprout',
+                        },
+                        switch (id) {
+                          'star' => 'Bintang',
+                          'rocket' => 'Roket',
+                          'heart' => 'Hati',
+                          'sun' => 'Matahari',
+                          _ => 'Pucuk',
+                        },
+                      ),
+                    ),
+                    trailing: state.avatarId == id
+                        ? AppSvgIcon(
+                            'check',
+                            color: LogicOasisTheme.of(context).leaf,
+                            size: 22,
+                          )
+                        : null,
+                    onTap: () => Navigator.of(context).pop(id),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (selected == null) return;
+    state.updateAvatar(selected);
+    if (!context.mounted) return;
+    _showMessage(
+      context,
+      state.t('Profile icon changed.', 'Ikon profil ditukar.'),
+    );
   }
 
   Future<void> _showScreenTimeSheet(BuildContext context) async {
@@ -712,6 +890,7 @@ class _FigmaProfileCard extends StatelessWidget {
     required this.name,
     required this.level,
     required this.email,
+    required this.avatarId,
     required this.crystals,
     required this.energy,
     required this.streak,
@@ -721,6 +900,7 @@ class _FigmaProfileCard extends StatelessWidget {
   final String name;
   final String level;
   final String email;
+  final String avatarId;
   final int crystals;
   final int energy;
   final int streak;
@@ -740,7 +920,7 @@ class _FigmaProfileCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const SproutAvatar(size: 68),
+              SproutAvatar(size: 68, avatarId: avatarId),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(

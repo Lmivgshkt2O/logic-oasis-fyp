@@ -131,6 +131,88 @@ class OasisSemanticTheme extends ThemeExtension<OasisSemanticTheme> {
     );
   }
 
+  /// Builds a presentation from a named colour palette (Issue #7). Accent
+  /// colours follow the theme; the neutral canvas/ink/outline follow the
+  /// chosen Eye Protecting presentation when [comfort] is true so readable
+  /// low-glare surfaces are retained for every theme.
+  factory OasisSemanticTheme.decode(
+    LogicOasisPalette palette, {
+    required bool comfort,
+  }) {
+    if (!comfort) {
+      return OasisSemanticTheme(
+        topCanvas: palette.topCanvas,
+        canvas: palette.canvas,
+        lowerCanvas: palette.lowerCanvas,
+        surface: palette.surface,
+        quietSurface: palette.quietSurface,
+        groupedSurface: palette.groupedSurface,
+        primaryInk: palette.primaryInk,
+        secondaryInk: palette.secondaryInk,
+        forest: palette.forest,
+        leaf: palette.leaf,
+        mint: palette.mint,
+        water: palette.water,
+        reward: palette.reward,
+        sand: palette.sand,
+        coral: palette.coral,
+        violet: palette.violet,
+        outline: palette.outline,
+        neutral: palette.neutral,
+        softShadow: const [
+          BoxShadow(
+            color: Color(0x1F496F55),
+            blurRadius: 24,
+            offset: Offset(0, 10),
+          ),
+        ],
+        liftShadow: const [
+          BoxShadow(
+            color: Color(0x29496F55),
+            blurRadius: 30,
+            offset: Offset(0, 14),
+          ),
+        ],
+        isComfort: false,
+      );
+    }
+    return OasisSemanticTheme(
+      topCanvas: LogicOasisDesign.comfortTopCanvas,
+      canvas: LogicOasisDesign.comfortCanvas,
+      lowerCanvas: LogicOasisDesign.comfortLowerCanvas,
+      surface: LogicOasisDesign.comfortSurface,
+      quietSurface: LogicOasisDesign.comfortQuietSurface,
+      groupedSurface: LogicOasisDesign.comfortGroupedSurface,
+      primaryInk: LogicOasisDesign.comfortPrimaryInk,
+      secondaryInk: LogicOasisDesign.comfortSecondaryInk,
+      forest: palette.forest,
+      leaf: palette.leaf,
+      mint: palette.mint,
+      water: palette.water,
+      reward: palette.reward,
+      sand: palette.sand,
+      coral: palette.coral,
+      violet: palette.violet,
+      outline: LogicOasisDesign.comfortOutline,
+      neutral: LogicOasisDesign.comfortNeutral,
+      softShadow: const [
+        BoxShadow(
+          color: Color(0x124A6B5A),
+          blurRadius: 18,
+          offset: Offset(0, 7),
+        ),
+      ],
+      liftShadow: const [
+        BoxShadow(
+          color: Color(0x1A4A6B5A),
+          blurRadius: 24,
+          offset: Offset(0, 11),
+        ),
+      ],
+      isComfort: true,
+    );
+  }
+
   /// Misty botanical tone at the very top of the page background.
   final Color topCanvas;
 
@@ -327,15 +409,18 @@ class LogicOasisTheme {
   }
 
   /// Default Living Canopy theme.
-  static ThemeData light() => _build(comfort: false);
+  static ThemeData light({String themeColorId = 'green'}) =>
+      _build(comfort: false, palette: LogicOasisPalette.fromId(themeColorId));
 
   /// Eye Protecting (low-glare) Living Canopy theme.
-  static ThemeData eyeComfort() => _build(comfort: true);
+  static ThemeData eyeComfort({String themeColorId = 'green'}) =>
+      _build(comfort: true, palette: LogicOasisPalette.fromId(themeColorId));
 
-  static ThemeData _build({required bool comfort}) {
-    final oasis = comfort
-        ? OasisSemanticTheme.comfort()
-        : OasisSemanticTheme.defaults();
+  static ThemeData _build({
+    required bool comfort,
+    required LogicOasisPalette palette,
+  }) {
+    final oasis = OasisSemanticTheme.decode(palette, comfort: comfort);
 
     final colorScheme = ColorScheme.fromSeed(
       seedColor: oasis.forest,
@@ -608,4 +693,124 @@ class LogicOasisTheme {
       textTheme: textTheme,
     );
   }
+}
+
+/// A complete colour role set for a named theme. Each theme provides every
+/// role (background, surface, ink, action, accent, outline) so cards and text
+/// stay readable instead of only swapping one accent colour.
+class LogicOasisPalette {
+  const LogicOasisPalette({
+    required this.topCanvas,
+    required this.canvas,
+    required this.lowerCanvas,
+    required this.surface,
+    required this.quietSurface,
+    required this.groupedSurface,
+    required this.primaryInk,
+    required this.secondaryInk,
+    required this.forest,
+    required this.leaf,
+    required this.mint,
+    required this.water,
+    required this.reward,
+    required this.sand,
+    required this.coral,
+    required this.violet,
+    required this.outline,
+    required this.neutral,
+  });
+
+  final Color topCanvas;
+  final Color canvas;
+  final Color lowerCanvas;
+  final Color surface;
+  final Color quietSurface;
+  final Color groupedSurface;
+  final Color primaryInk;
+  final Color secondaryInk;
+  final Color forest;
+  final Color leaf;
+  final Color mint;
+  final Color water;
+  final Color reward;
+  final Color sand;
+  final Color coral;
+  final Color violet;
+  final Color outline;
+  final Color neutral;
+
+  /// Default Living Canopy (green) theme, matching the existing palette.
+  static const LogicOasisPalette green = LogicOasisPalette(
+    topCanvas: LogicOasisDesign.topCanvas,
+    canvas: LogicOasisDesign.canvas,
+    lowerCanvas: LogicOasisDesign.lowerCanvas,
+    surface: LogicOasisDesign.surface,
+    quietSurface: LogicOasisDesign.quietSurface,
+    groupedSurface: LogicOasisDesign.groupedSurface,
+    primaryInk: LogicOasisDesign.primaryInk,
+    secondaryInk: LogicOasisDesign.secondaryInk,
+    forest: LogicOasisDesign.forestAction,
+    leaf: LogicOasisDesign.leafAccent,
+    mint: LogicOasisDesign.mintSurface,
+    water: LogicOasisDesign.waterAccent,
+    reward: LogicOasisDesign.rewardGold,
+    sand: LogicOasisDesign.sandClay,
+    coral: LogicOasisDesign.coralDanger,
+    violet: LogicOasisDesign.forumViolet,
+    outline: LogicOasisDesign.outlineQuiet,
+    neutral: LogicOasisDesign.neutralQuiet,
+  );
+
+  /// Ocean (teal/blue) theme.
+  static const LogicOasisPalette ocean = LogicOasisPalette(
+    topCanvas: Color(0xFFF0F7F9),
+    canvas: Color(0xFFE3F0F4),
+    lowerCanvas: Color(0xFFDCE9EF),
+    surface: Color(0xFFFAFDFE),
+    quietSurface: Color(0xFFF0F8FA),
+    groupedSurface: Color(0xFFE4F1F5),
+    primaryInk: Color(0xFF12333E),
+    secondaryInk: Color(0xFF4C6B74),
+    forest: Color(0xFF12607A),
+    leaf: Color(0xFF3E9AB2),
+    mint: Color(0xFFD7F0F6),
+    water: Color(0xFF3FA6CE),
+    reward: Color(0xFFF1C84A),
+    sand: Color(0xFFD7B36A),
+    coral: Color(0xFFBF4A3F),
+    violet: Color(0xFF6D5AC8),
+    outline: Color(0xFFCFE3E8),
+    neutral: Color(0xFF90A6AC),
+  );
+
+  /// Sunset (warm peach) theme.
+  static const LogicOasisPalette sunset = LogicOasisPalette(
+    topCanvas: Color(0xFFFDF6F0),
+    canvas: Color(0xFFFAEDE4),
+    lowerCanvas: Color(0xFFF7E7DB),
+    surface: Color(0xFFFFFCFA),
+    quietSurface: Color(0xFFFBF3EA),
+    groupedSurface: Color(0xFFF7E9DD),
+    primaryInk: Color(0xFF4A2A1E),
+    secondaryInk: Color(0xFF8A6A5A),
+    forest: Color(0xFFB65A32),
+    leaf: Color(0xFFD9854F),
+    mint: Color(0xFFFFEDDE),
+    water: Color(0xFF4F9DB6),
+    reward: Color(0xFFF1C84A),
+    sand: Color(0xFFD7B36A),
+    coral: Color(0xFFC1503E),
+    violet: Color(0xFF8A5AC2),
+    outline: Color(0xFFF0DED0),
+    neutral: Color(0xFFB0A094),
+  );
+
+  static LogicOasisPalette fromId(String id) => switch (id) {
+    'ocean' => ocean,
+    'sunset' => sunset,
+    _ => green,
+  };
+
+  /// A representative accent colour for a theme, used as a settings swatch.
+  static Color swatchFor(String id) => fromId(id).forest;
 }

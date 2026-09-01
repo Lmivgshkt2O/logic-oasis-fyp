@@ -27,6 +27,26 @@ class AppState extends ChangeNotifier {
        topics = List<Topic>.from(_localTopicsForYear(4));
 
   static const String demoStudentId = 'student_aiman_y4';
+
+  /// Mutual-aid granted per forum badge (Issue #6).
+  static const int forumHelpfulAid = 5;
+  static const int forumAiVerifiedAid = 10;
+
+  /// Selectable colour themes (See Issue #7: Settings > Learning).
+  static const List<String> themeColorOptions = <String>[
+    'green',
+    'ocean',
+    'sunset',
+  ];
+
+  /// Selectable local profile avatars (See Issue #8: Settings > Learning).
+  static const List<String> avatarOptions = <String>[
+    'sprout',
+    'star',
+    'rocket',
+    'heart',
+    'sun',
+  ];
   // Used only when the student has no quiz attempts yet.
   static const String recommendedMissionTopicId = 'whole_numbers_y4';
   static const int recommendedMissionRequiredCompletions = 2;
@@ -41,6 +61,9 @@ class AppState extends ChangeNotifier {
   static const String _soundEnabledKey = 'logic_oasis_sound_enabled';
   static const String _accessibilityModeKey = 'logic_oasis_accessibility_mode';
   static const String _screenTimeLimitKey = 'logic_oasis_screen_time_limit';
+  static const String _themeColorKey = 'logic_oasis_theme_color';
+  static const String _avatarKey = 'logic_oasis_avatar';
+  static const String _forumAidRewardedKey = 'logic_oasis_forum_aid_rewarded';
   static const String _unlockedTopicIdsKey = 'logic_oasis_unlocked_topics';
   static const String _unlockedSubtopicIdsKey =
       'logic_oasis_unlocked_subtopics';
@@ -291,8 +314,15 @@ class AppState extends ChangeNotifier {
   bool soundEnabled = true;
   bool accessibilityMode = false;
   int screenTimeLimitMinutes = 30;
+  /// Selected colour theme id (one of [themeColorOptions]).
+  String themeColorId = 'green';
+  /// Selected profile avatar id (one of [avatarOptions]).
+  String avatarId = 'sprout';
   int crystals = 124;
   int mutualAidEnergy = 36;
+  /// Forum answers (and badges) that already granted mutual-aid, so a student
+  /// is rewarded once per badge and never double-counted.
+  final Set<String> _forumAidRewarded = <String>{};
   final Set<String> claimedRecommendedMissionTopicIds = <String>{};
   final Set<String> _unlockedTopicIds = <String>{};
   final Set<String> _unlockedSubtopicIds = <String>{};
@@ -540,6 +570,11 @@ class AppState extends ChangeNotifier {
     screenTimeLimitMinutes =
         preferences.getInt(_screenTimeLimitKey) ?? screenTimeLimitMinutes;
     screenTimeLimitMinutes = screenTimeLimitMinutes.clamp(15, 120).toInt();
+    themeColorId = preferences.getString(_themeColorKey) ?? themeColorId;
+    avatarId = preferences.getString(_avatarKey) ?? avatarId;
+    _forumAidRewarded
+      ..clear()
+      ..addAll(preferences.getStringList(_forumAidRewardedKey) ?? const []);
     _unlockedTopicIds.clear();
     _unlockedSubtopicIds.clear();
     claimedRecommendedMissionTopicIds
@@ -574,6 +609,12 @@ class AppState extends ChangeNotifier {
     await preferences.setBool(_soundEnabledKey, soundEnabled);
     await preferences.setBool(_accessibilityModeKey, accessibilityMode);
     await preferences.setInt(_screenTimeLimitKey, screenTimeLimitMinutes);
+    await preferences.setString(_themeColorKey, themeColorId);
+    await preferences.setString(_avatarKey, avatarId);
+    await preferences.setStringList(
+      _forumAidRewardedKey,
+      _forumAidRewarded.toList()..sort(),
+    );
     await preferences.setStringList(
       _unlockedTopicIdsKey,
       _unlockedTopicIds.toList()..sort(),
@@ -864,19 +905,32 @@ class AppState extends ChangeNotifier {
   }
 
   /// Applies a trusted callable completion immediately, then the caller can
-  /// refresh the same state from Firestore. It never writes a quiz attempt,
-  /// mastery record, reward, or correctness field from the client.
-  void applyTrustedQuizCompletion({
+  /// refresh the same state from Firestore. It never writes the quiz attempt,
+  /// mastery record, or reward to Firestore from the client; the crystal
+  /// reward (Issue #6) is granted in-memory only.
+  QuizReward? applyTrustedQuizCompletion({
     required String topicId,
     required String subtopicId,
     required int correctCount,
     required int totalQuestions,
   }) {
-    if (totalQuestions <= 0) return;
+    if (totalQuestions <= 0) return null;
     final rate = (correctCount.clamp(0, totalQuestions) / totalQuestions)
         .clamp(0.0, 1.0)
         .toDouble();
-    final mastery = _masteryForScore((rate * 100).round());
+    final score = (rate * 100).round();
+    final mastery = _masteryForScore(score);
+    // Issue #6: reward crystals only when the BKT mastery moved forward, on a
+    // mastery-progress tier. No penalty is applied when mastery is low or
+    // drops, but then no crystals are granted.
+    final previousPercent =
+        ((_subtopicMasteryProbability(topicId, subtopicId) ?? 0) * 100)
+            .round();
+    final earned = _quizRewardCrystals(
+      previousPercent: previousPercent,
+      newPercent: score,
+    );
+    if (earned > 0) crystals += earned;
     applyTrustedSubtopicProgress(<TrustedSubtopicProgress>[
       TrustedSubtopicProgress(
         studentId: currentStudentId,
@@ -897,6 +951,15 @@ class AppState extends ChangeNotifier {
         projectionStatus: 'finalized_pending_ai',
       ),
     ], replaceAll: false);
+    final reward = QuizReward(
+      score: score,
+      earnedCrystals: earned,
+      previousMastery: _masteryForScore(previousPercent),
+      newMastery: mastery,
+      encouragement: _encouragementForScore(score),
+    );
+    notifyListeners();
+    return reward;
   }
 
   Future<void> refreshTrustedProgress({bool replaceAll = true}) async {
@@ -1101,6 +1164,22 @@ class AppState extends ChangeNotifier {
     accessibilityMode = value;
     notifyListeners();
     unawaited(saveAppSession());
+  }
+
+  void updateThemeColor(String value) {
+    if (themeColorOptions.contains(value)) {
+      themeColorId = value;
+      notifyListeners();
+      unawaited(saveAppSession());
+    }
+  }
+
+  void updateAvatar(String value) {
+    if (avatarOptions.contains(value)) {
+      avatarId = value;
+      notifyListeners();
+      unawaited(saveAppSession());
+    }
   }
 
   void updateScreenTimeLimit(int minutes) {
@@ -1375,6 +1454,34 @@ class AppState extends ChangeNotifier {
       unawaited(_saveOasisProgressToFirebase());
     }
     return true;
+  }
+
+  /// Issue #6 forum mutual-aid reward, awarded once per answer and badge.
+  /// +[forumHelpfulAid] for a helpful mark; +[forumAiVerifiedAid] for an
+  /// AI-verified badge. No penalty for "may be irrelevant" or absence of a
+  /// helpful / AI-verified badge.
+  void awardForumAid({
+    required String answerId,
+    required bool helpful,
+    required bool aiVerified,
+  }) {
+    var gained = 0;
+    final helpfulKey = '$answerId:helpful';
+    final verifiedKey = '$answerId:ai_verified';
+    if (helpful && !_forumAidRewarded.contains(helpfulKey)) {
+      _forumAidRewarded.add(helpfulKey);
+      gained += forumHelpfulAid;
+    }
+    if (aiVerified && !_forumAidRewarded.contains(verifiedKey)) {
+      _forumAidRewarded.add(verifiedKey);
+      gained += forumAiVerifiedAid;
+    }
+    if (gained > 0) {
+      mutualAidEnergy += gained;
+      notifyListeners();
+      unawaited(saveAppSession());
+      if (persistQuizResults) unawaited(_saveOasisProgressToFirebase());
+    }
   }
 
   double mathMax(double a, double b) => a > b ? a : b;
@@ -1813,6 +1920,29 @@ class AppState extends ChangeNotifier {
         ? 8
         : 4;
     return effortBonus + correctBonus + masteryBonus;
+  }
+
+  /// Look up the current BKT mastery probability (0..1) for a subtopic, or
+  /// null when the subtopic is not yet present / has no projection.
+  double? _subtopicMasteryProbability(String topicId, String subtopicId) {
+    for (final topic in topics) {
+      if (topic.id != topicId) continue;
+      for (final subtopic in topic.subtopics) {
+        if (subtopic.id == subtopicId) return subtopic.masteryProbability;
+      }
+    }
+    return null;
+  }
+
+  /// Issue #6 quiz reward tiers, in crystals. Reward only when the new
+  /// mastery moved forward (new > 0 and not below the previous value).
+  int _quizRewardCrystals({required int previousPercent, required int newPercent}) {
+    if (newPercent <= 0) return 0;
+    if (newPercent < previousPercent) return 0;
+    if (newPercent < 20) return 10;
+    if (newPercent < 60) return 20;
+    if (newPercent <= 80) return 30;
+    return 50;
   }
 
   String _masteryForScore(int score) {

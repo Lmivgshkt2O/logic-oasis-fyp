@@ -7,6 +7,7 @@ import 'package:logic_oasis/shared/models/next_learning_action.dart';
 import 'package:logic_oasis/shared/models/question_response.dart';
 import 'package:logic_oasis/shared/models/quiz_completion.dart';
 import 'package:logic_oasis/shared/models/quiz_question.dart';
+import 'package:logic_oasis/shared/models/quiz_reward.dart';
 import 'package:logic_oasis/shared/models/quiz_session.dart';
 import 'package:logic_oasis/shared/repositories/collaboration_repository.dart';
 import 'package:logic_oasis/shared/services/quiz_session_service.dart';
@@ -29,7 +30,7 @@ class QuizPage extends StatefulWidget {
   final String title;
   final bool isBahasaMelayu;
   final QuizSessionGateway? sessionService;
-  final Future<void> Function(QuizCompletion completion)? onFinalized;
+  final Future<QuizReward?> Function(QuizCompletion completion)? onFinalized;
   final AiDiagnosisStreamFactory? aiDiagnosisStreamFactory;
   final CollaborationRepository? forumRepository;
 
@@ -139,12 +140,13 @@ class _QuizPageState extends State<QuizPage> {
         widget.session.id,
       );
       if (!mounted) return;
-      await widget.onFinalized?.call(completion);
+      final reward = await widget.onFinalized?.call(completion);
       if (!mounted) return;
       final action = await Navigator.of(context).push<NextLearningAction>(
         MaterialPageRoute(
           builder: (_) => ResultPage(
             completion: completion,
+            reward: reward,
             topicArea: widget.title,
             isBahasaMelayu: widget.isBahasaMelayu,
             topicId: widget.session.topicId,

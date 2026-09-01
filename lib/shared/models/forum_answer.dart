@@ -61,6 +61,7 @@ class ForumAnswer {
     this.mode = 'free_form',
     this.selectedOption,
     this.explanation,
+    this.helpfulCount = 0,
     this.aiPublicState = 'none',
     this.aiRunId,
     this.aiRevision,
@@ -77,6 +78,7 @@ class ForumAnswer {
   final String mode;
   final int? selectedOption;
   final String? explanation;
+  final int helpfulCount;
   final String aiPublicState;
   final String? aiRunId;
   final int? aiRevision;
@@ -98,6 +100,7 @@ class ForumAnswer {
       mode: data['mode'] as String? ?? 'free_form',
       selectedOption: rawOption is int ? rawOption : null,
       explanation: data['explanation'] as String?,
+      helpfulCount: (data['helpfulCount'] as num?)?.toInt() ?? 0,
       aiPublicState: data['aiPublicState'] as String? ?? 'none',
       aiRunId: data['aiRunId'] as String?,
       aiRevision: rawAiRevision is int ? rawAiRevision : null,

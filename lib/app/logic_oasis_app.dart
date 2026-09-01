@@ -153,8 +153,10 @@ class _LogicOasisAppState extends State<LogicOasisApp>
             title: 'Logic Oasis',
             debugShowCheckedModeBanner: false,
             theme: state.eyeComfortMode
-                ? LogicOasisTheme.eyeComfort()
-                : LogicOasisTheme.light(),
+                ? LogicOasisTheme.eyeComfort(
+                    themeColorId: state.themeColorId,
+                  )
+                : LogicOasisTheme.light(themeColorId: state.themeColorId),
             themeAnimationStyle: AnimationStyle(
               duration: LogicOasisMotion.themeTransitionFor(context),
               curve: LogicOasisMotion.themeTransitionCurve,
