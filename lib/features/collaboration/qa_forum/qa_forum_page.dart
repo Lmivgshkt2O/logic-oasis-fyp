@@ -905,11 +905,13 @@ class _AnswersPageState extends State<ForumDiscussionPage> {
                                   isBahasaMelayu:
                                       widget.state.isBahasaMelayu,
                                 ),
-                                icon:
-                                    answer.aiPublicState ==
-                                        'may_be_irrelevant'
-                                    ? Icons.help_outline
-                                    : Icons.verified_outlined,
+                                icon: switch (answer.aiPublicState) {
+                                  'may_be_irrelevant' =>
+                                    Icons.help_outline,
+                                  'similar_answer' =>
+                                    Icons.content_copy_outlined,
+                                  _ => Icons.verified_outlined,
+                                },
                               ),
                             ],
                             Row(
@@ -1078,6 +1080,9 @@ class _AnswersPageState extends State<ForumDiscussionPage> {
   }
 
   Future<void> _awardForAnswer(ForumAnswer answer) async {
+    // A near-duplicate of an earlier verified answer is not a fresh
+    // contribution, so it earns neither the helpful nor the AI-verified aid.
+    final isSimilar = answer.aiPublicState == 'similar_answer';
     var helpful = answer.helpfulCount > 0;
     try {
       helpful = helpful || (await _repo.countHelpfulMarks(answer.id)) > 0;
@@ -1086,7 +1091,7 @@ class _AnswersPageState extends State<ForumDiscussionPage> {
     }
     widget.state.awardForumAid(
       answerId: answer.id,
-      helpful: helpful,
+      helpful: !isSimilar && helpful,
       aiVerified: answer.aiPublicState == 'verified',
     );
   }

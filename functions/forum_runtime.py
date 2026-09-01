@@ -46,6 +46,7 @@ FORUM_LINKED_EXPLANATION_MAX_LENGTH = 4000
 FORUM_PUBLIC_STATE_NONE = "none"
 FORUM_PUBLIC_STATE_VERIFIED = "verified"
 FORUM_PUBLIC_STATE_MAY_BE_IRRELEVANT = "may_be_irrelevant"
+FORUM_PUBLIC_STATE_SIMILAR_ANSWER = "similar_answer"
 FORUM_PRIVATE_FEEDBACK_COLLECTION = "forumAiFeedback"
 FORUM_REASONING_MODEL_VERSION = "forum-controlled-demo-nb-v1"
 FORUM_RELEVANCE_MODEL_VERSION = "forum-relevance-nb-v1"
@@ -205,6 +206,33 @@ def _answer_content_hash(data: Mapping[str, Any]) -> str | None:
     }, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
 
 
+def _normalize_text(text: str) -> list[str]:
+    """Lowercase and strip punctuation so near-copies are compared by token."""
+    return re.sub(r"[^a-z0-9 ]+", " ", text.lower()).split()
+
+
+def _is_near_duplicate(
+    new_text: str,
+    existing_texts: list[str],
+    threshold: float = 0.85,
+) -> bool:
+    """True when a new answer is ~verbatim (or lightly reworded) like an
+    existing answer. Uses set Jaccard on normalised tokens so a copied answer
+    is caught even when only a few words are changed."""
+    new_tokens = set(_normalize_text(new_text))
+    if not new_tokens:
+        return False
+    for existing in existing_texts:
+        existing_tokens = set(_normalize_text(existing))
+        if not existing_tokens:
+            continue
+        intersection = len(new_tokens & existing_tokens)
+        union = len(new_tokens | existing_tokens)
+        if union and (intersection / union) >= threshold:
+            return True
+    return False
+
+
 def _linked_discussion_id(question_id: str, content_version: str) -> str:
     return f"{LINKED_DISCUSSION_PREFIX}{question_id}_{content_version}"
 
@@ -302,6 +330,7 @@ def _public_answer_projection(
             FORUM_PUBLIC_STATE_NONE,
             FORUM_PUBLIC_STATE_VERIFIED,
             FORUM_PUBLIC_STATE_MAY_BE_IRRELEVANT,
+            FORUM_PUBLIC_STATE_SIMILAR_ANSWER,
         }
         else FORUM_PUBLIC_STATE_NONE
     )
@@ -1464,6 +1493,9 @@ class ForumRuntimeGateway:
             outcome = self._evaluate_outcome(
                 data, classifier, logical_inference_id=logical_id,
             )
+            outcome = self._deduplicate_outcome(
+                data, outcome, answer_id=answer_id,
+            )
             return self._finalize_answer(claim, outcome, now=now)
         except Exception as error:
             permanent = isinstance(error, (ForumRuntimeError, ValueError, TypeError))
@@ -1511,6 +1543,67 @@ class ForumRuntimeGateway:
             ),
             run_bindings={},
         )
+
+    def _existing_answer_texts(
+        self,
+        question_id: str,
+        *,
+        exclude_answer_id: str,
+    ) -> list[str]:
+        """Analysis texts of verified answers already posted on the same
+        question, used to detect copied or near-duplicate responses. Only
+        verified answers are compared so an independently written response
+        that happens to resemble a wrong answer is not penalised."""
+        texts: list[str] = []
+        snapshot = self.database.collection("forumAnswers").where(
+            "questionId", "==", question_id,
+        ).stream()
+        for doc in snapshot:
+            if doc.id == exclude_answer_id:
+                continue
+            answer = doc.to_dict()
+            if answer.get("aiPublicState") != FORUM_PUBLIC_STATE_VERIFIED:
+                continue
+            text = _answer_analysis_text(answer)
+            if text:
+                texts.append(text)
+        return texts
+
+    def _deduplicate_outcome(
+        self,
+        data: Mapping[str, Any],
+        outcome: ForumOutcome,
+        *,
+        answer_id: str,
+    ) -> ForumOutcome:
+        """Downgrade a would-be verified answer that is a near-duplicate of an
+        existing verified answer on the same question. The answer stays visible
+        and correct-checked, but no fresh contribution badge/reward is earned."""
+        if outcome.public_state != FORUM_PUBLIC_STATE_VERIFIED:
+            return outcome
+        try:
+            question_id = data.get("questionId")
+            if not question_id:
+                return outcome
+            text = _answer_analysis_text(data)
+            if not text:
+                return outcome
+            existing = self._existing_answer_texts(
+                question_id,
+                exclude_answer_id=answer_id,
+            )
+            if existing and _is_near_duplicate(text, existing):
+                return ForumOutcome(
+                    public_state=FORUM_PUBLIC_STATE_SIMILAR_ANSWER,
+                    private=outcome.private,
+                    run_bindings=outcome.run_bindings,
+                    state=outcome.state,
+                )
+        except Exception:
+            # Never let a duplicates lookup failure downgrade or reject an
+            # otherwise verified answer.
+            LOGGER.exception("Duplicate answer check failed; keeping verified.")
+        return outcome
 
     def _terminalize_invalid_answer(
         self,

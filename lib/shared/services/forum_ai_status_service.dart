@@ -13,6 +13,8 @@ class ForumAiStatusService {
     'verified' => isBahasaMelayu ? 'AI-disahkan' : 'AI-verified',
     'may_be_irrelevant' =>
       isBahasaMelayu ? 'Mungkin tidak berkaitan' : 'May be irrelevant',
+    'similar_answer' =>
+      isBahasaMelayu ? 'Mirip jawapan terdahulu' : 'Similar to an earlier answer',
     _ => null,
   };
 
@@ -27,6 +29,9 @@ class ForumAiStatusService {
     'may_be_irrelevant' => isBahasaMelayu
         ? 'Jawapan ini mungkin tidak menjawab soalan secara langsung.'
         : 'This answer may not directly address the question.',
+    'similar_answer' => isBahasaMelayu
+        ? 'Jawapan ini hampir sama dengan jawapan yang telah diberikan sebelum ini. Cuba terangkan dengan cara anda sendiri.'
+        : 'This answer is very similar to an earlier one. Try explaining it in your own words.',
     _ => null,
   };
 
