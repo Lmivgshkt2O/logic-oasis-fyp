@@ -1072,13 +1072,23 @@ class _AnswersPageState extends State<ForumDiscussionPage> {
       if (!mounted) return;
       for (final answer in answers) {
         if (answer.authorId != widget.state.currentStudentId) continue;
-        widget.state.awardForumAid(
-          answerId: answer.id,
-          helpful: answer.helpfulCount > 0,
-          aiVerified: answer.aiPublicState == 'verified',
-        );
+        unawaited(_awardForAnswer(answer));
       }
     });
+  }
+
+  Future<void> _awardForAnswer(ForumAnswer answer) async {
+    var helpful = answer.helpfulCount > 0;
+    try {
+      helpful = helpful || (await _repo.countHelpfulMarks(answer.id)) > 0;
+    } catch (_) {
+      // If the marks lookup is unavailable, keep the answer-document field.
+    }
+    widget.state.awardForumAid(
+      answerId: answer.id,
+      helpful: helpful,
+      aiVerified: answer.aiPublicState == 'verified',
+    );
   }
 
   String _optionLabel(int? index) {

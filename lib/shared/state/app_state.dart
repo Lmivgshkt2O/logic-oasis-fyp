@@ -1162,6 +1162,21 @@ class AppState extends ChangeNotifier {
         newPercent: newPercent,
       );
       if (earned > 0) crystals += earned;
+      // Persist immediately, scoped to the learner who earned the reward and
+      // the exact resource values at grant time, so the reward survives a
+      // logout / login (and a rapid account switch).
+      final rewardStudentId = currentStudentId;
+      final rewardCrystals = crystals;
+      final rewardAid = mutualAidEnergy;
+      if (earned > 0 && persistQuizResults) {
+        unawaited(
+          _saveOasisProgressSnapshot(
+            studentId: rewardStudentId,
+            crystalsValue: rewardCrystals,
+            aidValue: rewardAid,
+          ),
+        );
+      }
       final scoreRate = record.bestCorrectRate.clamp(0.0, 1.0);
       final score = (scoreRate * 100).round();
       lastQuizReward = QuizReward(
@@ -1437,14 +1452,28 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  Future<void> _saveOasisProgressToFirebase() async {
+  Future<void> _saveOasisProgressToFirebase() {
+    // Snapshot at call time so a later account switch cannot mis-write a
+    // reward that was earned by a different learner onto this learner's doc.
+    return _saveOasisProgressSnapshot(
+      studentId: currentStudentId,
+      crystalsValue: crystals,
+      aidValue: mutualAidEnergy,
+    );
+  }
+
+  Future<void> _saveOasisProgressSnapshot({
+    required String studentId,
+    required int crystalsValue,
+    required int aidValue,
+  }) async {
     try {
       final repository = _learningRepository ?? LearningRepository();
       await repository.saveOasisProgress(
-        studentId: currentStudentId,
+        studentId: studentId,
         yearLevel: yearLevel,
-        crystals: crystals,
-        mutualAidEnergy: mutualAidEnergy,
+        crystals: crystalsValue,
+        mutualAidEnergy: aidValue,
         language: language,
         missionReminders: missionReminders,
         eyeComfortMode: eyeComfortMode,
@@ -1536,7 +1565,18 @@ class AppState extends ChangeNotifier {
       mutualAidEnergy += gained;
       notifyListeners();
       unawaited(saveAppSession());
-      if (persistQuizResults) unawaited(_saveOasisProgressToFirebase());
+      if (persistQuizResults) {
+        final studentId = currentStudentId;
+        final c = crystals;
+        final a = mutualAidEnergy;
+        unawaited(
+          _saveOasisProgressSnapshot(
+            studentId: studentId,
+            crystalsValue: c,
+            aidValue: a,
+          ),
+        );
+      }
     }
   }
 

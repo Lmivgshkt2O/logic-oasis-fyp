@@ -238,6 +238,17 @@ class CollaborationRepository {
       .httpsCallable('markForumAnswerHelpful')
       .call({'answerId': answerId});
 
+  /// Number of "helpful" marks an answer has received. Marks are stored in the
+  /// `forumHelpfulMarks` collection (one doc per answer/actor), so the answer
+  /// document itself does not carry a count.
+  Future<int> countHelpfulMarks(String answerId) async {
+    final snapshot = await _firestore
+        .collection('forumHelpfulMarks')
+        .where('answerId', isEqualTo: answerId)
+        .get();
+    return snapshot.docs.length;
+  }
+
   Future<void> report({
     required String targetType,
     required String targetId,
