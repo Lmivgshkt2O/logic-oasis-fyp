@@ -204,12 +204,28 @@ class RuntimeGateway(Protocol):
                  policy_probe: Mapping[str, Any] | None = None) -> str: ...
 
 
+def _ensure_attempt_sequence(attempt: Mapping[str, Any]) -> dict[str, Any]:
+    """Ensure an attempt carries a valid positive sourceAttemptSequence.
+
+    Older/seed records may omit the field; default to ``1`` (a single earliest
+    attempt) so the BKT runtime never raises KeyError on it.
+    """
+    sequence = attempt.get("sourceAttemptSequence")
+    if isinstance(sequence, int) and not isinstance(sequence, bool) and sequence > 0:
+        return dict(attempt)
+    return {**attempt, "sourceAttemptSequence": 1}
+
+
 def process_finalized_attempt(attempt_id: str, *, gateway: RuntimeGateway, bundle: RuntimeBundle,
                               provenance: str = "real") -> str:
     """Process one event delivery; rethrow only controlled transient failures."""
     attempt = gateway.attempt(attempt_id)
     if not attempt:
         return "failed"
+    # Tolerate attempts that predate the sourceAttemptSequence field (e.g. the
+    # FYP1 demo seed) by treating them as a single, earliest attempt. Without
+    # this the BKT runtime crashes on missing-attempt-sequence records.
+    attempt = _ensure_attempt_sequence(attempt)
     claim = gateway.claim(attempt)
     if claim.terminal_state:
         return claim.terminal_state
@@ -1162,10 +1178,13 @@ class FirestoreRuntimeGateway:
             if state in TERMINAL_STATES:
                 return RuntimeClaim(int(existing.get("attemptCount", 0)), state)
             count = int(existing.get("attemptCount", 0)) + 1
+            sequence = attempt.get("sourceAttemptSequence")
+            if not isinstance(sequence, int) or isinstance(sequence, bool) or sequence < 1:
+                sequence = 1
             now = datetime.now(timezone.utc)
             transaction.set(job_ref, {"attemptId": attempt["attemptId"], "studentId": attempt["studentId"],
                 "status": "processing", "attemptCount": count, "pipelineVersion": AI_RUNTIME_VERSION,
-                "sourceAttemptSequence": attempt["sourceAttemptSequence"], "updatedAt": now,
+                "sourceAttemptSequence": sequence, "updatedAt": now,
                 "createdAt": existing.get("createdAt", now)}, merge=True)
             if not existing:
                 status = safe_status_document(attempt=attempt, analysis_state="processing", display_code="analysis_in_progress")
