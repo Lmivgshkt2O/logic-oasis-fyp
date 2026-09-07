@@ -680,7 +680,7 @@ class AppState extends ChangeNotifier {
           'Memuat ${firebaseTopics.length} topik Tahun $yearLevel daripada Firebase.',
         );
       }
-      if (persistQuizResults && currentStudentId != demoStudentId) {
+      if (persistQuizResults) {
         await refreshTrustedProgress();
       }
     } catch (_) {
@@ -886,9 +886,7 @@ class AppState extends ChangeNotifier {
     unawaited(saveAppSession().catchError((_) {}));
     if (persistQuizResults) {
       unawaited(loadTopicsFromFirebase());
-      if (currentStudentId != demoStudentId) {
-        unawaited(refreshTrustedProgress());
-      }
+      unawaited(refreshTrustedProgress());
     }
   }
 
@@ -976,7 +974,7 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> refreshTrustedProgress({bool replaceAll = true}) async {
-    if (!persistQuizResults || currentStudentId == demoStudentId) return;
+    if (!persistQuizResults) return;
     final requestedStudentId = currentStudentId;
     try {
       final repository = _learningRepository ?? LearningRepository();
@@ -998,7 +996,7 @@ class AppState extends ChangeNotifier {
   /// can move from "Preparing mastery..." to the calculated BKT mastery as
   /// soon as the runtime finishes, without waiting for the next navigation.
   void watchTrustedProgress() {
-    if (!persistQuizResults || currentStudentId == demoStudentId) return;
+    if (!persistQuizResults) return;
     _cancelTrustedProgressWatch();
     final repository = _learningRepository ?? LearningRepository();
     final requestedStudentId = currentStudentId;
