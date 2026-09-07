@@ -53,6 +53,8 @@ class AppState extends ChangeNotifier {
   static const int recommendedMissionRequiredCompletions = 2;
   static const String _claimedMissionSubtopicIdsKey =
       'logic_oasis_claimed_mission_subtopics';
+  static const String _subtopicPracticeCountsKey =
+      'logic_oasis_subtopic_practice_counts';
   static const String _lastTabKey = 'logic_oasis_last_tab';
   static const String _navigationSchemaKey =
       'logic_oasis_navigation_schema_version';
@@ -337,6 +339,9 @@ class AppState extends ChangeNotifier {
   /// Forum answers (and badges) that already granted mutual-aid, so a student
   /// is rewarded once per badge and never double-counted.
   final Set<String> _forumAidRewarded = <String>{};
+  /// Number of finalized quiz attempts per subtopic, used by the mission so it
+  /// can count server-path completions (which do not write a client attempt).
+  final Map<String, int> _subtopicPracticeCount = <String, int>{};
   /// Previous mastery % captured at quiz completion, awaiting the server BKT
   /// value so the crystal reward matches the mastery the student actually sees.
   final Map<String, int> _pendingQuizRewardPrevious = <String, int>{};
@@ -614,6 +619,17 @@ class AppState extends ChangeNotifier {
       ..addAll(
         preferences.getStringList(_claimedMissionSubtopicIdsKey) ?? const [],
       );
+    _subtopicPracticeCount.clear();
+    for (final entry
+        in preferences.getStringList(_subtopicPracticeCountsKey) ?? const []) {
+      final parts = entry.split('|');
+      if (parts.length == 2) {
+        final count = int.tryParse(parts[1]);
+        if (count != null && parts[0].isNotEmpty) {
+          _subtopicPracticeCount[parts[0]] = count;
+        }
+      }
+    }
     // Production progress is scoped to the authenticated student and comes
     // from server-owned subtopicMastery projections. Legacy local attempts are
     // retained only for offline/prototype tests, never the signed-in runtime.
@@ -667,6 +683,13 @@ class AppState extends ChangeNotifier {
     await preferences.setStringList(
       _claimedMissionSubtopicIdsKey,
       claimedRecommendedMissionSubtopicIds.toList()..sort(),
+    );
+    await preferences.setStringList(
+      _subtopicPracticeCountsKey,
+      _subtopicPracticeCount.entries
+          .map((entry) => '${entry.key}|${entry.value}')
+          .toList()
+        ..sort(),
     );
     await preferences.setString(_savedAttemptsKey, _encodedSavedAttempts());
   }
@@ -751,9 +774,7 @@ class AppState extends ChangeNotifier {
         ? currentYearAttempts
               .where((attempt) => attempt.topicId == topic.id)
               .length
-        : currentYearAttempts
-              .where((attempt) => attempt.subtopicId == subtopic.id)
-              .length;
+        : (_subtopicPracticeCount[subtopic.id] ?? 0);
     return RecommendedMission(
       topicId: topic.id,
       topicTitle: topic.title,
@@ -1066,6 +1087,8 @@ class AppState extends ChangeNotifier {
       previousMasteryPercent: previousPercent,
     );
     lastQuizReward = reward;
+    _subtopicPracticeCount[subtopicId] =
+        (_subtopicPracticeCount[subtopicId] ?? 0) + 1;
     _recordActivity();
     notifyListeners();
     return reward;
@@ -1435,6 +1458,11 @@ class AppState extends ChangeNotifier {
     );
 
     attempts.insert(0, attempt);
+    final practiceSubtopicId = updatedSubtopic?.id;
+    if (practiceSubtopicId != null) {
+      _subtopicPracticeCount[practiceSubtopicId] =
+          (_subtopicPracticeCount[practiceSubtopicId] ?? 0) + 1;
+    }
 
     final reward = QuizReward(
       score: score,
