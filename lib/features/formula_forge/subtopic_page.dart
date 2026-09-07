@@ -245,7 +245,9 @@ class _TopicProgressSummary extends StatelessWidget {
     final theme = Theme.of(context);
     final oasis = LogicOasisTheme.of(context);
     final subtopics = state.subtopicsForTopic(topic);
-    final completed = subtopics.where((subtopic) => subtopic.isComplete).length;
+    final completed = subtopics
+        .where((subtopic) => subtopic.hasAttemptedQuiz)
+        .length;
     return SoftCard(
       padding: const EdgeInsets.all(14),
       radius: 18,

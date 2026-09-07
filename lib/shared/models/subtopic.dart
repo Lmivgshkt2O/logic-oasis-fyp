@@ -17,6 +17,7 @@ class Subtopic {
     this.mastery = 'New',
     this.completed = false,
     this.accessUnlocked = false,
+    this.attempted = false,
     this.masteryProbability,
     this.evidenceLevel,
     this.recommendedLearningAction,
@@ -46,6 +47,9 @@ class Subtopic {
   final bool completed;
   /// Unlocks after any valid finalized attempt, independent of completion.
   final bool accessUnlocked;
+  /// Whether the student has completed (finalized) at least one quiz on this
+  /// subtopic. Used for progress, separate from the mastery criterion.
+  final bool attempted;
   /// Safe BKT posterior from the server; null while pending or on fallback.
   final double? masteryProbability;
   final String? evidenceLevel;
@@ -61,6 +65,10 @@ class Subtopic {
   bool get isComplete => completed;
 
   bool get isAttempted => accessUnlocked || completed;
+
+  /// True once the student has completed (finalized) a quiz on this subtopic,
+  /// regardless of the mastery outcome. Drives progress, not mastery.
+  bool get hasAttemptedQuiz => attempted || completed;
 
   bool get isAnalysisPending =>
       isAttempted &&
@@ -95,6 +103,7 @@ class Subtopic {
     String? mastery,
     bool? completed,
     bool? accessUnlocked,
+    bool? attempted,
     double? masteryProbability,
     String? evidenceLevel,
     String? recommendedLearningAction,
@@ -122,6 +131,7 @@ class Subtopic {
       mastery: mastery ?? this.mastery,
       completed: completed ?? this.completed,
       accessUnlocked: accessUnlocked ?? this.accessUnlocked,
+      attempted: attempted ?? this.attempted,
       masteryProbability: masteryProbability ?? this.masteryProbability,
       evidenceLevel: evidenceLevel ?? this.evidenceLevel,
       recommendedLearningAction:

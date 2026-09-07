@@ -67,7 +67,7 @@ AI_RUNTIME_SERVICE_ACCOUNT = "logic-oasis-ai-runtime@logic-oasis-fyp.iam.gservic
 # frozen external-evaluation configuration.
 SUBTOPIC_COMPLETION_CRITERION_VERSION = "subtopic-completion-v1"
 SUBTOPIC_COMPLETION_MASTERY_AT_LEAST = 0.72
-SUBTOPIC_COMPLETION_MINIMUM_OBSERVATIONS = 1
+SUBTOPIC_COMPLETION_MINIMUM_OBSERVATIONS = 5
 _DIFFICULTY_ORDER = {"Easy": 0, "Moderate": 1, "Hard": 2}
 TERMINAL_STATES = frozenset({"completed", "fallback", "failed"})
 MAX_RUNTIME_ATTEMPTS = 3

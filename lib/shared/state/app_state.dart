@@ -1051,12 +1051,13 @@ class AppState extends ChangeNotifier {
                   subtopic.accessUnlocked ||
                   subtopic.masteryProbability != null) {
                 topicChanged = true;
-                return subtopic.copyWith(
-                  progress: 0,
-                  mastery: 'New',
-                  completed: false,
-                  accessUnlocked: false,
-                  masteryProbability: null,
+              return subtopic.copyWith(
+                progress: 0,
+                mastery: 'New',
+                completed: false,
+                accessUnlocked: false,
+                attempted: false,
+                masteryProbability: null,
                   evidenceLevel: null,
                   recommendedLearningAction: null,
                   recommendationBasis: null,
@@ -1104,6 +1105,7 @@ class AppState extends ChangeNotifier {
               mastery: record.masteryLevel,
               completed: record.completed,
               accessUnlocked: record.accessUnlocked || record.completed,
+              attempted: record.attempted || subtopic.attempted,
               masteryProbability: masteryProbability,
               evidenceLevel: record.evidenceLevel,
               recommendedLearningAction: record.recommendedLearningAction,
@@ -1594,7 +1596,7 @@ class AppState extends ChangeNotifier {
   double _topicProgressFromSubtopics(List<Subtopic> subtopics) {
     if (subtopics.isEmpty) return 0;
     final completedCount = subtopics
-        .where((subtopic) => subtopic.isComplete)
+        .where((subtopic) => subtopic.hasAttemptedQuiz)
         .length;
     return completedCount / subtopics.length;
   }
@@ -1683,6 +1685,7 @@ class AppState extends ChangeNotifier {
                 // callable finalization: a passing score unlocks and counts as
                 // complete for offline/prototype sessions.
                 completed: bestAttempt.score >= 50,
+                attempted: true,
                 accessUnlocked: true,
               );
             })

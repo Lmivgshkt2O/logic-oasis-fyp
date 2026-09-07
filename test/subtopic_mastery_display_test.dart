@@ -20,6 +20,7 @@ void main() {
     String subtopicId, {
     bool completed = false,
     bool accessUnlocked = true,
+    bool attempted = true,
     double? masteryProbability,
     String? recommendationBasis,
     String? projectionStatus,
@@ -33,7 +34,7 @@ void main() {
       completed: completed,
       masteryLevel: completed ? 'Strong' : 'New',
       bestCorrectRate: bestCorrectRate,
-      attempted: true,
+      attempted: attempted,
       accessUnlocked: accessUnlocked,
       masteryProbability: masteryProbability,
       recommendationBasis: recommendationBasis,
@@ -64,7 +65,7 @@ void main() {
 
       await pumpSubtopicPage(tester);
 
-      expect(find.text('0 of 5 subtopics completed'), findsOneWidget);
+      expect(find.text('1 of 5 subtopics completed'), findsOneWidget);
       expect(find.text('Preparing mastery…'), findsOneWidget);
       expect(subtopics.first.isComplete, isFalse);
       expect(subtopics.first.accessUnlocked, isTrue);
@@ -143,24 +144,28 @@ void main() {
       ),
       record(
         'place_digit_value',
+        attempted: false,
         masteryProbability: 0.4,
         recommendationBasis: 'bkt_mastery',
         projectionStatus: 'ai_enriched',
       ),
       record(
         'compare_order_numbers',
+        attempted: false,
         masteryProbability: 0.5,
         recommendationBasis: 'bkt_mastery',
         projectionStatus: 'ai_enriched',
       ),
       record(
         'odd_even_numbers',
+        attempted: false,
         masteryProbability: 0.6,
         recommendationBasis: 'bkt_mastery',
         projectionStatus: 'ai_enriched',
       ),
       record(
         'number_patterns',
+        attempted: false,
         masteryProbability: 0.7,
         recommendationBasis: 'bkt_mastery',
         projectionStatus: 'ai_enriched',

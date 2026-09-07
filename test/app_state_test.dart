@@ -354,7 +354,9 @@ void main() {
       expect(subtopics.first.isAnalysisPending, isTrue);
       expect(state.isSubtopicUnlocked(topic, subtopics[1]), isTrue);
       expect(subtopics[1].activeBankCount, 0);
-      expect(topic.progress, 0);
+      // Progress counts the attempt even though the authoritative BKT/mastery
+      // outcome has not arrived yet (the provisional projection is used).
+      expect(topic.progress, 0.2);
     },
   );
 
