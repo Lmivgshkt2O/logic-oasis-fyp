@@ -33,6 +33,7 @@ class ResultPage extends StatelessWidget {
     required this.topicId,
     required this.subtopicId,
     required this.yearLevel,
+    this.currentDifficulty = 'Easy',
     this.reward,
     this.aiDiagnosis,
     this.attemptId,
@@ -46,6 +47,8 @@ class ResultPage extends StatelessWidget {
   final String topicId;
   final String subtopicId;
   final int yearLevel;
+  /// Difficulty level the student just practised (Easy / Moderate / Hard).
+  final String currentDifficulty;
   final QuizReward? reward;
   final AiDiagnosis? aiDiagnosis;
   final String? attemptId;
@@ -119,30 +122,6 @@ class ResultPage extends StatelessWidget {
             icon: Icons.emoji_events_outlined,
             child: Text('$score%', style: theme.textTheme.headlineLarge),
           ),
-          if (reward != null) ...[
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: _RewardTile(
-                    icon: Icons.diamond_outlined,
-                    label: l10n.crystals,
-                    value: '+${reward!.earnedCrystals}',
-                    color: LogicOasisTheme.of(context).water,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _RewardTile(
-                    icon: Icons.construction_outlined,
-                    label: l10n.repairReady,
-                    value: l10n.home,
-                    color: LogicOasisTheme.of(context).reward,
-                  ),
-                ),
-              ],
-            ),
-          ],
           const SizedBox(height: 14),
           _ReviewSection(
             completion: completion,
@@ -173,7 +152,9 @@ class ResultPage extends StatelessWidget {
             topicId: topicId,
             subtopicId: subtopicId,
             yearLevel: yearLevel,
+            currentDifficulty: currentDifficulty,
             isBahasaMelayu: isBahasaMelayu,
+            reward: reward,
             streamFactory: aiDiagnosisStreamFactory,
             initialDiagnosis: aiDiagnosis,
           ),
@@ -377,7 +358,9 @@ class _ResultAnalysis extends StatefulWidget {
     required this.topicId,
     required this.subtopicId,
     required this.yearLevel,
+    required this.currentDifficulty,
     required this.isBahasaMelayu,
+    required this.reward,
     required this.streamFactory,
     this.initialDiagnosis,
   });
@@ -386,7 +369,9 @@ class _ResultAnalysis extends StatefulWidget {
   final String topicId;
   final String subtopicId;
   final int yearLevel;
+  final String currentDifficulty;
   final bool isBahasaMelayu;
+  final QuizReward? reward;
   final AiDiagnosisStreamFactory? streamFactory;
   final AiDiagnosis? initialDiagnosis;
 
@@ -461,6 +446,10 @@ class _ResultAnalysisState extends State<_ResultAnalysis> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (!analysisError &&
+            diagnosis != null &&
+            (diagnosis.isCompleted || diagnosis.isFallback))
+          _quizRewardRow(context, diagnosis),
         if (analysisError)
           _AnalysisUnavailable(
             isBahasaMelayu: widget.isBahasaMelayu,
@@ -474,8 +463,47 @@ class _ResultAnalysisState extends State<_ResultAnalysis> {
         const SizedBox(height: 14),
         _NextPracticePanel(
           diagnosis: diagnosis,
+          currentDifficulty: widget.currentDifficulty,
           isBahasaMelayu: widget.isBahasaMelayu,
         ),
+      ],
+    );
+  }
+
+  Widget _quizRewardRow(BuildContext context, AiDiagnosis diagnosis) {
+    final l10n = AppLocalizations.of(context)!;
+    final previousPercent = widget.reward?.previousMasteryPercent ?? 0;
+    final newPercent = (diagnosis.bktMasteryProbability * 100).round();
+    final earned = AppState.quizRewardCrystals(
+      previousPercent: previousPercent,
+      newPercent: newPercent,
+    );
+    if (earned <= 0) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _RewardTile(
+                icon: Icons.diamond_outlined,
+                label: l10n.crystals,
+                value: '+$earned',
+                color: LogicOasisTheme.of(context).water,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _RewardTile(
+                icon: Icons.construction_outlined,
+                label: l10n.repairReady,
+                value: l10n.home,
+                color: LogicOasisTheme.of(context).reward,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
       ],
     );
   }
@@ -484,10 +512,12 @@ class _ResultAnalysisState extends State<_ResultAnalysis> {
 class _NextPracticePanel extends StatelessWidget {
   const _NextPracticePanel({
     required this.diagnosis,
+    required this.currentDifficulty,
     required this.isBahasaMelayu,
   });
 
   final AiDiagnosis? diagnosis;
+  final String currentDifficulty;
   final bool isBahasaMelayu;
 
   NextLearningAction? _action() {
@@ -568,7 +598,7 @@ class _NextPracticePanel extends StatelessWidget {
               label: Text(
                 ready
                     ? (action.isRepeat
-                          ? l10n.practiseAgain
+                          ? _repeatLabel(action, isBahasaMelayu)
                           : l10n.moveOn)
                     : l10n.preparingNextPractice,
               ),
@@ -577,6 +607,14 @@ class _NextPracticePanel extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _repeatLabel(NextLearningAction action, bool isBahasaMelayu) {
+    // Same difficulty as the quiz just completed -> retry the same level.
+    if (action.difficultyLabel == currentDifficulty) {
+      return isBahasaMelayu ? 'Cuba lagi' : 'Try again';
+    }
+    return isBahasaMelayu ? 'Cuba Tahap Seterusnya' : 'Try Next Level';
   }
 }
 

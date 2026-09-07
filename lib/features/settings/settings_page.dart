@@ -1,4 +1,7 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:logic_oasis/app/theme.dart';
 import 'package:logic_oasis/features/settings/parent_access_page.dart';
 import 'package:logic_oasis/features/settings/parent_invitation_page.dart';
@@ -43,6 +46,8 @@ class SettingsPage extends StatelessWidget {
           level:
               '${state.t('Level 7 Gardener', 'Tukang Kebun Tahap 7')} - ${state.t('Year', 'Tahun')} ${state.yearLevel}',
           email: state.currentStudentEmail ?? 'amirah@logicoasis.edu.my',
+          avatarId: state.avatarId,
+          imageBytes: state.avatarImageBytes,
           crystals: state.crystals,
           energy: state.mutualAidEnergy,
           streak: state.currentYearAttempts.length,
@@ -50,7 +55,7 @@ class SettingsPage extends StatelessWidget {
         ),
         const SizedBox(height: 20),
         _SettingsSection(
-          title: 'LEARNING',
+          title: state.t('LEARNING', 'PEMBELAJARAN'),
           children: [
             SettingsRow(
               icon: 'volume_up',
@@ -102,30 +107,11 @@ class SettingsPage extends StatelessWidget {
               },
             ),
             SettingsRow(
-              icon: state.missionReminders
-                  ? 'notifications_active'
-                  : 'notifications_off',
-              iconColor: OasisSemanticTheme.continuedPracticeText,
-              label: state.t('Notification', 'Notifikasi'),
-              value: state.missionReminders
-                  ? state.t('Mission reminders', 'Peringatan misi')
-                  : state.t('Off', 'Mati'),
-              trailingSwitch: state.missionReminders,
-              onTap: () {
-                state.updateMissionReminders(!state.missionReminders);
-                _showMessage(
-                  context,
-                  state.missionReminders
-                      ? state.t(
-                          'Mission reminders turned on.',
-                          'Peringatan misi dihidupkan.',
-                        )
-                      : state.t(
-                          'Mission reminders turned off.',
-                          'Peringatan misi dimatikan.',
-                        ),
-                );
-              },
+              icon: 'palette',
+              iconColor: oasis.violet,
+              label: state.t('Theme colour', 'Warna tema'),
+              value: _themeColorLabel(state),
+              onTap: () => _showThemeColorSheet(context),
             ),
             SettingsRow(
               icon: 'visibility',
@@ -170,7 +156,7 @@ class SettingsPage extends StatelessWidget {
         ),
         const SizedBox(height: 20),
         _SettingsSection(
-          title: 'PARENT & SAFETY',
+          title: state.t('PARENT & SAFETY', 'IBU BAPA & KESELAMATAN'),
           children: [
             _ParentDashboardCard(
               title: l10n.parentDashboard,
@@ -307,6 +293,87 @@ class SettingsPage extends StatelessWidget {
           content: Text(AppLocalizations.of(context)!.languageSet(selected)),
         ),
       );
+  }
+
+  String _themeColorLabel(AppState state) {
+    return state.t(
+      switch (state.themeColorId) {
+        'ocean' => 'Ocean',
+        'sunset' => 'Sunset',
+        _ => 'Green',
+      },
+      switch (state.themeColorId) {
+        'ocean' => 'Lautan',
+        'sunset' => 'Senja',
+        _ => 'Hijau',
+      },
+    );
+  }
+
+  Future<void> _showThemeColorSheet(BuildContext context) async {
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  state.t('Theme colour', 'Warna tema'),
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 10),
+                for (final id in AppState.themeColorOptions)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: LogicOasisPalette.swatchFor(id),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    title: Text(
+                      state.t(
+                        switch (id) {
+                          'ocean' => 'Ocean',
+                          'sunset' => 'Sunset',
+                          _ => 'Green',
+                        },
+                        switch (id) {
+                          'ocean' => 'Lautan',
+                          'sunset' => 'Senja',
+                          _ => 'Hijau',
+                        },
+                      ),
+                    ),
+                    trailing: state.themeColorId == id
+                        ? AppSvgIcon(
+                            'check',
+                            color: LogicOasisTheme.of(context).leaf,
+                            size: 22,
+                          )
+                        : null,
+                    onTap: () => Navigator.of(context).pop(id),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (selected == null) return;
+    state.updateThemeColor(selected);
+    if (!context.mounted) return;
+    _showMessage(
+      context,
+      state.t('Theme colour changed.', 'Warna tema ditukar.'),
+    );
   }
 
   Future<void> _showScreenTimeSheet(BuildContext context) async {
@@ -712,6 +779,8 @@ class _FigmaProfileCard extends StatelessWidget {
     required this.name,
     required this.level,
     required this.email,
+    required this.avatarId,
+    required this.imageBytes,
     required this.crystals,
     required this.energy,
     required this.streak,
@@ -721,6 +790,8 @@ class _FigmaProfileCard extends StatelessWidget {
   final String name;
   final String level;
   final String email;
+  final String avatarId;
+  final Uint8List? imageBytes;
   final int crystals;
   final int energy;
   final int streak;
@@ -740,7 +811,7 @@ class _FigmaProfileCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const SproutAvatar(size: 68),
+              SproutAvatar(size: 68, avatarId: avatarId, imageBytes: imageBytes),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -980,6 +1051,114 @@ class _StudentProfileSheetState extends State<_StudentProfileSheet> {
     }
   }
 
+  Widget _buildAvatarPicker(BuildContext context) {
+    final state = widget.state;
+    final theme = Theme.of(context);
+    final oasis = LogicOasisTheme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            SproutAvatar(
+              size: 54,
+              avatarId: state.avatarId,
+              imageBytes: state.avatarImageBytes,
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    state.t('Profile icon', 'Ikon profil'),
+                    style: theme.textTheme.titleSmall,
+                  ),
+                  Text(
+                    state.t(
+                      'Pick one below or upload from your device.',
+                      'Pilih satu di bawah atau muat naik dari peranti anda.',
+                    ),
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 12,
+          runSpacing: 10,
+          children: [
+            for (final id in AppState.avatarOptions)
+              GestureDetector(
+                onTap: () {
+                  state.updateAvatarImage(null);
+                  state.updateAvatar(id);
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: state.avatarImageBytes == null &&
+                              state.avatarId == id
+                          ? oasis.leaf
+                          : Colors.transparent,
+                      width: 2,
+                    ),
+                  ),
+                  child: SproutAvatar(size: 48, avatarId: id),
+                ),
+              ),
+            _avatarUploadButton(context),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _avatarUploadButton(BuildContext context) {
+    return Tooltip(
+      message: 'Upload from device',
+      child: GestureDetector(
+        onTap: _pickAvatarImage,
+        child: Container(
+          width: 52,
+          height: 52,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: LogicOasisTheme.of(context).groupedSurface,
+            border: Border.all(
+              color: LogicOasisTheme.of(context).outline,
+            ),
+          ),
+          child: Icon(
+            Icons.add_a_photo_outlined,
+            color: LogicOasisTheme.of(context).secondaryInk,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickAvatarImage() async {
+    try {
+      final picked = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 600,
+        imageQuality: 85,
+      );
+      if (picked == null || !mounted) return;
+      final bytes = await picked.readAsBytes();
+      if (mounted) widget.state.updateAvatarImage(bytes);
+    } catch (_) {
+      // Device picking can be cancelled or unavailable; silently ignore.
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -1000,6 +1179,8 @@ class _StudentProfileSheetState extends State<_StudentProfileSheet> {
               l10n.editStudentProfile,
               style: Theme.of(context).textTheme.titleLarge,
             ),
+            const SizedBox(height: 12),
+            _buildAvatarPicker(context),
             const SizedBox(height: 16),
             TextField(
               controller: nameController,

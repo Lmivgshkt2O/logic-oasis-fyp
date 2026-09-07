@@ -153,19 +153,23 @@ void main() {
   test('recommended mission becomes claimable after enough topic attempts', () {
     final state = AppState();
     final missionTopicId = state.recommendedMission.topicId;
+    final missionSubtopicId = state.recommendedMission.subtopicId;
 
     state.saveQuizResult(
       topicId: missionTopicId,
+      subtopicId: missionSubtopicId,
       correctCount: 2,
       totalQuestions: 5,
     );
 
     expect(state.recommendedMission.topicId, missionTopicId);
+    expect(state.recommendedMission.subtopicId, missionSubtopicId);
     expect(state.recommendedMission.visibleCompletions, 1);
     expect(state.recommendedMission.isReadyToClaim, isFalse);
 
     state.saveQuizResult(
       topicId: missionTopicId,
+      subtopicId: missionSubtopicId,
       correctCount: 3,
       totalQuestions: 5,
     );
@@ -177,14 +181,17 @@ void main() {
   test('recommended mission reward can only be claimed once', () {
     final state = AppState();
     final missionTopicId = state.recommendedMission.topicId;
+    final missionSubtopicId = state.recommendedMission.subtopicId;
 
     state.saveQuizResult(
       topicId: missionTopicId,
+      subtopicId: missionSubtopicId,
       correctCount: 2,
       totalQuestions: 5,
     );
     state.saveQuizResult(
       topicId: missionTopicId,
+      subtopicId: missionSubtopicId,
       correctCount: 3,
       totalQuestions: 5,
     );
@@ -196,7 +203,8 @@ void main() {
       state.crystals,
       crystalsBeforeClaim + AppState.recommendedMissionRewardCrystals,
     );
-    expect(state.recommendedMission.rewardClaimed, isTrue);
+    // The reward was claimed, so the mission advances to a new subtopic.
+    expect(state.recommendedMission.rewardClaimed, isFalse);
 
     expect(state.claimRecommendedMissionReward(), isFalse);
     expect(
@@ -209,25 +217,31 @@ void main() {
     'claimed recommended mission reward is restored from saved session',
     () async {
       SharedPreferences.setMockInitialValues({
-        'logic_oasis_claimed_mission_topics': <String>['whole_numbers_y4'],
+        'logic_oasis_claimed_mission_subtopics': <String>[
+          'read_write_numbers',
+        ],
       });
       final state = AppState();
 
       state.saveQuizResult(
         topicId: 'whole_numbers_y4',
+        subtopicId: 'read_write_numbers',
         correctCount: 5,
         totalQuestions: 5,
       );
       state.saveQuizResult(
         topicId: 'whole_numbers_y4',
+        subtopicId: 'read_write_numbers',
         correctCount: 5,
         totalQuestions: 5,
       );
 
       await state.loadSavedAppPreferences();
 
+      // read_write_numbers was already claimed, so the mission moves on.
+      expect(state.recommendedMission.subtopicId, isNot('read_write_numbers'));
       expect(state.recommendedMission.isReadyToClaim, isFalse);
-      expect(state.recommendedMission.rewardClaimed, isTrue);
+      expect(state.recommendedMission.rewardClaimed, isFalse);
       expect(state.claimRecommendedMissionReward(), isFalse);
     },
   );
@@ -354,7 +368,9 @@ void main() {
       expect(subtopics.first.isAnalysisPending, isTrue);
       expect(state.isSubtopicUnlocked(topic, subtopics[1]), isTrue);
       expect(subtopics[1].activeBankCount, 0);
-      expect(topic.progress, 0);
+      // Progress counts the attempt even though the authoritative BKT/mastery
+      // outcome has not arrived yet (the provisional projection is used).
+      expect(topic.progress, 0.2);
     },
   );
 
@@ -768,5 +784,26 @@ void main() {
     final completedYear5First = year5First.copyWith(progress: 0.6);
     state.topics[1] = completedYear5First;
     expect(state.isTopicUnlocked(year5Second), isTrue);
+  });
+
+  test('completing a quiz records a daily activity streak', () {
+    final state = AppState();
+    expect(state.dayStreak, 0);
+    state.applyTrustedQuizCompletion(
+      topicId: 'whole_numbers_y4',
+      subtopicId: 'read_write_numbers',
+      correctCount: 5,
+      totalQuestions: 5,
+    );
+    expect(state.dayStreak, 1);
+  });
+
+  test('screen time session can be acknowledged', () {
+    final state = AppState();
+    state.updateScreenTimeLimit(15);
+    state.startScreenTimeSession();
+    expect(state.screenTimeLimitReached, isFalse);
+    state.acknowledgeScreenTimeLimit();
+    expect(state.screenTimeLimitReached, isFalse);
   });
 }

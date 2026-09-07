@@ -30,6 +30,7 @@ class LogicOasisShell extends StatefulWidget {
 class _LogicOasisShellState extends State<LogicOasisShell> {
   Timer? welcomeTimer;
   bool showWelcome = false;
+  bool _screenTimePromptVisible = false;
 
   @override
   void initState() {
@@ -84,6 +85,11 @@ class _LogicOasisShellState extends State<LogicOasisShell> {
   Widget build(BuildContext context) {
     final state = AppStateScope.watch(context);
     final l10n = AppLocalizations.of(context)!;
+    if (state.screenTimeLimitReached && !_screenTimePromptVisible) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _showScreenTimeDialog(context, state),
+      );
+    }
     final pages = [
       HomePage(state: state),
       FormulaForgePage(state: state),
@@ -120,6 +126,47 @@ class _LogicOasisShellState extends State<LogicOasisShell> {
       ),
     );
   }
+
+  Future<void> _showScreenTimeDialog(
+    BuildContext context,
+    AppState state,
+  ) async {
+    if (!mounted) return;
+    _screenTimePromptVisible = true;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(
+            state.t('Screen time reached', 'Masa skrin dicapai'),
+          ),
+          content: Text(
+            state.t(
+              'You have reached your screen time. Want a rest?',
+              'Anda telah mencapai masa skrin. Mahu berehat?',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                state.acknowledgeScreenTimeLimit();
+                Navigator.of(dialogContext).pop();
+              },
+              child: Text(state.t('Continue', 'Teruskan')),
+            ),
+            FilledButton(
+              onPressed: () {
+                state.acknowledgeScreenTimeLimit();
+                Navigator.of(dialogContext).pop();
+              },
+              child: Text(state.t('Take a break', 'Ambil rehat')),
+            ),
+          ],
+        );
+      },
+    );
+    if (mounted) setState(() => _screenTimePromptVisible = false);
+  }
 }
 
 class _WelcomeToast extends StatelessWidget {
@@ -131,6 +178,8 @@ class _WelcomeToast extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final oasis = LogicOasisTheme.of(context);
+    final isBahasaMelayu =
+        Localizations.localeOf(context).languageCode == 'ms';
 
     return Material(
       color: Colors.transparent,
@@ -157,7 +206,9 @@ class _WelcomeToast extends StatelessWidget {
               const SizedBox(width: 8),
               Flexible(
                 child: Text(
-                  'Welcome back, $studentName',
+                  isBahasaMelayu
+                      ? 'Selamat kembali, $studentName'
+                      : 'Welcome back, $studentName',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.titleMedium?.copyWith(fontSize: 13.5),

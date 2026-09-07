@@ -48,7 +48,10 @@ class AttemptRow extends StatelessWidget {
                       style: theme.textTheme.titleMedium,
                     ),
                   ),
-                  MasteryChip(label: attempt.mastery),
+                  MasteryChip(
+                    label: attempt.mastery,
+                    isBahasaMelayu: isBahasaMelayu,
+                  ),
                 ],
               ),
               const SizedBox(height: 4),

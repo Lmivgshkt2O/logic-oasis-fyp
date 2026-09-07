@@ -95,12 +95,12 @@ class SubtopicPage extends StatelessWidget {
         MaterialPageRoute(
           builder: (_) => QuizPage(
             session: session,
-            title: topic.localizedTitle(state.isBahasaMelayu),
+            title: subtopic.localizedTitle(state.isBahasaMelayu),
             isBahasaMelayu: state.isBahasaMelayu,
             sessionService: sessionService,
             aiDiagnosisStreamFactory: aiDiagnosisStreamFactory,
-            onFinalized: (completion) {
-              state.applyTrustedQuizCompletion(
+            onFinalized: (completion) async {
+              final reward = state.applyTrustedQuizCompletion(
                 topicId: topic.id,
                 subtopicId: subtopic.id,
                 correctCount: completion.correctCount,
@@ -115,7 +115,7 @@ class SubtopicPage extends StatelessWidget {
               // with its projection without holding the result page hostage to
               // a separate Firestore read.
               unawaited(state.refreshTrustedProgress(replaceAll: false));
-              return Future<void>.value();
+              return reward;
             },
           ),
         ),
@@ -245,7 +245,9 @@ class _TopicProgressSummary extends StatelessWidget {
     final theme = Theme.of(context);
     final oasis = LogicOasisTheme.of(context);
     final subtopics = state.subtopicsForTopic(topic);
-    final completed = subtopics.where((subtopic) => subtopic.isComplete).length;
+    final completed = subtopics
+        .where((subtopic) => subtopic.hasAttemptedQuiz)
+        .length;
     return SoftCard(
       padding: const EdgeInsets.all(14),
       radius: 18,
@@ -354,7 +356,7 @@ class _SubtopicCard extends StatelessWidget {
                       ),
                       Icon(
                         canStart
-                            ? Icons.play_arrow_rounded
+                            ? Icons.chevron_right_rounded
                             : Icons.lock_outline_rounded,
                         color: canStart
                             ? oasis.forest
@@ -451,19 +453,16 @@ class _SubtopicStatus {
   }) {
     if (!unlocked) {
       return _SubtopicStatus(
-        label: 'Lock',
+        label: isBahasaMelayu ? 'Dikunci' : 'Lock',
         color: oasis.neutral,
         background: oasis.groupedSurface,
         progressColor: oasis.neutral,
         icon: 'lock_outline',
-        progressSemanticsLabel: 'Locked',
+        progressSemanticsLabel: isBahasaMelayu ? 'Dikunci' : 'Locked',
       );
     }
     if (!subtopic.isAttempted) {
-      final label =
-          subtopic.mastery == 'New'
-              ? (isBahasaMelayu ? 'Baru' : 'New')
-              : subtopic.mastery;
+      final label = _masteryLabel(subtopic.mastery, isBahasaMelayu);
       return _SubtopicStatus(
         label: label,
         color: OasisSemanticTheme.continuedPracticeText,
@@ -523,12 +522,25 @@ class _SubtopicStatus {
       );
     }
     return _SubtopicStatus(
-      label: subtopic.mastery,
+      label: _masteryLabel(subtopic.mastery, isBahasaMelayu),
       color: OasisSemanticTheme.continuedPracticeText,
       background: oasis.reward.withValues(alpha: .15),
       progressColor: oasis.leaf,
-      progressSemanticsLabel: subtopic.mastery,
+      progressSemanticsLabel: _masteryLabel(subtopic.mastery, isBahasaMelayu),
     );
+  }
+
+  static String _masteryLabel(String label, bool isBahasaMelayu) {
+    if (!isBahasaMelayu) return label.isEmpty ? 'New' : label;
+    return switch (label) {
+      'Strong' => 'Kukuh',
+      'Moderate' => 'Sederhana',
+      'Weak' => 'Lemah',
+      'New' => 'Baru',
+      'Locked' => 'Dikunci',
+      '' => 'Baru',
+      _ => label,
+    };
   }
 }
 

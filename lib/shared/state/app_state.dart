@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:logic_oasis/shared/data/year4_chapter1_content.dart';
@@ -27,10 +28,34 @@ class AppState extends ChangeNotifier {
        topics = List<Topic>.from(_localTopicsForYear(4));
 
   static const String demoStudentId = 'student_aiman_y4';
+
+  /// Mutual-aid granted per forum badge (Issue #6).
+  static const int forumHelpfulAid = 5;
+  static const int forumAiVerifiedAid = 10;
+
+  /// Selectable colour themes (See Issue #7: Settings > Learning).
+  static const List<String> themeColorOptions = <String>[
+    'green',
+    'ocean',
+    'sunset',
+  ];
+
+  /// Selectable local profile avatars (See Issue #8: Settings > Learning).
+  static const List<String> avatarOptions = <String>[
+    'sprout',
+    'star',
+    'rocket',
+    'heart',
+    'sun',
+  ];
   // Used only when the student has no quiz attempts yet.
-  static const String recommendedMissionTopicId = 'whole_numbers_y4';
-  static const int recommendedMissionRequiredCompletions = 2;
   static const int recommendedMissionRewardCrystals = 20;
+  static const int recommendedMissionRequiredCompletions = 2;
+  static const String _claimedMissionSubtopicIdsKey =
+      'logic_oasis_claimed_mission_subtopics';
+  static const String _subtopicPracticeCountsKey =
+      'logic_oasis_subtopic_practice_counts';
+  static const String _reportedAnswerIdsKey = 'logic_oasis_reported_answer_ids';
   static const String _lastTabKey = 'logic_oasis_last_tab';
   static const String _navigationSchemaKey =
       'logic_oasis_navigation_schema_version';
@@ -41,6 +66,11 @@ class AppState extends ChangeNotifier {
   static const String _soundEnabledKey = 'logic_oasis_sound_enabled';
   static const String _accessibilityModeKey = 'logic_oasis_accessibility_mode';
   static const String _screenTimeLimitKey = 'logic_oasis_screen_time_limit';
+  static const String _themeColorKey = 'logic_oasis_theme_color';
+  static const String _avatarKey = 'logic_oasis_avatar';
+  static const String _forumAidRewardedKey = 'logic_oasis_forum_aid_rewarded';
+  static const String _dayStreakKey = 'logic_oasis_day_streak';
+  static const String _lastActiveDayKey = 'logic_oasis_last_active_day';
   static const String _unlockedTopicIdsKey = 'logic_oasis_unlocked_topics';
   static const String _unlockedSubtopicIdsKey =
       'logic_oasis_unlocked_subtopics';
@@ -291,9 +321,37 @@ class AppState extends ChangeNotifier {
   bool soundEnabled = true;
   bool accessibilityMode = false;
   int screenTimeLimitMinutes = 30;
+  /// True once the student has been active for screenTimeLimitMinutes; the UI
+  /// surfaces a rest prompt from this.
+  bool screenTimeLimitReached = false;
+  Timer? _screenTimeTimer;
+  /// Selected colour theme id (one of [themeColorOptions]).
+  String themeColorId = 'green';
+  /// Selected profile avatar id (one of [avatarOptions]).
+  String avatarId = 'sprout';
+  /// Optional device-uploaded avatar image bytes (overrides [avatarId]).
+  Uint8List? avatarImageBytes;
   int crystals = 124;
   int mutualAidEnergy = 36;
+  /// Consecutive-day streak of activity (quiz attempt, repair, or a reward
+  /// claim). Separate from the crystal/mutual-aid balances.
+  int dayStreak = 0;
+  DateTime? _lastActiveDay;
+  /// Forum answers (and badges) that already granted mutual-aid, so a student
+  /// is rewarded once per badge and never double-counted.
+  final Set<String> _forumAidRewarded = <String>{};
+  /// Number of finalized quiz attempts per subtopic, used by the mission so it
+  /// can count server-path completions (which do not write a client attempt).
+  final Map<String, int> _subtopicPracticeCount = <String, int>{};
+  /// Answers the current student has reported; kept hidden on their device only.
+  final Set<String> _reportedAnswerIds = <String>{};
+  /// Previous mastery % captured at quiz completion, awaiting the server BKT
+  /// value so the crystal reward matches the mastery the student actually sees.
+  final Map<String, int> _pendingQuizRewardPrevious = <String, int>{};
+  /// The most recent authoritative quiz reward, for display.
+  QuizReward? lastQuizReward;
   final Set<String> claimedRecommendedMissionTopicIds = <String>{};
+  final Set<String> claimedRecommendedMissionSubtopicIds = <String>{};
   final Set<String> _unlockedTopicIds = <String>{};
   final Set<String> _unlockedSubtopicIds = <String>{};
   final Map<String, List<String>> _recentQuestionIdsBySubtopic =
@@ -540,6 +598,18 @@ class AppState extends ChangeNotifier {
     screenTimeLimitMinutes =
         preferences.getInt(_screenTimeLimitKey) ?? screenTimeLimitMinutes;
     screenTimeLimitMinutes = screenTimeLimitMinutes.clamp(15, 120).toInt();
+    themeColorId = preferences.getString(_themeColorKey) ?? themeColorId;
+    avatarId = preferences.getString(_avatarKey) ?? avatarId;
+    dayStreak = preferences.getInt(_dayStreakKey) ?? dayStreak;
+    final savedLastActiveDay = preferences.getString(_lastActiveDayKey);
+    _lastActiveDay = savedLastActiveDay == null
+        ? null
+        : DateTime.tryParse(savedLastActiveDay.toUpperCase().endsWith('Z')
+              ? savedLastActiveDay
+              : '${savedLastActiveDay}Z');
+    _forumAidRewarded
+      ..clear()
+      ..addAll(preferences.getStringList(_forumAidRewardedKey) ?? const []);
     _unlockedTopicIds.clear();
     _unlockedSubtopicIds.clear();
     claimedRecommendedMissionTopicIds
@@ -547,6 +617,25 @@ class AppState extends ChangeNotifier {
       ..addAll(
         preferences.getStringList(_claimedMissionTopicIdsKey) ?? const [],
       );
+    claimedRecommendedMissionSubtopicIds
+      ..clear()
+      ..addAll(
+        preferences.getStringList(_claimedMissionSubtopicIdsKey) ?? const [],
+      );
+    _subtopicPracticeCount.clear();
+    for (final entry
+        in preferences.getStringList(_subtopicPracticeCountsKey) ?? const []) {
+      final parts = entry.split('|');
+      if (parts.length == 2) {
+        final count = int.tryParse(parts[1]);
+        if (count != null && parts[0].isNotEmpty) {
+          _subtopicPracticeCount[parts[0]] = count;
+        }
+      }
+    }
+    _reportedAnswerIds
+      ..clear()
+      ..addAll(preferences.getStringList(_reportedAnswerIdsKey) ?? const []);
     // Production progress is scoped to the authenticated student and comes
     // from server-owned subtopicMastery projections. Legacy local attempts are
     // retained only for offline/prototype tests, never the signed-in runtime.
@@ -574,6 +663,17 @@ class AppState extends ChangeNotifier {
     await preferences.setBool(_soundEnabledKey, soundEnabled);
     await preferences.setBool(_accessibilityModeKey, accessibilityMode);
     await preferences.setInt(_screenTimeLimitKey, screenTimeLimitMinutes);
+    await preferences.setString(_themeColorKey, themeColorId);
+    await preferences.setString(_avatarKey, avatarId);
+    await preferences.setInt(_dayStreakKey, dayStreak);
+    await preferences.setString(
+      _lastActiveDayKey,
+      _lastActiveDay?.toIso8601String() ?? '',
+    );
+    await preferences.setStringList(
+      _forumAidRewardedKey,
+      _forumAidRewarded.toList()..sort(),
+    );
     await preferences.setStringList(
       _unlockedTopicIdsKey,
       _unlockedTopicIds.toList()..sort(),
@@ -585,6 +685,21 @@ class AppState extends ChangeNotifier {
     await preferences.setStringList(
       _claimedMissionTopicIdsKey,
       claimedRecommendedMissionTopicIds.toList()..sort(),
+    );
+    await preferences.setStringList(
+      _claimedMissionSubtopicIdsKey,
+      claimedRecommendedMissionSubtopicIds.toList()..sort(),
+    );
+    await preferences.setStringList(
+      _subtopicPracticeCountsKey,
+      _subtopicPracticeCount.entries
+          .map((entry) => '${entry.key}|${entry.value}')
+          .toList()
+        ..sort(),
+    );
+    await preferences.setStringList(
+      _reportedAnswerIdsKey,
+      _reportedAnswerIds.toList()..sort(),
     );
     await preferences.setString(_savedAttemptsKey, _encodedSavedAttempts());
   }
@@ -631,7 +746,7 @@ class AppState extends ChangeNotifier {
           'Memuat ${firebaseTopics.length} topik Tahun $yearLevel daripada Firebase.',
         );
       }
-      if (persistQuizResults && currentStudentId != demoStudentId) {
+      if (persistQuizResults) {
         await refreshTrustedProgress();
       }
     } catch (_) {
@@ -662,24 +777,83 @@ class AppState extends ChangeNotifier {
         rewardClaimed: true,
       );
     }
-    final recommendedTopicId = _currentRecommendedMissionTopicId();
-    final topic = topics.firstWhere(
-      (topic) => topic.id == recommendedTopicId,
-      orElse: () => topics.first,
-    );
-    final completedCompletions = currentYearAttempts
-        .where((attempt) => attempt.topicId == topic.id)
-        .length;
-
+    final focus = _recommendedFocus();
+    final topic = focus?.$1 ?? topics.first;
+    final subtopic = focus?.$2;
+    final completedCompletions = subtopic == null
+        ? currentYearAttempts
+              .where((attempt) => attempt.topicId == topic.id)
+              .length
+        : (_subtopicPracticeCount[subtopic.id] ?? 0);
     return RecommendedMission(
       topicId: topic.id,
       topicTitle: topic.title,
       topicTitleBm: topic.titleBm,
+      subtopicId: subtopic?.id ?? '',
+      subtopicTitle: subtopic?.title ?? topic.title,
+      subtopicTitleBm: subtopic?.titleBm ?? topic.titleBm,
       requiredCompletions: recommendedMissionRequiredCompletions,
       completedCompletions: completedCompletions,
       rewardCrystals: recommendedMissionRewardCrystals,
-      rewardClaimed: claimedRecommendedMissionTopicIds.contains(topic.id),
+      rewardClaimed: subtopic == null
+          ? claimedRecommendedMissionTopicIds.contains(topic.id)
+          : claimedRecommendedMissionSubtopicIds.contains(subtopic.id),
     );
+  }
+
+  /// Picks the subtopic the student should practise next: prefer starting a
+  /// not-yet-attempted accessible subtopic, otherwise continue the lowest-mastery
+  /// attempted subtopic. Returns null when there is nothing available.
+  (Topic, Subtopic?)? _recommendedFocus() {
+    // The server AI diagnosis directs the focus when present.
+    final ai = _recommendedAiDiagnosis();
+    if (ai != null) {
+      final aiTopic = _topicById(ai.recommendationTargetTopicId ?? ai.topicId);
+      if (aiTopic != null) {
+        final targetSubtopicId = ai.recommendationTargetSubtopicId;
+        if (targetSubtopicId != null) {
+          for (final subtopic in aiTopic.subtopics) {
+            if (subtopic.id == targetSubtopicId) return (aiTopic, subtopic);
+          }
+        }
+        return (
+          aiTopic,
+          aiTopic.subtopics.isEmpty ? null : _pickSubtopic(aiTopic),
+        );
+      }
+    }
+    // Recommend the next unclaimed subtopic of an unlocked topic. It stays the
+    // focus until its mission reward is claimed, so practice on it counts.
+    for (final topic in topics) {
+      if (!isTopicUnlocked(topic)) continue;
+      if (topic.subtopics.any(
+        (subtopic) => !claimedRecommendedMissionSubtopicIds.contains(
+          subtopic.id,
+        ),
+      )) {
+        return (topic, _pickSubtopic(topic));
+      }
+    }
+    return null;
+  }
+
+  Topic? _topicById(String topicId) {
+    for (final topic in topics) {
+      if (topic.id == topicId) return topic;
+    }
+    return null;
+  }
+
+  /// Within a topic, prefer a not-yet-attempted accessible subtopic, else the
+  /// The next unclaimed subtopic in a topic. It remains the focus until the
+  /// mission reward is claimed, so repeated practice on it counts.
+  Subtopic _pickSubtopic(Topic topic) {
+    for (final subtopic in topic.subtopics) {
+      if (!claimedRecommendedMissionSubtopicIds.contains(subtopic.id)) {
+        return subtopic;
+      }
+    }
+    return topic.subtopics.first;
   }
 
   String t(String english, String bahasaMelayu) {
@@ -821,6 +995,7 @@ class AppState extends ChangeNotifier {
         unawaited(refreshTrustedProgress());
       }
     }
+    startScreenTimeSession();
   }
 
   /// Session-level year switch for the Formula Forge: lets a Year 6 student
@@ -837,9 +1012,7 @@ class AppState extends ChangeNotifier {
     unawaited(saveAppSession().catchError((_) {}));
     if (persistQuizResults) {
       unawaited(loadTopicsFromFirebase());
-      if (currentStudentId != demoStudentId) {
-        unawaited(refreshTrustedProgress());
-      }
+      unawaited(refreshTrustedProgress());
     }
   }
 
@@ -855,6 +1028,8 @@ class AppState extends ChangeNotifier {
 
   void _clearSignedInStudentRuntimeState() {
     _cancelTrustedProgressWatch();
+    _screenTimeTimer?.cancel();
+    screenTimeLimitReached = false;
     attempts.clear();
     aiDiagnoses.clear();
     _recentQuestionIdsBySubtopic.clear();
@@ -864,19 +1039,31 @@ class AppState extends ChangeNotifier {
   }
 
   /// Applies a trusted callable completion immediately, then the caller can
-  /// refresh the same state from Firestore. It never writes a quiz attempt,
-  /// mastery record, reward, or correctness field from the client.
-  void applyTrustedQuizCompletion({
+  /// refresh the same state from Firestore. It never writes the quiz attempt,
+  /// mastery record, or reward to Firestore from the client; the crystal
+  /// reward (Issue #6) is granted in-memory only.
+  QuizReward? applyTrustedQuizCompletion({
     required String topicId,
     required String subtopicId,
     required int correctCount,
     required int totalQuestions,
   }) {
-    if (totalQuestions <= 0) return;
+    if (totalQuestions <= 0) return null;
     final rate = (correctCount.clamp(0, totalQuestions) / totalQuestions)
         .clamp(0.0, 1.0)
         .toDouble();
-    final mastery = _masteryForScore((rate * 100).round());
+    final score = (rate * 100).round();
+    final mastery = _masteryForScore(score);
+    // Issue #6: reward crystals only when the BKT mastery moved forward, on a
+    // mastery-progress tier. No penalty is applied when mastery is low or
+    // drops, but then no crystals are granted.
+    final previousPercent =
+        ((_subtopicMasteryProbability(topicId, subtopicId) ?? 0) * 100)
+            .round();
+    // The crystal reward is granted once the authoritative server BKT value
+    // arrives (see _grantAuthoritativeQuizRewards), so it matches the mastery
+    // the student sees rather than the provisional score-based projection.
+    _pendingQuizRewardPrevious[subtopicId] = previousPercent;
     applyTrustedSubtopicProgress(<TrustedSubtopicProgress>[
       TrustedSubtopicProgress(
         studentId: currentStudentId,
@@ -897,10 +1084,28 @@ class AppState extends ChangeNotifier {
         projectionStatus: 'finalized_pending_ai',
       ),
     ], replaceAll: false);
+    final provisionalEarned = quizRewardCrystals(
+      previousPercent: previousPercent,
+      newPercent: score,
+    );
+    final reward = QuizReward(
+      score: score,
+      earnedCrystals: provisionalEarned,
+      previousMastery: _masteryForScore(previousPercent),
+      newMastery: mastery,
+      encouragement: _encouragementForScore(score),
+      previousMasteryPercent: previousPercent,
+    );
+    lastQuizReward = reward;
+    _subtopicPracticeCount[subtopicId] =
+        (_subtopicPracticeCount[subtopicId] ?? 0) + 1;
+    _recordActivity();
+    notifyListeners();
+    return reward;
   }
 
   Future<void> refreshTrustedProgress({bool replaceAll = true}) async {
-    if (!persistQuizResults || currentStudentId == demoStudentId) return;
+    if (!persistQuizResults) return;
     final requestedStudentId = currentStudentId;
     try {
       final repository = _learningRepository ?? LearningRepository();
@@ -922,7 +1127,7 @@ class AppState extends ChangeNotifier {
   /// can move from "Preparing mastery..." to the calculated BKT mastery as
   /// soon as the runtime finishes, without waiting for the next navigation.
   void watchTrustedProgress() {
-    if (!persistQuizResults || currentStudentId == demoStudentId) return;
+    if (!persistQuizResults) return;
     _cancelTrustedProgressWatch();
     final repository = _learningRepository ?? LearningRepository();
     final requestedStudentId = currentStudentId;
@@ -977,12 +1182,13 @@ class AppState extends ChangeNotifier {
                   subtopic.accessUnlocked ||
                   subtopic.masteryProbability != null) {
                 topicChanged = true;
-                return subtopic.copyWith(
-                  progress: 0,
-                  mastery: 'New',
-                  completed: false,
-                  accessUnlocked: false,
-                  masteryProbability: null,
+              return subtopic.copyWith(
+                progress: 0,
+                mastery: 'New',
+                completed: false,
+                accessUnlocked: false,
+                attempted: false,
+                masteryProbability: null,
                   evidenceLevel: null,
                   recommendedLearningAction: null,
                   recommendationBasis: null,
@@ -1030,6 +1236,7 @@ class AppState extends ChangeNotifier {
               mastery: record.masteryLevel,
               completed: record.completed,
               accessUnlocked: record.accessUnlocked || record.completed,
+              attempted: record.attempted || subtopic.attempted,
               masteryProbability: masteryProbability,
               evidenceLevel: record.evidenceLevel,
               recommendedLearningAction: record.recommendedLearningAction,
@@ -1057,11 +1264,62 @@ class AppState extends ChangeNotifier {
         );
       }
     }
+    _grantAuthoritativeQuizRewards(records);
     if (!changed) return;
     _unlockedTopicIds.clear();
     _unlockedSubtopicIds.clear();
     _recordUnlockedProgression();
     notifyListeners();
+  }
+
+  /// Grants the quiz crystal reward once the authoritative server BKT mastery
+  /// arrives for a subtopic that has a pending quiz reward. This keeps the
+  /// reward aligned with the mastery the student sees on the subtopic card.
+  void _grantAuthoritativeQuizRewards(List<TrustedSubtopicProgress> records) {
+    for (final record in records) {
+      if (record.studentId != currentStudentId ||
+          record.yearLevel != yearLevel) {
+        continue;
+      }
+      final masteryProbability = record.masteryProbability;
+      if (masteryProbability == null) continue;
+      final previousPercent = _pendingQuizRewardPrevious.remove(
+        record.subtopicId,
+      );
+      if (previousPercent == null) continue;
+      final newPercent = (masteryProbability * 100).round();
+      final earned = quizRewardCrystals(
+        previousPercent: previousPercent,
+        newPercent: newPercent,
+      );
+      if (earned > 0) crystals += earned;
+      // Persist immediately, scoped to the learner who earned the reward and
+      // the exact resource values at grant time, so the reward survives a
+      // logout / login (and a rapid account switch).
+      final rewardStudentId = currentStudentId;
+      final rewardCrystals = crystals;
+      final rewardAid = mutualAidEnergy;
+      if (earned > 0 && persistQuizResults) {
+        unawaited(
+          _saveOasisProgressSnapshot(
+            studentId: rewardStudentId,
+            crystalsValue: rewardCrystals,
+            aidValue: rewardAid,
+          ),
+        );
+      }
+      final scoreRate = record.bestCorrectRate.clamp(0.0, 1.0);
+      final score = (scoreRate * 100).round();
+      lastQuizReward = QuizReward(
+        score: score,
+        earnedCrystals: earned,
+        previousMastery: _masteryForScore(previousPercent),
+        newMastery: _masteryForScore(newPercent),
+        encouragement: _encouragementForScore(score),
+        previousMasteryPercent: previousPercent,
+      );
+      notifyListeners();
+    }
   }
 
   void updateLanguage(String value) {
@@ -1103,10 +1361,51 @@ class AppState extends ChangeNotifier {
     unawaited(saveAppSession());
   }
 
+  void updateThemeColor(String value) {
+    if (themeColorOptions.contains(value)) {
+      themeColorId = value;
+      notifyListeners();
+      unawaited(saveAppSession());
+    }
+  }
+
+  void updateAvatar(String value) {
+    if (avatarOptions.contains(value)) {
+      avatarId = value;
+      notifyListeners();
+      unawaited(saveAppSession());
+    }
+  }
+
+  void updateAvatarImage(Uint8List? bytes) {
+    avatarImageBytes = bytes;
+    avatarId = 'sprout';
+    notifyListeners();
+    unawaited(saveAppSession());
+  }
+
   void updateScreenTimeLimit(int minutes) {
     screenTimeLimitMinutes = minutes.clamp(15, 120).toInt();
     notifyListeners();
     unawaited(saveAppSession());
+  }
+
+  /// Begin counting the student's active session against screenTimeLimitMinutes.
+  void startScreenTimeSession() {
+    _screenTimeTimer?.cancel();
+    screenTimeLimitReached = false;
+    final limit = screenTimeLimitMinutes;
+    _screenTimeTimer = Timer(Duration(minutes: limit), () {
+      screenTimeLimitReached = true;
+      notifyListeners();
+    });
+  }
+
+  /// Acknowledge the screen-time prompt and restart the session count.
+  void acknowledgeScreenTimeLimit() {
+    _screenTimeTimer?.cancel();
+    screenTimeLimitReached = false;
+    notifyListeners();
   }
 
   QuizReward saveQuizResult({
@@ -1169,6 +1468,11 @@ class AppState extends ChangeNotifier {
     );
 
     attempts.insert(0, attempt);
+    final practiceSubtopicId = updatedSubtopic?.id;
+    if (practiceSubtopicId != null) {
+      _subtopicPracticeCount[practiceSubtopicId] =
+          (_subtopicPracticeCount[practiceSubtopicId] ?? 0) + 1;
+    }
 
     final reward = QuizReward(
       score: score,
@@ -1302,14 +1606,28 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  Future<void> _saveOasisProgressToFirebase() async {
+  Future<void> _saveOasisProgressToFirebase() {
+    // Snapshot at call time so a later account switch cannot mis-write a
+    // reward that was earned by a different learner onto this learner's doc.
+    return _saveOasisProgressSnapshot(
+      studentId: currentStudentId,
+      crystalsValue: crystals,
+      aidValue: mutualAidEnergy,
+    );
+  }
+
+  Future<void> _saveOasisProgressSnapshot({
+    required String studentId,
+    required int crystalsValue,
+    required int aidValue,
+  }) async {
     try {
       final repository = _learningRepository ?? LearningRepository();
       await repository.saveOasisProgress(
-        studentId: currentStudentId,
+        studentId: studentId,
         yearLevel: yearLevel,
-        crystals: crystals,
-        mutualAidEnergy: mutualAidEnergy,
+        crystals: crystalsValue,
+        mutualAidEnergy: aidValue,
         language: language,
         missionReminders: missionReminders,
         eyeComfortMode: eyeComfortMode,
@@ -1368,7 +1686,12 @@ class AppState extends ChangeNotifier {
     if (!mission.isReadyToClaim) return false;
 
     crystals += mission.rewardCrystals;
-    claimedRecommendedMissionTopicIds.add(mission.topicId);
+    if (mission.subtopicId.isNotEmpty) {
+      claimedRecommendedMissionSubtopicIds.add(mission.subtopicId);
+    } else {
+      claimedRecommendedMissionTopicIds.add(mission.topicId);
+    }
+    _recordActivity();
     notifyListeners();
     _saveAppSessionInBackground();
     if (persistQuizResults) {
@@ -1376,6 +1699,75 @@ class AppState extends ChangeNotifier {
     }
     return true;
   }
+
+  /// Issue #6 forum mutual-aid reward, awarded once per answer and badge.
+  /// +[forumHelpfulAid] for a helpful mark; +[forumAiVerifiedAid] for an
+  /// AI-verified badge. No penalty for "may be irrelevant" or absence of a
+  /// helpful / AI-verified badge.
+  void awardForumAid({
+    required String answerId,
+    required bool helpful,
+    required bool aiVerified,
+  }) {
+    var gained = 0;
+    final helpfulKey = '$answerId:helpful';
+    final verifiedKey = '$answerId:ai_verified';
+    if (helpful && !_forumAidRewarded.contains(helpfulKey)) {
+      _forumAidRewarded.add(helpfulKey);
+      gained += forumHelpfulAid;
+    }
+    if (aiVerified && !_forumAidRewarded.contains(verifiedKey)) {
+      _forumAidRewarded.add(verifiedKey);
+      gained += forumAiVerifiedAid;
+    }
+    if (gained > 0) {
+      mutualAidEnergy += gained;
+      notifyListeners();
+      unawaited(saveAppSession());
+      if (persistQuizResults) {
+        final studentId = currentStudentId;
+        final c = crystals;
+        final a = mutualAidEnergy;
+        unawaited(
+          _saveOasisProgressSnapshot(
+            studentId: studentId,
+            crystalsValue: c,
+            aidValue: a,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Whether the current student has reported this answer (hidden locally).
+  bool isAnswerReported(String answerId) =>
+      _reportedAnswerIds.contains(answerId);
+
+  /// Marks an answer as reported so it is hidden for the reporting student.
+  void markAnswerReported(String answerId) {
+    if (_reportedAnswerIds.add(answerId)) {
+      notifyListeners();
+      unawaited(saveAppSession().catchError((_) {}));
+    }
+  }
+
+  /// Update the consecutive-day activity streak. Called after any meaningful
+  /// student action (quiz, oasis repair, reward claim).
+  void _recordActivity([DateTime? now]) {
+    final today = _dateOnly(now ?? DateTime.now());
+    final last = _lastActiveDay == null ? null : _dateOnly(_lastActiveDay!);
+    if (last == null) {
+      dayStreak = 1;
+    } else if (today.isAfter(last)) {
+      dayStreak = today.difference(last).inDays == 1 ? dayStreak + 1 : 1;
+    }
+    _lastActiveDay = today;
+    notifyListeners();
+    unawaited(saveAppSession());
+  }
+
+  static DateTime _dateOnly(DateTime value) =>
+      DateTime(value.year, value.month, value.day);
 
   double mathMax(double a, double b) => a > b ? a : b;
 
@@ -1393,7 +1785,7 @@ class AppState extends ChangeNotifier {
   double _topicProgressFromSubtopics(List<Subtopic> subtopics) {
     if (subtopics.isEmpty) return 0;
     final completedCount = subtopics
-        .where((subtopic) => subtopic.isComplete)
+        .where((subtopic) => subtopic.hasAttemptedQuiz)
         .length;
     return completedCount / subtopics.length;
   }
@@ -1482,6 +1874,7 @@ class AppState extends ChangeNotifier {
                 // callable finalization: a passing score unlocks and counts as
                 // complete for offline/prototype sessions.
                 completed: bestAttempt.score >= 50,
+                attempted: true,
                 accessUnlocked: true,
               );
             })
@@ -1647,53 +2040,6 @@ class AppState extends ChangeNotifier {
     return subtopicsForTopic(matches.first).length;
   }
 
-  String _currentRecommendedMissionTopicId() {
-    final aiRecommendation = _recommendedAiDiagnosis();
-    if (aiRecommendation != null) {
-      return aiRecommendation.topicId;
-    }
-
-    final yearAttempts = currentYearAttempts;
-    if (yearAttempts.isEmpty) return _firstUnclaimedTopicId();
-
-    final grouped = <String, List<QuizAttempt>>{};
-    for (final attempt in yearAttempts) {
-      if (!topics.any((topic) => topic.id == attempt.topicId)) continue;
-      grouped.putIfAbsent(attempt.topicId, () => []).add(attempt);
-    }
-
-    if (grouped.isEmpty) return _firstUnclaimedTopicId();
-
-    var weakestTopicId = grouped.keys.first;
-    var weakestAverage = 101;
-
-    for (final entry in grouped.entries) {
-      final average = _averageScoreForAttempts(entry.value);
-      if (average < weakestAverage) {
-        weakestTopicId = entry.key;
-        weakestAverage = average;
-      }
-    }
-
-    return weakestTopicId;
-  }
-
-  String _firstUnclaimedTopicId() {
-    final unclaimedTopics = topics.where(
-      (topic) => !claimedRecommendedMissionTopicIds.contains(topic.id),
-    );
-    return unclaimedTopics.isEmpty ? topics.first.id : unclaimedTopics.first.id;
-  }
-
-  int _averageScoreForAttempts(List<QuizAttempt> topicAttempts) {
-    if (topicAttempts.isEmpty) return 0;
-    final total = topicAttempts.fold<int>(
-      0,
-      (sum, attempt) => sum + attempt.score,
-    );
-    return total ~/ topicAttempts.length;
-  }
-
   AiDiagnosis? _recommendedAiDiagnosis() {
     if (aiDiagnoses.isEmpty) return null;
 
@@ -1797,6 +2143,7 @@ class AppState extends ChangeNotifier {
     oasisAreas[areaIndex] = area.copyWith(
       progress: (area.progress + 0.25).clamp(0.0, 1.0),
     );
+    _recordActivity();
     notifyListeners();
     if (persistQuizResults) {
       unawaited(_saveOasisProgressToFirebase());
@@ -1813,6 +2160,32 @@ class AppState extends ChangeNotifier {
         ? 8
         : 4;
     return effortBonus + correctBonus + masteryBonus;
+  }
+
+  /// Look up the current BKT mastery probability (0..1) for a subtopic, or
+  /// null when the subtopic is not yet present / has no projection.
+  double? _subtopicMasteryProbability(String topicId, String subtopicId) {
+    for (final topic in topics) {
+      if (topic.id != topicId) continue;
+      for (final subtopic in topic.subtopics) {
+        if (subtopic.id == subtopicId) return subtopic.masteryProbability;
+      }
+    }
+    return null;
+  }
+
+  /// Issue #6 quiz reward tiers, in crystals. Reward only when the new
+  /// mastery moved forward (new > 0 and not below the previous value).
+  static int quizRewardCrystals({
+    required int previousPercent,
+    required int newPercent,
+  }) {
+    if (newPercent <= 0) return 0;
+    if (newPercent < previousPercent) return 0;
+    if (newPercent < 20) return 10;
+    if (newPercent < 60) return 20;
+    if (newPercent <= 80) return 30;
+    return 50;
   }
 
   String _masteryForScore(int score) {

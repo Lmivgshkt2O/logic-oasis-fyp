@@ -22,14 +22,18 @@ class HomePage extends StatelessWidget {
       children: [
         Row(
           children: [
-            const SproutAvatar(size: 60),
+            SproutAvatar(
+              size: 60,
+              avatarId: state.avatarId,
+              imageBytes: state.avatarImageBytes,
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Good morning,',
+                    state.t('Good morning,', 'Selamat pagi,'),
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: oasis.secondaryInk,
                       fontSize: 15,
@@ -38,7 +42,7 @@ class HomePage extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${state.studentName} *',
+                    state.studentName,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.headlineMedium,
@@ -46,13 +50,6 @@ class HomePage extends StatelessWidget {
                 ],
               ),
             ),
-            SoftIconButton(
-              icon: state.missionReminders
-                  ? 'notifications_active'
-                  : 'notifications_off',
-              onTap: () => _toggleMissionReminders(context),
-            ),
-            const SizedBox(width: 10),
             SoftIconButton(icon: 'settings', onTap: () => state.changeTab(3)),
           ],
         ),
@@ -84,7 +81,7 @@ class HomePage extends StatelessWidget {
                 compact: true,
                 icon: 'stat_streak',
                 iconColor: oasis.leaf,
-                value: '${state.currentYearAttempts.length}',
+                value: '${state.dayStreak}',
                 label: l10n.dayStreak,
               ),
             ),
@@ -132,20 +129,6 @@ class HomePage extends StatelessWidget {
       );
   }
 
-  void _toggleMissionReminders(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final nextValue = !state.missionReminders;
-    state.updateMissionReminders(nextValue);
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(
-            nextValue ? l10n.missionRemindersOn : l10n.missionRemindersOff,
-          ),
-        ),
-      );
-  }
 }
 
 class _HomeMissionCard extends StatelessWidget {
@@ -162,7 +145,13 @@ class _HomeMissionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final topic = isBahasaMelayu ? mission.topicTitleBm : mission.topicTitle;
+    final topic = isBahasaMelayu
+        ? (mission.subtopicTitleBm.isNotEmpty
+              ? mission.subtopicTitleBm
+              : mission.topicTitleBm)
+        : (mission.subtopicTitle.isNotEmpty
+              ? mission.subtopicTitle
+              : mission.topicTitle);
     final required = mission.requiredCompletions;
     final progress = required == 0
         ? 0.0
@@ -171,15 +160,18 @@ class _HomeMissionCard extends StatelessWidget {
         ? l10n.rewardClaimedKeepPractising(topic)
         : mission.isReadyToClaim
         ? l10n.missionCompleteClaimReward
+        : isBahasaMelayu
+        ? '+${mission.rewardCrystals} Kristal apabila selesai'
         : '+${mission.rewardCrystals} Crystals on completion';
 
     return MissionCard(
       topicLabel: topic,
-      durationLabel: 'Easy - 5 min',
+      durationLabel: isBahasaMelayu ? 'Mudah - 5 minit' : 'Easy - 5 min',
       title: l10n.completeTopicDrills(required, topic),
       rewardLabel: rewardLabel,
       progress: progress,
       progressLabel: '${mission.visibleCompletions}/$required',
+      sectionLabel: isBahasaMelayu ? 'MISI HARI INI' : "TODAY'S MISSION",
       readyToClaim: mission.isReadyToClaim,
       onTap: onTap,
     );

@@ -814,6 +814,7 @@ class _AnswersPageState extends State<ForumDiscussionPage> {
               }
               if (!snapshot.hasData)
                 return const Center(child: CircularProgressIndicator());
+              _rewardAid(snapshot.data!);
               var effectiveAcceptedAnswerId = _acceptedAnswerId;
               for (final answer in snapshot.data!) {
                 if (answer.acceptedAt != null) {
@@ -822,7 +823,11 @@ class _AnswersPageState extends State<ForumDiscussionPage> {
                 }
               }
               final answers = snapshot.data!
-                  .where((answer) => !_blockedAuthors.contains(answer.authorId))
+                  .where(
+                    (answer) =>
+                        !_blockedAuthors.contains(answer.authorId) &&
+                        !widget.state.isAnswerReported(answer.id),
+                  )
                   .toList(growable: false);
               if (answers.isEmpty) {
                 return _Message(
@@ -904,11 +909,13 @@ class _AnswersPageState extends State<ForumDiscussionPage> {
                                   isBahasaMelayu:
                                       widget.state.isBahasaMelayu,
                                 ),
-                                icon:
-                                    answer.aiPublicState ==
-                                        'may_be_irrelevant'
-                                    ? Icons.help_outline
-                                    : Icons.verified_outlined,
+                                icon: switch (answer.aiPublicState) {
+                                  'may_be_irrelevant' =>
+                                    Icons.help_outline,
+                                  'similar_answer' =>
+                                    Icons.content_copy_outlined,
+                                  _ => Icons.verified_outlined,
+                                },
                               ),
                             ],
                             Row(
@@ -1063,10 +1070,40 @@ class _AnswersPageState extends State<ForumDiscussionPage> {
     }
   }
 
+  /// Grants the student's own mutual-aid once per answer/badge (Issue #6).
+  /// Runs post-frame so it never mutates [AppState] during build. The award
+  /// is idempotent in [AppState.awardForumAid], so repeat scans are no-ops.
+  void _rewardAid(List<ForumAnswer> answers) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      for (final answer in answers) {
+        if (answer.authorId != widget.state.currentStudentId) continue;
+        unawaited(_awardForAnswer(answer));
+      }
+    });
+  }
+
+  Future<void> _awardForAnswer(ForumAnswer answer) async {
+    // A near-duplicate of an earlier verified answer is not a fresh
+    // contribution, so it earns neither the helpful nor the AI-verified aid.
+    final isSimilar = answer.aiPublicState == 'similar_answer';
+    var helpful = answer.helpfulCount > 0;
+    try {
+      helpful = helpful || (await _repo.countHelpfulMarks(answer.id)) > 0;
+    } catch (_) {
+      // If the marks lookup is unavailable, keep the answer-document field.
+    }
+    widget.state.awardForumAid(
+      answerId: answer.id,
+      helpful: !isSimilar && helpful,
+      aiVerified: answer.aiPublicState == 'verified',
+    );
+  }
+
   String _optionLabel(int? index) {
     final options = _options;
     if (index == null || index < 0 || index >= options.length) return '';
-    return options[index];
+    return '${String.fromCharCode(65 + index)}. ${options[index]}';
   }
 
   Future<bool> _submitLinked(int selectedOption, String explanation) async {
@@ -1196,11 +1233,14 @@ class _AnswersPageState extends State<ForumDiscussionPage> {
               answerId: answer.id,
               text: value,
             )
-          : () => _repo.report(
-              targetType: 'answer',
-              targetId: answer.id,
-              reason: value,
-            ),
+          : () async {
+              await _repo.report(
+                targetType: 'answer',
+                targetId: answer.id,
+                reason: value,
+              );
+              widget.state.markAnswerReported(answer.id);
+            },
       action == _AnswerAction.edit
           ? _t(
               'Response edited successfully. Feedback review queued.',
@@ -1485,6 +1525,7 @@ class _LinkedAnswerFormState extends State<_LinkedAnswerForm> {
         for (var index = 0; index < widget.options.length; index++) ...[
           _OptionTile(
             label: widget.options[index],
+            letter: String.fromCharCode(65 + index),
             selected: _selectedOption == index,
             onTap: _submitting
                 ? null
@@ -1527,11 +1568,14 @@ class _OptionTile extends StatelessWidget {
     required this.label,
     required this.selected,
     required this.onTap,
+    this.letter,
   });
 
   final String label;
   final bool selected;
   final VoidCallback? onTap;
+  /// Optional textbook-style option letter (A, B, C, D) shown before the text.
+  final String? letter;
 
   @override
   Widget build(BuildContext context) {
@@ -1554,6 +1598,28 @@ class _OptionTile extends StatelessWidget {
         ),
         child: Row(
           children: [
+            if (letter != null) ...[
+              Container(
+                width: 26,
+                height: 26,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: selected ? oasis.violet : oasis.primaryInk,
+                  shape: BoxShape.circle,
+                ),
+                child: Text(
+                  letter!,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontFamily: 'Fredoka',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    height: 1,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 9),
+            ],
             Icon(
               selected
                   ? Icons.radio_button_checked

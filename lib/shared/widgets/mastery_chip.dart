@@ -2,9 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:logic_oasis/app/theme.dart';
 
 class MasteryChip extends StatelessWidget {
-  const MasteryChip({super.key, required this.label});
+  const MasteryChip({
+    super.key,
+    required this.label,
+    this.isBahasaMelayu = false,
+  });
 
   final String label;
+  final bool isBahasaMelayu;
 
   @override
   Widget build(BuildContext context) {
@@ -23,7 +28,7 @@ class MasteryChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(99),
       ),
       child: Text(
-        label,
+        _displayLabel(label, isBahasaMelayu),
         style: TextStyle(
           color: color,
           fontWeight: FontWeight.w600,
@@ -32,5 +37,18 @@ class MasteryChip extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  static String _displayLabel(String label, bool isBahasaMelayu) {
+    if (!isBahasaMelayu) return label.isEmpty ? 'Mastery' : label;
+    return switch (label) {
+      'Strong' => 'Kukuh',
+      'Moderate' => 'Sederhana',
+      'Weak' => 'Lemah',
+      'New' => 'Baharu',
+      'Locked' => 'Dikunci',
+      '' => 'Penguasaan',
+      _ => label,
+    };
   }
 }

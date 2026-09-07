@@ -153,8 +153,10 @@ class _LogicOasisAppState extends State<LogicOasisApp>
             title: 'Logic Oasis',
             debugShowCheckedModeBanner: false,
             theme: state.eyeComfortMode
-                ? LogicOasisTheme.eyeComfort()
-                : LogicOasisTheme.light(),
+                ? LogicOasisTheme.eyeComfort(
+                    themeColorId: state.themeColorId,
+                  )
+                : LogicOasisTheme.light(themeColorId: state.themeColorId),
             themeAnimationStyle: AnimationStyle(
               duration: LogicOasisMotion.themeTransitionFor(context),
               curve: LogicOasisMotion.themeTransitionCurve,
@@ -165,7 +167,7 @@ class _LogicOasisAppState extends State<LogicOasisApp>
               return MediaQuery(
                 data: mediaQuery.copyWith(
                   textScaler: state.accessibilityMode
-                      ? const TextScaler.linear(1.08)
+                      ? const TextScaler.linear(1.15)
                       : mediaQuery.textScaler,
                 ),
                 child: child ?? const SizedBox.shrink(),

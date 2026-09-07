@@ -441,9 +441,9 @@ void main() {
     );
 
     await _completeOneQuiz(tester);
-    final practiseAgain = find.text('Practise Again');
-    await tester.ensureVisible(practiseAgain);
-    await tester.tap(practiseAgain);
+    final tryAgain = find.text('Try again');
+    await tester.ensureVisible(tryAgain);
+    await tester.tap(tryAgain);
     await tester.pumpAndSettle();
 
     expect(service.startedSubtopicIds, <String>['s1', 's1']);

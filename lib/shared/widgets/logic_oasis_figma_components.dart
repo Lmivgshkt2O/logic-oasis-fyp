@@ -1,5 +1,7 @@
 // ignore_for_file: unused_element
 
+import 'dart:typed_data';
+
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -280,13 +282,48 @@ class SoftIconButton extends StatelessWidget {
 }
 
 class SproutAvatar extends StatelessWidget {
-  const SproutAvatar({super.key, this.size = 48});
+  const SproutAvatar({
+    super.key,
+    this.size = 48,
+    this.avatarId = 'sprout',
+    this.imageBytes,
+  });
 
   final double size;
+  final String avatarId;
+  final Uint8List? imageBytes;
 
   @override
   Widget build(BuildContext context) {
     final oasis = LogicOasisTheme.of(context);
+    if (imageBytes != null && imageBytes!.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(size * .28),
+        child: Image.memory(
+          imageBytes!,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+        ),
+      );
+    }
+    final iconOption = _AvatarIconOption.from(avatarId, oasis);
+    if (iconOption != null) {
+      return Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: iconOption.color.withValues(alpha: .18),
+          borderRadius: BorderRadius.circular(size * .28),
+          border: Border.all(color: iconOption.color, width: 1.4),
+        ),
+        child: Icon(
+          iconOption.icon,
+          color: iconOption.color,
+          size: size * .5,
+        ),
+      );
+    }
     return Container(
       width: size,
       height: size,
@@ -299,6 +336,37 @@ class SproutAvatar extends StatelessWidget {
         child: const AppIllustration('sprout_avatar.jpg'),
       ),
     );
+  }
+}
+
+/// Map a local avatar id to its colour + icon cue. `sprout` keeps the bundled
+/// illustration; the others are locally rendered so no extra assets are needed.
+class _AvatarIconOption {
+  const _AvatarIconOption({required this.icon, required this.color});
+
+  final IconData icon;
+  final Color color;
+
+  static _AvatarIconOption? from(String id, OasisSemanticTheme oasis) {
+    return switch (id) {
+      'star' => _AvatarIconOption(
+        icon: Icons.star_rounded,
+        color: oasis.reward,
+      ),
+      'rocket' => _AvatarIconOption(
+        icon: Icons.rocket_launch_rounded,
+        color: oasis.water,
+      ),
+      'heart' => _AvatarIconOption(
+        icon: Icons.favorite_rounded,
+        color: oasis.coral,
+      ),
+      'sun' => _AvatarIconOption(
+        icon: Icons.wb_sunny_rounded,
+        color: oasis.forest,
+      ),
+      _ => null,
+    };
   }
 }
 
@@ -432,6 +500,7 @@ class MissionCard extends StatelessWidget {
     required this.progressLabel,
     required this.onTap,
     required this.readyToClaim,
+    required this.sectionLabel,
   });
 
   final String topicLabel;
@@ -442,6 +511,7 @@ class MissionCard extends StatelessWidget {
   final String progressLabel;
   final VoidCallback onTap;
   final bool readyToClaim;
+  final String sectionLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -450,7 +520,7 @@ class MissionCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SectionLabel(label: "TODAY'S MISSION"),
+        _SectionLabel(label: sectionLabel),
         const SizedBox(height: 8),
         SoftCard(
           onTap: onTap,
@@ -533,25 +603,23 @@ class MissionCard extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               Container(
-                width: 42,
-                height: 42,
-                decoration: const BoxDecoration(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF58C878), Color(0xFF259D55)],
-                  ),
+                  color: oasis.forest,
                   boxShadow: [
                     BoxShadow(
-                      color: Color(0x33369E58),
-                      blurRadius: 15,
-                      offset: Offset(0, 8),
+                      color: oasis.forest.withValues(alpha: .28),
+                      blurRadius: 12,
+                      offset: const Offset(0, 5),
                     ),
                   ],
                 ),
                 child: AppSvgIcon(
                   readyToClaim ? 'card_giftcard' : 'play',
                   color: Colors.white,
-                  size: 24,
+                  size: 20,
                 ),
               ),
             ],
@@ -604,11 +672,11 @@ class OasisHeroCard extends StatelessWidget {
                   restorationProgress: progress,
                 ),
               ),
-              const Positioned(
+              Positioned(
                 left: 20,
                 top: 18,
                 right: 20,
-                child: _HeroTitleBlock(),
+                child: _HeroTitleBlock(isBahasaMelayu: isBahasaMelayu),
               ),
               // Progress-aware repair markers.
               Positioned(
@@ -1786,7 +1854,9 @@ class _SectionLabel extends StatelessWidget {
 }
 
 class _HeroTitleBlock extends StatelessWidget {
-  const _HeroTitleBlock();
+  const _HeroTitleBlock({required this.isBahasaMelayu});
+
+  final bool isBahasaMelayu;
 
   @override
   Widget build(BuildContext context) {
@@ -1805,7 +1875,9 @@ class _HeroTitleBlock extends StatelessWidget {
         ),
         const SizedBox(height: 5),
         Text(
-          'Learn. Restore. Grow together.',
+          isBahasaMelayu
+              ? 'Belajar. Pulihkan. Berkembang bersama.'
+              : 'Learn. Restore. Grow together.',
           style: theme.textTheme.bodyMedium?.copyWith(
             color: oasis.secondaryInk,
             fontSize: 14,

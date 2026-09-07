@@ -25,7 +25,7 @@ class FormulaForgePage extends StatelessWidget {
         children: [
         LogicHeader(
           leading: const _ForgeVillageIcon(),
-          title: 'Formula Forge',
+          title: l10n.formulaForge,
           subtitle: state.t(
             'Practice topics that restore your oasis.',
             l10n.forgeSubtitle,
