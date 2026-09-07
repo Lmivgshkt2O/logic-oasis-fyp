@@ -43,7 +43,6 @@ class AppState extends ChangeNotifier {
   /// Selectable local profile avatars (See Issue #8: Settings > Learning).
   static const List<String> avatarOptions = <String>[
     'sprout',
-    'star',
     'rocket',
     'heart',
     'sun',
@@ -65,6 +64,8 @@ class AppState extends ChangeNotifier {
   static const String _themeColorKey = 'logic_oasis_theme_color';
   static const String _avatarKey = 'logic_oasis_avatar';
   static const String _forumAidRewardedKey = 'logic_oasis_forum_aid_rewarded';
+  static const String _dayStreakKey = 'logic_oasis_day_streak';
+  static const String _lastActiveDayKey = 'logic_oasis_last_active_day';
   static const String _unlockedTopicIdsKey = 'logic_oasis_unlocked_topics';
   static const String _unlockedSubtopicIdsKey =
       'logic_oasis_unlocked_subtopics';
@@ -315,6 +316,10 @@ class AppState extends ChangeNotifier {
   bool soundEnabled = true;
   bool accessibilityMode = false;
   int screenTimeLimitMinutes = 30;
+  /// True once the student has been active for screenTimeLimitMinutes; the UI
+  /// surfaces a rest prompt from this.
+  bool screenTimeLimitReached = false;
+  Timer? _screenTimeTimer;
   /// Selected colour theme id (one of [themeColorOptions]).
   String themeColorId = 'green';
   /// Selected profile avatar id (one of [avatarOptions]).
@@ -323,6 +328,10 @@ class AppState extends ChangeNotifier {
   Uint8List? avatarImageBytes;
   int crystals = 124;
   int mutualAidEnergy = 36;
+  /// Consecutive-day streak of activity (quiz attempt, repair, or a reward
+  /// claim). Separate from the crystal/mutual-aid balances.
+  int dayStreak = 0;
+  DateTime? _lastActiveDay;
   /// Forum answers (and badges) that already granted mutual-aid, so a student
   /// is rewarded once per badge and never double-counted.
   final Set<String> _forumAidRewarded = <String>{};
@@ -580,6 +589,13 @@ class AppState extends ChangeNotifier {
     screenTimeLimitMinutes = screenTimeLimitMinutes.clamp(15, 120).toInt();
     themeColorId = preferences.getString(_themeColorKey) ?? themeColorId;
     avatarId = preferences.getString(_avatarKey) ?? avatarId;
+    dayStreak = preferences.getInt(_dayStreakKey) ?? dayStreak;
+    final savedLastActiveDay = preferences.getString(_lastActiveDayKey);
+    _lastActiveDay = savedLastActiveDay == null
+        ? null
+        : DateTime.tryParse(savedLastActiveDay.toUpperCase().endsWith('Z')
+              ? savedLastActiveDay
+              : '${savedLastActiveDay}Z');
     _forumAidRewarded
       ..clear()
       ..addAll(preferences.getStringList(_forumAidRewardedKey) ?? const []);
@@ -619,6 +635,11 @@ class AppState extends ChangeNotifier {
     await preferences.setInt(_screenTimeLimitKey, screenTimeLimitMinutes);
     await preferences.setString(_themeColorKey, themeColorId);
     await preferences.setString(_avatarKey, avatarId);
+    await preferences.setInt(_dayStreakKey, dayStreak);
+    await preferences.setString(
+      _lastActiveDayKey,
+      _lastActiveDay?.toIso8601String() ?? '',
+    );
     await preferences.setStringList(
       _forumAidRewardedKey,
       _forumAidRewarded.toList()..sort(),
@@ -870,6 +891,7 @@ class AppState extends ChangeNotifier {
         unawaited(refreshTrustedProgress());
       }
     }
+    startScreenTimeSession();
   }
 
   /// Session-level year switch for the Formula Forge: lets a Year 6 student
@@ -902,6 +924,8 @@ class AppState extends ChangeNotifier {
 
   void _clearSignedInStudentRuntimeState() {
     _cancelTrustedProgressWatch();
+    _screenTimeTimer?.cancel();
+    screenTimeLimitReached = false;
     attempts.clear();
     aiDiagnoses.clear();
     _recentQuestionIdsBySubtopic.clear();
@@ -969,6 +993,7 @@ class AppState extends ChangeNotifier {
       previousMasteryPercent: previousPercent,
     );
     lastQuizReward = reward;
+    _recordActivity();
     notifyListeners();
     return reward;
   }
@@ -1259,6 +1284,24 @@ class AppState extends ChangeNotifier {
     unawaited(saveAppSession());
   }
 
+  /// Begin counting the student's active session against screenTimeLimitMinutes.
+  void startScreenTimeSession() {
+    _screenTimeTimer?.cancel();
+    screenTimeLimitReached = false;
+    final limit = screenTimeLimitMinutes;
+    _screenTimeTimer = Timer(Duration(minutes: limit), () {
+      screenTimeLimitReached = true;
+      notifyListeners();
+    });
+  }
+
+  /// Acknowledge the screen-time prompt and restart the session count.
+  void acknowledgeScreenTimeLimit() {
+    _screenTimeTimer?.cancel();
+    screenTimeLimitReached = false;
+    notifyListeners();
+  }
+
   QuizReward saveQuizResult({
     required String topicId,
     String? subtopicId,
@@ -1533,6 +1576,7 @@ class AppState extends ChangeNotifier {
 
     crystals += mission.rewardCrystals;
     claimedRecommendedMissionTopicIds.add(mission.topicId);
+    _recordActivity();
     notifyListeners();
     _saveAppSessionInBackground();
     if (persistQuizResults) {
@@ -1579,6 +1623,24 @@ class AppState extends ChangeNotifier {
       }
     }
   }
+
+  /// Update the consecutive-day activity streak. Called after any meaningful
+  /// student action (quiz, oasis repair, reward claim).
+  void _recordActivity([DateTime? now]) {
+    final today = _dateOnly(now ?? DateTime.now());
+    final last = _lastActiveDay == null ? null : _dateOnly(_lastActiveDay!);
+    if (last == null) {
+      dayStreak = 1;
+    } else if (today.isAfter(last)) {
+      dayStreak = today.difference(last).inDays == 1 ? dayStreak + 1 : 1;
+    }
+    _lastActiveDay = today;
+    notifyListeners();
+    unawaited(saveAppSession());
+  }
+
+  static DateTime _dateOnly(DateTime value) =>
+      DateTime(value.year, value.month, value.day);
 
   double mathMax(double a, double b) => a > b ? a : b;
 
@@ -2001,6 +2063,7 @@ class AppState extends ChangeNotifier {
     oasisAreas[areaIndex] = area.copyWith(
       progress: (area.progress + 0.25).clamp(0.0, 1.0),
     );
+    _recordActivity();
     notifyListeners();
     if (persistQuizResults) {
       unawaited(_saveOasisProgressToFirebase());

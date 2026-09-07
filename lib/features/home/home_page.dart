@@ -88,7 +88,7 @@ class HomePage extends StatelessWidget {
                 compact: true,
                 icon: 'stat_streak',
                 iconColor: oasis.leaf,
-                value: '${state.currentYearAttempts.length}',
+                value: '${state.dayStreak}',
                 label: l10n.dayStreak,
               ),
             ),

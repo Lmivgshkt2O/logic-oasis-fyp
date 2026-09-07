@@ -771,4 +771,25 @@ void main() {
     state.topics[1] = completedYear5First;
     expect(state.isTopicUnlocked(year5Second), isTrue);
   });
+
+  test('completing a quiz records a daily activity streak', () {
+    final state = AppState();
+    expect(state.dayStreak, 0);
+    state.applyTrustedQuizCompletion(
+      topicId: 'whole_numbers_y4',
+      subtopicId: 'read_write_numbers',
+      correctCount: 5,
+      totalQuestions: 5,
+    );
+    expect(state.dayStreak, 1);
+  });
+
+  test('screen time session can be acknowledged', () {
+    final state = AppState();
+    state.updateScreenTimeLimit(15);
+    state.startScreenTimeSession();
+    expect(state.screenTimeLimitReached, isFalse);
+    state.acknowledgeScreenTimeLimit();
+    expect(state.screenTimeLimitReached, isFalse);
+  });
 }
