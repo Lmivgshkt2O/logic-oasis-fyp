@@ -823,7 +823,11 @@ class _AnswersPageState extends State<ForumDiscussionPage> {
                 }
               }
               final answers = snapshot.data!
-                  .where((answer) => !_blockedAuthors.contains(answer.authorId))
+                  .where(
+                    (answer) =>
+                        !_blockedAuthors.contains(answer.authorId) &&
+                        !widget.state.isAnswerReported(answer.id),
+                  )
                   .toList(growable: false);
               if (answers.isEmpty) {
                 return _Message(
@@ -1229,11 +1233,14 @@ class _AnswersPageState extends State<ForumDiscussionPage> {
               answerId: answer.id,
               text: value,
             )
-          : () => _repo.report(
-              targetType: 'answer',
-              targetId: answer.id,
-              reason: value,
-            ),
+          : () async {
+              await _repo.report(
+                targetType: 'answer',
+                targetId: answer.id,
+                reason: value,
+              );
+              widget.state.markAnswerReported(answer.id);
+            },
       action == _AnswerAction.edit
           ? _t(
               'Response edited successfully. Feedback review queued.',

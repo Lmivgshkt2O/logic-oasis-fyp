@@ -55,6 +55,7 @@ class AppState extends ChangeNotifier {
       'logic_oasis_claimed_mission_subtopics';
   static const String _subtopicPracticeCountsKey =
       'logic_oasis_subtopic_practice_counts';
+  static const String _reportedAnswerIdsKey = 'logic_oasis_reported_answer_ids';
   static const String _lastTabKey = 'logic_oasis_last_tab';
   static const String _navigationSchemaKey =
       'logic_oasis_navigation_schema_version';
@@ -342,6 +343,8 @@ class AppState extends ChangeNotifier {
   /// Number of finalized quiz attempts per subtopic, used by the mission so it
   /// can count server-path completions (which do not write a client attempt).
   final Map<String, int> _subtopicPracticeCount = <String, int>{};
+  /// Answers the current student has reported; kept hidden on their device only.
+  final Set<String> _reportedAnswerIds = <String>{};
   /// Previous mastery % captured at quiz completion, awaiting the server BKT
   /// value so the crystal reward matches the mastery the student actually sees.
   final Map<String, int> _pendingQuizRewardPrevious = <String, int>{};
@@ -630,6 +633,9 @@ class AppState extends ChangeNotifier {
         }
       }
     }
+    _reportedAnswerIds
+      ..clear()
+      ..addAll(preferences.getStringList(_reportedAnswerIdsKey) ?? const []);
     // Production progress is scoped to the authenticated student and comes
     // from server-owned subtopicMastery projections. Legacy local attempts are
     // retained only for offline/prototype tests, never the signed-in runtime.
@@ -690,6 +696,10 @@ class AppState extends ChangeNotifier {
           .map((entry) => '${entry.key}|${entry.value}')
           .toList()
         ..sort(),
+    );
+    await preferences.setStringList(
+      _reportedAnswerIdsKey,
+      _reportedAnswerIds.toList()..sort(),
     );
     await preferences.setString(_savedAttemptsKey, _encodedSavedAttempts());
   }
@@ -1726,6 +1736,18 @@ class AppState extends ChangeNotifier {
           ),
         );
       }
+    }
+  }
+
+  /// Whether the current student has reported this answer (hidden locally).
+  bool isAnswerReported(String answerId) =>
+      _reportedAnswerIds.contains(answerId);
+
+  /// Marks an answer as reported so it is hidden for the reporting student.
+  void markAnswerReported(String answerId) {
+    if (_reportedAnswerIds.add(answerId)) {
+      notifyListeners();
+      unawaited(saveAppSession().catchError((_) {}));
     }
   }
 

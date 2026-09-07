@@ -603,25 +603,23 @@ class MissionCard extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               Container(
-                width: 42,
-                height: 42,
-                decoration: const BoxDecoration(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF58C878), Color(0xFF259D55)],
-                  ),
+                  color: oasis.forest,
                   boxShadow: [
                     BoxShadow(
-                      color: Color(0x33369E58),
-                      blurRadius: 15,
-                      offset: Offset(0, 8),
+                      color: oasis.forest.withValues(alpha: .28),
+                      blurRadius: 12,
+                      offset: const Offset(0, 5),
                     ),
                   ],
                 ),
                 child: AppSvgIcon(
                   readyToClaim ? 'card_giftcard' : 'play',
                   color: Colors.white,
-                  size: 24,
+                  size: 20,
                 ),
               ),
             ],
