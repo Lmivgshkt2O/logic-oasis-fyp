@@ -349,6 +349,10 @@ class _AvatarIconOption {
 
   static _AvatarIconOption? from(String id, OasisSemanticTheme oasis) {
     return switch (id) {
+      'star' => _AvatarIconOption(
+        icon: Icons.star_rounded,
+        color: oasis.reward,
+      ),
       'rocket' => _AvatarIconOption(
         icon: Icons.rocket_launch_rounded,
         color: oasis.water,

@@ -42,7 +42,7 @@ class HomePage extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${state.studentName} *',
+                    state.studentName,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.headlineMedium,
@@ -50,13 +50,6 @@ class HomePage extends StatelessWidget {
                 ],
               ),
             ),
-            SoftIconButton(
-              icon: state.missionReminders
-                  ? 'notifications_active'
-                  : 'notifications_off',
-              onTap: () => _toggleMissionReminders(context),
-            ),
-            const SizedBox(width: 10),
             SoftIconButton(icon: 'settings', onTap: () => state.changeTab(3)),
           ],
         ),
@@ -136,20 +129,6 @@ class HomePage extends StatelessWidget {
       );
   }
 
-  void _toggleMissionReminders(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final nextValue = !state.missionReminders;
-    state.updateMissionReminders(nextValue);
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(
-            nextValue ? l10n.missionRemindersOn : l10n.missionRemindersOff,
-          ),
-        ),
-      );
-  }
 }
 
 class _HomeMissionCard extends StatelessWidget {
@@ -166,7 +145,13 @@ class _HomeMissionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final topic = isBahasaMelayu ? mission.topicTitleBm : mission.topicTitle;
+    final topic = isBahasaMelayu
+        ? (mission.subtopicTitleBm.isNotEmpty
+              ? mission.subtopicTitleBm
+              : mission.topicTitleBm)
+        : (mission.subtopicTitle.isNotEmpty
+              ? mission.subtopicTitle
+              : mission.topicTitle);
     final required = mission.requiredCompletions;
     final progress = required == 0
         ? 0.0

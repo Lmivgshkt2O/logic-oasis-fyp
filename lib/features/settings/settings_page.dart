@@ -114,32 +114,6 @@ class SettingsPage extends StatelessWidget {
               onTap: () => _showThemeColorSheet(context),
             ),
             SettingsRow(
-              icon: state.missionReminders
-                  ? 'notifications_active'
-                  : 'notifications_off',
-              iconColor: OasisSemanticTheme.continuedPracticeText,
-              label: state.t('Notification', 'Notifikasi'),
-              value: state.missionReminders
-                  ? state.t('Mission reminders', 'Peringatan misi')
-                  : state.t('Off', 'Mati'),
-              trailingSwitch: state.missionReminders,
-              onTap: () {
-                state.updateMissionReminders(!state.missionReminders);
-                _showMessage(
-                  context,
-                  state.missionReminders
-                      ? state.t(
-                          'Mission reminders turned on.',
-                          'Peringatan misi dihidupkan.',
-                        )
-                      : state.t(
-                          'Mission reminders turned off.',
-                          'Peringatan misi dimatikan.',
-                        ),
-                );
-              },
-            ),
-            SettingsRow(
               icon: 'visibility',
               iconColor: state.eyeComfortMode
                   ? OasisSemanticTheme.continuedPracticeText

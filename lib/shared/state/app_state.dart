@@ -43,14 +43,16 @@ class AppState extends ChangeNotifier {
   /// Selectable local profile avatars (See Issue #8: Settings > Learning).
   static const List<String> avatarOptions = <String>[
     'sprout',
+    'star',
     'rocket',
     'heart',
     'sun',
   ];
   // Used only when the student has no quiz attempts yet.
-  static const String recommendedMissionTopicId = 'whole_numbers_y4';
-  static const int recommendedMissionRequiredCompletions = 2;
   static const int recommendedMissionRewardCrystals = 20;
+  static const int recommendedMissionRequiredCompletions = 2;
+  static const String _claimedMissionSubtopicIdsKey =
+      'logic_oasis_claimed_mission_subtopics';
   static const String _lastTabKey = 'logic_oasis_last_tab';
   static const String _navigationSchemaKey =
       'logic_oasis_navigation_schema_version';
@@ -341,6 +343,7 @@ class AppState extends ChangeNotifier {
   /// The most recent authoritative quiz reward, for display.
   QuizReward? lastQuizReward;
   final Set<String> claimedRecommendedMissionTopicIds = <String>{};
+  final Set<String> claimedRecommendedMissionSubtopicIds = <String>{};
   final Set<String> _unlockedTopicIds = <String>{};
   final Set<String> _unlockedSubtopicIds = <String>{};
   final Map<String, List<String>> _recentQuestionIdsBySubtopic =
@@ -606,6 +609,11 @@ class AppState extends ChangeNotifier {
       ..addAll(
         preferences.getStringList(_claimedMissionTopicIdsKey) ?? const [],
       );
+    claimedRecommendedMissionSubtopicIds
+      ..clear()
+      ..addAll(
+        preferences.getStringList(_claimedMissionSubtopicIdsKey) ?? const [],
+      );
     // Production progress is scoped to the authenticated student and comes
     // from server-owned subtopicMastery projections. Legacy local attempts are
     // retained only for offline/prototype tests, never the signed-in runtime.
@@ -655,6 +663,10 @@ class AppState extends ChangeNotifier {
     await preferences.setStringList(
       _claimedMissionTopicIdsKey,
       claimedRecommendedMissionTopicIds.toList()..sort(),
+    );
+    await preferences.setStringList(
+      _claimedMissionSubtopicIdsKey,
+      claimedRecommendedMissionSubtopicIds.toList()..sort(),
     );
     await preferences.setString(_savedAttemptsKey, _encodedSavedAttempts());
   }
@@ -732,24 +744,85 @@ class AppState extends ChangeNotifier {
         rewardClaimed: true,
       );
     }
-    final recommendedTopicId = _currentRecommendedMissionTopicId();
-    final topic = topics.firstWhere(
-      (topic) => topic.id == recommendedTopicId,
-      orElse: () => topics.first,
-    );
-    final completedCompletions = currentYearAttempts
-        .where((attempt) => attempt.topicId == topic.id)
-        .length;
-
+    final focus = _recommendedFocus();
+    final topic = focus?.$1 ?? topics.first;
+    final subtopic = focus?.$2;
+    final completedCompletions = subtopic == null
+        ? currentYearAttempts
+              .where((attempt) => attempt.topicId == topic.id)
+              .length
+        : currentYearAttempts
+              .where((attempt) => attempt.subtopicId == subtopic.id)
+              .length;
     return RecommendedMission(
       topicId: topic.id,
       topicTitle: topic.title,
       topicTitleBm: topic.titleBm,
+      subtopicId: subtopic?.id ?? '',
+      subtopicTitle: subtopic?.title ?? topic.title,
+      subtopicTitleBm: subtopic?.titleBm ?? topic.titleBm,
       requiredCompletions: recommendedMissionRequiredCompletions,
       completedCompletions: completedCompletions,
       rewardCrystals: recommendedMissionRewardCrystals,
-      rewardClaimed: claimedRecommendedMissionTopicIds.contains(topic.id),
+      rewardClaimed: subtopic == null
+          ? claimedRecommendedMissionTopicIds.contains(topic.id)
+          : claimedRecommendedMissionSubtopicIds.contains(subtopic.id),
     );
+  }
+
+  /// Picks the subtopic the student should practise next: prefer starting a
+  /// not-yet-attempted accessible subtopic, otherwise continue the lowest-mastery
+  /// attempted subtopic. Returns null when there is nothing available.
+  (Topic, Subtopic?)? _recommendedFocus() {
+    // The server AI diagnosis directs the focus when present.
+    final ai = _recommendedAiDiagnosis();
+    if (ai != null) {
+      final aiTopic = _topicById(ai.recommendationTargetTopicId ?? ai.topicId);
+      if (aiTopic != null) {
+        final targetSubtopicId = ai.recommendationTargetSubtopicId;
+        if (targetSubtopicId != null) {
+          for (final subtopic in aiTopic.subtopics) {
+            if (subtopic.id == targetSubtopicId) return (aiTopic, subtopic);
+          }
+        }
+        return (
+          aiTopic,
+          aiTopic.subtopics.isEmpty ? null : _pickSubtopic(aiTopic),
+        );
+      }
+    }
+    // Recommend the next unclaimed subtopic of an unlocked topic. It stays the
+    // focus until its mission reward is claimed, so practice on it counts.
+    for (final topic in topics) {
+      if (!isTopicUnlocked(topic)) continue;
+      if (topic.subtopics.any(
+        (subtopic) => !claimedRecommendedMissionSubtopicIds.contains(
+          subtopic.id,
+        ),
+      )) {
+        return (topic, _pickSubtopic(topic));
+      }
+    }
+    return null;
+  }
+
+  Topic? _topicById(String topicId) {
+    for (final topic in topics) {
+      if (topic.id == topicId) return topic;
+    }
+    return null;
+  }
+
+  /// Within a topic, prefer a not-yet-attempted accessible subtopic, else the
+  /// The next unclaimed subtopic in a topic. It remains the focus until the
+  /// mission reward is claimed, so repeated practice on it counts.
+  Subtopic _pickSubtopic(Topic topic) {
+    for (final subtopic in topic.subtopics) {
+      if (!claimedRecommendedMissionSubtopicIds.contains(subtopic.id)) {
+        return subtopic;
+      }
+    }
+    return topic.subtopics.first;
   }
 
   String t(String english, String bahasaMelayu) {
@@ -1575,7 +1648,11 @@ class AppState extends ChangeNotifier {
     if (!mission.isReadyToClaim) return false;
 
     crystals += mission.rewardCrystals;
-    claimedRecommendedMissionTopicIds.add(mission.topicId);
+    if (mission.subtopicId.isNotEmpty) {
+      claimedRecommendedMissionSubtopicIds.add(mission.subtopicId);
+    } else {
+      claimedRecommendedMissionTopicIds.add(mission.topicId);
+    }
     _recordActivity();
     notifyListeners();
     _saveAppSessionInBackground();
@@ -1911,53 +1988,6 @@ class AppState extends ChangeNotifier {
     final matches = topics.where((topic) => topic.id == topicId);
     if (matches.isEmpty) return 0;
     return subtopicsForTopic(matches.first).length;
-  }
-
-  String _currentRecommendedMissionTopicId() {
-    final aiRecommendation = _recommendedAiDiagnosis();
-    if (aiRecommendation != null) {
-      return aiRecommendation.topicId;
-    }
-
-    final yearAttempts = currentYearAttempts;
-    if (yearAttempts.isEmpty) return _firstUnclaimedTopicId();
-
-    final grouped = <String, List<QuizAttempt>>{};
-    for (final attempt in yearAttempts) {
-      if (!topics.any((topic) => topic.id == attempt.topicId)) continue;
-      grouped.putIfAbsent(attempt.topicId, () => []).add(attempt);
-    }
-
-    if (grouped.isEmpty) return _firstUnclaimedTopicId();
-
-    var weakestTopicId = grouped.keys.first;
-    var weakestAverage = 101;
-
-    for (final entry in grouped.entries) {
-      final average = _averageScoreForAttempts(entry.value);
-      if (average < weakestAverage) {
-        weakestTopicId = entry.key;
-        weakestAverage = average;
-      }
-    }
-
-    return weakestTopicId;
-  }
-
-  String _firstUnclaimedTopicId() {
-    final unclaimedTopics = topics.where(
-      (topic) => !claimedRecommendedMissionTopicIds.contains(topic.id),
-    );
-    return unclaimedTopics.isEmpty ? topics.first.id : unclaimedTopics.first.id;
-  }
-
-  int _averageScoreForAttempts(List<QuizAttempt> topicAttempts) {
-    if (topicAttempts.isEmpty) return 0;
-    final total = topicAttempts.fold<int>(
-      0,
-      (sum, attempt) => sum + attempt.score,
-    );
-    return total ~/ topicAttempts.length;
   }
 
   AiDiagnosis? _recommendedAiDiagnosis() {

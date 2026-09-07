@@ -3,6 +3,9 @@ class RecommendedMission {
     required this.topicId,
     required this.topicTitle,
     required this.topicTitleBm,
+    this.subtopicId = '',
+    this.subtopicTitle = '',
+    this.subtopicTitleBm = '',
     required this.requiredCompletions,
     required this.completedCompletions,
     required this.rewardCrystals,
@@ -12,6 +15,9 @@ class RecommendedMission {
   final String topicId;
   final String topicTitle;
   final String topicTitleBm;
+  final String subtopicId;
+  final String subtopicTitle;
+  final String subtopicTitleBm;
   final int requiredCompletions;
   final int completedCompletions;
   final int rewardCrystals;

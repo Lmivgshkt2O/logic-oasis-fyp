@@ -153,19 +153,23 @@ void main() {
   test('recommended mission becomes claimable after enough topic attempts', () {
     final state = AppState();
     final missionTopicId = state.recommendedMission.topicId;
+    final missionSubtopicId = state.recommendedMission.subtopicId;
 
     state.saveQuizResult(
       topicId: missionTopicId,
+      subtopicId: missionSubtopicId,
       correctCount: 2,
       totalQuestions: 5,
     );
 
     expect(state.recommendedMission.topicId, missionTopicId);
+    expect(state.recommendedMission.subtopicId, missionSubtopicId);
     expect(state.recommendedMission.visibleCompletions, 1);
     expect(state.recommendedMission.isReadyToClaim, isFalse);
 
     state.saveQuizResult(
       topicId: missionTopicId,
+      subtopicId: missionSubtopicId,
       correctCount: 3,
       totalQuestions: 5,
     );
@@ -177,14 +181,17 @@ void main() {
   test('recommended mission reward can only be claimed once', () {
     final state = AppState();
     final missionTopicId = state.recommendedMission.topicId;
+    final missionSubtopicId = state.recommendedMission.subtopicId;
 
     state.saveQuizResult(
       topicId: missionTopicId,
+      subtopicId: missionSubtopicId,
       correctCount: 2,
       totalQuestions: 5,
     );
     state.saveQuizResult(
       topicId: missionTopicId,
+      subtopicId: missionSubtopicId,
       correctCount: 3,
       totalQuestions: 5,
     );
@@ -196,7 +203,8 @@ void main() {
       state.crystals,
       crystalsBeforeClaim + AppState.recommendedMissionRewardCrystals,
     );
-    expect(state.recommendedMission.rewardClaimed, isTrue);
+    // The reward was claimed, so the mission advances to a new subtopic.
+    expect(state.recommendedMission.rewardClaimed, isFalse);
 
     expect(state.claimRecommendedMissionReward(), isFalse);
     expect(
@@ -209,25 +217,31 @@ void main() {
     'claimed recommended mission reward is restored from saved session',
     () async {
       SharedPreferences.setMockInitialValues({
-        'logic_oasis_claimed_mission_topics': <String>['whole_numbers_y4'],
+        'logic_oasis_claimed_mission_subtopics': <String>[
+          'read_write_numbers',
+        ],
       });
       final state = AppState();
 
       state.saveQuizResult(
         topicId: 'whole_numbers_y4',
+        subtopicId: 'read_write_numbers',
         correctCount: 5,
         totalQuestions: 5,
       );
       state.saveQuizResult(
         topicId: 'whole_numbers_y4',
+        subtopicId: 'read_write_numbers',
         correctCount: 5,
         totalQuestions: 5,
       );
 
       await state.loadSavedAppPreferences();
 
+      // read_write_numbers was already claimed, so the mission moves on.
+      expect(state.recommendedMission.subtopicId, isNot('read_write_numbers'));
       expect(state.recommendedMission.isReadyToClaim, isFalse);
-      expect(state.recommendedMission.rewardClaimed, isTrue);
+      expect(state.recommendedMission.rewardClaimed, isFalse);
       expect(state.claimRecommendedMissionReward(), isFalse);
     },
   );
